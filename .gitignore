@@ -14,6 +14,10 @@ build/
 .vscode/
 .idea/
 
+# Resumes (user-specific, not tracked)
+knowledge/*.pdf
+knowledge/*.docx
+
 # Data
 data/*.db
 data/*.sqlite
