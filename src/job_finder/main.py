@@ -14,87 +14,77 @@ warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
 
 
 def run():
-    """Run the full job search pipeline."""
-    from job_finder.crew import JobFinderCrew
+    """Run the full job search pipeline with optional AI enhancement."""
+    from job_finder.llm_client import LLMClient
+    from job_finder.pipeline import JobFinderPipeline
+
+    llm = LLMClient()
+    has_llm = llm.is_configured and llm.is_available()
 
     print("\n" + "=" * 70)
-    print("  JOB FINDER — AI-Powered Job Search Pipeline")
+    print("  JOB FINDER — Job Search Pipeline")
     print("=" * 70)
-    print("Using Claude as LLM | Searching 5+ job boards | Scoring against resume")
+    if has_llm:
+        info = llm.get_provider_info()
+        print(f"  LLM: {info['model']} via {info['label']}")
+    else:
+        print("  LLM: not configured (basic keyword scoring)")
+    print("  Searching 5+ job boards | Scoring against resume")
     print("=" * 70 + "\n")
 
-    crew = JobFinderCrew()
-    result = crew.crew().kickoff()
-
-    report_path = os.path.join(
-        os.path.dirname(__file__), "output", "job_search_report.md"
+    pipeline = JobFinderPipeline(llm=llm if has_llm else None)
+    results = pipeline.run_full_pipeline(
+        progress=lambda msg: print(f"  {msg}"),
+        use_ai=has_llm,
     )
 
     print("\n" + "=" * 70)
-    print("  Pipeline complete! Results saved to:")
-    print(f"    Report: {report_path}")
-    print("    DB: data/job_tracker.db")
+    print(f"  Pipeline complete! {len(results)} jobs processed.")
+    print("  DB: data/job_tracker.db")
     print("=" * 70 + "\n")
 
-    return result
+    return results
 
 
 def search():
     """Run only the job search step (no scoring/optimization)."""
     import json
-    from job_finder.tools.job_search_tool import JobSearchTool
 
-    tool = JobSearchTool()
+    from job_finder.pipeline import JobFinderPipeline
 
-    searches = [
-        ("senior data engineer", "Los Angeles, CA"),
-        ("staff data engineer", "Remote"),
-        ("head of data", "Los Angeles, CA"),
-        ("head of data", "Remote"),
-        ("data platform engineer", "Remote"),
-        ("manager data engineering", "Remote"),
-        ("dbt data engineer", "Remote"),
-    ]
+    pipeline = JobFinderPipeline()
+    jobs = pipeline.search_all_jobs(
+        progress=lambda msg: print(f"  {msg}"),
+    )
 
-    all_jobs = []
-    for term, location in searches:
-        print(f"Searching: '{term}' in {location}...")
-        result = json.loads(tool._run(search_term=term, location=location, results_wanted=15))
-        if "jobs" in result:
-            all_jobs.extend(result["jobs"])
-            print(f"   Found {len(result['jobs'])} listings")
-        else:
-            print(f"   Warning: {result.get('error', 'No results')}")
-
-    # Deduplicate by URL
-    seen_urls = set()
-    unique_jobs = []
-    for job in all_jobs:
-        url = job.get("url", "")
-        if url and url not in seen_urls:
-            seen_urls.add(url)
-            unique_jobs.append(job)
-
-    print(f"\nTotal unique jobs found: {len(unique_jobs)}")
+    print(f"\nTotal unique jobs found: {len(jobs)}")
 
     # Save to file
     output_path = os.path.join(os.path.dirname(__file__), "output", "raw_search_results.json")
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, "w") as f:
-        json.dump(unique_jobs, f, indent=2)
+        json.dump(jobs, f, indent=2)
     print(f"Saved to {output_path}")
 
-    return unique_jobs
+    return jobs
 
 
 def score():
-    """Run the full pipeline (search + scoring + optimization + cover letters)."""
-    from job_finder.crew import JobFinderCrew
+    """Run search + scoring (basic keyword scoring, no LLM needed)."""
+    from job_finder.llm_client import LLMClient
+    from job_finder.pipeline import JobFinderPipeline
 
-    print("Running full pipeline...")
-    crew = JobFinderCrew()
-    result = crew.crew().kickoff()
-    return result
+    llm = LLMClient()
+    has_llm = llm.is_configured and llm.is_available()
+
+    pipeline = JobFinderPipeline(llm=llm if has_llm else None)
+    results = pipeline.run_full_pipeline(
+        progress=lambda msg: print(f"  {msg}"),
+        use_ai=has_llm,
+    )
+
+    print(f"\n{len(results)} jobs scored.")
+    return results
 
 
 if __name__ == "__main__":

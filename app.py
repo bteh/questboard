@@ -20,15 +20,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from job_finder.llm_client import LLMClient, PRESETS
 from job_finder.models.database import (
     DB_PATH,
     init_db,
-    get_session,
     get_all_applications,
     update_application_status,
     save_application,
-    ApplicationRecord,
 )
+from job_finder.pipeline import JobFinderPipeline
 
 # Initialize database
 init_db()
@@ -47,11 +47,6 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    .stMetric .metric-container {
-        background-color: #f0f2f6;
-        border-radius: 10px;
-        padding: 15px;
-    }
     .score-high { color: #00c853; font-weight: bold; }
     .score-medium { color: #ff9800; font-weight: bold; }
     .score-low { color: #f44336; font-weight: bold; }
@@ -76,15 +71,27 @@ _STATUS_OPTIONS = [
 ]
 
 
-def _report_path() -> str:
-    return os.path.join(_PROJECT_ROOT, "src", "job_finder", "output", "job_search_report.md")
+def _get_llm() -> LLMClient:
+    """Create an LLM client from current env/config."""
+    return LLMClient()
+
+
+def _llm_status_badge(llm: LLMClient) -> None:
+    """Show a colored badge for LLM connection status."""
+    info = llm.get_provider_info()
+    if not llm.is_configured:
+        st.warning("⚠️ No LLM configured — basic scoring only")
+    elif llm.is_available():
+        st.success(f"✅ Connected to **{info['model']}** via {info['label']}")
+    else:
+        st.error(f"❌ LLM configured ({info['label']}) but not reachable. Is the proxy running?")
 
 
 # ── Sidebar ───────────────────────────────────────────────────────────────
 
 with st.sidebar:
     st.title("🔍 Job Finder")
-    st.caption("AI-Powered Job Search Agent")
+    st.caption("AI-Powered Job Search")
     st.divider()
 
     page = st.radio(
@@ -115,7 +122,14 @@ with st.sidebar:
     st.metric("🎯 Interviewing", interviewing)
 
     st.divider()
-    st.caption("Powered by CrewAI + Claude")
+
+    # LLM status
+    llm = _get_llm()
+    info = llm.get_provider_info()
+    if llm.is_configured:
+        st.caption(f"LLM: {info['model']}")
+    else:
+        st.caption("LLM: not configured")
 
 # ── Dashboard Page ────────────────────────────────────────────────────────
 
@@ -240,7 +254,7 @@ if page == "🏠 Dashboard":
                         st.text(app.resume_tweaks_json)
     else:
         st.info(
-            "No scored jobs yet. Go to **🚀 Run Search** to start your job search pipeline!"
+            "No scored jobs yet. Go to **🚀 Run Search** to start your job search!"
         )
 
     # Recent activity
@@ -268,15 +282,16 @@ if page == "🏠 Dashboard":
 elif page == "🚀 Run Search":
     st.title("Run Job Search Pipeline")
 
+    # LLM status
+    llm = _get_llm()
+    _llm_status_badge(llm)
+
     st.markdown(
         """
-        This will run the full AI-powered job search pipeline:
-        1. **Search** — Scrape 5+ job boards for matching roles
-        2. **Score** — Rate each job against your resume
-        3. **Optimize** — Suggest resume tweaks for top matches
-        4. **Cover Letters** — Draft tailored letters for STRONG_APPLY roles
-        5. **Research** — Gather company intelligence
-        6. **Compile** — Create your action plan
+        **Pipeline stages:**
+        1. 🔍 **Search** — Scrape 5+ job boards (always works)
+        2. 📊 **Score** — Rate each job against your resume (basic or AI)
+        3. ✨ **Enhance** *(AI only)* — Resume tweaks, cover letters, company intel
         """
     )
 
@@ -301,15 +316,12 @@ elif page == "🚀 Run Search":
             height=200,
         )
         keywords = st.text_input("Keyword Searches", value="dbt, Trino, lakehouse")
-        locations = st.text_input("Locations", value="Los Angeles, CA; Remote")
+        locations_input = st.text_input("Locations", value="Los Angeles, CA; Remote")
 
     with col2:
         st.subheader("Filters")
-        min_comp = st.number_input("Min Base Salary ($)", value=190000, step=10000)
-        target_comp = st.number_input("Target Total Comp ($)", value=300000, step=10000)
         max_days = st.slider("Posted within (days)", 1, 30, 14)
         include_remote = st.checkbox("Include Remote", value=True)
-        exclude_agencies = st.checkbox("Exclude Staffing Agencies", value=True)
 
     st.divider()
 
@@ -320,7 +332,7 @@ elif page == "🚀 Run Search":
         resume_files = [f for f in os.listdir(knowledge_dir) if f.lower().endswith(".pdf")]
 
     if resume_files:
-        st.success(f"Resume found: `{resume_files[0]}`")
+        st.success(f"📄 Resume found: `{resume_files[0]}`")
     else:
         st.warning("No resume PDF found in `knowledge/` directory.")
         uploaded = st.file_uploader("Upload your resume (PDF)", type=["pdf"])
@@ -334,77 +346,64 @@ elif page == "🚀 Run Search":
 
     st.divider()
 
-    # API key check
-    has_anthropic = bool(os.getenv("ANTHROPIC_API_KEY"))
-    has_serper = bool(os.getenv("SERPER_API_KEY"))
-
-    if has_anthropic:
-        st.success("Anthropic API key configured")
-    else:
-        st.error("ANTHROPIC_API_KEY not set in .env file")
-
-    if has_serper:
-        st.success("Serper API key configured")
-    else:
-        st.warning("SERPER_API_KEY not set — company research will be limited")
-
-    st.divider()
+    # Parse inputs
+    role_list = [r.strip() for r in roles.strip().split("\n") if r.strip()]
+    kw_list = [k.strip() for k in keywords.split(",") if k.strip()]
+    location_list = [loc.strip() for loc in locations_input.split(";") if loc.strip()]
 
     # Run buttons
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        if st.button("🔍 Search Only", use_container_width=True, type="secondary"):
-            with st.spinner("Searching job boards..."):
-                from job_finder.tools.job_search_tool import JobSearchTool
+        search_only = st.button("🔍 Search Only", use_container_width=True, type="secondary")
 
-                tool = JobSearchTool()
-                role_list = [r.strip() for r in roles.strip().split("\n") if r.strip()]
-                location_list = [
-                    loc.strip() for loc in locations.split(";") if loc.strip()
-                ]
+    with col2:
+        search_score = st.button("📊 Search + Score", use_container_width=True, type="secondary")
 
-                if not role_list or not location_list:
-                    st.error("Please enter at least one role and one location.")
-                else:
-                    progress_bar = st.progress(0)
-                    status_text = st.empty()
-                    all_jobs = []
+    with col3:
+        ai_available = llm.is_configured
+        full_pipeline = st.button(
+            "✨ Full AI Pipeline",
+            use_container_width=True,
+            type="primary",
+            disabled=not ai_available,
+            help="Requires an LLM provider. Configure in Settings." if not ai_available else None,
+        )
 
-                    total_searches = len(role_list) * len(location_list)
-                    for i, role in enumerate(role_list):
-                        for j, location in enumerate(location_list):
-                            idx = i * len(location_list) + j
-                            progress_bar.progress(
-                                (idx + 1) / total_searches,
-                                text=f"Searching: {role} in {location}",
-                            )
-                            status_text.text(f"🔍 {role} | {location}")
+    if search_only or search_score or full_pipeline:
+        if not role_list or not location_list:
+            st.error("Please enter at least one role and one location.")
+        else:
+            progress_bar = st.progress(0)
+            status_text = st.empty()
 
-                            result = json.loads(
-                                tool._run(
-                                    search_term=role,
-                                    location=location,
-                                    results_wanted=15,
-                                    hours_old=max_days * 24,
-                                )
-                            )
-                            if "jobs" in result:
-                                all_jobs.extend(result["jobs"])
+            use_ai = full_pipeline and ai_available
+            pipeline = JobFinderPipeline(llm=llm if use_ai else None)
 
-                    # Deduplicate
-                    seen = set()
-                    unique = []
-                    for job in all_jobs:
-                        url = job.get("url", "")
-                        if url and url not in seen:
-                            seen.add(url)
-                            unique.append(job)
+            _step = [0]  # mutable container for closure
+            total_steps = len(role_list) * len(location_list) + len(kw_list) * len(location_list)
+            if search_score or full_pipeline:
+                total_steps += 10  # scoring + enhancement steps
 
-                    # Save to DB (dedup handled by save_application)
-                    saved_count = 0
-                    for job in unique:
-                        result = save_application(
+            def update_progress(msg: str):
+                _step[0] += 1
+                pct = min(_step[0] / max(total_steps, 1), 0.99)
+                progress_bar.progress(pct, text=msg)
+                status_text.text(msg)
+
+            if search_only:
+                # Search only — no scoring
+                with st.spinner("Searching job boards..."):
+                    jobs = pipeline.search_all_jobs(
+                        roles=role_list,
+                        locations=location_list,
+                        progress=update_progress,
+                    )
+
+                    # Save to DB
+                    saved = 0
+                    for job in jobs:
+                        rec = save_application(
                             job_title=job.get("title", ""),
                             company=job.get("company", ""),
                             location=job.get("location", ""),
@@ -415,55 +414,36 @@ elif page == "🚀 Run Search":
                             salary_min=job.get("salary_min"),
                             salary_max=job.get("salary_max"),
                         )
-                        if result:
-                            saved_count += 1
+                        if rec:
+                            saved += 1
 
                     progress_bar.progress(1.0, text="Complete!")
-                    st.success(
-                        f"Found {len(unique)} unique jobs across {total_searches} searches! "
-                        f"({saved_count} new saved to DB)"
-                    )
+                    st.success(f"Found {len(jobs)} unique jobs! ({saved} new saved)")
                     st.balloons()
 
-    with col2:
-        if st.button("🧠 Full Pipeline", use_container_width=True, type="primary"):
-            if not resume_files:
-                st.error("Please upload your resume first!")
-            elif not has_anthropic:
-                st.error("Please set your ANTHROPIC_API_KEY in .env!")
             else:
-                with st.spinner(
-                    "Running full AI pipeline... This takes 5-15 minutes."
-                ):
-                    st.info(
-                        "The crew is working: Searching > Scoring > "
-                        "Optimizing > Writing > Researching > Compiling"
-                    )
+                # Search + Score (basic or AI) + optional enhancement
+                with st.spinner("Running pipeline..." if not use_ai else "Running full AI pipeline..."):
                     try:
-                        from job_finder.crew import JobFinderCrew
+                        jobs = pipeline.run_full_pipeline(
+                            progress=update_progress,
+                            roles=role_list,
+                            locations=location_list,
+                            use_ai=use_ai,
+                        )
 
-                        crew_instance = JobFinderCrew()
-                        result = crew_instance.crew().kickoff()
-                        st.success("Pipeline complete!")
+                        progress_bar.progress(1.0, text="Complete!")
+                        scored = len([j for j in jobs if j.get("overall_score")])
+                        strong = len([j for j in jobs if j.get("recommendation") in ("STRONG_APPLY", "APPLY")])
+                        st.success(
+                            f"Done! {len(jobs)} jobs found, {scored} scored, "
+                            f"{strong} strong matches."
+                        )
                         st.balloons()
-
-                        # Show the report
-                        rpath = _report_path()
-                        if os.path.exists(rpath):
-                            with open(rpath, "r") as f:
-                                st.markdown(f.read())
                     except Exception as e:
-                        st.error(f"Pipeline error: {str(e)}")
+                        st.error(f"Pipeline error: {e}")
                         st.exception(e)
 
-    with col3:
-        if st.button("View Last Report", use_container_width=True, type="secondary"):
-            rpath = _report_path()
-            if os.path.exists(rpath):
-                with open(rpath, "r") as f:
-                    st.markdown(f.read())
-            else:
-                st.info("No report generated yet. Run the Full Pipeline first.")
 
 # ── All Applications Page ─────────────────────────────────────────────────
 
@@ -530,7 +510,7 @@ elif page == "📋 All Applications":
             },
         )
 
-        # CSV export — use download_button directly to avoid flash-disappear bug
+        # CSV export
         st.divider()
         st.subheader("Bulk Actions")
         st.download_button(
@@ -580,7 +560,6 @@ elif page == "📊 Analytics":
     st.title("Search Analytics")
 
     if all_apps:
-        # Score distribution
         scored_apps = [a for a in all_apps if a.overall_score]
         if scored_apps:
             col1, col2 = st.columns(2)
@@ -643,7 +622,7 @@ elif page == "📊 Analytics":
             fig.update_layout(height=400)
             st.plotly_chart(fig, use_container_width=True)
 
-        # Top companies
+        # Source and company charts
         col1, col2 = st.columns(2)
         with col1:
             st.subheader("Jobs by Source")
@@ -690,31 +669,189 @@ elif page == "📊 Analytics":
 elif page == "⚙️ Settings":
     st.title("Settings")
 
-    st.subheader("API Keys")
+    # ── LLM Provider Configuration ──
+    st.subheader("🤖 LLM Provider")
     st.markdown(
-        "Set these in your `.env` file in the project root directory."
+        "Configure which AI provider powers smart scoring, cover letters, "
+        "and resume optimization. **Search and basic scoring work without any LLM.**"
     )
 
-    has_anthropic = bool(os.getenv("ANTHROPIC_API_KEY"))
-    has_serper = bool(os.getenv("SERPER_API_KEY"))
-
-    st.markdown(
-        f"- **ANTHROPIC_API_KEY**: {'Configured' if has_anthropic else 'Not set'}"
-    )
-    st.markdown(
-        f"- **SERPER_API_KEY**: {'Configured' if has_serper else 'Not set (optional)'}"
-    )
+    # Current status
+    llm = _get_llm()
+    _llm_status_badge(llm)
 
     st.divider()
 
-    st.subheader("LLM Configuration")
-    st.markdown(f"- **Model**: `{os.getenv('MODEL_NAME', 'anthropic/claude-sonnet-4-20250514')}`")
-    st.markdown(f"- **Max Tokens**: `{os.getenv('MAX_TOKENS', '8192')}`")
-    st.markdown(f"- **Temperature**: `{os.getenv('TEMPERATURE', '0.7')}`")
+    # Provider selection
+    provider_options = {
+        "": "None (basic scoring only)",
+        "claude-proxy": "🟣 Claude Proxy (CLIProxyAPI) — use your Claude Max subscription",
+        "claude-proxy-alt": "🟣 Claude Proxy (claude-max-api-proxy) — alternative proxy",
+        "openai-proxy": "🟢 OpenAI Proxy (Codex) — use your ChatGPT subscription",
+        "anthropic-api": "🟣 Anthropic API — pay-per-use ($0.50-2/run)",
+        "openai-api": "🟢 OpenAI API — pay-per-use",
+        "gemini": "🔵 Google Gemini — free tier (250 req/day)",
+        "ollama": "⚪ Ollama — local models, free",
+    }
+
+    current_provider = os.getenv("LLM_PROVIDER", "")
+    provider_keys = list(provider_options.keys())
+    try:
+        current_idx = provider_keys.index(current_provider)
+    except ValueError:
+        current_idx = 0
+
+    selected_provider = st.selectbox(
+        "Provider",
+        provider_keys,
+        index=current_idx,
+        format_func=lambda k: provider_options.get(k, k),
+    )
+
+    # Dynamic fields based on provider
+    preset = PRESETS.get(selected_provider, {})
+
+    if selected_provider in ("anthropic-api", "openai-api", "gemini"):
+        api_key = st.text_input(
+            "API Key",
+            value=os.getenv("LLM_API_KEY", ""),
+            type="password",
+            help="Required for pay-per-use providers",
+        )
+    else:
+        api_key = preset.get("api_key", "not-needed")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        base_url = st.text_input(
+            "Base URL",
+            value=os.getenv("LLM_BASE_URL", "") or preset.get("base_url", ""),
+            help="The API endpoint URL",
+        )
+    with col2:
+        model = st.text_input(
+            "Model",
+            value=os.getenv("LLM_MODEL", "") or preset.get("model", ""),
+            help="Model name to use",
+        )
+
+    # Save config
+    if st.button("💾 Save & Test Connection", type="primary"):
+        env_path = os.path.join(_PROJECT_ROOT, ".env")
+        lines = []
+        if os.path.exists(env_path):
+            with open(env_path, "r") as f:
+                lines = f.readlines()
+
+        # Update or add env vars
+        env_vars = {
+            "LLM_PROVIDER": selected_provider,
+            "LLM_BASE_URL": base_url,
+            "LLM_API_KEY": api_key,
+            "LLM_MODEL": model,
+        }
+
+        for key, val in env_vars.items():
+            found = False
+            for i, line in enumerate(lines):
+                if line.strip().startswith(f"{key}=") or line.strip().startswith(f"# {key}="):
+                    lines[i] = f"{key}={val}\n"
+                    found = True
+                    break
+            if not found:
+                lines.append(f"{key}={val}\n")
+
+        with open(env_path, "w") as f:
+            f.writelines(lines)
+
+        # Set env vars for current session
+        for key, val in env_vars.items():
+            os.environ[key] = val
+
+        # Test connection
+        test_llm = LLMClient(
+            provider=selected_provider,
+            base_url=base_url,
+            api_key=api_key,
+            model=model,
+        )
+        if not selected_provider:
+            st.info("No provider selected. Basic scoring mode active.")
+        elif test_llm.is_available():
+            st.success(f"✅ Connected to {model}!")
+        else:
+            st.warning(
+                f"⚠️ Config saved but could not reach {base_url}. "
+                "Make sure the proxy is running."
+            )
+
+    # Setup instructions
+    st.divider()
+    st.subheader("📖 Provider Setup Guides")
+
+    with st.expander("🟣 Claude Proxy (CLIProxyAPI) — use your $200/mo Max plan"):
+        st.markdown("""
+**Prerequisites:** Claude Max subscription, macOS or Linux
+
+```bash
+# 1. Install
+brew install cliproxyapi
+
+# 2. Authenticate (opens browser)
+cli-proxy-api --claude-login
+
+# 3. Start the proxy
+brew services start cliproxyapi
+# Runs on http://localhost:8317
+```
+
+Then select **Claude Proxy** above and click Save & Test.
+""")
+
+    with st.expander("🟢 OpenAI Proxy (Codex) — use your ChatGPT Plus plan"):
+        st.markdown("""
+**Prerequisites:** ChatGPT Plus/Pro subscription, Node.js
+
+```bash
+# 1. Install Codex CLI
+npm install -g @openai/codex
+
+# 2. Install the proxy
+# See: github.com/Securiteru/codex-openai-proxy
+
+# 3. Start and point to localhost:3457
+```
+""")
+
+    with st.expander("🔵 Google Gemini — free, no credit card"):
+        st.markdown("""
+1. Go to [aistudio.google.com](https://aistudio.google.com)
+2. Click **"Get API Key"**
+3. Create a key (takes 30 seconds)
+4. Paste it above and select **Gemini**
+
+Free tier: 250 requests/day with Gemini 2.5 Flash.
+""")
+
+    with st.expander("⚪ Ollama — local models, completely free"):
+        st.markdown("""
+```bash
+# 1. Install
+brew install ollama
+
+# 2. Pull a model
+ollama pull llama3.1
+
+# 3. Ollama runs automatically on localhost:11434
+```
+
+Then select **Ollama** above and click Save & Test.
+""")
 
     st.divider()
 
-    st.subheader("Resume")
+    # ── Resume ──
+    st.subheader("📄 Resume")
     knowledge_dir = os.path.join(_PROJECT_ROOT, "knowledge")
     if os.path.exists(knowledge_dir):
         pdfs = [f for f in os.listdir(knowledge_dir) if f.lower().endswith(".pdf")]
@@ -735,7 +872,8 @@ elif page == "⚙️ Settings":
 
     st.divider()
 
-    st.subheader("Database")
+    # ── Database ──
+    st.subheader("💾 Database")
     if os.path.exists(DB_PATH):
         size_mb = os.path.getsize(DB_PATH) / (1024 * 1024)
         st.markdown(f"- **Path**: `{DB_PATH}`")
@@ -746,7 +884,8 @@ elif page == "⚙️ Settings":
 
     st.divider()
 
-    st.subheader("Search Configuration")
+    # ── Search Config ──
+    st.subheader("🔧 Search Configuration")
     config_path = os.path.join(
         _PROJECT_ROOT, "src", "job_finder", "config", "search_config.yaml",
     )
