@@ -1,0 +1,692 @@
+/* ==========================================================================
+   Gig AI — Professional Dashboard Theme
+   ========================================================================== */
+
+/* --- Hide Streamlit Deploy & Branding --- */
+#MainMenu { visibility: hidden; }
+footer { visibility: hidden; }
+.stDeployButton { display: none !important; }
+header[data-testid="stHeader"] button[kind="header"] { display: none !important; }
+
+/* --- Global Cursor Fix --- */
+button, a, [role="button"], [role="tab"], [role="option"],
+.nav-link, summary, label[data-testid="stWidgetLabel"],
+div[data-testid="stExpander"] summary {
+    cursor: pointer !important;
+}
+
+/* --- Layout --- */
+.block-container {
+    padding-top: 2rem;
+    padding-bottom: 2rem;
+    max-width: 1200px;
+}
+
+/* --- Headings --- */
+h1 {
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: #0F172A;
+}
+
+h2, h3 {
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: #1E293B;
+}
+
+hr {
+    border: none;
+    border-top: 1px solid #E2E8F0;
+    margin: 1.5rem 0;
+}
+
+/* --- Metric Cards --- */
+div[data-testid="stMetric"] {
+    background-color: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    padding: 16px 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    transition: box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+div[data-testid="stMetric"]:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    transform: translateY(-1px);
+}
+
+div[data-testid="stMetricLabel"] {
+    font-size: 0.8rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748B;
+}
+
+div[data-testid="stMetricValue"] {
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: #1E293B;
+}
+
+/* --- Sidebar --- */
+section[data-testid="stSidebar"] {
+    border-right: 1px solid #E2E8F0;
+}
+
+section[data-testid="stSidebar"] div[data-testid="stMetric"] {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 4px 0;
+}
+
+section[data-testid="stSidebar"] div[data-testid="stMetricValue"] {
+    font-size: 1.25rem;
+}
+
+/* Option menu overrides */
+.nav-link {
+    font-size: 0.9rem !important;
+    padding: 8px 12px !important;
+    cursor: pointer !important;
+    transition: background-color 0.15s ease, color 0.15s ease !important;
+}
+
+.nav-link:hover {
+    background-color: #F1F5F9 !important;
+}
+
+.nav-link.active, .nav-link-selected {
+    background-color: #EEF2FF !important;
+    color: #4F46E5 !important;
+    font-weight: 600 !important;
+}
+
+/* --- Buttons --- */
+button[data-testid="stBaseButton-primary"] {
+    border-radius: 6px;
+    font-weight: 500;
+    cursor: pointer !important;
+    transition: background-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+button[data-testid="stBaseButton-primary"]:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(79, 70, 229, 0.25);
+}
+
+button[data-testid="stBaseButton-primary"]:active {
+    transform: translateY(0);
+}
+
+button[data-testid="stBaseButton-secondary"] {
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    font-weight: 500;
+    color: #334155;
+    cursor: pointer !important;
+    transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+button[data-testid="stBaseButton-secondary"]:hover {
+    border-color: #94A3B8;
+    background-color: #F8FAFC;
+    transform: translateY(-1px);
+}
+
+/* --- Expanders (used for job detail views) --- */
+div[data-testid="stExpander"] {
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    margin-bottom: 4px;
+    margin-top: -8px;
+    background-color: #FFFFFF;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+div[data-testid="stExpander"]:hover {
+    border-color: #CBD5E1;
+}
+
+div[data-testid="stExpander"] summary {
+    cursor: pointer !important;
+    transition: background-color 0.15s ease;
+    border-radius: 8px;
+}
+
+div[data-testid="stExpander"] summary:hover {
+    background-color: #F8FAFC;
+}
+
+/* When expander is open, connect it visually to the card above */
+div[data-testid="stExpander"][open] {
+    border-color: #C7D2FE;
+    box-shadow: 0 2px 8px rgba(79, 70, 229, 0.06);
+}
+
+/* --- Inputs --- */
+div[data-testid="stTextInput"] input,
+div[data-testid="stTextArea"] textarea {
+    border-radius: 6px;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+div[data-testid="stTextInput"] input:focus,
+div[data-testid="stTextArea"] textarea:focus {
+    border-color: #4F46E5;
+    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.1);
+}
+
+/* --- Select boxes --- */
+div[data-testid="stSelectbox"] > div > div {
+    cursor: pointer !important;
+}
+
+/* --- DataFrames --- */
+div[data-testid="stDataFrame"] {
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+/* --- Tabs --- */
+.stTabs [data-baseweb="tab"] {
+    font-weight: 500;
+    font-size: 0.875rem;
+    cursor: pointer !important;
+    transition: color 0.15s ease;
+}
+
+.stTabs [aria-selected="true"] {
+    color: #4F46E5;
+}
+
+/* --- Progress Bar --- */
+.stProgress > div > div > div {
+    background-color: #4F46E5;
+    border-radius: 9999px;
+    transition: width 0.3s ease;
+}
+
+/* --- Alerts --- */
+div[data-testid="stAlert"] {
+    border-radius: 6px;
+    font-size: 0.875rem;
+}
+
+/* --- Links --- */
+a {
+    cursor: pointer !important;
+    transition: color 0.15s ease, opacity 0.15s ease;
+}
+
+a:hover {
+    opacity: 0.85;
+}
+
+/* ==========================================================================
+   Badge Pills
+   ========================================================================== */
+
+.badge-strong-apply, .badge-apply, .badge-maybe, .badge-skip,
+.badge-remote, .badge-funding, .badge-salary,
+.badge-faang, .badge-bigtech, .badge-elite, .badge-growth,
+.badge-early, .badge-midsize, .badge-enterprise {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.78em;
+    font-weight: 600;
+    margin-left: 0;
+    transition: transform 0.1s ease;
+    white-space: nowrap;
+}
+
+.badge-strong-apply { background-color: #DCFCE7; color: #166534; }
+.badge-apply        { background-color: #DBEAFE; color: #1E40AF; }
+.badge-maybe        { background-color: #FEF3C7; color: #92400E; }
+.badge-skip         { background-color: #FEE2E2; color: #991B1B; }
+.badge-remote       { background-color: #E0E7FF; color: #3730A3; }
+.badge-funding      { background-color: #F3E8FF; color: #6B21A8; }
+.badge-salary       { background-color: #D1FAE5; color: #065F46; }
+
+/* Company Type Badges */
+.badge-faang        { background: #FEF3C7; color: #92400E; }
+.badge-bigtech      { background: #DBEAFE; color: #1E40AF; }
+.badge-elite        { background: #E0E7FF; color: #3730A3; }
+.badge-growth       { background: #DCFCE7; color: #166534; }
+.badge-early        { background: #F0FDF4; color: #14532D; }
+.badge-midsize      { background: #F1F5F9; color: #475569; }
+.badge-enterprise   { background: #E2E8F0; color: #334155; }
+
+/* ==========================================================================
+   Status Badges
+   ========================================================================== */
+
+.status-badge {
+    display: inline-block;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 0.75em;
+    font-weight: 600;
+    text-transform: capitalize;
+}
+
+.status-found       { background: #F1F5F9; color: #475569; }
+.status-reviewed    { background: #E0E7FF; color: #3730A3; }
+.status-applying    { background: #FEF3C7; color: #92400E; }
+.status-applied     { background: #DBEAFE; color: #1E40AF; }
+.status-interviewing { background: #DCFCE7; color: #166534; }
+.status-offer       { background: #D1FAE5; color: #065F46; }
+.status-rejected    { background: #FEE2E2; color: #991B1B; }
+.status-withdrawn   { background: #F1F5F9; color: #64748B; }
+
+/* ==========================================================================
+   Job Cards
+   ========================================================================== */
+
+.job-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin-bottom: 4px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+    cursor: default;
+}
+
+.job-card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    border-color: #C7D2FE;
+    transform: translateY(-1px);
+}
+
+.job-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.job-card-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.job-card-title {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #1E293B;
+    margin: 0 0 4px 0;
+    line-height: 1.3;
+}
+
+.job-card-company {
+    font-size: 0.9rem;
+    color: #64748B;
+    margin: 0 0 6px 0;
+}
+
+.job-card-team-signal {
+    font-size: 0.78rem;
+    color: #6366F1;
+    font-weight: 500;
+    margin: 0 0 4px 0;
+    letter-spacing: 0.01em;
+}
+
+.job-card-desc-preview {
+    font-size: 0.82rem;
+    color: #94A3B8;
+    margin: 0 0 8px 0;
+    line-height: 1.4;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    max-height: 2.8em;
+}
+
+.job-card-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+
+.job-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #F1F5F9;
+    font-size: 0.8rem;
+    color: #94A3B8;
+}
+
+.job-card-meta a {
+    color: #4F46E5;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer !important;
+}
+
+.job-card-meta a:hover {
+    color: #4338CA;
+    text-decoration: underline;
+}
+
+.job-card-source {
+    background: #F1F5F9;
+    padding: 1px 8px;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    color: #64748B;
+}
+
+.job-card-score {
+    text-align: center;
+    min-width: 56px;
+    flex-shrink: 0;
+}
+
+.score-number {
+    font-size: 1.8rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.score-label {
+    font-size: 0.7rem;
+    color: #94A3B8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 2px;
+}
+
+.score-high  { color: #10B981; }
+.score-mid   { color: #F59E0B; }
+.score-low   { color: #EF4444; }
+
+/* --- Detail Expand Hint --- */
+.expand-hint {
+    text-align: center;
+    font-size: 0.78rem;
+    color: #94A3B8;
+    padding: 2px 0 0;
+    margin-top: -2px;
+    margin-bottom: 8px;
+}
+
+/* --- Score Bar (used in detail view) --- */
+.score-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 0.82rem;
+}
+
+.score-bar-label {
+    width: 110px;
+    color: #475569;
+    font-weight: 500;
+    flex-shrink: 0;
+    text-align: right;
+}
+
+.score-bar-track {
+    flex: 1;
+    height: 8px;
+    background: #F1F5F9;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.score-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.4s ease;
+}
+
+.score-bar-fill-high { background: linear-gradient(90deg, #34D399, #10B981); }
+.score-bar-fill-mid  { background: linear-gradient(90deg, #FCD34D, #F59E0B); }
+.score-bar-fill-low  { background: linear-gradient(90deg, #FCA5A5, #EF4444); }
+
+.score-bar-value {
+    width: 32px;
+    text-align: right;
+    font-weight: 600;
+    color: #334155;
+    font-size: 0.8rem;
+}
+
+/* --- Strengths / Gaps Pills --- */
+.insight-pill {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    margin: 2px 4px 2px 0;
+}
+
+.insight-strength {
+    background: #DCFCE7;
+    color: #166534;
+}
+
+.insight-gap {
+    background: #FEF3C7;
+    color: #92400E;
+}
+
+/* ==========================================================================
+   Activity Feed
+   ========================================================================== */
+
+.activity-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-bottom: 1px solid #F1F5F9;
+    font-size: 0.88rem;
+    border-radius: 6px;
+    transition: background-color 0.15s ease;
+    cursor: default;
+}
+
+.activity-item:hover {
+    background-color: #F8FAFC;
+}
+
+.activity-item:last-child {
+    border-bottom: none;
+}
+
+.activity-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.activity-dot-green  { background: #10B981; }
+.activity-dot-blue   { background: #4F46E5; }
+.activity-dot-amber  { background: #F59E0B; }
+.activity-dot-gray   { background: #94A3B8; }
+
+.activity-text {
+    flex: 1;
+    color: #334155;
+}
+
+.activity-time {
+    color: #94A3B8;
+    font-size: 0.8rem;
+    white-space: nowrap;
+}
+
+/* ==========================================================================
+   Pipeline Steps
+   ========================================================================== */
+
+.pipeline-step {
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+    background: #FFFFFF;
+    transition: all 0.2s ease;
+    cursor: default;
+}
+
+.pipeline-step-done {
+    border-color: #10B981;
+    background: #F0FDF4;
+}
+
+.pipeline-step-active {
+    border-color: #4F46E5;
+    background: #EEF2FF;
+    box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.15);
+}
+
+.pipeline-step-pending {
+    border-color: #E2E8F0;
+    background: #F8FAFC;
+    opacity: 0.6;
+}
+
+.pipeline-step-icon {
+    font-size: 1.5rem;
+    margin-bottom: 6px;
+}
+
+.pipeline-step-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #1E293B;
+}
+
+.pipeline-step-desc {
+    font-size: 0.75rem;
+    color: #64748B;
+    margin-top: 2px;
+}
+
+/* ==========================================================================
+   Empty States
+   ========================================================================== */
+
+.empty-state {
+    text-align: center;
+    padding: 48px 24px;
+    color: #64748B;
+}
+
+.empty-state-icon {
+    font-size: 2.5rem;
+    margin-bottom: 12px;
+    opacity: 0.5;
+}
+
+.empty-state-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 6px;
+}
+
+.empty-state-desc {
+    font-size: 0.9rem;
+    color: #94A3B8;
+}
+
+/* ==========================================================================
+   Compact Summary (sidebar)
+   ========================================================================== */
+
+.sidebar-stats {
+    font-size: 0.85rem;
+    color: #475569;
+    line-height: 1.6;
+    padding: 8px 0;
+}
+
+.sidebar-stats strong {
+    color: #1E293B;
+}
+
+/* ==========================================================================
+   Connection Status Badge
+   ========================================================================== */
+
+.conn-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.conn-badge-ok  { background: #DCFCE7; color: #166534; }
+.conn-badge-err { background: #FEE2E2; color: #991B1B; }
+.conn-badge-off { background: #F1F5F9; color: #64748B; }
+
+.conn-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.conn-dot-ok  { background: #10B981; }
+.conn-dot-err { background: #EF4444; }
+.conn-dot-off { background: #94A3B8; }
+
+/* ==========================================================================
+   Score Dots (legacy)
+   ========================================================================== */
+
+.score-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+.score-dot-high { background-color: #10B981; }
+.score-dot-mid  { background-color: #F59E0B; }
+.score-dot-low  { background-color: #EF4444; }
+
+.company-info {
+    font-size: 0.85em;
+    color: #64748B;
+    margin-top: 2px;
+}
+
+/* --- Scrollbar --- */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #F1F5F9; }
+::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+/* --- Toast Animation --- */
+div[data-testid="stToast"] {
+    border-radius: 8px;
+    animation: slideInRight 0.3s ease;
+}
+
+@keyframes slideInRight {
+    from { transform: translateX(100%); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}

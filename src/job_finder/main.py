@@ -13,9 +13,24 @@ load_dotenv()
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
 
 
-def run():
+def _parse_profile() -> str | None:
+    """Extract ``--profile NAME`` from sys.argv (removes it so other parsing works)."""
+    for i, arg in enumerate(sys.argv):
+        if arg == "--profile" and i + 1 < len(sys.argv):
+            profile = sys.argv[i + 1]
+            del sys.argv[i : i + 2]
+            return profile
+        if arg.startswith("--profile="):
+            profile = arg.split("=", 1)[1]
+            del sys.argv[i]
+            return profile
+    return None
+
+
+def run(profile: str | None = None):
     """Run the full job search pipeline with optional AI enhancement."""
     from job_finder.llm_client import LLMClient
+    from job_finder.models.database import DB_PATH
     from job_finder.pipeline import JobFinderPipeline
 
     llm = LLMClient()
@@ -24,6 +39,8 @@ def run():
     print("\n" + "=" * 70)
     print("  JOB FINDER — Job Search Pipeline")
     print("=" * 70)
+    if profile:
+        print(f"  Profile: {profile}")
     if has_llm:
         info = llm.get_provider_info()
         print(f"  LLM: {info['model']} via {info['label']}")
@@ -32,7 +49,7 @@ def run():
     print("  Searching 5+ job boards | Scoring against resume")
     print("=" * 70 + "\n")
 
-    pipeline = JobFinderPipeline(llm=llm if has_llm else None)
+    pipeline = JobFinderPipeline(llm=llm if has_llm else None, profile=profile)
     results = pipeline.run_full_pipeline(
         progress=lambda msg: print(f"  {msg}"),
         use_ai=has_llm,
@@ -40,19 +57,19 @@ def run():
 
     print("\n" + "=" * 70)
     print(f"  Pipeline complete! {len(results)} jobs processed.")
-    print("  DB: data/job_tracker.db")
+    print(f"  DB: {DB_PATH}")
     print("=" * 70 + "\n")
 
     return results
 
 
-def search():
+def search(profile: str | None = None):
     """Run only the job search step (no scoring/optimization)."""
     import json
 
     from job_finder.pipeline import JobFinderPipeline
 
-    pipeline = JobFinderPipeline()
+    pipeline = JobFinderPipeline(profile=profile)
     jobs = pipeline.search_all_jobs(
         progress=lambda msg: print(f"  {msg}"),
     )
@@ -69,7 +86,7 @@ def search():
     return jobs
 
 
-def score():
+def score(profile: str | None = None):
     """Run search + scoring (basic keyword scoring, no LLM needed)."""
     from job_finder.llm_client import LLMClient
     from job_finder.pipeline import JobFinderPipeline
@@ -77,7 +94,7 @@ def score():
     llm = LLMClient()
     has_llm = llm.is_configured and llm.is_available()
 
-    pipeline = JobFinderPipeline(llm=llm if has_llm else None)
+    pipeline = JobFinderPipeline(llm=llm if has_llm else None, profile=profile)
     results = pipeline.run_full_pipeline(
         progress=lambda msg: print(f"  {msg}"),
         use_ai=has_llm,
@@ -88,14 +105,16 @@ def score():
 
 
 if __name__ == "__main__":
+    _profile = _parse_profile()
+
     if len(sys.argv) > 1:
         command = sys.argv[1]
         if command == "search":
-            search()
+            search(_profile)
         elif command == "score":
-            score()
+            score(_profile)
         else:
             print(f"Unknown command: {command}")
-            print("Usage: python -m job_finder.main [search|score]")
+            print("Usage: python -m job_finder.main [search|score] [--profile NAME]")
     else:
-        run()
+        run(_profile)

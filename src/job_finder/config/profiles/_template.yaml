@@ -1,0 +1,137 @@
+# Profile Template — Copy this file and rename to create a new profile
+# Example: cp _template.yaml my_profile.yaml
+#
+# Then select the profile in the Streamlit UI sidebar, or run:
+#   python -m job_finder.main --profile my_profile
+
+profile:
+  name: "Your Name"                    # Display name in the UI
+  description: "Brief description"     # What kind of roles you're targeting
+  resume_path: ""                      # Path to resume PDF (empty = auto-detect knowledge/{profile}_resume.pdf)
+
+# --- SEARCH CONFIGURATION ---
+
+# Job titles to search for (one per line)
+target_roles:
+  - "software engineer"
+  - "data analyst"
+  # Add more roles here...
+
+# Keyword-based searches (technologies, specialties)
+keyword_searches:
+  - "python developer"
+  # Add more keywords here...
+
+# Where to search
+locations:
+  - "Los Angeles, CA"
+  - "Remote"
+
+# --- SCORING KEYWORDS ---
+# These keyword lists determine how jobs are scored against your resume.
+# The scorer checks for these terms in the job description.
+
+keywords:
+  # Technical skills you have (matched against job descriptions)
+  technical:
+    - "python"
+    - "sql"
+    - "excel"
+    # Add your technical skills...
+
+  # Leadership / growth signals to look for in job postings
+  leadership:
+    - "mentorship"
+    - "lead"
+    - "manager"
+    # Add leadership keywords...
+
+  # Signals that the role involves building something new
+  platform_building:
+    - "greenfield"
+    - "from scratch"
+    # Add platform-building signals...
+
+  # Company/level signals that correlate with higher compensation
+  # Leave empty if compensation level isn't a priority
+  high_comp_signals: []
+
+# --- SCORING WEIGHTS ---
+# How much each dimension matters in the overall score (must sum to 1.0)
+#
+# Adjust these based on what matters most to you:
+# - Entry-level: high technical + culture, low comp/progression
+# - Experienced: balanced across all dimensions
+# - Leadership-seeking: high leadership + progression
+scoring:
+  technical_skills: 0.30      # How well your skills match the JD
+  leadership_signal: 0.10     # Leadership/growth opportunity signals
+  comp_potential: 0.10        # Compensation potential
+  platform_building: 0.10     # Building something new vs maintaining
+  company_trajectory: 0.10    # Company growth signals
+  culture_fit: 0.20           # Culture and work style fit
+  career_progression: 0.10    # Career upgrade from current role (set to 0 to disable)
+
+  # Score thresholds for recommendations
+  thresholds:
+    strong_apply: 70    # Score >= this = "STRONG_APPLY"
+    apply: 55           # Score >= this = "APPLY"
+    maybe: 40           # Score >= this = "MAYBE", below = "SKIP"
+
+# --- CAREER BASELINE ---
+# Your current position — used for career progression scoring
+career_baseline:
+  current_title: "Software Engineer"
+  current_level: "mid"       # intern, junior, mid, senior, staff, principal, manager, director, vp, cto
+  current_tc: 100000          # Current total compensation
+  min_acceptable_tc: 80000
+  preferred_direction: "any"  # up, up_or_lateral_leadership, any
+
+# --- COMPENSATION ---
+compensation:
+  min_base: 80000
+  target_total_comp: 150000
+  include_equity: false
+
+# --- SEARCH SETTINGS ---
+search_settings:
+  results_per_board: 25
+  max_days_old: 14
+  exclude_staffing_agencies: true
+  country: "USA"
+
+# --- JOB BOARDS ---
+job_boards:
+  - "indeed"
+  - "linkedin"
+  - "glassdoor"
+  - "zip_recruiter"
+  - "google"
+
+# Additional sources (YC Work at a Startup, etc.)
+additional_sources: []
+
+# Company targeting (leave empty if no preference)
+target_companies:
+  big_tech: []
+  startup_criteria:
+    funding_stages: []
+    min_funding_amount: 0
+    prefer_founding_roles: false
+
+# --- AUTO-APPLY ---
+applicant_info:
+  first_name: ""
+  last_name: ""
+  email: ""
+  phone: ""
+  linkedin_url: ""
+
+auto_apply:
+  enabled: false
+  dry_run: true
+  methods:
+    greenhouse: true
+    lever: true
+    linkedin_easy_apply: false
+  max_applications_per_run: 5

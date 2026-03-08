@@ -62,15 +62,20 @@ def search_jobs(
     site_names = ["indeed", "linkedin", "glassdoor", "zip_recruiter", "google"]
 
     try:
-        jobs_df: pd.DataFrame = scrape_jobs(
+        scrape_kwargs = dict(
             site_name=site_names,
             search_term=search_term,
             location=location,
             results_wanted=results_wanted,
             hours_old=hours_old,
-            is_remote=is_remote,
             country_indeed=country,
         )
+        # Only pass is_remote when explicitly True/False (not None)
+        # JobSpy Pydantic model rejects None
+        if is_remote is not None:
+            scrape_kwargs["is_remote"] = bool(is_remote)
+
+        jobs_df: pd.DataFrame = scrape_jobs(**scrape_kwargs)
 
         if jobs_df.empty:
             return []

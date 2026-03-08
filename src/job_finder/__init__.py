@@ -1,1 +1,1 @@
-"""Job Finder - AI-powered job search agent using CrewAI + Claude."""
+"""Gig AI job finder package."""

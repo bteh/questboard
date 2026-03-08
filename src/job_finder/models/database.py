@@ -58,6 +58,7 @@ class ApplicationRecord(Base):
     comp_potential_score = Column(Float, nullable=True)
     company_trajectory_score = Column(Float, nullable=True)
     culture_fit_score = Column(Float, nullable=True)
+    career_progression_score = Column(Float, nullable=True)
     recommendation = Column(String(50), default="")  # STRONG_APPLY, APPLY, MAYBE, SKIP
     score_reasoning = Column(Text, default="")
     key_strengths = Column(Text, default="")  # JSON array
@@ -68,10 +69,15 @@ class ApplicationRecord(Base):
     total_funding = Column(String(100), nullable=True)
     employee_count = Column(String(100), nullable=True)
     company_intel_json = Column(Text, default="")  # Full CompanyIntel as JSON
+    company_type = Column(String(50), default="Unknown")  # FAANG+, Big Tech, etc.
 
     # Application materials
     resume_tweaks_json = Column(Text, default="")  # ResumeOptimization as JSON
     cover_letter = Column(Text, default="")
+
+    # Application method and profile
+    application_method = Column(String(100), default="")  # manual, greenhouse, lever
+    profile = Column(String(100), default="default")  # which profile found this job
 
     # Status tracking
     status = Column(String(50), default="found")
@@ -122,6 +128,26 @@ DB_PATH = os.path.join(
 )
 
 
+def _migrate_db(engine) -> None:
+    """Add any missing columns to existing tables (lightweight migration)."""
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(engine)
+    if "applications" not in inspector.get_table_names():
+        return
+
+    existing_cols = {c["name"] for c in inspector.get_columns("applications")}
+    with engine.begin() as conn:
+        if "profile" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN profile VARCHAR(100) DEFAULT 'default'")
+            )
+        if "company_type" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN company_type VARCHAR(50) DEFAULT 'Unknown'")
+            )
+
+
 def init_db(db_path: str | None = None) -> None:
     """Initialize the database and create tables."""
     global _engine, _SessionLocal
@@ -134,6 +160,7 @@ def init_db(db_path: str | None = None) -> None:
         echo=False,
         connect_args={"check_same_thread": False},
     )
+    _migrate_db(_engine)
     Base.metadata.create_all(_engine)
     _SessionLocal = scoped_session(sessionmaker(bind=_engine))
 
@@ -160,13 +187,22 @@ def save_application(
     leadership_score: float | None = None,
     platform_building_score: float | None = None,
     comp_potential_score: float | None = None,
+    company_trajectory_score: float | None = None,
+    culture_fit_score: float | None = None,
+    career_progression_score: float | None = None,
     recommendation: str = "",
     score_reasoning: str = "",
-    key_strengths: list[str] | None = None,
-    key_gaps: list[str] | None = None,
+    key_strengths: list[str] | str | None = None,
+    key_gaps: list[str] | str | None = None,
     funding_stage: str | None = None,
+    total_funding: str | None = None,
+    employee_count: str | None = None,
+    company_intel_json: str | None = None,
     cover_letter: str = "",
     resume_tweaks_json: str = "",
+    application_method: str = "",
+    profile: str = "default",
+    company_type: str = "Unknown",
     notes: str = "",
 ) -> ApplicationRecord | None:
     """Save a new application record to the database. Returns None if duplicate URL."""
@@ -177,6 +213,17 @@ def save_application(
             existing = session.query(ApplicationRecord).filter_by(job_url=job_url).first()
             if existing:
                 return existing
+
+        # Normalize key_strengths/key_gaps: accept list or JSON string
+        if isinstance(key_strengths, list):
+            key_strengths = json.dumps(key_strengths)
+        elif key_strengths is None:
+            key_strengths = "[]"
+
+        if isinstance(key_gaps, list):
+            key_gaps = json.dumps(key_gaps)
+        elif key_gaps is None:
+            key_gaps = "[]"
 
         record = ApplicationRecord(
             job_title=job_title,
@@ -193,13 +240,22 @@ def save_application(
             leadership_score=leadership_score,
             platform_building_score=platform_building_score,
             comp_potential_score=comp_potential_score,
+            company_trajectory_score=company_trajectory_score,
+            culture_fit_score=culture_fit_score,
+            career_progression_score=career_progression_score,
             recommendation=recommendation,
             score_reasoning=score_reasoning,
-            key_strengths=json.dumps(key_strengths or []),
-            key_gaps=json.dumps(key_gaps or []),
+            key_strengths=key_strengths,
+            key_gaps=key_gaps,
             funding_stage=funding_stage,
+            total_funding=total_funding,
+            employee_count=employee_count,
+            company_intel_json=company_intel_json or "",
             cover_letter=cover_letter,
             resume_tweaks_json=resume_tweaks_json,
+            application_method=application_method,
+            profile=profile,
+            company_type=company_type,
             notes=notes,
         )
         session.add(record)
@@ -246,17 +302,93 @@ def update_application_status(
 def get_all_applications(
     status: str | None = None,
     min_score: float | None = None,
+    profile: str | None = None,
+    company_type: str | None = None,
 ) -> list[ApplicationRecord]:
     """Retrieve applications with optional filters."""
     session = get_session()
     try:
         query = session.query(ApplicationRecord)
+        if profile:
+            query = query.filter(ApplicationRecord.profile == profile)
         if status:
             query = query.filter(ApplicationRecord.status == status)
         if min_score is not None:
             query = query.filter(ApplicationRecord.overall_score >= min_score)
+        if company_type:
+            query = query.filter(ApplicationRecord.company_type == company_type)
         results = query.order_by(ApplicationRecord.overall_score.desc()).all()
         session.expunge_all()
         return results
+    finally:
+        session.close()
+
+
+def purge_non_matching_locations(
+    preferred_states: list[str] | None = None,
+    preferred_cities: list[str] | None = None,
+    profile: str | None = None,
+) -> int:
+    """Delete existing records that don't match location preferences.
+
+    Remote jobs are always kept. When ``profile`` is provided, only records
+    for that profile are considered. Returns the number of deleted records.
+    """
+    if not preferred_states and not preferred_cities:
+        return 0
+
+    from job_finder.company_classifier import location_matches_preferences
+
+    session = get_session()
+    try:
+        query = session.query(ApplicationRecord)
+        if profile:
+            query = query.filter(ApplicationRecord.profile == profile)
+        records = query.all()
+        deleted = 0
+        for rec in records:
+            if not location_matches_preferences(
+                rec.location or "",
+                rec.is_remote or False,
+                preferred_states,
+                preferred_cities,
+            ):
+                session.delete(rec)
+                deleted += 1
+        session.commit()
+        return deleted
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+
+def backfill_company_types() -> int:
+    """Classify existing records that have company_type='Unknown' or NULL."""
+    from job_finder.company_classifier import classify_company
+
+    session = get_session()
+    try:
+        records = session.query(ApplicationRecord).filter(
+            (ApplicationRecord.company_type == "Unknown")
+            | (ApplicationRecord.company_type == None)  # noqa: E711
+        ).all()
+        updated = 0
+        for rec in records:
+            ct = classify_company(
+                rec.company or "",
+                rec.funding_stage,
+                rec.total_funding,
+                rec.employee_count,
+            )
+            if ct != "Unknown":
+                rec.company_type = ct
+                updated += 1
+        session.commit()
+        return updated
+    except Exception:
+        session.rollback()
+        raise
     finally:
         session.close()

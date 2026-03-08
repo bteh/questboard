@@ -1,4 +1,4 @@
-"""Pydantic models for structured CrewAI agent outputs."""
+"""Pydantic models for structured pipeline outputs."""
 
 from __future__ import annotations
 
@@ -92,6 +92,9 @@ class JobScore(BaseModel):
     )
     culture_fit_score: float = Field(
         description="Culture and work style fit 0-100", ge=0, le=100
+    )
+    career_progression_score: float = Field(
+        description="Career progression/upgrade signal 0-100", ge=0, le=100
     )
     skill_matches: list[SkillMatch] = Field(
         default_factory=list, description="Detailed skill-by-skill matching"

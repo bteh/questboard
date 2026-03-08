@@ -8,11 +8,16 @@ import os
 logger = logging.getLogger(__name__)
 
 
-def find_resume() -> str | None:
+def find_resume(profile: str | None = None) -> str | None:
     """Search for a resume PDF in the ``knowledge/`` directory.
 
-    Returns the absolute path of the first PDF found (preferring files with
-    "resume" in the name), or *None* if nothing is found.
+    Parameters
+    ----------
+    profile:
+        When provided, looks for ``{profile}_resume.pdf`` first before
+        falling back to generic resume detection.
+
+    Returns the absolute path of the first PDF found, or *None*.
     """
     knowledge_dirs = [
         os.path.join(os.getcwd(), "knowledge"),
@@ -25,20 +30,30 @@ def find_resume() -> str | None:
     ]
 
     for knowledge_dir in knowledge_dirs:
-        if os.path.exists(knowledge_dir):
-            pdfs = [
-                f for f in os.listdir(knowledge_dir) if f.lower().endswith(".pdf")
-            ]
-            if not pdfs:
-                continue
-            # Prefer files with "resume" in the name
-            resume_pdfs = [f for f in pdfs if "resume" in f.lower()]
-            target = resume_pdfs[0] if resume_pdfs else pdfs[0]
-            return os.path.join(knowledge_dir, target)
+        if not os.path.exists(knowledge_dir):
+            continue
+
+        # Priority 1: profile-specific resume
+        if profile:
+            profile_file = f"{profile}_resume.pdf"
+            profile_path = os.path.join(knowledge_dir, profile_file)
+            if os.path.exists(profile_path):
+                return profile_path
+
+        # Priority 2-3: generic fallback
+        pdfs = [
+            f for f in os.listdir(knowledge_dir) if f.lower().endswith(".pdf")
+        ]
+        if not pdfs:
+            continue
+        # Prefer files with "resume" in the name
+        resume_pdfs = [f for f in pdfs if "resume" in f.lower()]
+        target = resume_pdfs[0] if resume_pdfs else pdfs[0]
+        return os.path.join(knowledge_dir, target)
     return None
 
 
-def parse_resume(file_path: str = "") -> str:
+def parse_resume(file_path: str = "", profile: str | None = None) -> str:
     """Parse a PDF resume and return the full text content.
 
     Parameters
@@ -46,6 +61,8 @@ def parse_resume(file_path: str = "") -> str:
     file_path:
         Path to the resume PDF.  If empty, checks the ``RESUME_PATH``
         environment variable, then searches ``knowledge/``.
+    profile:
+        Profile name for profile-specific resume detection.
 
     Returns
     -------
@@ -57,7 +74,7 @@ def parse_resume(file_path: str = "") -> str:
     if not file_path:
         file_path = os.getenv("RESUME_PATH", "")
     if not file_path:
-        file_path = find_resume() or ""
+        file_path = find_resume(profile=profile) or ""
 
     if not file_path:
         return (

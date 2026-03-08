@@ -2,15 +2,24 @@
 # Customize these to match your target roles and preferences
 
 target_roles:
+  # Data Engineering
   - "data platform engineer"
   - "analytics engineer"
   - "senior data engineer"
   - "staff data engineer"
-  - "manager data engineering"
+  - "principal data engineer"
+  - "founding data engineer"
   - "head of data"
   - "director of data engineering"
-  - "founding data engineer"
-  - "principal data engineer"
+  - "director of data"
+  - "manager data engineering"
+  # Management / Leadership
+  - "engineering manager"
+  - "senior engineering manager"
+  - "director of engineering"
+  - "VP engineering"
+  - "VP of data"
+  - "CTO"
 
 # Keyword-based searches (technologies/tools)
 keyword_searches:
@@ -19,6 +28,10 @@ keyword_searches:
   - "lakehouse"
   - "data platform"
   - "iceberg data engineer"
+  - "founding engineer data"
+  - "build data team"
+  - "head of data"
+  - "data leader"
 
 locations:
   - "Los Angeles, CA"
@@ -65,14 +78,23 @@ target_companies:
     min_funding_amount: 10000000  # $10M minimum
     prefer_founding_roles: true
 
-# Scoring weights
+# Career baseline — used for career progression scoring
+career_baseline:
+  current_title: "Senior Data Engineer"
+  current_level: "senior"  # junior, mid, senior, staff, principal, manager, director, vp, cto
+  current_tc: 200000
+  min_acceptable_tc: 200000
+  preferred_direction: "up_or_lateral_leadership"  # up, up_or_lateral_leadership, any
+
+# Scoring weights (must sum to 1.0)
 scoring:
-  technical_skills: 0.30
-  leadership_signal: 0.20
-  comp_potential: 0.15
-  platform_building: 0.15  # "building from scratch" signal
+  technical_skills: 0.25
+  leadership_signal: 0.15
+  comp_potential: 0.12
+  platform_building: 0.13
   company_trajectory: 0.10
   culture_fit: 0.10
+  career_progression: 0.15
 
 # Compensation filters
 compensation:
@@ -86,3 +108,21 @@ search_settings:
   max_days_old: 14
   exclude_staffing_agencies: true
   country: "USA"
+
+# Applicant information (used for auto-apply)
+applicant_info:
+  first_name: ""
+  last_name: ""
+  email: ""
+  phone: ""
+  linkedin_url: ""
+
+# Auto-apply configuration (opt-in)
+auto_apply:
+  enabled: false  # Set to true to enable
+  dry_run: true   # Set to false to actually submit
+  methods:
+    greenhouse: true
+    lever: true
+    linkedin_easy_apply: false  # Not automatable without browser automation
+  max_applications_per_run: 5

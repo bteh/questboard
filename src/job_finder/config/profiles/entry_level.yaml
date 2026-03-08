@@ -1,0 +1,169 @@
+# Profile: Entry Level — Open to any role (analyst, support, tech, admin)
+profile:
+  name: "Entry Level"
+  description: "Open to any role — analyst, support, tech, admin"
+  resume_path: ""  # leave empty to auto-detect from knowledge/ dir
+
+# What to search for — broad, cast a wide net
+target_roles:
+  - "data analyst"
+  - "business analyst"
+  - "junior software engineer"
+  - "software engineer"
+  - "junior developer"
+  - "associate software engineer"
+  - "entry level developer"
+  - "QA analyst"
+  - "junior QA engineer"
+  - "IT support"
+  - "help desk"
+  - "technical support"
+  - "customer success associate"
+  - "administrative assistant"
+  - "operations analyst"
+  - "marketing coordinator"
+  - "project coordinator"
+  - "account coordinator"
+  - "executive assistant"
+  - "recruiter"
+  - "sales associate"
+  - "office manager"
+
+keyword_searches:
+  - "entry level"
+  - "junior"
+  - "associate"
+  - "coordinator"
+  - "analyst"
+
+locations:
+  - "Los Angeles, CA"
+  - "Orange County, CA"
+  - "Remote"
+
+# Keyword lists for scoring — broad skills, not domain-specific
+keywords:
+  technical:
+    - "python"
+    - "javascript"
+    - "sql"
+    - "excel"
+    - "google sheets"
+    - "powerpoint"
+    - "word"
+    - "html"
+    - "css"
+    - "react"
+    - "git"
+    - "tableau"
+    - "java"
+    - "salesforce"
+    - "quickbooks"
+    - "microsoft office"
+    - "data entry"
+    - "customer service"
+    - "communication"
+    - "teamwork"
+    - "problem solving"
+
+  # Repurposed as "growth opportunity" signals for entry-level
+  leadership:
+    - "mentorship"
+    - "training program"
+    - "rotational"
+    - "development program"
+    - "career growth"
+    - "learning"
+    - "onboarding"
+    - "junior friendly"
+    - "will train"
+    - "new grad"
+    - "entry level"
+    - "bootcamp grad"
+    - "internship to full time"
+    - "on-the-job training"
+    - "professional development"
+
+  platform_building:
+    - "startup"
+    - "fast-paced"
+    - "wearing many hats"
+    - "small team"
+    - "generalist"
+    - "full stack"
+    - "hands-on"
+
+  high_comp_signals: []  # not relevant for entry-level
+
+# Job boards
+job_boards:
+  - "indeed"
+  - "linkedin"
+  - "glassdoor"
+  - "zip_recruiter"
+  - "google"
+
+# Skip startup-specific sources
+additional_sources: []
+
+# No specific company targeting
+target_companies:
+  big_tech: []
+  startup_criteria:
+    funding_stages: []
+    min_funding_amount: 0
+    prefer_founding_roles: false
+
+# Career baseline — entry level, no progression scoring
+career_baseline:
+  current_title: "New Graduate"
+  current_level: "intern"
+  current_tc: 0
+  min_acceptable_tc: 40000
+  preferred_direction: "any"
+
+# Scoring weights — rebalanced for entry-level
+# Technical match and culture fit matter most; career progression disabled (weight 0)
+scoring:
+  technical_skills: 0.35
+  leadership_signal: 0.15
+  comp_potential: 0.05
+  platform_building: 0.10
+  company_trajectory: 0.10
+  culture_fit: 0.25
+  career_progression: 0.00
+  thresholds:
+    strong_apply: 60
+    apply: 45
+    maybe: 30
+
+# Compensation targets — entry-level range
+compensation:
+  min_base: 40000
+  target_total_comp: 80000
+  include_equity: false
+
+# Search settings — wider net
+search_settings:
+  results_per_board: 50
+  max_days_old: 30
+  exclude_staffing_agencies: false
+  country: "USA"
+
+# Applicant information (for auto-apply)
+applicant_info:
+  first_name: ""
+  last_name: ""
+  email: ""
+  phone: ""
+  linkedin_url: ""
+
+# Auto-apply — disabled by default
+auto_apply:
+  enabled: false
+  dry_run: true
+  methods:
+    greenhouse: true
+    lever: true
+    linkedin_easy_apply: false
+  max_applications_per_run: 5

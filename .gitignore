@@ -21,6 +21,7 @@ knowledge/*.docx
 # Data
 data/*.db
 data/*.sqlite
+**/*.db
 
 # Output
 src/job_finder/output/*.json
@@ -30,6 +31,8 @@ src/job_finder/output/*.md
 .DS_Store
 Thumbs.db
 
-# UV
-uv.lock
+# Claude / Tooling
 .claude/
+
+# Stray pip artifacts
+=*
