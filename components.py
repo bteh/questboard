@@ -80,6 +80,20 @@ _COMPANY_TYPE_CSS = {
     "Enterprise": "badge-enterprise",
 }
 
+# Company avatar color palette — modern, muted, accessible on white text
+_AVATAR_COLORS = [
+    "#4F46E5", "#7C3AED", "#2563EB", "#0891B2", "#059669",
+    "#D97706", "#DC2626", "#DB2777", "#9333EA", "#0D9488",
+    "#6366F1", "#8B5CF6", "#0284C7", "#0F766E", "#B45309",
+]
+
+
+def _avatar_color(name: str) -> str:
+    """Deterministic background color for company initial avatar."""
+    if not name:
+        return _AVATAR_COLORS[0]
+    return _AVATAR_COLORS[hash(name) % len(_AVATAR_COLORS)]
+
 
 def company_type_badge(company_type: str) -> str:
     if not company_type or company_type == "Unknown":
@@ -329,7 +343,11 @@ def render_job_card(app, key_prefix: str = "") -> None:
     meta_parts.append(f'<span>{time_str}</span>')
     meta_html = " &nbsp;&middot;&nbsp; ".join(meta_parts)
 
-    card_html = f"""<div class="job-card"><div class="job-card-header"><div class="job-card-info"><div class="job-card-title">{safe_title}</div><div class="job-card-company">{company_line}</div>{team_html}{desc_html}<div class="job-card-badges">{badges}</div><div class="job-card-meta">{meta_html}</div></div><div class="job-card-score"><div class="score-number {sc_class}">{score:.0f}</div><div class="score-label">score</div></div></div></div>"""
+    # Company avatar — colored circle with first letter
+    avatar_initial = safe_company[0].upper() if safe_company else "?"
+    avatar_bg = _avatar_color(app.company or "")
+
+    card_html = f"""<div class="job-card"><div class="job-card-header"><div class="job-card-info"><div class="job-card-top"><div class="job-card-avatar" style="background:{avatar_bg}">{avatar_initial}</div><div><div class="job-card-title">{safe_title}</div><div class="job-card-company">{company_line}</div></div></div>{team_html}{desc_html}<div class="job-card-badges">{badges}</div><div class="job-card-meta">{meta_html}</div></div><div class="job-card-score"><div class="score-number {sc_class}">{score:.0f}</div><div class="score-label">score</div></div></div></div>"""
     st.markdown(card_html, unsafe_allow_html=True)
 
     # Expandable detail view
@@ -362,7 +380,7 @@ def _render_detail_expander(app, key_prefix: str) -> None:
 
     label = " \u00b7 ".join(detail_parts)
 
-    with st.expander(f"\U0001f4cb {label}", expanded=False):
+    with st.expander(label, expanded=False):
         # Action row at top: status dropdown + quick actions
         acol1, acol2 = st.columns([1, 2])
         with acol1:
@@ -431,9 +449,7 @@ def _render_detail_expander(app, key_prefix: str) -> None:
                 # then convert newlines to <br> for readable formatting
                 desc_safe = _html_mod.escape(desc[:3000]).replace("\n", "<br>")
                 st.markdown(
-                    f"<div style='font-size:0.85rem; color:#475569; "
-                    f"line-height:1.6; max-height:300px; overflow-y:auto; "
-                    f"padding:8px 0;'>{desc_safe}</div>",
+                    f'<div class="job-description-body">{desc_safe}</div>',
                     unsafe_allow_html=True,
                 )
 
@@ -524,16 +540,34 @@ def render_empty_state(icon: str, title: str, description: str) -> None:
     )
 
 
+JOB_SOURCES = [
+    ("Indeed", "https://indeed.com"),
+    ("LinkedIn", "https://linkedin.com"),
+    ("Glassdoor", "https://glassdoor.com"),
+    ("ZipRecruiter", "https://ziprecruiter.com"),
+    ("Google Jobs", "https://google.com/jobs"),
+    ("YC Startups", "https://workatastartup.com"),
+    ("Remotive", "https://remotive.com"),
+    ("Himalayas", "https://himalayas.app"),
+    ("We Work Remotely", "https://weworkremotely.com"),
+    ("HN Hiring", "https://news.ycombinator.com"),
+    ("Greenhouse", "https://greenhouse.io"),
+    ("Lever", "https://lever.co"),
+]
+
+
 def render_pipeline_steps(llm_available: bool) -> None:
     """Show the 3-step pipeline as visual cards."""
     cols = st.columns(3)
+
+    source_names = " &middot; ".join(name for name, _ in JOB_SOURCES)
     steps = [
-        ("1", "Search", "Scrape 5+ job boards", "done"),
-        ("2", "Score", "Rate against resume", "done"),
+        ("1", "Search", f'<span class="pipeline-sources">{source_names}</span>', "done"),
+        ("2", "Score", "7-dimension scoring against resume", "done"),
         (
             "3",
             "Enhance",
-            "Cover letters & intel",
+            "Cover letters & company intel",
             "done" if llm_available else "pending",
         ),
     ]

@@ -181,6 +181,29 @@ class JobFinderPipeline:
                 if progress:
                     progress(f"  YC scraper unavailable: {e}")
 
+        # Search additional sources (Remotive, Himalayas, WWR, HN, Greenhouse, Lever)
+        extra_sources = self.config.get("additional_sources", [])
+        enabled_extras = [
+            s["name"] for s in extra_sources
+            if s.get("enabled") and s["name"] not in ("workatastartup", "greenhouse", "lever")
+        ]
+        # Always-on lightweight sources when any additional sources are configured
+        if enabled_extras:
+            try:
+                from job_finder.tools.additional_scrapers import search_additional_sources
+
+                extra_jobs = search_additional_sources(
+                    roles=roles,
+                    max_results_per_source=results_per_board,
+                    sources=enabled_extras,
+                    progress=progress,
+                )
+                all_jobs.extend(extra_jobs)
+            except Exception as e:
+                logger.warning("Additional scrapers failed (non-fatal): %s", e)
+                if progress:
+                    progress(f"  Additional scrapers error: {e}")
+
         deduped = _deduplicate(all_jobs)
         if progress:
             progress(f"Found {len(deduped)} unique jobs (from {len(all_jobs)} raw)")

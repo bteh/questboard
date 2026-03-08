@@ -108,8 +108,23 @@ job_boards:
   - "zip_recruiter"
   - "google"
 
-# Additional sources (YC Work at a Startup, etc.)
-additional_sources: []
+# Additional sources beyond JobSpy (Indeed/LinkedIn/Glassdoor/ZipRecruiter/Google)
+# Set enabled: false to skip any source
+additional_sources:
+  - name: "workatastartup"
+    enabled: true
+  - name: "remotive"
+    enabled: true
+  - name: "himalayas"
+    enabled: true
+  - name: "weworkremotely"
+    enabled: true
+  - name: "hackernews"
+    enabled: true
+  - name: "greenhouse"
+    enabled: true
+  - name: "lever"
+    enabled: true
 
 # Company targeting (leave empty if no preference)
 target_companies:

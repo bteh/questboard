@@ -150,6 +150,18 @@ additional_sources:
   - name: "workatastartup"
     url: "https://www.workatastartup.com/jobs"
     enabled: true
+  - name: "remotive"
+    url: "https://remotive.com/api/remote-jobs"
+    enabled: true
+  - name: "himalayas"
+    url: "https://himalayas.app/jobs/api"
+    enabled: true
+  - name: "weworkremotely"
+    url: "https://weworkremotely.com"
+    enabled: true
+  - name: "hackernews"
+    url: "https://hn.algolia.com/api/v1"
+    enabled: true
   - name: "greenhouse"
     url_pattern: "boards.greenhouse.io"
     enabled: true
