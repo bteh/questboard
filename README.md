@@ -1,16 +1,16 @@
-# Gig AI
+# Launchboard
 
 **Your personal AI agent for the job search grind.**
 
-Gig AI searches 5+ job boards, scores listings against your resume across 7 dimensions, generates tailored cover letters and resume tweaks, drafts company research for interview prep, and optionally auto-applies through ATS APIs. The core pipeline, database, and resume handling run locally on your machine.
+Launchboard searches 5+ job boards, scores listings against your resume across 7 dimensions, generates tailored cover letters and resume tweaks, drafts company research for interview prep, and optionally auto-applies through ATS APIs. The core pipeline, database, and resume handling run locally on your machine.
 
-The job market rewards quality over volume. Gig AI is built on a simple thesis: the best job search tool is one that thinks like a hiring manager, not a spray-and-pray bot.
+The job market rewards quality over volume. Launchboard is built on a simple thesis: the best job search tool is one that thinks like a hiring manager, not a spray-and-pray bot.
 
 ---
 
 ## What It Does Today
 
-**Search** -- Searches Indeed, LinkedIn, Glassdoor, ZipRecruiter, Google Jobs, and optional YC Work at a Startup in a single run. Filters by location preferences. Deduplication is currently URL-based, so exact duplicates are removed reliably, but cross-board duplicates with different URLs can still appear.
+**Search** -- Searches 14+ sources in parallel: Indeed, LinkedIn, Glassdoor, ZipRecruiter, Google Jobs (via JobSpy), plus Remotive, Arbeitnow, Himalayas, RemoteOK, Jobicy, We Work Remotely, Hacker News Who's Hiring, The Muse, CryptoJobsList, and ATS boards from 100+ companies via Greenhouse, Lever, and Ashby APIs. YC Work at a Startup scraper extracts listings from Inertia.js page data. Filters by location preferences. Deduplication is URL-based.
 
 **Score** -- Rates every job on 7 weighted dimensions: technical match (TF-IDF + keywords), leadership signal, compensation potential, platform-building opportunity, company trajectory, culture fit, and career progression. The platform-building dimension (13% weight) specifically rewards startup signals like "greenfield", "0 to 1", "first data hire", and "founding engineer". Works without any LLM. With an LLM connected, scoring becomes context-aware.
 
@@ -46,12 +46,18 @@ The job market rewards quality over volume. Gig AI is built on a simple thesis: 
                +------------------+
                |    SQLite DB     |  ApplicationRecord (50+ columns)
                +------------------+
-                        |
-                        v
-               +------------------+
-               |   Streamlit UI   |  Dashboard | Search | Apps | Analytics | Settings
-               +------------------+
+                   /          \
+                  v            v
+      +----------------+  +------------------+
+      | FastAPI Backend |  | React Frontend   |
+      | REST API        |  | TanStack Router  |
+      | SSE streaming   |  | Tailwind CSS     |
+      +----------------+  +------------------+
 ```
+
+There are two UI options:
+- **Web UI (recommended):** FastAPI backend + React frontend. Run with `make dev`.
+- **Streamlit UI (legacy):** Single-file dashboard. Run with `streamlit run app.py`.
 
 **Key design decision:** LLM features are additive, never required. Search works with zero API keys. Resume-based scoring requires a PDF resume. AI features unlock progressively as you connect a provider.
 
@@ -61,16 +67,21 @@ The job market rewards quality over volume. Gig AI is built on a simple thesis: 
 
 ```bash
 # Clone and install
-git clone <your-repo-url>
-cd gig-ai
-python -m venv .venv && source .venv/bin/activate
-pip install -e .
+git clone https://github.com/bteh/launchboard.git
+cd launchboard
+make setup          # installs Python + Node deps, creates .env
 
 # Add your resume
-mkdir -p knowledge
 cp your_resume.pdf knowledge/yourname_resume.pdf
 
-# Launch
+# Create your profile
+cp src/job_finder/config/profiles/_template.yaml src/job_finder/config/profiles/yourname.yaml
+
+# Launch the web UI (recommended)
+make dev
+# Backend: http://localhost:8000   Frontend: http://localhost:5173
+
+# Or launch the legacy Streamlit UI
 streamlit run app.py
 ```
 
@@ -91,23 +102,26 @@ The fastest free option is Google Gemini:
 2. In the app, go to **Settings > LLM Provider**
 3. Select "Google Gemini", paste your key, click **Save & Test**
 
-Other supported providers:
+Other supported providers (all configurable in Settings):
 
-| Provider | Preset Name | Cost | Setup |
-|----------|-------------|------|-------|
-| Claude Proxy (CLIProxyAPI) | `claude-proxy` | Free (Max sub) | `brew install cliproxyapi` |
-| Claude Proxy (alt) | `claude-proxy-alt` | Free (Max sub) | GitHub: claude-max-api-proxy |
-| OpenAI Proxy (Codex) | `openai-proxy` | Free (Plus sub) | `npm install -g @openai/codex` |
-| Anthropic API | `anthropic-api` | Pay-per-use | api.anthropic.com |
-| OpenAI API | `openai-api` | Pay-per-use | platform.openai.com |
-| Google Gemini | `gemini` | Free tier (250 req/day) | aistudio.google.com |
-| Ollama | `ollama` | Free (local) | `brew install ollama` |
+| Provider | Cost | Notes |
+|----------|------|-------|
+| Google Gemini | Free (250 req/day) | Recommended free option |
+| Groq | Free (1,000 req/day) | Fastest inference |
+| OpenRouter | Free (200 req/day) | 27+ free models |
+| Cerebras | Free (1M tokens/day) | Ultra-fast |
+| SambaNova | Free | Large Llama models |
+| Mistral | Free (1B tokens/month) | European provider |
+| DeepSeek | Free credits + cheap | Strong reasoning |
+| Anthropic API | Pay-per-use | Claude models |
+| OpenAI API | Pay-per-use | GPT models |
+| Ollama | Free (local) | Run models on your machine |
 
 ---
 
 ## Profile System
 
-Gig AI uses YAML profiles to customize everything per user. Each profile controls:
+Launchboard uses YAML profiles to customize everything per user. Each profile controls:
 
 - **Target roles and keywords** -- what to search for
 - **Scoring weights** -- which dimensions matter most to you
@@ -154,54 +168,26 @@ All thresholds and weights are configurable per profile.
 
 ## Product Roadmap
 
-### Phase 1: Foundation -- DONE
+### Done
 
-- [x] Multi-board job scraping (5 boards + YC Work at a Startup)
-- [x] YC startup scraper with embedded JSON + HTML fallback parsing
-- [x] Greenhouse/Lever ATS detection for direct applications when a posting uses those systems
-- [x] 7-dimension weighted scoring (TF-IDF + keyword, works offline)
-- [x] Platform-building dimension (13%) targeting founding/greenfield/0-to-1 startup roles
-- [x] LLM-powered scoring, resume optimization, cover letters, company research
-- [x] 8-tier company classification -- 50+ known startups (OpenAI, Anthropic, Stripe, dbt Labs, etc.) + funding heuristics
-- [x] Location-aware filtering (preferred states/cities, remote always passes)
-- [x] Profile config with startup targeting (funding stages, min funding, founding role preference)
-- [x] SQLite application tracker with 50+ fields
-- [x] Streamlit dashboard with analytics and company type filtering
+- [x] 14+ source parallel search (JobSpy, Remotive, Arbeitnow, Himalayas, RemoteOK, Jobicy, We Work Remotely, Hacker News, The Muse, CryptoJobsList, Greenhouse, Lever, Ashby, YC Work at a Startup, Workday)
+- [x] Plugin-based scraper registry — add a new source with one decorated file
+- [x] 7-dimension weighted scoring (TF-IDF + keywords, works offline)
+- [x] 10 free LLM provider integrations + live model fetching from provider APIs
 - [x] Auto-apply via Greenhouse and Lever APIs (opt-in, dry-run default)
-- [x] Provider-agnostic LLM client (7 presets, any OpenAI-compatible endpoint)
+- [x] Resume upload with auto-analysis (extracts skills, roles, career baseline)
+- [x] FastAPI backend with SSE streaming + React frontend
+- [x] SQLite application tracker with 50+ fields
+- [x] 8-tier company classification with 50+ known startups
+- [x] Profile-driven config (YAML)
 
-### Phase 2: Intelligence -- NEXT
+### Next
 
-- [ ] **Interview Prep Engine** -- Generate STAR-format answers from resume + JD. Company-specific question banks. Technical interview topic extraction.
-- [ ] **Salary Intelligence** -- Cross-reference comp data sources. Per-company ranges. Negotiation talking points.
-- [ ] **Expanded Startup Sources** -- Scrape Wellfound (AngelList), Hacker News "Who's Hiring", Built In, Otta, and startup-specific Greenhouse/Lever boards. Enrich company data with grounded funding and company data sources.
-- [ ] **Scoring Calibration** -- Feed back application outcomes (interview, offer, rejection) to tune scoring weights over time.
-- [ ] **A/B Resume Testing** -- Track which resume variant leads to more callbacks. Statistical significance tracking.
-- [ ] **Application Follow-Up** -- Detect stale applications. Generate follow-up email drafts. Track response rates by company type.
-
-### Phase 3: Automation
-
-- [ ] **Scheduled Scanning** -- Background search with change detection. Notify on new high-scoring jobs.
-- [ ] **Notification System** -- Email/Slack/Discord alerts for STRONG_APPLY matches. Daily digest.
-- [ ] **ATS Expansion** -- Workday, Ashby, BambooHR, Jobvite adapters. Detect ATS type from any job URL.
-- [ ] **Browser Extension** -- Score any job page in-browser. One-click add to tracker.
-- [ ] **Smart Scheduling** -- Rate-limit applications per company. Spread submissions for deliverability.
-
-### Phase 4: Multi-User Platform
-
-- [ ] **FastAPI Backend** -- REST API replacing direct SQLAlchemy calls. JWT authentication.
-- [ ] **User Accounts** -- Registration, profile management, resume storage per user.
-- [ ] **Shared Job Board** -- Aggregated job feed across users. Collaborative scoring and reviews.
-- [ ] **Team Features** -- Shared profiles for recruiting teams. Candidate-job matching.
-- [ ] **Usage Analytics** -- Search volume, scoring accuracy, success rates across the platform.
-
-### Phase 5: Autonomous Agent
-
-- [ ] **Agent Loop** -- Continuous search-score-apply cycle with human-in-the-loop approval.
-- [ ] **Memory System** -- Remember past applications, interviewer names, company interactions.
-- [ ] **Multi-Step Reasoning** -- Chain company research into interview prep into follow-up strategy.
-- [ ] **Tool Use** -- Browse company websites, read reviews, check profiles.
-- [ ] **Adaptive Strategy** -- Shift search parameters based on what converts.
+- [ ] **Interview Prep** -- STAR-format answers from resume + JD
+- [ ] **Salary Intelligence** -- Cross-reference comp data, negotiation talking points
+- [ ] **Scoring Calibration** -- Feed back outcomes to tune weights
+- [ ] **Scheduled Scanning** -- Background search with notifications
+- [ ] **Browser Extension** -- Score any job page in-browser
 
 ---
 
@@ -273,7 +259,7 @@ auto_apply:
 
 ```bash
 git clone <your-repo-url>
-cd gig-ai
+cd launchboard
 python -m venv .venv && source .venv/bin/activate
 pip install -e .
 cp .env.example .env
@@ -291,21 +277,28 @@ cp .env.example .env
 
 5. **Local-first.** SQLite, local PDFs, no cloud storage required. Cloud features are additive, never required.
 
-### Adding a New Scoring Dimension
+### Adding a New Job Source
 
-1. Add the keyword list and weight to `scorer.py`
-2. Add the weight key to profile YAML (and `_template.yaml`)
-3. Add the column to `ApplicationRecord` in `database.py`
-4. Add the field to `save_application()`
-5. Update `prompts.py` templates to include the dimension
-6. Update `components.py` to display the score in the detail popover
+Create one file in `src/job_finder/tools/scrapers/`:
 
-### Adding a New LLM Feature
+```python
+from job_finder.tools.scrapers._registry import register_scraper
+from job_finder.tools.scrapers._utils import _get_json, _match_roles
 
-1. Add the prompt template to `prompts.py` with a `build_*_prompt(config)` function
-2. Add the method to `JobFinderPipeline` following the graceful degradation pattern
-3. Wire it into `run_full_pipeline()` at the appropriate stage
-4. Add UI controls in `app.py` if user-facing
+@register_scraper(
+    name="myboard",
+    display_name="My Board",
+    url="https://myboard.com",
+    description="Jobs from My Board",
+    category="remote",
+)
+def search_myboard(roles=None, max_results=50, **kwargs) -> list[dict]:
+    ...
+```
+
+Auto-discovered on import. Metadata flows to the API and frontend automatically.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for full contributor guide.
 
 ---
 
@@ -313,12 +306,14 @@ cp .env.example .env
 
 | Layer | Technology |
 |-------|-----------|
-| Search | python-jobspy, BeautifulSoup, requests |
+| Search | python-jobspy, requests, feedparser, BeautifulSoup |
 | Scoring | scikit-learn (TF-IDF), custom keyword matching |
 | LLM | openai SDK (any compatible endpoint) |
 | Database | SQLAlchemy + SQLite |
 | Models | Pydantic v2 |
-| UI | Streamlit + Plotly + custom CSS |
+| Backend | FastAPI, uvicorn, SSE streaming |
+| Frontend | React 19, TanStack Router, Tailwind CSS, Recharts |
+| Legacy UI | Streamlit + Plotly + custom CSS |
 | Config | PyYAML, python-dotenv |
 | PDF | PyPDF2 |
 

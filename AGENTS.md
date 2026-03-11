@@ -1,4 +1,4 @@
-# AGENTS.md -- Gig AI
+# AGENTS.md -- Launchboard
 
 AI-powered job search agent. Searches 5+ job boards, scores jobs against your resume
 using 7-dimension weighted scoring, generates tailored application materials via LLM,

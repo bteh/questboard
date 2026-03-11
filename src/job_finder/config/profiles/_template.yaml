@@ -3,54 +3,70 @@
 #
 # Then select the profile in the Streamlit UI sidebar, or run:
 #   python -m job_finder.main --profile my_profile
+#
+# This template works for ANY profession — engineers, marketers, designers,
+# salespeople, nurses, teachers, analysts, etc. Just fill in your skills
+# and target roles.
 
 profile:
   name: "Your Name"                    # Display name in the UI
-  description: "Brief description"     # What kind of roles you're targeting
-  resume_path: ""                      # Path to resume PDF (empty = auto-detect knowledge/{profile}_resume.pdf)
+  description: "Brief description"     # e.g., "Senior marketer targeting growth roles"
+  resume_path: ""                      # Path to resume PDF (empty = auto-detect)
 
 # --- SEARCH CONFIGURATION ---
 
 # Job titles to search for (one per line)
+# Examples for different professions:
+#   Engineer:   "senior software engineer", "staff data engineer", "engineering manager"
+#   Marketing:  "marketing manager", "growth lead", "director of marketing"
+#   Design:     "senior product designer", "UX researcher", "design director"
+#   Sales:      "account executive", "sales manager", "director of sales"
+#   Operations: "operations manager", "program manager", "chief of staff"
+#   Healthcare: "nurse practitioner", "clinical director", "nurse manager"
 target_roles:
-  - "software engineer"
-  - "data analyst"
-  # Add more roles here...
+  - ""
+  # Add your target roles here...
 
-# Keyword-based searches (technologies, specialties)
+# Keyword-based searches (skills, specialties, industry terms)
+# These are searched as freetext on job boards
 keyword_searches:
-  - "python developer"
-  # Add more keywords here...
+  - ""
+  # Add keywords specific to your field...
 
 # Where to search
 locations:
-  - "Los Angeles, CA"
   - "Remote"
+  # Add cities: "New York, NY", "San Francisco, CA", etc.
 
 # --- SCORING KEYWORDS ---
 # These keyword lists determine how jobs are scored against your resume.
-# The scorer checks for these terms in the job description.
+# Add YOUR skills and terms from YOUR industry — the scorer uses these
+# to match against job descriptions.
 
 keywords:
-  # Technical skills you have (matched against job descriptions)
+  # Your core skills (matched against job descriptions)
+  # Engineers: python, sql, kubernetes, terraform, etc.
+  # Marketers: SEO, analytics, campaign management, HubSpot, etc.
+  # Designers: Figma, user research, prototyping, design systems, etc.
+  # Nurses: patient care, EMR, clinical protocols, triage, etc.
   technical:
-    - "python"
-    - "sql"
-    - "excel"
-    # Add your technical skills...
+    - ""
+    # Add your skills...
 
   # Leadership / growth signals to look for in job postings
   leadership:
     - "mentorship"
     - "lead"
     - "manager"
-    # Add leadership keywords...
+    - "build the team"
+    # Add leadership keywords relevant to your field...
 
   # Signals that the role involves building something new
   platform_building:
     - "greenfield"
     - "from scratch"
-    # Add platform-building signals...
+    - "new initiative"
+    # Add building signals...
 
   # Company/level signals that correlate with higher compensation
   # Leave empty if compensation level isn't a priority
@@ -59,17 +75,18 @@ keywords:
 # --- SCORING WEIGHTS ---
 # How much each dimension matters in the overall score (must sum to 1.0)
 #
-# Adjust these based on what matters most to you:
-# - Entry-level: high technical + culture, low comp/progression
-# - Experienced: balanced across all dimensions
-# - Leadership-seeking: high leadership + progression
+# Suggested presets:
+#   Entry-level:       tech=0.30, lead=0.05, comp=0.10, build=0.05, traj=0.15, culture=0.25, prog=0.10
+#   Experienced IC:    tech=0.30, lead=0.10, comp=0.15, build=0.10, traj=0.10, culture=0.15, prog=0.10
+#   Leadership-bound:  tech=0.20, lead=0.20, comp=0.12, build=0.13, traj=0.10, culture=0.10, prog=0.15
+#   Non-tech pro:      tech=0.25, lead=0.10, comp=0.15, build=0.10, traj=0.10, culture=0.20, prog=0.10
 scoring:
-  technical_skills: 0.30      # How well your skills match the JD
+  technical_skills: 0.25      # How well your skills match the JD
   leadership_signal: 0.10     # Leadership/growth opportunity signals
   comp_potential: 0.10        # Compensation potential
   platform_building: 0.10     # Building something new vs maintaining
   company_trajectory: 0.10    # Company growth signals
-  culture_fit: 0.20           # Culture and work style fit
+  culture_fit: 0.25           # Culture and work style fit
   career_progression: 0.10    # Career upgrade from current role (set to 0 to disable)
 
   # Score thresholds for recommendations
@@ -81,17 +98,17 @@ scoring:
 # --- CAREER BASELINE ---
 # Your current position — used for career progression scoring
 career_baseline:
-  current_title: "Software Engineer"
-  current_level: "mid"       # intern, junior, mid, senior, staff, principal, manager, director, vp, cto
-  current_tc: 100000          # Current total compensation
-  min_acceptable_tc: 80000
-  preferred_direction: "any"  # up, up_or_lateral_leadership, any
+  current_title: ""                    # e.g., "Marketing Manager", "Senior Nurse", "Sales Director"
+  current_level: "mid"                 # intern, junior, associate, mid, senior, staff, principal, manager, director, vp
+  current_tc: 80000                    # Current total compensation
+  min_acceptable_tc: 70000
+  preferred_direction: "any"           # up, up_or_lateral_leadership, any
 
 # --- COMPENSATION ---
 compensation:
-  min_base: 80000
-  target_total_comp: 150000
-  include_equity: false
+  min_base: 60000
+  target_total_comp: 100000
+  include_equity: false                # Set true if targeting tech/startup roles with equity
 
 # --- SEARCH SETTINGS ---
 search_settings:
@@ -110,6 +127,11 @@ job_boards:
 
 # Additional sources beyond JobSpy (Indeed/LinkedIn/Glassdoor/ZipRecruiter/Google)
 # Set enabled: false to skip any source
+# Note: Some sources focus on specific industries:
+#   - remotive, himalayas, weworkremotely, remoteok: Remote jobs (all industries)
+#   - workatastartup, hackernews: Tech startups
+#   - greenhouse, lever: Company career pages (all industries)
+#   - cryptojobslist: Crypto/Web3
 additional_sources:
   - name: "workatastartup"
     enabled: true
@@ -125,6 +147,10 @@ additional_sources:
     enabled: true
   - name: "lever"
     enabled: true
+  - name: "remoteok"
+    enabled: true
+  - name: "cryptojobslist"
+    enabled: false           # Enable if targeting crypto/Web3
 
 # Company targeting (leave empty if no preference)
 target_companies:

@@ -246,6 +246,43 @@ def classify_company(
 
 
 # =========================================================================
+# Metro area mapping (cities that belong to the same metro / commute zone)
+# =========================================================================
+
+METRO_AREAS: dict[str, set[str]] = {
+    "Los Angeles": {"los angeles", "santa monica", "culver city", "burbank", "pasadena", "glendale", "long beach", "torrance", "el segundo", "playa vista", "marina del rey", "venice", "west hollywood", "beverly hills", "inglewood", "hawthorne", "manhattan beach", "hermosa beach", "redondo beach", "irvine", "costa mesa", "anaheim", "santa ana", "huntington beach", "newport beach", "woodland hills", "encino", "sherman oaks"},
+    "San Francisco": {"san francisco", "san jose", "oakland", "palo alto", "mountain view", "sunnyvale", "santa clara", "cupertino", "menlo park", "redwood city", "san mateo", "fremont", "berkeley", "emeryville", "south san francisco", "foster city", "milpitas", "campbell", "los gatos", "saratoga"},
+    "New York": {"new york", "brooklyn", "manhattan", "queens", "bronx", "staten island", "jersey city", "hoboken", "newark", "white plains", "stamford", "yonkers"},
+    "Seattle": {"seattle", "bellevue", "redmond", "kirkland", "tacoma", "bothell", "renton", "kent", "everett"},
+    "Boston": {"boston", "cambridge", "somerville", "quincy", "brookline", "waltham", "newton", "lexington", "burlington"},
+    "Austin": {"austin", "round rock", "cedar park", "pflugerville", "georgetown", "san marcos", "kyle"},
+    "Chicago": {"chicago", "evanston", "schaumburg", "naperville", "arlington heights", "skokie", "oak brook"},
+    "Denver": {"denver", "boulder", "aurora", "lakewood", "littleton", "broomfield", "westminster", "englewood"},
+    "San Diego": {"san diego", "la jolla", "chula vista", "carlsbad", "encinitas", "oceanside"},
+    "Washington": {"washington", "arlington", "alexandria", "bethesda", "silver spring", "tysons", "reston", "mclean", "fairfax"},
+    "Miami": {"miami", "fort lauderdale", "hollywood", "coral gables", "boca raton", "doral", "aventura"},
+    "Atlanta": {"atlanta", "decatur", "marietta", "alpharetta", "sandy springs", "roswell", "dunwoody"},
+    "Dallas": {"dallas", "fort worth", "plano", "frisco", "irving", "arlington", "richardson", "addison"},
+    "Portland": {"portland", "beaverton", "hillsboro", "lake oswego", "tigard"},
+    "Minneapolis": {"minneapolis", "st paul", "saint paul", "bloomington", "eden prairie", "plymouth"},
+    "Pittsburgh": {"pittsburgh", "carnegie mellon", "oakland"},
+    "Detroit": {"detroit", "ann arbor", "dearborn", "troy", "southfield"},
+    "Philadelphia": {"philadelphia", "king of prussia", "conshohocken", "cherry hill", "camden"},
+    "Raleigh": {"raleigh", "durham", "chapel hill", "cary", "morrisville", "research triangle"},
+    "Salt Lake City": {"salt lake city", "provo", "sandy", "draper", "lehi", "orem"},
+}
+
+
+def _find_metro(city: str) -> str | None:
+    """Given a city name, return the metro area it belongs to (or None)."""
+    city_lower = city.lower().strip()
+    for metro, cities in METRO_AREAS.items():
+        if city_lower in cities:
+            return metro
+    return None
+
+
+# =========================================================================
 # Location parsing and filtering
 # =========================================================================
 
@@ -258,6 +295,22 @@ _US_STATES = {
 }
 
 _REMOTE_KEYWORDS = {"remote", "work from home", "wfh", "anywhere", "distributed"}
+_HYBRID_KEYWORDS = {"hybrid", "in-office", "in office", "on-site", "onsite", "days in office", "office days"}
+_ONSITE_KEYWORDS = {"on-site only", "onsite only", "in-person", "in person", "no remote"}
+
+# Regex patterns that strongly indicate hybrid/in-office requirements in descriptions
+_HYBRID_PATTERNS = [
+    r"\d+\s*(?:days?|x)\s*(?:per|a|each|\/)\s*week\s*(?:in|at|from)?\s*(?:the\s+)?(?:office|on.?site)",
+    r"(?:in|at|from)\s*(?:the\s+)?office\s*\d+\s*(?:days?|x)\s*(?:per|a|each|\/)\s*week",
+    r"(?:office|on.?site)\s*(?:presence|attendance)\s*(?:required|expected|mandatory)",
+    r"return\s+to\s+(?:the\s+)?office",
+    r"(?:must|required to|expected to|need to)\s+(?:be\s+)?(?:in|at|come\s+to)\s+(?:the\s+)?office",
+    r"(?:work|report)\s+(?:from|at|in)\s+(?:the|our)\s+(?:office|location|site|campus)",
+    r"days?\s+(?:in|at)\s+(?:the\s+)?office",
+    r"(?:in|at)\s+(?:the\s+)?office\s+(?:at\s+least|minimum)",
+    r"flexible\s+(?:hybrid|work\s+arrangement)",
+    r"combination\s+of\s+(?:remote|in.office|office)",
+]
 
 
 def parse_location(raw_location: str, is_remote: bool = False) -> dict:
@@ -308,41 +361,159 @@ def parse_location(raw_location: str, is_remote: bool = False) -> dict:
     return result
 
 
+def _has_physical_location(location: str) -> bool:
+    """Check if the location string contains a real city/state (not just 'Remote')."""
+    if not location:
+        return False
+    cleaned = re.sub(
+        r"\b(remote|hybrid|work from home|wfh|anywhere|distributed)\b",
+        "", location, flags=re.IGNORECASE,
+    )
+    cleaned = re.sub(r",?\s*\b(United States|US|USA|U\.S\.)\b", "", cleaned, flags=re.IGNORECASE)
+    cleaned = cleaned.strip(" ,-()/")
+    # Has a city/state if there's meaningful text left (e.g. "Durham, NC")
+    return bool(re.search(r"[A-Za-z]{2,}", cleaned))
+
+
+def _desc_has_hybrid_pattern(desc_lower: str) -> bool:
+    """Check description for hybrid/in-office requirement patterns."""
+    # Check simple keywords first
+    for kw in _HYBRID_KEYWORDS:
+        if kw in desc_lower:
+            return True
+    # Check regex patterns for more nuanced phrases
+    for pattern in _HYBRID_PATTERNS:
+        if re.search(pattern, desc_lower):
+            return True
+    return False
+
+
+def classify_work_type(
+    location: str,
+    description: str = "",
+    is_remote_hint: bool = False,
+) -> str:
+    """Classify a job as 'remote', 'hybrid', or 'onsite'.
+
+    Checks both the location string and description for signals.
+    Hybrid signals override remote signals (stricter classification).
+
+    When the only remote signal comes from the job board's metadata
+    (is_remote_hint) but the job has a physical location and no
+    explicit 'fully remote' confirmation in the description, we
+    scan the description more aggressively for hybrid/office patterns
+    since job boards frequently mislabel hybrid jobs as remote.
+
+    Returns
+    -------
+    'remote' | 'hybrid' | 'onsite'
+    """
+    loc_lower = location.lower() if location else ""
+    desc_lower = description.lower()[:4000] if description else ""
+
+    remote_in_location = any(kw in loc_lower for kw in _REMOTE_KEYWORDS)
+    has_remote = is_remote_hint or remote_in_location
+    has_hybrid = any(kw in loc_lower for kw in _HYBRID_KEYWORDS)
+    has_onsite = any(kw in loc_lower for kw in _ONSITE_KEYWORDS)
+
+    # Always scan description for hybrid/office signals
+    if not has_hybrid and not has_onsite:
+        has_hybrid = _desc_has_hybrid_pattern(desc_lower)
+
+    # Look for explicit "fully remote" confirmation in description
+    confirmed_remote_in_desc = bool(
+        re.search(r"\b(fully\s+remote|100%?\s*remote|remote.first|permanently\s+remote|all.remote)\b", desc_lower)
+    )
+    if confirmed_remote_in_desc:
+        has_remote = True
+
+    # KEY FIX: When the only remote signal is from the job board's metadata
+    # (is_remote_hint) and there's a physical location like "Durham, NC",
+    # be skeptical. Job boards frequently mislabel hybrid jobs as remote.
+    # Require confirmation from the description or location text itself.
+    hint_only_remote = is_remote_hint and not remote_in_location and not confirmed_remote_in_desc
+    if hint_only_remote and _has_physical_location(location):
+        # The board says remote but the posting has a specific city —
+        # downgrade to hybrid unless description explicitly says remote.
+        if has_hybrid:
+            return "hybrid"
+        # Even without hybrid keywords, a physical location + no remote
+        # confirmation in the text is suspicious — call it hybrid.
+        return "hybrid"
+
+    # Hybrid overrides remote (if location says both "remote" and "hybrid",
+    # it's hybrid — e.g. "Remote / Hybrid in San Francisco")
+    if has_hybrid:
+        return "hybrid"
+    if has_onsite:
+        return "onsite"
+    if has_remote:
+        return "remote"
+
+    return "onsite"
+
+
 def location_matches_preferences(
     job_location: str,
     is_remote: bool,
     preferred_states: list[str] | None = None,
     preferred_cities: list[str] | None = None,
+    remote_only: bool = False,
+    work_type: str = "",
 ) -> bool:
     """Check if a job location matches user preferences.
 
     Rules:
-    1. Remote jobs ALWAYS pass.
-    2. If job's state matches any preferred state -> pass.
-    3. If job's city matches any preferred city (substring) -> pass.
+    1. If remote_only=True, only truly remote jobs pass (hybrid/onsite rejected).
+    2. Fully remote jobs pass (unless they're actually hybrid).
+    3. Hybrid and onsite jobs must match state/city preferences.
     4. If no preferences configured -> pass (no filtering).
     """
     # No preferences = no filtering
-    if not preferred_states and not preferred_cities:
+    if not preferred_states and not preferred_cities and not remote_only:
         return True
 
+    # Use work_type if provided, otherwise fall back to basic detection
+    wt = work_type or classify_work_type(job_location, "", is_remote)
+
+    # Rule 1: remote_only mode — only truly remote passes
+    if remote_only:
+        return wt == "remote"
+
+    # Rule 2: Fully remote passes (but NOT hybrid)
+    if wt == "remote":
+        return True
+
+    # Rule 3: Hybrid and onsite must match state/city
     parsed = parse_location(job_location, is_remote)
 
-    # Rule 1: Remote always passes
-    if parsed["is_remote"]:
+    # If location is empty or unparseable, keep the job rather than silently
+    # dropping it — the scorer will handle relevance.
+    if not parsed["city"] and not parsed["state"]:
         return True
 
-    # Rule 2: State match
+    # City-level matching with metro area awareness
+    if preferred_cities and parsed["city"]:
+        job_city = parsed["city"].lower()
+        job_metro = _find_metro(parsed["city"])
+        for pref_city in preferred_cities:
+            pref_lower = pref_city.lower()
+            # Direct city match
+            if pref_lower in job_city or job_city in pref_lower:
+                return True
+            # Metro area match: job's city is in the same metro as the preferred city
+            pref_metro = _find_metro(pref_city)
+            if pref_metro and pref_metro == job_metro:
+                return True
+
+    # State-level fallback (only when no city match was possible)
     if preferred_states and parsed["state"]:
+        # If cities were specified but didn't match, don't fall through to state
+        # unless the job has no parseable city
+        if preferred_cities and parsed["city"]:
+            return False  # City was parsed but didn't match any metro
         if parsed["state"].upper() in [s.upper() for s in preferred_states]:
             return True
-
-    # Rule 3: City match (substring, case-insensitive)
-    if preferred_cities and parsed["city"]:
-        city_lower = parsed["city"].lower()
-        for pref_city in preferred_cities:
-            if pref_city.lower() in city_lower or city_lower in pref_city.lower():
-                return True
 
     # No match
     return False

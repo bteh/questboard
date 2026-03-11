@@ -50,11 +50,33 @@ additional_sources:
   - name: "workatastartup"
     url: "https://www.workatastartup.com/jobs"
     enabled: true
+  - name: "remotive"
+    enabled: true
+  - name: "himalayas"
+    enabled: true
+  - name: "weworkremotely"
+    enabled: true
+  - name: "hackernews"
+    enabled: true
   - name: "greenhouse"
     url_pattern: "boards.greenhouse.io"
     enabled: true
   - name: "lever"
     url_pattern: "jobs.lever.co"
+    enabled: true
+  - name: "remoteok"
+    enabled: true
+  - name: "cryptojobslist"
+    enabled: true
+  - name: "wellfound"
+    enabled: true
+  - name: "workday"
+    enabled: true
+  - name: "arbeitnow"
+    enabled: true
+  - name: "jobicy"
+    enabled: true
+  - name: "themuse"
     enabled: true
 
 # Company targeting
@@ -105,6 +127,7 @@ compensation:
 # Search frequency
 search_settings:
   results_per_board: 25
+  results_per_additional_source: 100  # Higher limit for additional scrapers (they only run once per search)
   max_days_old: 14
   exclude_staffing_agencies: true
   country: "USA"

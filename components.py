@@ -1,4 +1,4 @@
-"""Reusable UI components for Gig AI dashboard."""
+"""Reusable UI components for Launchboard dashboard."""
 
 from __future__ import annotations
 
@@ -540,27 +540,37 @@ def render_empty_state(icon: str, title: str, description: str) -> None:
     )
 
 
-JOB_SOURCES = [
-    ("Indeed", "https://indeed.com"),
-    ("LinkedIn", "https://linkedin.com"),
-    ("Glassdoor", "https://glassdoor.com"),
-    ("ZipRecruiter", "https://ziprecruiter.com"),
-    ("Google Jobs", "https://google.com/jobs"),
-    ("YC Startups", "https://workatastartup.com"),
-    ("Remotive", "https://remotive.com"),
-    ("Himalayas", "https://himalayas.app"),
-    ("We Work Remotely", "https://weworkremotely.com"),
-    ("HN Hiring", "https://news.ycombinator.com"),
-    ("Greenhouse", "https://greenhouse.io"),
-    ("Lever", "https://lever.co"),
-]
+def _get_job_sources() -> list[tuple[str, str]]:
+    """Get job sources from the scraper registry."""
+    try:
+        from job_finder.tools.scrapers import get_all_metadata
+        return [(m.display_name, m.url) for m in get_all_metadata()]
+    except Exception:
+        # Fallback if registry fails to load
+        return [
+            ("Indeed", "https://indeed.com"),
+            ("LinkedIn", "https://linkedin.com"),
+            ("Glassdoor", "https://glassdoor.com"),
+            ("ZipRecruiter", "https://ziprecruiter.com"),
+            ("Google Jobs", "https://google.com/jobs"),
+            ("YC Startups", "https://workatastartup.com"),
+            ("Remotive", "https://remotive.com"),
+            ("Himalayas", "https://himalayas.app"),
+            ("We Work Remotely", "https://weworkremotely.com"),
+            ("Hacker News", "https://news.ycombinator.com"),
+            ("Greenhouse", "https://greenhouse.io"),
+            ("Lever", "https://lever.co"),
+            ("RemoteOK", "https://remoteok.com"),
+            ("CryptoJobsList", "https://cryptojobslist.com"),
+        ]
 
 
 def render_pipeline_steps(llm_available: bool) -> None:
     """Show the 3-step pipeline as visual cards."""
     cols = st.columns(3)
 
-    source_names = " &middot; ".join(name for name, _ in JOB_SOURCES)
+    job_sources = _get_job_sources()
+    source_names = " &middot; ".join(name for name, _ in job_sources)
     steps = [
         ("1", "Search", f'<span class="pipeline-sources">{source_names}</span>', "done"),
         ("2", "Score", "7-dimension scoring against resume", "done"),

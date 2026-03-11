@@ -102,7 +102,7 @@ def _profile_resume_filename(profile_name: str) -> str:
 # ==========================================================================
 
 st.set_page_config(
-    page_title="Gig AI - Job Search Pipeline",
+    page_title="Launchboard - AI Job Search Agent",
     page_icon="G",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -118,7 +118,7 @@ if os.path.exists(_css_path):
 # ==========================================================================
 
 with st.sidebar:
-    st.title("Gig AI")
+    st.title("Launchboard")
 
     # Profile selector
     available_profiles = _list_profiles()

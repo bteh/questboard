@@ -29,18 +29,25 @@ def find_resume(profile: str | None = None) -> str | None:
         ),
     ]
 
-    for knowledge_dir in knowledge_dirs:
-        if not os.path.exists(knowledge_dir):
-            continue
+    # Deduplicate resolved paths to avoid scanning the same directory twice
+    seen: set[str] = set()
+    unique_dirs: list[str] = []
+    for d in knowledge_dirs:
+        resolved = os.path.realpath(d)
+        if resolved not in seen and os.path.exists(resolved):
+            seen.add(resolved)
+            unique_dirs.append(resolved)
 
-        # Priority 1: profile-specific resume
-        if profile:
-            profile_file = f"{profile}_resume.pdf"
+    # Priority 1: profile-specific resume across ALL directories
+    if profile:
+        profile_file = f"{profile}_resume.pdf"
+        for knowledge_dir in unique_dirs:
             profile_path = os.path.join(knowledge_dir, profile_file)
             if os.path.exists(profile_path):
                 return profile_path
 
-        # Priority 2-3: generic fallback
+    # Priority 2-3: generic fallback
+    for knowledge_dir in unique_dirs:
         pdfs = [
             f for f in os.listdir(knowledge_dir) if f.lower().endswith(".pdf")
         ]

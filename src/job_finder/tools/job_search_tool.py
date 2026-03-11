@@ -46,6 +46,7 @@ def search_jobs(
     hours_old: int = 336,
     is_remote: bool | None = None,
     country: str = "USA",
+    linkedin_fetch_description: bool = True,
 ) -> list[dict]:
     """Search multiple job boards via JobSpy and return normalised dicts.
 
@@ -65,10 +66,12 @@ def search_jobs(
         scrape_kwargs = dict(
             site_name=site_names,
             search_term=search_term,
+            google_search_term=f"{search_term} jobs near {location}",
             location=location,
             results_wanted=results_wanted,
             hours_old=hours_old,
             country_indeed=country,
+            linkedin_fetch_description=linkedin_fetch_description,
         )
         # Only pass is_remote when explicitly True/False (not None)
         # JobSpy Pydantic model rejects None
@@ -87,19 +90,31 @@ def search_jobs(
             if pd.isna(url) or not url:
                 url = row.get("job_url_direct", "")
 
+            loc_str = _safe_str(row.get("location", ""))
+            loc_lower = loc_str.lower()
+            raw_remote = _safe_bool(row.get("is_remote"))
+
+            # Fix is_remote: hybrid jobs are NOT remote
+            if any(kw in loc_lower for kw in ("hybrid", "in-office", "on-site")):
+                is_remote_val = False
+            elif raw_remote or "remote" in loc_lower:
+                is_remote_val = True
+            else:
+                is_remote_val = False
+
             job = {
                 "title": _safe_str(row.get("title", "")),
                 "company": _safe_str(
                     row.get("company_name", row.get("company", ""))
                 ),
-                "location": _safe_str(row.get("location", "")),
+                "location": loc_str,
                 "url": _safe_str(url),
                 "source": _safe_str(row.get("site", "")),
                 "description": _safe_str(row.get("description", ""))[:3000],
                 "salary_min": _safe_float(row.get("min_amount")),
                 "salary_max": _safe_float(row.get("max_amount")),
                 "date_posted": _safe_str(row.get("date_posted", "")),
-                "is_remote": _safe_bool(row.get("is_remote")),
+                "is_remote": is_remote_val,
                 "company_size": _safe_str(
                     row.get("company_num_employees", "")
                 ),

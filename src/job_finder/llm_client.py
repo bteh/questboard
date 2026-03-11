@@ -18,47 +18,99 @@ logger = logging.getLogger(__name__)
 # Provider presets -------------------------------------------------------
 
 PRESETS: dict[str, dict[str, str]] = {
+    # ── Free cloud providers (recommended for public users) ──
+    "gemini": {
+        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
+        "model": "gemini-2.5-flash",
+        "api_key": "",
+        "label": "Google Gemini (free tier available)",
+        "needs_api_key": "true",
+    },
+    "groq": {
+        "base_url": "https://api.groq.com/openai/v1",
+        "model": "meta-llama/llama-4-maverick-17b-128e-instruct",
+        "api_key": "",
+        "label": "Groq (free tier available)",
+        "needs_api_key": "true",
+    },
+    "openrouter": {
+        "base_url": "https://openrouter.ai/api/v1",
+        "model": "meta-llama/llama-4-maverick:free",
+        "api_key": "",
+        "label": "OpenRouter (free models available)",
+        "needs_api_key": "true",
+    },
+    "cerebras": {
+        "base_url": "https://api.cerebras.ai/v1",
+        "model": "llama-4-scout-17b-16e",
+        "api_key": "",
+        "label": "Cerebras (free tier available)",
+        "needs_api_key": "true",
+    },
+    "sambanova": {
+        "base_url": "https://api.sambanova.ai/v1",
+        "model": "Meta-Llama-3.3-70B-Instruct",
+        "api_key": "",
+        "label": "SambaNova (free tier available)",
+        "needs_api_key": "true",
+    },
+    # ── Paid API providers ──
+    "anthropic-api": {
+        "base_url": "https://api.anthropic.com/v1",
+        "model": "claude-sonnet-4-6",
+        "api_key": "",
+        "label": "Anthropic API (pay-per-use)",
+        "needs_api_key": "true",
+    },
+    "openai-api": {
+        "base_url": "https://api.openai.com/v1",
+        "model": "gpt-5.4",
+        "api_key": "",
+        "label": "OpenAI API (pay-per-use)",
+        "needs_api_key": "true",
+    },
+    "mistral": {
+        "base_url": "https://api.mistral.ai/v1",
+        "model": "mistral-small-latest",
+        "api_key": "",
+        "label": "Mistral (free experiment tier)",
+        "needs_api_key": "true",
+    },
+    "deepseek": {
+        "base_url": "https://api.deepseek.com/v1",
+        "model": "deepseek-chat",
+        "api_key": "",
+        "label": "DeepSeek (1M tokens/month free)",
+        "needs_api_key": "true",
+    },
+    # ── Local models ──
+    "ollama": {
+        "base_url": "http://localhost:11434/v1",
+        "model": "llama3.1",
+        "api_key": "ollama",
+        "label": "Ollama (local)",
+    },
+    # ── Internal / proxy (hidden from public UI) ──
     "claude-proxy": {
         "base_url": "http://localhost:8317/v1",
         "model": "claude-sonnet-4-20250514",
         "api_key": "not-needed",
         "label": "Claude Proxy (CLIProxyAPI)",
+        "internal": "true",
     },
     "claude-proxy-alt": {
         "base_url": "http://localhost:3456/v1",
         "model": "claude-sonnet-4",
         "api_key": "not-needed",
         "label": "Claude Proxy (claude-max-api-proxy)",
+        "internal": "true",
     },
     "openai-proxy": {
         "base_url": "http://localhost:3457/v1",
         "model": "gpt-4o",
         "api_key": "not-needed",
         "label": "OpenAI Proxy (Codex)",
-    },
-    "anthropic-api": {
-        "base_url": "https://api.anthropic.com/v1",
-        "model": "claude-sonnet-4-20250514",
-        "api_key": "",
-        "label": "Anthropic API (pay-per-use)",
-    },
-    "openai-api": {
-        "base_url": "https://api.openai.com/v1",
-        "model": "gpt-4o",
-        "api_key": "",
-        "label": "OpenAI API (pay-per-use)",
-    },
-    "gemini": {
-        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
-        "model": "gemini-2.5-flash",
-        "api_key": "",
-        "label": "Google Gemini (free tier available)",
-    },
-    "ollama": {
-        "base_url": "http://localhost:11434/v1",
-        "model": "llama3.1",
-        "api_key": "ollama",
-        "label": "Ollama (local)",
+        "internal": "true",
     },
 }
 

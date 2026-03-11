@@ -1,1 +1,1 @@
-"""Gig AI job finder package."""
+"""Launchboard — AI-powered job search agent."""

@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from datetime import datetime, timezone
 from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 from sqlalchemy import (
     Column,
@@ -40,10 +43,11 @@ class ApplicationRecord(Base):
     job_title = Column(String(500), nullable=False)
     company = Column(String(300), nullable=False)
     location = Column(String(300), default="")
-    job_url = Column(String(2000), default="", unique=True)
+    job_url = Column(String(2000), nullable=True, unique=True)
     source = Column(String(100), default="")  # LinkedIn, Indeed, etc.
     description = Column(Text, default="")
     is_remote = Column(Boolean, default=False)
+    work_type = Column(String(20), default="")  # remote, hybrid, onsite
 
     # Salary info
     salary_min = Column(Float, nullable=True)
@@ -90,6 +94,10 @@ class ApplicationRecord(Base):
     contact_name = Column(String(300), default="")
     contact_email = Column(String(300), default="")
     referral_source = Column(String(300), default="")
+
+    # URL liveness
+    url_status = Column(String(20), default="unknown")  # alive, dead, unknown
+    last_checked_at = Column(DateTime, nullable=True)
 
     # Timestamps
     created_at = Column(DateTime, default=_utcnow)
@@ -146,6 +154,20 @@ def _migrate_db(engine) -> None:
             conn.execute(
                 text("ALTER TABLE applications ADD COLUMN company_type VARCHAR(50) DEFAULT 'Unknown'")
             )
+        if "work_type" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN work_type VARCHAR(20) DEFAULT ''")
+            )
+        if "url_status" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN url_status VARCHAR(20) DEFAULT 'unknown'")
+            )
+        if "last_checked_at" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN last_checked_at DATETIME")
+            )
+        # Convert empty job_url strings to NULL (allows multiple NULLs in unique column)
+        conn.execute(text("UPDATE applications SET job_url = NULL WHERE job_url = ''"))
 
 
 def init_db(db_path: str | None = None) -> None:
@@ -170,6 +192,12 @@ def get_session() -> Session:
     if _SessionLocal is None:
         init_db()
     return _SessionLocal()
+
+
+def _close_session() -> None:
+    """Properly close and remove the scoped session from the registry."""
+    if _SessionLocal is not None:
+        _SessionLocal.remove()
 
 
 def save_application(
@@ -203,16 +231,88 @@ def save_application(
     application_method: str = "",
     profile: str = "default",
     company_type: str = "Unknown",
+    work_type: str = "",
     notes: str = "",
 ) -> ApplicationRecord | None:
     """Save a new application record to the database. Returns None if duplicate URL."""
+    # Store empty URLs as None so SQLite unique constraint allows multiples
+    if not job_url:
+        job_url = None
+
     session = get_session()
     try:
         # Skip duplicates by URL
         if job_url:
             existing = session.query(ApplicationRecord).filter_by(job_url=job_url).first()
             if existing:
+                session.refresh(existing)
+                session.expunge(existing)
                 return existing
+
+        # Skip cross-source duplicates by normalized company + title
+        if job_title and company:
+            from job_finder.pipeline import _normalize_company, _normalize_title
+            norm_co = _normalize_company(company)
+            norm_title = _normalize_title(job_title)
+            if norm_co and norm_title:
+                # Narrow by case-insensitive company match first (SQL-level filter)
+                from sqlalchemy import func
+                co_words = norm_co.split()
+                # Use the longest word in the company name for SQL LIKE filter
+                longest_word = max(co_words, key=len) if co_words else norm_co
+                candidates = (
+                    session.query(ApplicationRecord)
+                    .filter(
+                        func.lower(ApplicationRecord.company).contains(longest_word),
+                        ApplicationRecord.job_title.isnot(None),
+                    )
+                    .all()
+                )
+                for cand in candidates:
+                    if (
+                        _normalize_company(cand.company or "") == norm_co
+                        and _normalize_title(cand.job_title or "") == norm_title
+                    ):
+                        # Update existing record if new data is richer
+                        updated = False
+                        if not cand.salary_min and salary_min:
+                            cand.salary_min = salary_min
+                            updated = True
+                        if not cand.salary_max and salary_max:
+                            cand.salary_max = salary_max
+                            updated = True
+                        if overall_score and (not cand.overall_score or overall_score > cand.overall_score):
+                            cand.overall_score = overall_score
+                            cand.technical_score = technical_score
+                            cand.leadership_score = leadership_score
+                            cand.platform_building_score = platform_building_score
+                            cand.comp_potential_score = comp_potential_score
+                            cand.company_trajectory_score = company_trajectory_score
+                            cand.culture_fit_score = culture_fit_score
+                            cand.career_progression_score = career_progression_score
+                            cand.recommendation = recommendation
+                            cand.score_reasoning = score_reasoning
+                            cand.key_strengths = key_strengths if isinstance(key_strengths, str) else json.dumps(key_strengths or [])
+                            cand.key_gaps = key_gaps if isinstance(key_gaps, str) else json.dumps(key_gaps or [])
+                            updated = True
+                        if len(description) > len(cand.description or ""):
+                            cand.description = description
+                            updated = True
+                        if cover_letter and not cand.cover_letter:
+                            cand.cover_letter = cover_letter
+                            updated = True
+                        if company_intel_json and not cand.company_intel_json:
+                            cand.company_intel_json = company_intel_json
+                            updated = True
+                        if resume_tweaks_json and not cand.resume_tweaks_json:
+                            cand.resume_tweaks_json = resume_tweaks_json
+                            updated = True
+                        if updated:
+                            cand.updated_at = _utcnow()
+                            session.commit()
+                        session.refresh(cand)
+                        session.expunge(cand)
+                        return cand
 
         # Normalize key_strengths/key_gaps: accept list or JSON string
         if isinstance(key_strengths, list):
@@ -256,6 +356,7 @@ def save_application(
             application_method=application_method,
             profile=profile,
             company_type=company_type,
+            work_type=work_type,
             notes=notes,
         )
         session.add(record)
@@ -263,11 +364,23 @@ def save_application(
         session.refresh(record)
         session.expunge(record)
         return record
-    except Exception:
+    except Exception as exc:
         session.rollback()
+        # Handle duplicate URL race condition gracefully
+        if "UNIQUE constraint" in str(exc) and job_url:
+            logger.debug("Duplicate job_url, returning existing: %s", job_url[:80])
+            try:
+                existing = session.query(ApplicationRecord).filter_by(job_url=job_url).first()
+                if existing:
+                    session.refresh(existing)
+                    session.expunge(existing)
+                    return existing
+            except Exception:
+                pass
+            return None
         raise
     finally:
-        session.close()
+        _close_session()
 
 
 def update_application_status(
@@ -296,7 +409,7 @@ def update_application_status(
         session.rollback()
         raise
     finally:
-        session.close()
+        _close_session()
 
 
 def get_all_applications(
@@ -321,7 +434,7 @@ def get_all_applications(
         session.expunge_all()
         return results
     finally:
-        session.close()
+        _close_session()
 
 
 def purge_non_matching_locations(
@@ -337,7 +450,10 @@ def purge_non_matching_locations(
     if not preferred_states and not preferred_cities:
         return 0
 
-    from job_finder.company_classifier import location_matches_preferences
+    from job_finder.company_classifier import (
+        classify_work_type,
+        location_matches_preferences,
+    )
 
     session = get_session()
     try:
@@ -347,11 +463,19 @@ def purge_non_matching_locations(
         records = query.all()
         deleted = 0
         for rec in records:
+            # Use stored work_type when available; otherwise re-classify
+            # from location + description to avoid stale is_remote flags.
+            wt = rec.work_type or classify_work_type(
+                rec.location or "",
+                rec.description or "",
+                rec.is_remote or False,
+            )
             if not location_matches_preferences(
                 rec.location or "",
                 rec.is_remote or False,
                 preferred_states,
                 preferred_cities,
+                work_type=wt,
             ):
                 session.delete(rec)
                 deleted += 1
@@ -361,7 +485,7 @@ def purge_non_matching_locations(
         session.rollback()
         raise
     finally:
-        session.close()
+        _close_session()
 
 
 def backfill_company_types() -> int:
@@ -391,4 +515,4 @@ def backfill_company_types() -> int:
         session.rollback()
         raise
     finally:
-        session.close()
+        _close_session()

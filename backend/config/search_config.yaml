@@ -1,0 +1,102 @@
+# Job Search Configuration
+# Customize these to match your target roles and preferences
+
+target_roles:
+  - "data platform engineer"
+  - "analytics engineer"
+  - "senior data engineer"
+  - "staff data engineer"
+  - "manager data engineering"
+  - "head of data"
+  - "director of data engineering"
+  - "founding data engineer"
+  - "principal data engineer"
+
+# Keyword-based searches (technologies/tools)
+keyword_searches:
+  - "dbt"
+  - "Trino"
+  - "lakehouse"
+  - "data platform"
+  - "iceberg data engineer"
+
+locations:
+  - "Los Angeles, CA"
+  - "Remote"
+
+# Job boards to scrape via JobSpy
+job_boards:
+  - "indeed"
+  - "linkedin"
+  - "glassdoor"
+  - "zip_recruiter"
+  - "google"
+
+# Additional sources (custom scrapers)
+additional_sources:
+  - name: "workatastartup"
+    enabled: true
+  - name: "remotive"
+    enabled: true
+  - name: "himalayas"
+    enabled: true
+  - name: "weworkremotely"
+    enabled: true
+  - name: "hackernews"
+    enabled: true
+  - name: "greenhouse"
+    enabled: true
+  - name: "lever"
+    enabled: true
+  - name: "remoteok"
+    enabled: true
+  - name: "cryptojobslist"
+    enabled: true
+  - name: "wellfound"
+    enabled: true
+  - name: "workday"
+    enabled: true
+
+# Company targeting
+target_companies:
+  big_tech:
+    - "Netflix"
+    - "NVIDIA"
+    - "Airbnb"
+    - "Stripe"
+    - "Databricks"
+    - "Snowflake"
+    - "Confluent"
+    - "dbt Labs"
+    - "Fivetran"
+    - "Starburst"
+  startup_criteria:
+    funding_stages:
+      - "Series A"
+      - "Series B"
+      - "Series C"
+    min_funding_amount: 10000000  # $10M minimum
+    prefer_founding_roles: true
+
+# Scoring weights
+scoring:
+  technical_skills: 0.30
+  leadership_signal: 0.20
+  comp_potential: 0.15
+  platform_building: 0.15  # "building from scratch" signal
+  company_trajectory: 0.10
+  culture_fit: 0.10
+
+# Compensation filters
+compensation:
+  min_base: 190000
+  target_total_comp: 300000
+  include_equity: true
+
+# Search frequency
+search_settings:
+  results_per_board: 25
+  results_per_additional_source: 100
+  max_days_old: 14
+  exclude_staffing_agencies: true
+  country: "USA"

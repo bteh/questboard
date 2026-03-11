@@ -1,5 +1,7 @@
 # Environment
 .env
+.env.*
+!.env.example
 .venv/
 venv/
 
@@ -13,10 +15,17 @@ build/
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
 
 # Resumes (user-specific, not tracked)
 knowledge/*.pdf
 knowledge/*.docx
+knowledge/.*_resume_name
+
+# User profiles (personal config — only _template.yaml is tracked)
+src/job_finder/config/profiles/*.yaml
+!src/job_finder/config/profiles/_template.yaml
 
 # Data
 data/*.db
@@ -26,6 +35,10 @@ data/*.sqlite
 # Output
 src/job_finder/output/*.json
 src/job_finder/output/*.md
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
 
 # OS
 .DS_Store

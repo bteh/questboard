@@ -60,6 +60,12 @@ Score the job on these {num_dimensions} weighted dimensions:
 6. CULTURE FIT       ({w_cult}%) — Remote-friendly?  Modern practices?
    Collaborative culture signals?
 {career_progression_block}
+Also determine the **actual work arrangement** from the job description text
+(ignore the job board's remote/onsite label — they are often wrong):
+- "remote" = fully remote, no office requirement
+- "hybrid" = mix of remote and in-office (e.g. "3 days in office")
+- "onsite" = must be physically present full-time
+
 Return your answer as **valid JSON** with this schema (no markdown fences):
 
 {{
@@ -74,7 +80,8 @@ Return your answer as **valid JSON** with this schema (no markdown fences):
   "recommendation": "<STRONG_APPLY | APPLY | MAYBE | SKIP>",
   "score_reasoning": "<2-3 sentences>",
   "key_strengths": ["<strength1>", "<strength2>", ...],
-  "key_gaps": ["<gap1>", "<gap2>", ...]
+  "key_gaps": ["<gap1>", "<gap2>", ...],
+  "work_type": "<remote | hybrid | onsite>"
 }}
 
 Recommendation thresholds:
@@ -129,14 +136,14 @@ def build_scorer_prompt(config: dict[str, Any] | None = None) -> str:
         career_block = _CAREER_PROGRESSION_BLOCK.format(
             w_prog=_pct(w_prog),
             current_title=baseline.get("current_title", "the candidate's current role"),
-            current_tc=_fmt_tc(baseline.get("current_tc", 200_000)),
+            current_tc=_fmt_tc(baseline.get("current_tc", 100_000)),
         )
         num_dimensions = "seven"
     else:
         career_block = ""
         num_dimensions = "six"
 
-    target_tc = _fmt_tc(comp.get("target_total_comp", 300_000))
+    target_tc = _fmt_tc(comp.get("target_total_comp", 150_000))
 
     thresh_strong = thresholds.get("strong_apply", 70)
     thresh_apply = thresholds.get("apply", 55)
@@ -189,7 +196,7 @@ You know that a resume bullet about "maintained systems" can be rewritten to
 highlight impact with specific technologies and metrics — same experience,
 completely different signal.
 
-The candidate's key technical skills include: {tech_sample}
+The candidate's key skills include: {tech_sample}
 
 For the given job, produce tailored resume optimizations.  All tweaks must be
 truthful and based on actual resume content.  Reposition and emphasize — never
@@ -269,9 +276,9 @@ Structure (keep under 400 words total):
    experience directly to the role's core challenges.  Use specific metrics
    and outcomes from the resume.
 
-3. TECHNICAL DEPTH (1 paragraph) — Demonstrate understanding of the company's
-   technical landscape and how the candidate's experience with technologies
-   like {tech_sample} applies to their stack.
+3. DOMAIN EXPERTISE (1 paragraph) — Demonstrate understanding of the company's
+   landscape and how the candidate's experience with skills and tools
+   like {tech_sample} applies to the role's core requirements.
 
 4. LEADERSHIP NARRATIVE (1 paragraph) — For leadership roles, tell the story
    of building and scaling a team.  For IC roles, emphasize technical
@@ -352,11 +359,17 @@ Build a conservative company intelligence profile covering:
 8. INTERVIEW TIPS — Known process, common questions, prep advice.
 
 Reliability rules:
-- Use only high-confidence knowledge.
-- When unsure, return `"Unknown"`, `null`, or `[]` instead of guessing.
-- Treat headcount, team size, compensation, and process details as estimates.
+- Prioritize data from web search results when provided — these are real-time
+  and more current than your training data.
+- When web results provide specific numbers (funding, headcount, ratings),
+  use those over your own estimates.
+- When unsure and no web data is available, return `"Unknown"`, `null`, or
+  `[]` instead of guessing.
+- Treat headcount, team size, compensation, and process details as estimates
+  unless backed by web search data.
 - Do not invent recent news, funding rounds, investors, Glassdoor ratings, or
-  interview details.
+  interview details that aren't supported by the provided web context or your
+  high-confidence knowledge.
 
 Return **valid JSON** (no markdown fences):
 
@@ -383,7 +396,7 @@ def build_company_researcher_prompt(config: dict[str, Any] | None = None) -> str
     """Build the company researcher system prompt from profile config."""
     cfg = config or {}
     comp = cfg.get("compensation", {})
-    target_tc = _fmt_tc(comp.get("target_total_comp", 300_000))
+    target_tc = _fmt_tc(comp.get("target_total_comp", 150_000))
     return _COMPANY_RESEARCHER_TEMPLATE.format(target_tc=target_tc)
 
 
@@ -397,4 +410,24 @@ Company: {company_name}
 Role being applied to: {job_title}
 
 Provide a comprehensive intelligence profile based on your knowledge.
+"""
+
+# Variant used when web search results are available for grounding
+COMPANY_RESEARCHER_GROUNDED_USER_TEMPLATE = """\
+Research the following company for a job application:
+
+Company: {company_name}
+Role being applied to: {job_title}
+
+Below are REAL-TIME web search results gathered just now. Use these to ground
+your analysis with current, factual information. Cite specific data points
+(funding amounts, headcount, news) from these results when available.
+
+─── WEB SEARCH RESULTS ───
+{web_context}
+───────────────────────────
+
+Combine the web search results with your own knowledge to produce the most
+accurate and current intelligence profile possible. Clearly distinguish
+between facts from the search results and your own estimates.
 """
