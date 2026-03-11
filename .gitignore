@@ -22,6 +22,9 @@ build/
 knowledge/*.pdf
 knowledge/*.docx
 knowledge/.*_resume_name
+backend/knowledge/*.pdf
+backend/knowledge/*.docx
+backend/knowledge/.*_resume_name
 
 # User profiles (personal config — only _template.yaml is tracked)
 src/job_finder/config/profiles/*.yaml
