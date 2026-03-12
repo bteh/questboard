@@ -11,28 +11,28 @@ router = APIRouter(prefix="/analytics", tags=["analytics"])
 
 
 @router.get("/stats", response_model=DashboardStats)
-def get_stats(db: Session = Depends(get_db)):
-    return analytics_service.get_dashboard_stats(db)
+def get_stats(profile: str | None = None, db: Session = Depends(get_db)):
+    return analytics_service.get_dashboard_stats(db, profile=profile)
 
 
 @router.get("/score-distribution", response_model=list[ChartDataPoint])
-def get_score_distribution(db: Session = Depends(get_db)):
-    return analytics_service.get_score_distribution(db)
+def get_score_distribution(profile: str | None = None, db: Session = Depends(get_db)):
+    return analytics_service.get_score_distribution(db, profile=profile)
 
 
 @router.get("/recommendations", response_model=list[ChartDataPoint])
-def get_recommendations(db: Session = Depends(get_db)):
-    return analytics_service.get_recommendation_breakdown(db)
+def get_recommendations(profile: str | None = None, db: Session = Depends(get_db)):
+    return analytics_service.get_recommendation_breakdown(db, profile=profile)
 
 
 @router.get("/sources", response_model=list[ChartDataPoint])
-def get_sources(db: Session = Depends(get_db)):
-    return analytics_service.get_source_breakdown(db)
+def get_sources(profile: str | None = None, db: Session = Depends(get_db)):
+    return analytics_service.get_source_breakdown(db, profile=profile)
 
 
 @router.get("/funnel", response_model=list[ChartDataPoint])
-def get_funnel(db: Session = Depends(get_db)):
-    return analytics_service.get_pipeline_funnel(db)
+def get_funnel(profile: str | None = None, db: Session = Depends(get_db)):
+    return analytics_service.get_pipeline_funnel(db, profile=profile)
 
 
 @router.get("/top-companies")

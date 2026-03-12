@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -13,7 +14,7 @@ class SearchRequest(BaseModel):
     max_days_old: int = 14
     use_ai: bool = False
     profile: str = "default"
-    mode: str = Field(
+    mode: Literal["search_only", "search_score", "full_pipeline"] = Field(
         default="search_score",
         description="search_only | search_score | full_pipeline",
     )

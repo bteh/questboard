@@ -29,8 +29,6 @@ _MODE_LABELS: dict[str, str] = {
     "full_pipeline": "Full AI Agent",
 }
 
-_STRONG_MATCH_THRESHOLD = 55
-
 _STAGE_LABELS: dict[str, str] = {
     "searching": "Searching job boards",
     "scoring": "Scoring jobs",
@@ -201,6 +199,7 @@ def start_run(
         locations,
         use_ai,
         mode,
+        max_days_old,
     )
     return run
 
@@ -211,6 +210,7 @@ def _execute_pipeline(
     locations: list[str],
     use_ai: bool,
     mode: str,
+    max_days_old: int | None = None,
 ) -> None:
     """Run the pipeline in a worker thread."""
     run.status = "running"
@@ -230,6 +230,9 @@ def _execute_pipeline(
     try:
         pipeline = get_pipeline(profile=run.profile)
 
+        if max_days_old is not None:
+            pipeline.config.setdefault("search_settings", {})["max_days_old"] = max_days_old
+
         tracker = _ProgressTracker(run, mode)
         progress_cb = tracker
 
@@ -240,7 +243,7 @@ def _execute_pipeline(
             run.jobs_found = len(jobs) if jobs else 0
             # Save to DB
             if jobs:
-                _save_search_results(pipeline, jobs, progress_cb)
+                _save_search_results(pipeline, jobs, progress_cb, search_run_id=run.run_id)
         else:
             # search_score: AI scoring only (no enhancement)
             # full_pipeline: AI scoring + enhancement (resume tweaks, cover letters)
@@ -250,12 +253,14 @@ def _execute_pipeline(
                 locations=locations,
                 use_ai=use_ai,
                 enhance=(mode == "full_pipeline"),
+                search_run_id=run.run_id,
             )
             run.jobs_found = len(jobs) if jobs else 0
             run.jobs_scored = sum(1 for j in (jobs or []) if j.get("overall_score") is not None)
+            strong_threshold = pipeline.config.get("scoring", {}).get("thresholds", {}).get("strong_apply", 70)
             run.strong_matches = sum(
                 1 for j in (jobs or [])
-                if (j.get("overall_score") or 0) >= _STRONG_MATCH_THRESHOLD
+                if (j.get("overall_score") or 0) >= strong_threshold
             )
 
         # Auto-merge any cross-source duplicates in the DB
@@ -368,7 +373,7 @@ def _auto_deduplicate(profile: str | None = None) -> int:
         return 0
 
 
-def _save_search_results(pipeline, jobs: list[dict], progress_cb) -> None:
+def _save_search_results(pipeline, jobs: list[dict], progress_cb, search_run_id: str | None = None) -> None:
     """Save search-only results to DB (mirrors app.py search_only logic)."""
     import json as _json
     from job_finder.models.database import init_db, save_application
@@ -403,6 +408,7 @@ def _save_search_results(pipeline, jobs: list[dict], progress_cb) -> None:
             profile=pipeline.profile_name,
             company_type=ct,
             work_type=wt,
+            search_run_id=search_run_id,
         )
     progress_cb(f"Saved {len(jobs)} jobs to database")
 

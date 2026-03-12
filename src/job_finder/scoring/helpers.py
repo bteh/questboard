@@ -65,6 +65,9 @@ def salary_score(
 ) -> float:
     """Estimate comp-potential score (0–100)."""
     if salary_max and salary_max > 0:
+        if salary_max > target_tc * 2:
+            # Way above target — likely a more senior role than user can land
+            return 40.0
         if salary_max >= target_tc:
             return 95.0
         if salary_max >= min_base:

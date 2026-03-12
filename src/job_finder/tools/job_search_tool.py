@@ -39,6 +39,9 @@ def _safe_bool(value: Any) -> bool:
 
 # -- Main search function --------------------------------------------------
 
+_DEFAULT_BOARDS = ["indeed", "linkedin", "glassdoor", "zip_recruiter", "google"]
+
+
 def search_jobs(
     search_term: str,
     location: str = "Los Angeles, CA",
@@ -47,12 +50,23 @@ def search_jobs(
     is_remote: bool | None = None,
     country: str = "USA",
     linkedin_fetch_description: bool = True,
+    boards: list[str] | None = None,
 ) -> list[dict]:
     """Search multiple job boards via JobSpy and return normalised dicts.
 
     Returns a *list of dicts* (not JSON string) for direct Python consumption.
     Each dict has keys: title, company, location, url, source, description,
     salary_min, salary_max, date_posted, is_remote, company_size.
+
+    Parameters
+    ----------
+    linkedin_fetch_description : bool
+        Fetch full job page per LinkedIn result (~2-3s each).  The pipeline
+        passes ``False`` during fast search and relies on descriptions from
+        other boards.  CLI callers default to ``True`` for richer data.
+    boards : list[str] or None
+        JobSpy site names to scrape.  Defaults to Indeed, LinkedIn, Glassdoor,
+        ZipRecruiter, and Google.  Configurable via ``job_boards`` in YAML.
     """
     try:
         from jobspy import scrape_jobs
@@ -60,7 +74,7 @@ def search_jobs(
         logger.error("python-jobspy not installed. Run: pip install python-jobspy")
         return []
 
-    site_names = ["indeed", "linkedin", "glassdoor", "zip_recruiter", "google"]
+    site_names = boards or _DEFAULT_BOARDS
 
     try:
         scrape_kwargs = dict(

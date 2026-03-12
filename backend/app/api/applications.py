@@ -95,6 +95,7 @@ def list_applications(
     is_remote: bool | None = None,
     work_type: str | None = None,
     profile: str | None = None,
+    search_run_id: str | None = None,
     sort_by: str = "overall_score",
     sort_dir: str = "desc",
     page: int = Query(1, ge=1),
@@ -112,6 +113,7 @@ def list_applications(
         is_remote=is_remote,
         work_type=work_type,
         profile=profile,
+        search_run_id=search_run_id,
         sort_by=sort_by,
         sort_dir=sort_dir,
         page=page,
@@ -376,6 +378,46 @@ def purge_non_matching_locations(
         profile=profile,
     )
     return {"purged": purged, "message": f"Removed {purged} jobs outside preferred locations"}
+
+
+@router.post("/purge-all")
+def purge_all_applications(
+    profile: str | None = None,
+    confirm: bool = Query(False, description="Must be true to confirm purge"),
+    db: Session = Depends(get_db),
+):
+    """Delete all saved applications. Requires confirm=true as a safety check."""
+    if not confirm:
+        return {"purged": 0, "message": "Pass ?confirm=true to confirm deletion"}
+
+    from app.models.application import ApplicationRecord
+
+    query = db.query(ApplicationRecord)
+    if profile:
+        query = query.filter(ApplicationRecord.profile == profile)
+    count = query.count()
+    query.delete()
+    db.commit()
+    return {"purged": count, "message": f"Deleted {count} applications"}
+
+
+@router.post("/backfill-scores")
+def backfill_scores(
+    profile: str = "default",
+):
+    """Trigger scoring backfill for unscored jobs.
+
+    Scores all DB records that have NULL overall_score using keyword-based
+    scoring (no LLM required). Returns the number of records scored.
+    """
+    from job_finder.models.database import (
+        init_db,
+        backfill_scores as _backfill,
+    )
+
+    init_db()
+    scored = _backfill(profile=profile if profile != "default" else None)
+    return {"scored": scored, "message": f"Backfilled scores for {scored} jobs"}
 
 
 @router.post("/{app_id}/prepare", response_model=PrepareResponse)

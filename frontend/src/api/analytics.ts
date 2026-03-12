@@ -1,22 +1,22 @@
 import { apiGet } from '@/lib/api-client';
 import type { DashboardStats, ChartDataPoint } from '@/types/analytics';
 
-export function getDashboardStats(): Promise<DashboardStats> {
-  return apiGet<DashboardStats>('/analytics/stats');
+export function getDashboardStats(profile?: string): Promise<DashboardStats> {
+  return apiGet<DashboardStats>('/analytics/stats', { profile });
 }
 
-export function getScoreDistribution(): Promise<ChartDataPoint[]> {
-  return apiGet<ChartDataPoint[]>('/analytics/score-distribution');
+export function getScoreDistribution(profile?: string): Promise<ChartDataPoint[]> {
+  return apiGet<ChartDataPoint[]>('/analytics/score-distribution', { profile });
 }
 
-export function getRecommendations(): Promise<ChartDataPoint[]> {
-  return apiGet<ChartDataPoint[]>('/analytics/recommendations');
+export function getRecommendations(profile?: string): Promise<ChartDataPoint[]> {
+  return apiGet<ChartDataPoint[]>('/analytics/recommendations', { profile });
 }
 
-export function getSources(): Promise<ChartDataPoint[]> {
-  return apiGet<ChartDataPoint[]>('/analytics/sources');
+export function getSources(profile?: string): Promise<ChartDataPoint[]> {
+  return apiGet<ChartDataPoint[]>('/analytics/sources', { profile });
 }
 
-export function getFunnel(): Promise<ChartDataPoint[]> {
-  return apiGet<ChartDataPoint[]>('/analytics/funnel');
+export function getFunnel(profile?: string): Promise<ChartDataPoint[]> {
+  return apiGet<ChartDataPoint[]>('/analytics/funnel', { profile });
 }

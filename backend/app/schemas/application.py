@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -72,7 +73,7 @@ class ApplicationUpdate(BaseModel):
 
 
 class StatusUpdate(BaseModel):
-    status: str
+    status: Literal["found", "reviewed", "applying", "applied", "interviewing", "offer", "rejected", "withdrawn"]
     notes: str | None = None
 
 

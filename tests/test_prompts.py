@@ -26,7 +26,8 @@ class PromptDefaultsTest(unittest.TestCase):
     def test_company_research_prompt_prefers_unknown_over_guessing(self) -> None:
         prompt = build_company_researcher_prompt({})
 
-        self.assertIn('return `"Unknown"`, `null`, or `[]` instead of guessing', prompt)
+        self.assertIn('`[]` instead of guessing', prompt)
+        self.assertIn('return `"Unknown"`', prompt)
         self.assertIn('"why_join": "<paragraph>"', prompt)
 
 

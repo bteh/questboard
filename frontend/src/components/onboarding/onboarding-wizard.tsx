@@ -1,13 +1,12 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from '@tanstack/react-router';
-import { Rocket, Upload, CheckCircle2, Loader2, ArrowRight, Sparkles, Search, Zap, BarChart3, FileText, DollarSign, Building2, X, ExternalLink } from 'lucide-react';
+import { Rocket, Upload, CheckCircle2, Loader2, ArrowRight, Sparkles, Search, Zap, BarChart3, FileText, DollarSign } from 'lucide-react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useResumeStatus, useUploadResume } from '@/hooks/use-resume';
 import { useLLMStatus, useProfilePreferences, useUpdateProfilePreferences } from '@/hooks/use-settings';
-import { useWatchlist, useAddCompany, useRemoveCompany } from '@/hooks/use-watchlist';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import type { ProfilePreferences } from '@/types/settings';
@@ -42,9 +41,9 @@ interface OnboardingWizardProps {
   onComplete: () => void;
 }
 
-type Step = 'welcome' | 'resume' | 'preferences' | 'companies' | 'ready';
+type Step = 'welcome' | 'resume' | 'preferences' | 'ready';
 
-const STEPS: Step[] = ['welcome', 'resume', 'preferences', 'companies', 'ready'];
+const STEPS: Step[] = ['welcome', 'resume', 'preferences', 'ready'];
 
 export function OnboardingWizard({ open, onComplete }: OnboardingWizardProps) {
   const navigate = useNavigate();
@@ -114,12 +113,6 @@ export function OnboardingWizard({ open, onComplete }: OnboardingWizardProps) {
           )}
           {step === 'preferences' && (
             <PreferencesStep
-              onSkip={() => setStep('companies')}
-              onNext={() => setStep('companies')}
-            />
-          )}
-          {step === 'companies' && (
-            <CompaniesStep
               onSkip={() => setStep('ready')}
               onNext={() => setStep('ready')}
             />
@@ -261,15 +254,6 @@ function ResumeStep({
   );
 }
 
-const LEVEL_OPTIONS = [
-  { value: 'junior', label: 'Junior / Entry' },
-  { value: 'mid', label: 'Mid-Level' },
-  { value: 'senior', label: 'Senior' },
-  { value: 'staff', label: 'Staff / Principal' },
-  { value: 'lead', label: 'Lead / Manager' },
-  { value: 'director', label: 'Director+' },
-];
-
 function PreferencesStep({ onSkip, onNext }: { onSkip: () => void; onNext: () => void }) {
   const { data } = useProfilePreferences();
   const updatePrefs = useUpdateProfilePreferences();
@@ -280,6 +264,8 @@ function PreferencesStep({ onSkip, onNext }: { onSkip: () => void; onNext: () =>
     current_tc: 100_000,
     min_base: 80_000,
     target_total_comp: 150_000,
+    auto_apply_enabled: false,
+    auto_apply_dry_run: true,
   });
   const [initialized, setInitialized] = useState(false);
 
@@ -325,35 +311,6 @@ function PreferencesStep({ onSkip, onNext }: { onSkip: () => void; onNext: () =>
           />
         </div>
 
-        <div className="space-y-1.5">
-          <Label className="text-sm font-medium">Level (select all that apply)</Label>
-          <div className="flex flex-wrap gap-1.5">
-            {LEVEL_OPTIONS.map((opt) => {
-              const selected = form.current_level.includes(opt.value);
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setForm((p) => ({
-                    ...p,
-                    current_level: selected
-                      ? p.current_level.filter((v) => v !== opt.value)
-                      : [...p.current_level, opt.value],
-                  }))}
-                  className={cn(
-                    'rounded-lg border px-2.5 py-1.5 text-xs transition-all cursor-pointer',
-                    selected
-                      ? 'border-brand bg-brand-light text-brand font-medium'
-                      : 'border-border-default text-text-secondary hover:border-brand/40',
-                  )}
-                >
-                  {opt.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
         <div className="grid grid-cols-3 gap-3">
           <div className="space-y-1.5">
             <Label className="text-xs font-medium text-text-secondary">Current TC</Label>
@@ -397,111 +354,6 @@ function PreferencesStep({ onSkip, onNext }: { onSkip: () => void; onNext: () =>
             <Loader2 className="h-4 w-4 mr-1 animate-spin" />
           ) : null}
           Save & Continue <ArrowRight className="h-4 w-4 ml-1" />
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function CompaniesStep({ onSkip, onNext }: { onSkip: () => void; onNext: () => void }) {
-  const { data: watchlistData } = useWatchlist();
-  const addCompany = useAddCompany();
-  const removeCompany = useRemoveCompany();
-  const [input, setInput] = useState('');
-
-  const companies = watchlistData?.companies ?? [];
-
-  const handleAdd = () => {
-    const name = input.trim();
-    if (!name) return;
-    addCompany.mutate(name, {
-      onSuccess: () => {
-        setInput('');
-        toast.success(`Added ${name}`);
-      },
-      onError: () => toast.error(`Failed to add ${name}`),
-    });
-  };
-
-  return (
-    <div className="text-center pt-4 space-y-5">
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-light mx-auto">
-        <Building2 className="h-7 w-7 text-brand" />
-      </div>
-      <div>
-        <h2 className="text-lg font-semibold text-text-primary">Target Companies</h2>
-        <p className="text-sm text-text-tertiary mt-1.5 leading-relaxed">
-          Add companies you'd love to work at. We'll check their career pages in every search.
-        </p>
-      </div>
-
-      <div className="space-y-3 text-left">
-        <div className="flex gap-2">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAdd(); } }}
-            placeholder="e.g. Netflix, Stripe, SpaceX..."
-            className="h-9"
-            disabled={addCompany.isPending}
-          />
-          <Button
-            onClick={handleAdd}
-            disabled={!input.trim() || addCompany.isPending}
-            size="sm"
-            className="shrink-0 h-9"
-          >
-            {addCompany.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Add'}
-          </Button>
-        </div>
-
-        {companies.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {companies.map((c) => (
-              <div
-                key={c.name}
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-xs group',
-                  c.ats !== 'unknown'
-                    ? 'border-brand/30 bg-brand-light/30'
-                    : 'border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30',
-                )}
-              >
-                <Building2 className="h-3 w-3 text-text-muted" />
-                <span className="font-medium text-text-primary">{c.name}</span>
-                {c.ats !== 'unknown' && (
-                  <span className="text-[9px] text-text-muted uppercase">{c.ats}</span>
-                )}
-                {c.careers_url && (
-                  <a href={c.careers_url} target="_blank" rel="noopener noreferrer" className="text-text-muted hover:text-brand" onClick={(e) => e.stopPropagation()}>
-                    <ExternalLink className="h-2.5 w-2.5" />
-                  </a>
-                )}
-                <button
-                  type="button"
-                  onClick={() => removeCompany.mutate(c.name)}
-                  className="text-text-muted hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {companies.length === 0 && (
-          <p className="text-xs text-text-muted text-center">
-            We auto-detect their career page (Greenhouse, Lever, Ashby) and include open roles in every search.
-          </p>
-        )}
-      </div>
-
-      <div className="flex gap-3">
-        <Button variant="outline" onClick={onSkip} className="flex-1">
-          Skip for now
-        </Button>
-        <Button onClick={onNext} className="flex-1">
-          {companies.length > 0 ? 'Continue' : 'Skip'} <ArrowRight className="h-4 w-4 ml-1" />
         </Button>
       </div>
     </div>

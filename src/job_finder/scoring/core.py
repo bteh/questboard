@@ -75,12 +75,24 @@ def score_job_basic(
         w_cult /= total_weight
         w_prog /= total_weight
 
-    # Keyword overrides from profile config
+    # Keyword overrides from profile config — profiles can provide
+    # domain-specific keywords so scoring works for any profession
     kw = cfg.get("keywords", {})
     tech_keywords = kw.get("technical", TECHNICAL_KEYWORDS)
     lead_keywords = kw.get("leadership", LEADERSHIP_KEYWORDS)
     plat_keywords = kw.get("platform_building", PLATFORM_BUILDING_KEYWORDS)
     comp_signals = kw.get("high_comp_signals", HIGH_COMP_SIGNALS)
+    traj_keywords = kw.get("company_trajectory") or None  # None = use defaults
+    culture_keywords = kw.get("culture_fit") or None  # None = use defaults
+
+    # When include_equity is false, strip equity-specific signals from comp scoring
+    include_equity = cfg.get("compensation", {}).get("include_equity", True)
+    if not include_equity:
+        _equity_signals = {
+            "equity", "rsu", "stock options", "signing bonus",
+            "competitive compensation", "total compensation",
+        }
+        comp_signals = [s for s in comp_signals if s.lower() not in _equity_signals]
 
     combined = f"{job_title} {company} {job_description}"
 
@@ -99,12 +111,15 @@ def score_job_basic(
         target_tc=cfg.get("compensation", {}).get("target_total_comp", 150_000),
     )
     plat_kw = score_platform(combined, plat_keywords)
-    traj_kw = score_trajectory(combined)
-    culture_kw = score_culture(combined, is_remote)
+    traj_kw = score_trajectory(combined, trajectory_keywords=traj_keywords)
+    culture_kw = score_culture(combined, is_remote, culture_keywords=culture_keywords)
 
     # Blend keyword scores with baselines:
     # - LLM intel: weighted blend (AI can lower scores, not just raise them)
-    # - Static tier: floor only (max) since tier is a coarse heuristic
+    # - Static tier: weighted blend — keyword relevance matters most (70%),
+    #   company tier provides a boost (30%).  Previous max() approach let
+    #   company prestige override job relevance, inflating scores for
+    #   irrelevant roles at well-known companies.
     if has_ai_intel:
         technical = tech_kw * 0.4 + baselines.get("technical", 0) * 0.6
         leadership = lead_kw * 0.4 + baselines.get("leadership", 0) * 0.6
@@ -113,12 +128,12 @@ def score_job_basic(
         trajectory = traj_kw * 0.4 + baselines.get("trajectory", 0) * 0.6
         culture = culture_kw * 0.4 + baselines.get("culture", 0) * 0.6
     else:
-        technical = max(tech_kw, baselines.get("technical", 0))
-        leadership = max(lead_kw, baselines.get("leadership", 0))
-        comp_potential = max(comp_kw, baselines.get("comp", 0))
-        platform = max(plat_kw, baselines.get("platform", 0))
-        trajectory = max(traj_kw, baselines.get("trajectory", 0))
-        culture = max(culture_kw, baselines.get("culture", 0))
+        technical = tech_kw * 0.7 + baselines.get("technical", 0) * 0.3
+        leadership = lead_kw * 0.7 + baselines.get("leadership", 0) * 0.3
+        comp_potential = comp_kw * 0.7 + baselines.get("comp", 0) * 0.3
+        platform = plat_kw * 0.7 + baselines.get("platform", 0) * 0.3
+        trajectory = traj_kw * 0.7 + baselines.get("trajectory", 0) * 0.3
+        culture = culture_kw * 0.7 + baselines.get("culture", 0) * 0.3
 
     progression = score_career_progression(
         job_title, job_description, salary_min, salary_max, cfg,

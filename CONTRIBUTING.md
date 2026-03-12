@@ -7,28 +7,25 @@ Thanks for your interest in improving Launchboard! This guide covers how to set 
 ```bash
 git clone https://github.com/bteh/launchboard.git
 cd launchboard
+make setup              # installs Python + Node deps, creates .env
+
+# Or manually:
 python -m venv .venv && source .venv/bin/activate
 pip install -e .
-cp .env.example .env
-
-# Frontend (optional, for web UI development)
 cd frontend && npm install && cd ..
-
-# Backend (optional, for API development)
 pip install -e backend/
+cp .env.example .env
 ```
 
 ## Running
 
 ```bash
-# Streamlit UI (legacy)
-streamlit run app.py
-
 # Web UI (recommended)
 make dev
+# Backend: http://localhost:8000   Frontend: http://localhost:5173
 
 # CLI
-launchboard --profile yourname
+python -m job_finder.main --profile default
 ```
 
 ## Project Principles
@@ -39,9 +36,11 @@ launchboard --profile yourname
 
 3. **Profile-driven.** New features should read from the YAML profile config. Hard-coded values are bugs.
 
-4. **Graceful degradation.** LLM calls return `None` on failure. Network calls catch exceptions. The pipeline never crashes on a single bad job listing.
+4. **Profession-agnostic.** Prompts, scoring, and search terms adapt to any career field via profile config. No tech-specific assumptions.
 
-5. **Local-first.** SQLite, local PDFs, no cloud storage required.
+5. **Graceful degradation.** LLM calls return `None` on failure. Network calls catch exceptions. The pipeline never crashes on a single bad job listing.
+
+6. **Local-first.** SQLite, local PDFs, no cloud storage required.
 
 ## Code Style
 
@@ -77,12 +76,13 @@ Auto-discovered on import. Metadata flows to backend API. Frontend picks it up d
 
 ## Adding a New Scoring Dimension
 
-1. Add the keyword list and weight to `scorer.py`
-2. Add the weight key to `_template.yaml` profile
-3. Add the column to `ApplicationRecord` in `models/database.py`
-4. Add the field to `save_application()`
-5. Update `prompts.py` templates
-6. Update frontend score display components
+1. Add the scorer function in `scoring/dimensions.py`
+2. Wire it into `scoring/core.py` with its weight
+3. Add the weight key to `config/profiles/_template.yaml`
+4. Add the column to `ApplicationRecord` in `models/database.py`
+5. Add the field to `save_application()`
+6. Update `prompts.py` templates
+7. Update frontend score display components
 
 ## Adding a New LLM Feature
 

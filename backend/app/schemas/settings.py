@@ -54,6 +54,29 @@ class ProfilePreferences(BaseModel):
     current_tc: int = 100_000
     min_base: int = 80_000
     target_total_comp: int = 150_000
+    auto_apply_enabled: bool = False
+    auto_apply_dry_run: bool = True
+
+    # Scoring weights
+    scoring_technical: float = 0.25
+    scoring_leadership: float = 0.15
+    scoring_career_progression: float = 0.15
+    scoring_platform: float = 0.13
+    scoring_comp: float = 0.12
+    scoring_trajectory: float = 0.10
+    scoring_culture: float = 0.10
+
+    # Thresholds
+    threshold_strong_apply: int = 70
+    threshold_apply: int = 55
+    threshold_maybe: int = 40
+
+    # Toggles
+    exclude_staffing_agencies: bool = True
+    include_equity: bool = True
+
+    # Career
+    min_acceptable_tc: float | None = None
 
 class ProfilePreferencesResponse(BaseModel):
     name: str

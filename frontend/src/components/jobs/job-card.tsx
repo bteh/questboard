@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ExternalLink, ChevronDown, MapPin, Send, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { ExternalLink, ChevronDown, MapPin, Send, CheckCircle2, AlertTriangle, Trash2 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CompanyAvatar } from '@/components/shared/company-avatar';
@@ -11,9 +11,13 @@ import { SalaryBadge } from '@/components/badges/salary-badge';
 import { FundingBadge } from '@/components/badges/funding-badge';
 import { JobDetail } from './job-detail';
 import { ApplyDrawer } from './apply-drawer';
+import { useDeleteApplication } from '@/hooks/use-applications';
 import { truncateDescription, formatDate } from '@/utils/format';
 import { cn } from '@/lib/utils';
 import { resolveSourceLabel } from '@/hooks/use-scrapers';
+import { toast } from 'sonner';
+import { SCORE_DIMENSIONS } from '@/utils/constants';
+import { scoreColorHex } from '@/utils/colors';
 import type { ApplicationResponse } from '@/types/application';
 
 const REC_BORDER_COLORS: Record<string, string> = {
@@ -36,9 +40,18 @@ interface JobCardProps {
   sourceLabels?: Record<string, string>;
 }
 
+/** Color classes for inline score breakdown bars. */
+function scoreBgClass(value: number | null): string {
+  if (value == null) return 'bg-bg-muted';
+  if (value > 60) return 'bg-emerald-500';
+  if (value >= 40) return 'bg-amber-500';
+  return 'bg-red-500';
+}
+
 export function JobCard({ app, sourceLabels }: JobCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [applyOpen, setApplyOpen] = useState(false);
+  const deleteApp = useDeleteApplication();
   const labels = sourceLabels;
   const isApplied = app.status === 'applied';
 
@@ -48,7 +61,7 @@ export function JobCard({ app, sourceLabels }: JobCardProps) {
   return (
     <Card
       className={cn(
-        'overflow-hidden border-l-[3px] transition-all duration-150',
+        'overflow-hidden border-l-[3px] transition-all duration-150 group',
         !expanded && 'hover:shadow-md hover:-translate-y-[1px]',
         expanded && 'shadow-md',
       )}
@@ -115,8 +128,46 @@ export function JobCard({ app, sourceLabels }: JobCardProps) {
             <FundingBadge app={app} />
           </div>
 
+          {/* Action row */}
+          <div className="mt-3 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+            {isApplied ? (
+              <span className="inline-flex items-center gap-1.5 rounded-md bg-success/10 px-2.5 py-1 text-xs font-medium text-success">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Applied
+              </span>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setApplyOpen(true);
+                }}
+                className="gap-1.5"
+              >
+                <Send className="h-3.5 w-3.5" />
+                Apply
+              </Button>
+            )}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                deleteApp.mutate(app.id, {
+                  onSuccess: () => toast.success(`Removed ${app.job_title}`),
+                  onError: () => toast.error('Failed to delete job'),
+                });
+              }}
+              disabled={deleteApp.isPending}
+              className="ml-auto inline-flex items-center justify-center h-7 w-7 rounded-md text-text-muted hover:text-danger hover:bg-danger/10 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
+              title="Remove job"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
           {/* Meta row */}
-          <div className="mt-3 flex items-center gap-3 text-xs text-text-muted">
+          <div className="mt-2 flex items-center gap-3 text-xs text-text-muted">
             {app.source && (
               <span className="inline-flex items-center rounded-md bg-bg-subtle border border-border-default px-1.5 py-0.5 text-[11px] font-medium text-text-tertiary">
                 {resolveSourceLabel(app.source, labels)}
@@ -124,7 +175,6 @@ export function JobCard({ app, sourceLabels }: JobCardProps) {
             )}
             {recency && <span>{recency}</span>}
             {app.date_found && !recency && <span>{formatDate(app.date_found, 'relative')}</span>}
-            {app.date_found && recency && <span>{formatDate(app.date_found, 'relative')}</span>}
             {app.employee_count && <span>{app.employee_count} employees</span>}
             {app.job_url && (
               app.url_status === 'dead' ? (
@@ -145,30 +195,38 @@ export function JobCard({ app, sourceLabels }: JobCardProps) {
                 </a>
               )
             )}
-            <span className="ml-auto" onClick={(e) => e.stopPropagation()}>
-              {isApplied ? (
-                <span className="inline-flex items-center gap-1 rounded-md bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success">
-                  <CheckCircle2 className="h-3 w-3" />
-                  Applied
-                </span>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="xs"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setApplyOpen(true);
-                  }}
-                  className="text-[11px] gap-1"
-                >
-                  <Send className="h-3 w-3" />
-                  Apply
-                </Button>
-              )}
-            </span>
           </div>
         </div>
       </button>
+
+      {expanded && app.overall_score != null && (
+        <div className="border-t border-border-default bg-bg-subtle px-5 py-4" onClick={(e) => e.stopPropagation()}>
+          <p className="text-xs font-medium text-text-secondary mb-2.5">Score Breakdown</p>
+          <div className="space-y-1.5">
+            {SCORE_DIMENSIONS.map(({ key, label }) => {
+              const value = (app as unknown as Record<string, unknown>)[key] as number | null;
+              const pct = value != null ? Math.min(value, 100) : 0;
+              return (
+                <div key={key} className="flex items-center gap-2">
+                  <span className="w-[120px] shrink-0 text-[11px] text-text-tertiary truncate">{label}</span>
+                  <div className="flex-1 h-1.5 rounded-full bg-bg-muted overflow-hidden">
+                    <div
+                      className={cn('h-full rounded-full transition-all', scoreBgClass(value))}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <span
+                    className="w-6 text-right text-[11px] font-medium tabular-nums"
+                    style={{ color: scoreColorHex(value) }}
+                  >
+                    {value != null ? Math.round(value) : '\u2014'}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {expanded && <JobDetail app={app} />}
 

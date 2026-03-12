@@ -6,7 +6,12 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from job_finder.tools.scrapers._registry import register_scraper
-from job_finder.tools.scrapers._utils import _get_json, _match_roles, _strip_html
+from job_finder.tools.scrapers._utils import (
+    _clean_company_name,
+    _get_json,
+    _match_roles,
+    _strip_html,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +74,7 @@ def _fetch_company_jobs(slug: str, roles: list[str] | None) -> list[dict]:
 
         jobs.append({
             "title": title,
-            "company": slug.replace("-", " ").title(),
+            "company": _clean_company_name(slug),
             "location": location,
             "url": job.get("absolute_url", ""),
             "source": "greenhouse",

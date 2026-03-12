@@ -52,31 +52,8 @@ additional_sources:
     enabled: true
   - name: "cryptojobslist"
     enabled: true
-  - name: "wellfound"
-    enabled: true
   - name: "workday"
     enabled: true
-
-# Company targeting
-target_companies:
-  big_tech:
-    - "Netflix"
-    - "NVIDIA"
-    - "Airbnb"
-    - "Stripe"
-    - "Databricks"
-    - "Snowflake"
-    - "Confluent"
-    - "dbt Labs"
-    - "Fivetran"
-    - "Starburst"
-  startup_criteria:
-    funding_stages:
-      - "Series A"
-      - "Series B"
-      - "Series C"
-    min_funding_amount: 10000000  # $10M minimum
-    prefer_founding_roles: true
 
 # Scoring weights
 scoring:
@@ -100,3 +77,6 @@ search_settings:
   max_days_old: 14
   exclude_staffing_agencies: true
   country: "USA"
+  max_parallel_searches: 6
+  max_unique_jobs: 300
+  max_search_tasks: 20

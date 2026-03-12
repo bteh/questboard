@@ -61,7 +61,7 @@ function SearchPage() {
   const { data: resume } = useResumeStatus();
   const startSearch = useStartSearch();
   const suggest = useSuggestSearch();
-  const { state, messages, result, error, mode, progress, activate, reset: resetSearch } = useSearchContext();
+  const { state, runId, messages, result, error, mode, progress, activate, reset: resetSearch } = useSearchContext();
   const { data: scraperSources } = useScraperSources();
   const sourceLabels = useMemo(() => buildSourceLabels(scraperSources), [scraperSources]);
   const { data: schedule } = useSchedule(profile);
@@ -699,12 +699,12 @@ function SearchPage() {
             <div className="space-y-1">
               <p className="text-sm font-medium text-success">Search Complete</p>
               <p className="text-xs text-text-secondary">
-                Found {result.jobs_found} jobs · Scored {result.jobs_scored} · {result.strong_matches} strong matches · {result.duration_seconds.toFixed(1)}s
+                Found {result.jobs_found} jobs · Scored {result.jobs_scored} · {result.strong_matches} strong matches · {(result.duration_seconds ?? 0).toFixed(1)}s
               </p>
             </div>
             <div className="flex items-center gap-2">
               <Button onClick={handleReset} variant="outline" size="sm">New Search</Button>
-              <Button size="sm" onClick={() => navigate({ to: '/applications' })}>
+              <Button size="sm" onClick={() => navigate({ to: '/applications', search: { run: runId ?? undefined } })}>
                 View {result.jobs_found} Jobs <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
               </Button>
             </div>

@@ -13,17 +13,18 @@ import { StatusBadge } from '@/components/badges/status-badge';
 import { CompanyTypeBadge } from '@/components/badges/company-type-badge';
 import { WorkTypeBadge } from '@/components/badges/work-type-badge';
 import { resolveSourceLabel } from '@/hooks/use-scrapers';
-import { formatDate } from '@/utils/format';
+import { formatDate, formatSalary } from '@/utils/format';
 import type { ApplicationResponse } from '@/types/application';
 
 interface JobTableProps {
   data: ApplicationResponse[];
   onRowClick?: (app: ApplicationResponse) => void;
+  selectedId?: number | null;
 }
 
 const columnHelper = createColumnHelper<ApplicationResponse>();
 
-export function JobTable({ data, onRowClick }: JobTableProps) {
+export function JobTable({ data, onRowClick, selectedId }: JobTableProps) {
   const columns = useMemo(() => [
     columnHelper.accessor('company', {
       header: 'Company',
@@ -61,6 +62,14 @@ export function JobTable({ data, onRowClick }: JobTableProps) {
     columnHelper.accessor('work_type', {
       header: 'Work Type',
       cell: (info) => <WorkTypeBadge workType={info.getValue()} isRemote={info.row.original.is_remote} />,
+    }),
+    columnHelper.accessor('salary_min', {
+      header: 'Salary',
+      cell: (info) => {
+        const salary = formatSalary(info.getValue(), info.row.original.salary_max);
+        if (!salary) return <span className="text-text-muted">&mdash;</span>;
+        return <span className="text-xs text-text-secondary whitespace-nowrap">{salary}</span>;
+      },
     }),
     columnHelper.accessor('source', {
       header: 'Source',
@@ -108,7 +117,7 @@ export function JobTable({ data, onRowClick }: JobTableProps) {
           {table.getRowModel().rows.map((row) => (
             <TableRow
               key={row.id}
-              className="cursor-pointer hover:bg-bg-subtle"
+              className={`cursor-pointer hover:bg-bg-subtle transition-colors ${selectedId === row.original.id ? 'bg-brand-light/40' : ''}`}
               onClick={() => onRowClick?.(row.original)}
             >
               {row.getVisibleCells().map((cell) => (

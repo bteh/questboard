@@ -220,12 +220,6 @@ additional_sources:
   - name: "remoteok"
     enabled: true
 
-target_companies:
-  big_tech: []
-  startup_criteria:
-    funding_stages: []
-    min_funding_amount: 0
-    prefer_founding_roles: false
 
 applicant_info:
   first_name: ""

@@ -6,7 +6,7 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Callable, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +82,7 @@ class ApplicationRecord(Base):
     # Application method and profile
     application_method = Column(String(100), default="")  # manual, greenhouse, lever
     profile = Column(String(100), default="default")  # which profile found this job
+    search_run_id = Column(String(12), nullable=True)  # links to the pipeline run that found this job
 
     # Status tracking
     status = Column(String(50), default="found")
@@ -166,6 +167,10 @@ def _migrate_db(engine) -> None:
             conn.execute(
                 text("ALTER TABLE applications ADD COLUMN last_checked_at DATETIME")
             )
+        if "search_run_id" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN search_run_id VARCHAR(12)")
+            )
         # Convert empty job_url strings to NULL (allows multiple NULLs in unique column)
         conn.execute(text("UPDATE applications SET job_url = NULL WHERE job_url = ''"))
 
@@ -233,6 +238,7 @@ def save_application(
     company_type: str = "Unknown",
     work_type: str = "",
     notes: str = "",
+    search_run_id: str | None = None,
 ) -> ApplicationRecord | None:
     """Save a new application record to the database. Returns None if duplicate URL."""
     # Store empty URLs as None so SQLite unique constraint allows multiples
@@ -241,10 +247,14 @@ def save_application(
 
     session = get_session()
     try:
-        # Skip duplicates by URL
+        # Skip duplicates by URL — but stamp the current run_id
         if job_url:
             existing = session.query(ApplicationRecord).filter_by(job_url=job_url).first()
             if existing:
+                if search_run_id and existing.search_run_id != search_run_id:
+                    existing.search_run_id = search_run_id
+                    existing.updated_at = _utcnow()
+                    session.commit()
                 session.refresh(existing)
                 session.expunge(existing)
                 return existing
@@ -307,6 +317,9 @@ def save_application(
                         if resume_tweaks_json and not cand.resume_tweaks_json:
                             cand.resume_tweaks_json = resume_tweaks_json
                             updated = True
+                        if search_run_id and cand.search_run_id != search_run_id:
+                            cand.search_run_id = search_run_id
+                            updated = True
                         if updated:
                             cand.updated_at = _utcnow()
                             session.commit()
@@ -358,6 +371,7 @@ def save_application(
             company_type=company_type,
             work_type=work_type,
             notes=notes,
+            search_run_id=search_run_id,
         )
         session.add(record)
         session.commit()
@@ -488,6 +502,41 @@ def purge_non_matching_locations(
         _close_session()
 
 
+def purge_non_matching_roles(
+    target_roles: list[str],
+    profile: str | None = None,
+) -> int:
+    """Delete existing records whose titles don't match any target role.
+
+    Uses the same ``_match_roles()`` logic as the scrapers so filtering is
+    consistent between new searches and existing DB records.
+    Returns the number of deleted records.
+    """
+    if not target_roles:
+        return 0
+
+    from job_finder.tools.scrapers._utils import _match_roles
+
+    session = get_session()
+    try:
+        query = session.query(ApplicationRecord)
+        if profile:
+            query = query.filter(ApplicationRecord.profile == profile)
+        records = query.all()
+        deleted = 0
+        for rec in records:
+            if not _match_roles(rec.job_title or "", target_roles):
+                session.delete(rec)
+                deleted += 1
+        session.commit()
+        return deleted
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        _close_session()
+
+
 def backfill_company_types() -> int:
     """Classify existing records that have company_type='Unknown' or NULL."""
     from job_finder.company_classifier import classify_company
@@ -511,6 +560,102 @@ def backfill_company_types() -> int:
                 updated += 1
         session.commit()
         return updated
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        _close_session()
+
+
+def backfill_scores(
+    profile: str | None = None,
+    progress: Callable[[str], None] | None = None,
+) -> int:
+    """Score all DB records that have NULL overall_score.
+
+    Uses keyword-based scoring (no LLM required). Loads the resume once
+    and scores each unscored record against it. Records that fail to score
+    are skipped so one bad record does not block the rest.
+
+    Returns the number of records successfully scored.
+    """
+    from job_finder.scoring import score_job_basic
+    from job_finder.tools.resume_parser_tool import parse_resume
+    from job_finder.pipeline import _load_search_config
+
+    config = _load_search_config(profile)
+
+    # Load resume text once for all scoring
+    resume_text = parse_resume("", profile=profile or "default")
+    if not resume_text:
+        logger.warning("backfill_scores: no resume found for profile=%s", profile)
+        if progress:
+            progress("No resume found — cannot score jobs")
+        return 0
+
+    session = get_session()
+    try:
+        query = session.query(ApplicationRecord).filter(
+            ApplicationRecord.overall_score == None  # noqa: E711
+        )
+        if profile:
+            query = query.filter(ApplicationRecord.profile == profile)
+        records = query.all()
+
+        if not records:
+            if progress:
+                progress("No unscored records found")
+            return 0
+
+        if progress:
+            progress(f"Backfilling scores for {len(records)} unscored jobs...")
+
+        scored = 0
+        for i, rec in enumerate(records, 1):
+            try:
+                score_data = score_job_basic(
+                    job_description=rec.description or "",
+                    resume_text=resume_text,
+                    job_title=rec.job_title or "",
+                    company=rec.company or "",
+                    company_type=rec.company_type or "Unknown",
+                    salary_min=rec.salary_min,
+                    salary_max=rec.salary_max,
+                    is_remote=rec.is_remote or False,
+                    config=config,
+                )
+
+                rec.overall_score = score_data["overall_score"]
+                rec.technical_score = score_data["technical_score"]
+                rec.leadership_score = score_data["leadership_score"]
+                rec.platform_building_score = score_data["platform_building_score"]
+                rec.comp_potential_score = score_data["comp_potential_score"]
+                rec.company_trajectory_score = score_data["company_trajectory_score"]
+                rec.culture_fit_score = score_data["culture_fit_score"]
+                rec.career_progression_score = score_data["career_progression_score"]
+                rec.recommendation = score_data["recommendation"]
+                rec.score_reasoning = score_data.get("score_reasoning", "")
+                rec.key_strengths = json.dumps(score_data.get("key_strengths", []))
+                rec.key_gaps = json.dumps(score_data.get("key_gaps", []))
+                rec.updated_at = _utcnow()
+                scored += 1
+
+                if progress and (i % 10 == 0 or i == len(records)):
+                    progress(f"Scored {i}/{len(records)} jobs")
+            except Exception:
+                logger.warning(
+                    "backfill_scores: failed to score record id=%s (%s @ %s)",
+                    rec.id, rec.job_title, rec.company,
+                    exc_info=True,
+                )
+                continue
+
+        session.commit()
+
+        if progress:
+            progress(f"Backfill complete — scored {scored} jobs")
+
+        return scored
     except Exception:
         session.rollback()
         raise

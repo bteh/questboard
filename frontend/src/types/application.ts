@@ -96,4 +96,5 @@ export interface ApplicationFilters {
   page?: number;
   page_size?: number;
   profile?: string;
+  search_run_id?: string;
 }

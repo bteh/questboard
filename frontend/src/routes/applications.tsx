@@ -1,9 +1,9 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { createRoute, Link } from '@tanstack/react-router';
+import { createRoute, Link, useNavigate } from '@tanstack/react-router';
 import { Route as rootRoute } from './__root';
 import {
   LayoutGrid, List, Search, X, SlidersHorizontal, Inbox, SearchX,
-  ArrowUpDown, ChevronLeft, ChevronRight, Rocket, LinkIcon, Loader2,
+  ArrowUpDown, ChevronLeft, ChevronRight, Rocket, LinkIcon, Loader2, Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,9 +14,10 @@ import { JobCard } from '@/components/jobs/job-card';
 import { JobTable } from '@/components/jobs/job-table';
 import { useQuery } from '@tanstack/react-query';
 import { useApplications } from '@/hooks/use-applications';
+import { useProfile } from '@/contexts/profile-context';
 import { useSourceLabels } from '@/hooks/use-scrapers';
 import { getSources } from '@/api/analytics';
-import { checkUrls } from '@/api/applications';
+import { checkUrls, purgeAllApplications } from '@/api/applications';
 import { STATUS_OPTIONS, STATUS_LABELS, COMPANY_TYPES, SORT_OPTIONS } from '@/utils/constants';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -26,6 +27,9 @@ export const Route = createRoute({
   getParentRoute: () => rootRoute,
   path: '/applications',
   component: ApplicationsPage,
+  validateSearch: (search: Record<string, unknown>) => ({
+    run: (search.run as string) || undefined,
+  }),
 });
 
 const WORK_TYPES = [
@@ -57,15 +61,16 @@ const SOURCE_LABEL_MAP: Record<string, string> = {
   remoteok: 'RemoteOK',
   cryptojobslist: 'CryptoJobsList',
   workatastartup: 'YC Work at a Startup',
-  wellfound: 'Wellfound',
   arbeitnow: 'Arbeitnow',
   themuse: 'The Muse',
   workday: 'Workday',
-  jobicy: 'Jobicy',
 };
 
 function ApplicationsPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const { run: searchRunId } = Route.useSearch();
+  const { profile } = useProfile();
   const sourceLabels = useSourceLabels();
   const urlCheck = useMutation({
     mutationFn: () => checkUrls(undefined, 100),
@@ -74,6 +79,14 @@ function ApplicationsPage() {
       toast.success(`Checked ${result.checked} URLs — ${result.alive} alive, ${result.dead} expired`);
     },
     onError: () => toast.error('Failed to check URLs'),
+  });
+  const purgeAll = useMutation({
+    mutationFn: () => purgeAllApplications(profile),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['applications'] });
+      toast.success(`Cleared ${result.purged} applications`);
+    },
+    onError: () => toast.error('Failed to clear applications'),
   });
   const { data: sourcesData } = useQuery({
     queryKey: ['analytics', 'sources'],
@@ -89,6 +102,7 @@ function ApplicationsPage() {
   const [view, setView] = useState<'cards' | 'table'>('cards');
   const [showFilters, setShowFilters] = useState(true);
   const [searchInput, setSearchInput] = useState('');
+  const [selectedJobId, setSelectedJobId] = useState<number | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
   const [filters, setFilters] = useState<ApplicationFilters>({
     sort_by: 'overall_score',
@@ -97,7 +111,7 @@ function ApplicationsPage() {
     page_size: 25,
   });
 
-  const { data, isLoading } = useApplications(filters);
+  const { data, isLoading } = useApplications({ ...filters, profile, search_run_id: searchRunId });
 
   const updateFilter = useCallback((key: keyof ApplicationFilters, value: unknown) => {
     setFilters((prev) => ({ ...prev, [key]: value, page: 1 }));
@@ -154,13 +168,22 @@ function ApplicationsPage() {
           <p className="mt-0.5 text-sm text-text-tertiary tabular-nums">
             {total > 0 ? (
               <>
-                {total} jobs tracked
+                {total} {searchRunId ? 'jobs from latest search' : 'jobs tracked'}
                 {hasActiveFilters && <span> · {items.length} matching filters</span>}
               </>
             ) : (
-              'No jobs tracked yet'
+              searchRunId ? 'No jobs found in this search' : 'No jobs tracked yet'
             )}
           </p>
+          {searchRunId && (
+            <button
+              type="button"
+              className="mt-1 text-xs text-brand hover:text-brand-dark font-medium cursor-pointer"
+              onClick={() => navigate({ to: '/applications', search: {} })}
+            >
+              Show all jobs
+            </button>
+          )}
         </div>
       </div>
 
@@ -319,6 +342,24 @@ function ApplicationsPage() {
                 )}
                 Remove expired
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('Clear all saved applications? This cannot be undone.')) {
+                    purgeAll.mutate();
+                  }
+                }}
+                disabled={purgeAll.isPending}
+                title="Delete all saved applications and start fresh"
+                className="inline-flex items-center gap-1.5 h-8 px-2.5 text-xs text-danger/70 hover:text-danger transition-colors rounded-md hover:bg-danger/10 cursor-pointer disabled:opacity-50"
+              >
+                {purgeAll.isPending ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Trash2 className="h-3 w-3" />
+                )}
+                Clear all
+              </button>
             </div>
           )}
         </div>
@@ -391,7 +432,22 @@ function ApplicationsPage() {
             ))}
           </div>
         ) : (
-          <JobTable data={items} />
+          <>
+            <JobTable
+              data={items}
+              onRowClick={(app) => setSelectedJobId(selectedJobId === app.id ? null : app.id)}
+              selectedId={selectedJobId}
+            />
+            {selectedJobId != null && (() => {
+              const selected = items.find((a) => a.id === selectedJobId);
+              if (!selected) return null;
+              return (
+                <div className="mt-4">
+                  <JobCard app={selected} sourceLabels={sourceLabels} />
+                </div>
+              );
+            })()}
+          </>
         )}
       </div>
 

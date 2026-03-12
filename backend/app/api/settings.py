@@ -22,6 +22,7 @@ from app.schemas.settings import (
     ProviderPreset,
 )
 from app.services import settings_service
+from app.dependencies import sanitize_profile
 
 router = APIRouter(tags=["settings"])
 
@@ -56,6 +57,41 @@ async def test_llm_connection():
     return settings_service.test_llm_connection()
 
 
+def _is_safe_url(url: str) -> bool:
+    """Validate that a URL is safe to proxy requests to.
+
+    Allows https:// URLs and localhost/127.0.0.1 over http://.
+    Rejects all other http:// targets to prevent SSRF against internal services.
+    """
+    from urllib.parse import urlparse
+    import ipaddress
+
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return False
+
+    if parsed.scheme == "https":
+        # Reject if the hostname resolves to a private/internal IP
+        hostname = parsed.hostname or ""
+        try:
+            addr = ipaddress.ip_address(hostname)
+            if addr.is_private or addr.is_loopback or addr.is_reserved or addr.is_link_local:
+                return False
+        except ValueError:
+            # Not a raw IP — it's a hostname, which is fine for https
+            pass
+        return True
+
+    if parsed.scheme == "http":
+        hostname = parsed.hostname or ""
+        if hostname in ("localhost", "127.0.0.1", "::1"):
+            return True
+        return False
+
+    return False
+
+
 @router.post("/settings/llm/models", response_model=list[ProviderModel])
 async def fetch_provider_models(req: FetchModelsRequest):
     """Fetch available models from a provider's /models endpoint.
@@ -66,6 +102,13 @@ async def fetch_provider_models(req: FetchModelsRequest):
     import requests as http_requests
 
     base = req.base_url.rstrip("/")
+
+    if not _is_safe_url(base):
+        raise HTTPException(
+            400,
+            "Invalid base_url: must use https:// or http://localhost / http://127.0.0.1",
+        )
+
     headers: dict[str, str] = {}
     if req.api_key:
         headers["Authorization"] = f"Bearer {req.api_key}"
@@ -138,12 +181,14 @@ async def get_profile(name: str):
 @router.get("/profiles/{name}/preferences", response_model=ProfilePreferencesResponse)
 async def get_profile_preferences(name: str):
     """Get user-editable preferences for a profile."""
+    name = sanitize_profile(name)
     return settings_service.get_profile_preferences(name)
 
 
 @router.put("/profiles/{name}/preferences", response_model=ProfilePreferencesResponse)
 async def update_profile_preferences(name: str, prefs: ProfilePreferences):
     """Update user-editable preferences for a profile."""
+    name = sanitize_profile(name)
     try:
         return settings_service.update_profile_preferences(name, prefs.model_dump())
     except Exception as e:

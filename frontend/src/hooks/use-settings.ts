@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getLLMStatus, updateLLMConfig, testLLMConnection, getLLMPresets,
-  fetchProviderModels, getProfilePreferences, updateProfilePreferences,
+  fetchProviderModels, getProfiles, getProfilePreferences, updateProfilePreferences,
 } from '@/api/settings';
 import { useProfile } from '@/contexts/profile-context';
 import type { LLMConfig, ProfilePreferences } from '@/types/settings';
@@ -57,6 +57,14 @@ export function useProviderModels(baseUrl: string, apiKey: string, enabled: bool
     enabled: enabled && !!baseUrl,
     staleTime: 5 * 60 * 1000, // cache for 5 minutes
     retry: false,
+  });
+}
+
+export function useProfiles() {
+  return useQuery({
+    queryKey: ['settings', 'profiles'],
+    queryFn: getProfiles,
+    staleTime: 60 * 60 * 1000,
   });
 }
 

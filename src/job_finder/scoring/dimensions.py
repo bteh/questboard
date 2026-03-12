@@ -1,7 +1,11 @@
-"""Individual dimension scoring functions (0–100 each).
+"""Individual dimension scoring functions (0\u2013100 each).
 
 Each function takes raw text / metadata and returns a float score.
 Company tier baselines are applied in ``core.score_job_basic``, not here.
+
+When profile config provides domain-specific keywords (e.g. a nurse profile
+with "patient care", "clinical protocols"), those are used instead of the
+hardcoded defaults.  This makes scoring work for any profession.
 """
 
 from __future__ import annotations
@@ -20,7 +24,7 @@ from job_finder.scoring.signals import (
 )
 
 
-# ── Technical skills ──────────────────────────────────────────────────────
+# \u2500\u2500 Technical skills \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
 def score_technical(
     resume_text: str,
@@ -28,20 +32,20 @@ def score_technical(
     combined: str,
     tech_keywords: list[str],
 ) -> float:
-    """Blend TF-IDF resume↔JD similarity with keyword matches."""
+    """Blend TF-IDF resume\u2194JD similarity with keyword matches."""
     tfidf_raw = tfidf_similarity(resume_text, job_description)
     tech_tfidf = min(tfidf_raw * 300, 100.0)
     tech_kw = keyword_score(combined, tech_keywords, saturation=6)
     return tech_tfidf * 0.5 + tech_kw * 0.5
 
 
-# ── Leadership ────────────────────────────────────────────────────────────
+# \u2500\u2500 Leadership \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
 def score_leadership(combined: str, lead_keywords: list[str]) -> float:
     return keyword_score(combined, lead_keywords, saturation=3)
 
 
-# ── Compensation potential ────────────────────────────────────────────────
+# \u2500\u2500 Compensation potential \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
 def score_comp(
     salary_min: float | None,
@@ -58,40 +62,62 @@ def score_comp(
     )
 
 
-# ── Platform building ─────────────────────────────────────────────────────
+# \u2500\u2500 Platform building \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
 def score_platform(combined: str, plat_keywords: list[str]) -> float:
     return keyword_score(combined, plat_keywords, saturation=3)
 
 
-# ── Company trajectory ────────────────────────────────────────────────────
+# \u2500\u2500 Company trajectory \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
-def score_trajectory(combined: str) -> float:
-    all_signals = TRAJECTORY_STARTUP_SIGNALS + TRAJECTORY_ENTERPRISE_SIGNALS
+def score_trajectory(
+    combined: str,
+    trajectory_keywords: list[str] | None = None,
+) -> float:
+    if trajectory_keywords:
+        all_signals = trajectory_keywords
+    else:
+        all_signals = TRAJECTORY_STARTUP_SIGNALS + TRAJECTORY_ENTERPRISE_SIGNALS
     return keyword_score(combined, all_signals, saturation=3)
 
 
-# ── Culture fit ───────────────────────────────────────────────────────────
+# \u2500\u2500 Culture fit \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
-def score_culture(combined: str, is_remote: bool) -> float:
-    all_signals = CULTURE_STARTUP_SIGNALS + CULTURE_ENTERPRISE_SIGNALS
+def score_culture(
+    combined: str,
+    is_remote: bool,
+    culture_keywords: list[str] | None = None,
+) -> float:
+    if culture_keywords:
+        all_signals = culture_keywords
+    else:
+        all_signals = CULTURE_STARTUP_SIGNALS + CULTURE_ENTERPRISE_SIGNALS
     score = keyword_score(combined, all_signals, saturation=4)
     if is_remote:
         score = min(score + 20, 100.0)
     return score
 
 
-# ── Career progression ────────────────────────────────────────────────────
+# \u2500\u2500 Career progression \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
 def _extract_level(title: str) -> float:
-    """Extract a numeric level from a job title."""
+    """Extract a numeric level from a job title.
+
+    Processes longer (more specific) keywords first so that e.g.
+    "account executive" (level 2) is matched before the shorter
+    "executive" phrases, and the most-specific match wins.
+    """
     title_lower = title.lower()
-    matched: list[float] = []
+    matched: list[tuple[int, float]] = []  # (keyword_length, level)
     for keyword, level in LEVEL_MAP.items():
         pattern = r'\b' + re.escape(keyword) + r'\b'
         if re.search(pattern, title_lower):
-            matched.append(level)
-    return max(matched) if matched else 2.0
+            matched.append((len(keyword), level))
+    if not matched:
+        return 2.0
+    # Return the level of the longest (most specific) matching keyword
+    matched.sort(key=lambda x: x[0], reverse=True)
+    return matched[0][1]
 
 
 def score_career_progression(
@@ -101,7 +127,7 @@ def score_career_progression(
     salary_max: float | None,
     config: dict,
 ) -> float:
-    """Score whether this job represents a career upgrade (0–100)."""
+    """Score whether this job represents a career upgrade (0\u2013100)."""
     baseline = config.get("career_baseline", {})
     current_level = _extract_level(baseline.get("current_title", "software engineer"))
     current_tc = baseline.get("current_tc", 100_000)
@@ -109,11 +135,16 @@ def score_career_progression(
 
     score = 50.0  # neutral
 
-    # Title escalation (+30 / -40)
+    # Title escalation: reward 1-level stretch, penalize overreach
     level_diff = job_level - current_level
-    if level_diff > 0:
-        score += min(level_diff * 15, 30)
+    if 0 < level_diff <= 1.5:
+        # Healthy stretch \u2014 one level up is ideal
+        score += min(level_diff * 15, 25)
+    elif level_diff > 1.5:
+        # Overreach \u2014 job is too senior for this user
+        score -= min((level_diff - 1) * 20, 40)
     elif level_diff < 0:
+        # Step down
         score += max(level_diff * 20, -40)
 
     # Scope expansion (+20)
@@ -130,7 +161,12 @@ def score_career_progression(
         elif salary_max < current_tc * 0.85:
             score -= 15
 
-    # IC→manager transition bonus
+        # Penalty when salary is below min_acceptable_tc
+        min_acceptable_tc = baseline.get("min_acceptable_tc", current_tc)
+        if salary_max < min_acceptable_tc:
+            score -= 20
+
+    # IC\u2192manager transition bonus
     title_lower = job_title.lower()
     is_mgmt = any(
         re.search(r'\b' + re.escape(sig) + r'\b', title_lower)

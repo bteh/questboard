@@ -2,7 +2,7 @@
 
 **Your personal AI agent for the job search grind.**
 
-Launchboard searches 5+ job boards, scores listings against your resume across 7 dimensions, generates tailored cover letters and resume tweaks, drafts company research for interview prep, and optionally auto-applies through ATS APIs. The core pipeline, database, and resume handling run locally on your machine.
+Launchboard searches 14+ job boards, scores listings against your resume across 7 dimensions, generates tailored cover letters and resume tweaks, drafts company research for interview prep, and optionally auto-applies through ATS APIs. Works for any profession -- data engineering, nursing, marketing, finance, and beyond. The core pipeline, database, and resume handling run locally on your machine.
 
 The job market rewards quality over volume. Launchboard is built on a simple thesis: the best job search tool is one that thinks like a hiring manager, not a spray-and-pray bot.
 
@@ -10,9 +10,9 @@ The job market rewards quality over volume. Launchboard is built on a simple the
 
 ## What It Does Today
 
-**Search** -- Searches 14+ sources in parallel: Indeed, LinkedIn, Glassdoor, ZipRecruiter, Google Jobs (via JobSpy), plus Remotive, Arbeitnow, Himalayas, RemoteOK, Jobicy, We Work Remotely, Hacker News Who's Hiring, The Muse, CryptoJobsList, and ATS boards from 100+ companies via Greenhouse, Lever, and Ashby APIs. YC Work at a Startup scraper extracts listings from Inertia.js page data. Filters by location preferences. Deduplication is URL-based.
+**Search** -- Searches 14+ sources in parallel: Indeed, LinkedIn, Glassdoor, ZipRecruiter, Google Jobs (via JobSpy), plus Remotive, Arbeitnow, Himalayas, RemoteOK, We Work Remotely, Hacker News Who's Hiring, The Muse, CryptoJobsList, and ATS boards from 100+ companies via Greenhouse, Lever, Ashby, and Workday APIs. YC Work at a Startup scraper extracts listings from Inertia.js page data. AI-powered role expansion enriches search terms for any profession. Post-search filters catch irrelevant results. Deduplication is URL-based.
 
-**Score** -- Rates every job on 7 weighted dimensions: technical match (TF-IDF + keywords), leadership signal, compensation potential, platform-building opportunity, company trajectory, culture fit, and career progression. The platform-building dimension (13% weight) specifically rewards startup signals like "greenfield", "0 to 1", "first data hire", and "founding engineer". Works without any LLM. With an LLM connected, scoring becomes context-aware.
+**Score** -- Rates every job on 7 weighted dimensions: technical match (TF-IDF + keywords), leadership signal, compensation potential, platform-building opportunity, company trajectory, culture fit, and career progression. All dimensions are profile-configurable -- a nurse's keywords differ from an engineer's. Works without any LLM. With an LLM connected, ALL jobs are scored by AI in parallel for context-aware accuracy.
 
 **Classify** -- Automatically categorizes companies into 8 tiers (FAANG+, Big Tech, Elite Startup, Growth Stage, Early Startup, Midsize, Enterprise, Unknown) using known-company lists (including 50+ VC-backed startups like OpenAI, Anthropic, Stripe, dbt Labs, Vercel), funding stage heuristics, and employee count data. Filter your dashboard by tier to focus on the company stage that fits you.
 
@@ -55,9 +55,7 @@ The job market rewards quality over volume. Launchboard is built on a simple the
       +----------------+  +------------------+
 ```
 
-There are two UI options:
-- **Web UI (recommended):** FastAPI backend + React frontend. Run with `make dev`.
-- **Streamlit UI (legacy):** Single-file dashboard. Run with `streamlit run app.py`.
+**Web UI:** FastAPI backend + React frontend. Run with `make dev`.
 
 **Key design decision:** LLM features are additive, never required. Search works with zero API keys. Resume-based scoring requires a PDF resume. AI features unlock progressively as you connect a provider.
 
@@ -77,12 +75,9 @@ cp your_resume.pdf knowledge/yourname_resume.pdf
 # Create your profile
 cp src/job_finder/config/profiles/_template.yaml src/job_finder/config/profiles/yourname.yaml
 
-# Launch the web UI (recommended)
+# Launch the web UI
 make dev
 # Backend: http://localhost:8000   Frontend: http://localhost:5173
-
-# Or launch the legacy Streamlit UI
-streamlit run app.py
 ```
 
 Searching and offline scoring do not require API keys. Resume-based scoring does require a PDF resume in `knowledge/`. LLM-generated cover letters and company research should always be reviewed before you send or rely on them.
@@ -170,7 +165,7 @@ All thresholds and weights are configurable per profile.
 
 ### Done
 
-- [x] 14+ source parallel search (JobSpy, Remotive, Arbeitnow, Himalayas, RemoteOK, Jobicy, We Work Remotely, Hacker News, The Muse, CryptoJobsList, Greenhouse, Lever, Ashby, YC Work at a Startup, Workday)
+- [x] 12+ source parallel search (JobSpy, Remotive, Arbeitnow, Himalayas, RemoteOK, We Work Remotely, Hacker News, The Muse, CryptoJobsList, Greenhouse, Lever, Ashby, YC Work at a Startup, Workday)
 - [x] Plugin-based scraper registry — add a new source with one decorated file
 - [x] 7-dimension weighted scoring (TF-IDF + keywords, works offline)
 - [x] 10 free LLM provider integrations + live model fetching from provider APIs
@@ -313,7 +308,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full contributor guide.
 | Models | Pydantic v2 |
 | Backend | FastAPI, uvicorn, SSE streaming |
 | Frontend | React 19, TanStack Router, Tailwind CSS, Recharts |
-| Legacy UI | Streamlit + Plotly + custom CSS |
 | Config | PyYAML, python-dotenv |
 | PDF | PyPDF2 |
 

@@ -1,5 +1,5 @@
 import { apiGet, apiPut, apiPost } from '@/lib/api-client';
-import type { LLMStatus, LLMConfig, LLMTestResult, ProviderPreset, ProviderModel, ProfilePreferences, ProfilePreferencesResponse } from '@/types/settings';
+import type { LLMStatus, LLMConfig, LLMTestResult, ProviderPreset, ProviderModel, ProfilePreferences, ProfilePreferencesResponse, ProfileSummary } from '@/types/settings';
 
 export function getLLMStatus(): Promise<LLMStatus> {
   return apiGet<LLMStatus>('/settings/llm');
@@ -20,6 +20,10 @@ export function getLLMPresets(includeInternal = false): Promise<ProviderPreset[]
 
 export function fetchProviderModels(base_url: string, api_key: string): Promise<ProviderModel[]> {
   return apiPost<ProviderModel[]>('/settings/llm/models', { base_url, api_key });
+}
+
+export function getProfiles(): Promise<ProfileSummary[]> {
+  return apiGet<ProfileSummary[]>('/profiles');
 }
 
 export function getProfilePreferences(profile: string): Promise<ProfilePreferencesResponse> {

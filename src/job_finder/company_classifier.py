@@ -294,6 +294,37 @@ _US_STATES = {
     "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY", "DC",
 }
 
+_STATE_NAME_TO_ABBR: dict[str, str] = {
+    "alabama": "AL", "alaska": "AK", "arizona": "AZ", "arkansas": "AR",
+    "california": "CA", "colorado": "CO", "connecticut": "CT", "delaware": "DE",
+    "florida": "FL", "georgia": "GA", "hawaii": "HI", "idaho": "ID",
+    "illinois": "IL", "indiana": "IN", "iowa": "IA", "kansas": "KS",
+    "kentucky": "KY", "louisiana": "LA", "maine": "ME", "maryland": "MD",
+    "massachusetts": "MA", "michigan": "MI", "minnesota": "MN",
+    "mississippi": "MS", "missouri": "MO", "montana": "MT", "nebraska": "NE",
+    "nevada": "NV", "new hampshire": "NH", "new jersey": "NJ",
+    "new mexico": "NM", "new york": "NY", "north carolina": "NC",
+    "north dakota": "ND", "ohio": "OH", "oklahoma": "OK", "oregon": "OR",
+    "pennsylvania": "PA", "rhode island": "RI", "south carolina": "SC",
+    "south dakota": "SD", "tennessee": "TN", "texas": "TX", "utah": "UT",
+    "vermont": "VT", "virginia": "VA", "washington": "WA",
+    "west virginia": "WV", "wisconsin": "WI", "wyoming": "WY",
+    "district of columbia": "DC",
+}
+
+# Common non-US countries/regions that appear in job locations
+_NON_US_COUNTRIES = {
+    "india", "canada", "uk", "united kingdom", "germany", "france", "brazil",
+    "australia", "japan", "china", "singapore", "ireland", "netherlands",
+    "mexico", "israel", "sweden", "spain", "italy", "poland", "argentina",
+    "colombia", "chile", "portugal", "switzerland", "austria", "belgium",
+    "denmark", "finland", "norway", "south korea", "taiwan", "philippines",
+    "vietnam", "thailand", "indonesia", "malaysia", "new zealand", "czech republic",
+    "romania", "hungary", "ukraine", "turkey", "egypt", "south africa", "nigeria",
+    "kenya", "pakistan", "bangladesh", "sri lanka", "nepal", "costa rica",
+    "united arab emirates", "uae", "saudi arabia", "qatar", "dubai",
+}
+
 _REMOTE_KEYWORDS = {"remote", "work from home", "wfh", "anywhere", "distributed"}
 _HYBRID_KEYWORDS = {"hybrid", "in-office", "in office", "on-site", "onsite", "days in office", "office days"}
 _ONSITE_KEYWORDS = {"on-site only", "onsite only", "in-person", "in person", "no remote"}
@@ -314,8 +345,13 @@ _HYBRID_PATTERNS = [
 
 
 def parse_location(raw_location: str, is_remote: bool = False) -> dict:
-    """Parse a raw location string into {city, state, is_remote}."""
-    result: dict = {"city": "", "state": "", "is_remote": is_remote}
+    """Parse a raw location string into {city, state, is_remote}.
+
+    Handles formats: "City, ST", "City, StateName", "City, State, Country",
+    "Country, ST, City" (reversed), and non-US locations.  Returns
+    ``country="non-us"`` when a known foreign country is detected.
+    """
+    result: dict = {"city": "", "state": "", "is_remote": is_remote, "country": ""}
 
     if not raw_location:
         return result
@@ -329,6 +365,13 @@ def parse_location(raw_location: str, is_remote: bool = False) -> dict:
             result["is_remote"] = True
             break
 
+    # Detect non-US countries early (before stripping)
+    for country in _NON_US_COUNTRIES:
+        # Match as whole word at end or as a comma-separated part
+        if re.search(r"(?:^|,\s*)" + re.escape(country) + r"(?:\s*$|,)", loc_lower):
+            result["country"] = "non-us"
+            return result
+
     # Strip remote/hybrid noise to find underlying city
     cleaned = re.sub(
         r"\b(remote|hybrid|work from home|wfh|anywhere|distributed)\b",
@@ -338,7 +381,7 @@ def parse_location(raw_location: str, is_remote: bool = False) -> dict:
     )
     # Strip country suffixes
     cleaned = re.sub(
-        r",?\s*\b(United States|US|USA|U\.S\.)\b",
+        r",?\s*\b(United States of America|United States|US|USA|U\.S\.)\b",
         "",
         cleaned,
         flags=re.IGNORECASE,
@@ -347,15 +390,42 @@ def parse_location(raw_location: str, is_remote: bool = False) -> dict:
 
     # Try "City, ST" or "City, ST ZIP"
     match = re.match(r"^([A-Za-z\s.'-]+),\s*([A-Z]{2})\b", cleaned.strip())
-    if match:
+    if match and match.group(2) in _US_STATES:
         result["city"] = match.group(1).strip()
         result["state"] = match.group(2).strip()
+        result["country"] = "US"
         return result
+
+    # Try "City, Full State Name" (e.g. "O'Fallon, Missouri")
+    match = re.match(r"^([A-Za-z\s.'-]+),\s*([A-Za-z\s]+)$", cleaned.strip())
+    if match:
+        state_name = match.group(2).strip().lower()
+        abbr = _STATE_NAME_TO_ABBR.get(state_name)
+        if abbr:
+            result["city"] = match.group(1).strip()
+            result["state"] = abbr
+            result["country"] = "US"
+            return result
+
+    # Try reversed "ST, City" or "Country, ST, City" format
+    parts = [p.strip() for p in cleaned.split(",")]
+    if len(parts) >= 2:
+        # Check if any part is a 2-letter US state code
+        for i, part in enumerate(parts):
+            if part.upper() in _US_STATES and len(part.strip()) == 2:
+                result["state"] = part.upper()
+                result["country"] = "US"
+                # City is the part after the state code, or before if reversed
+                remaining = [p for j, p in enumerate(parts) if j != i and p.upper() not in _US_STATES and len(p) > 2]
+                if remaining:
+                    result["city"] = remaining[-1].strip()
+                return result
 
     # Try just a 2-letter state code
     match = re.match(r"^([A-Z]{2})$", cleaned.strip())
     if match and match.group(1) in _US_STATES:
         result["state"] = match.group(1)
+        result["country"] = "US"
         return result
 
     return result
@@ -487,10 +557,18 @@ def location_matches_preferences(
     # Rule 3: Hybrid and onsite must match state/city
     parsed = parse_location(job_location, is_remote)
 
-    # If location is empty or unparseable, keep the job rather than silently
-    # dropping it — the scorer will handle relevance.
+    # Non-US locations: reject when user has US state/city preferences
+    if parsed.get("country") == "non-us":
+        return False
+
+    # If location is empty or unparseable AND the raw string looks non-empty,
+    # reject it — it's likely a foreign or unrecognized location.
     if not parsed["city"] and not parsed["state"]:
-        return True
+        # Truly empty location string → keep (benefit of the doubt)
+        if not job_location or not job_location.strip():
+            return True
+        # Has text but couldn't parse → reject (likely non-US or unusual format)
+        return False
 
     # City-level matching with metro area awareness
     if preferred_cities and parsed["city"]:
@@ -506,12 +584,8 @@ def location_matches_preferences(
             if pref_metro and pref_metro == job_metro:
                 return True
 
-    # State-level fallback (only when no city match was possible)
+    # State-level match — any job in a preferred state passes
     if preferred_states and parsed["state"]:
-        # If cities were specified but didn't match, don't fall through to state
-        # unless the job has no parseable city
-        if preferred_cities and parsed["city"]:
-            return False  # City was parsed but didn't match any metro
         if parsed["state"].upper() in [s.upper() for s in preferred_states]:
             return True
 

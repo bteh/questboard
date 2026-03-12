@@ -8,6 +8,10 @@ from sqlalchemy.orm import Session
 
 from app.models.application import ApplicationRecord
 
+_ALLOWED_SORT_BY = frozenset({
+    "overall_score", "date_found", "company", "job_title", "salary_min", "salary_max",
+})
+
 
 def _utcnow():
     return datetime.now(timezone.utc)
@@ -25,11 +29,14 @@ def get_applications(
     is_remote: bool | None = None,
     work_type: str | None = None,
     profile: str | None = None,
+    search_run_id: str | None = None,
     sort_by: str = "overall_score",
     sort_dir: str = "desc",
     page: int = 1,
     page_size: int = 25,
 ) -> tuple[list[ApplicationRecord], int]:
+    if sort_by not in _ALLOWED_SORT_BY:
+        sort_by = "overall_score"
     query = db.query(ApplicationRecord)
 
     if status:
@@ -48,6 +55,8 @@ def get_applications(
         query = query.filter(ApplicationRecord.work_type == work_type)
     if profile:
         query = query.filter(ApplicationRecord.profile == profile)
+    if search_run_id:
+        query = query.filter(ApplicationRecord.search_run_id == search_run_id)
     if search:
         pattern = f"%{search}%"
         query = query.filter(

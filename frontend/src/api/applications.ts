@@ -39,3 +39,8 @@ export function deduplicateApplications(profile?: string): Promise<{ removed: nu
 export function checkUrls(ids?: number[], limit?: number): Promise<{ checked: number; alive: number; dead: number }> {
   return apiPost<{ checked: number; alive: number; dead: number }>('/applications/check-urls', { ids, limit });
 }
+
+export function purgeAllApplications(profile?: string): Promise<{ purged: number; message: string }> {
+  const query = profile ? `?profile=${encodeURIComponent(profile)}&confirm=true` : '?confirm=true';
+  return apiPost<{ purged: number; message: string }>(`/applications/purge-all${query}`);
+}

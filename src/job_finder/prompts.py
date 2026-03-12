@@ -34,31 +34,38 @@ def _pct(weight: float) -> int:
 
 _JD_SCORER_TEMPLATE = """\
 You are a career strategist who has reviewed thousands of job descriptions
-and resumes.  You understand that ATS keyword matching is just the surface —
-what really matters is whether the role offers the candidate a chance to
-lead, build, and grow.
+and resumes across every industry — tech, healthcare, education, finance,
+marketing, government, and more.  You understand that keyword matching is
+just the surface — what really matters is whether the role offers the
+candidate a chance to lead, build, and grow in their specific field.
 
 Score the job on these {num_dimensions} weighted dimensions:
 
 1. TECHNICAL SKILLS  ({w_tech}%) — How well do the candidate's skills
-   ({tech_sample}) match the JD requirements?
+   ({tech_sample}) match the JD requirements?  Evaluate domain-specific
+   skill overlap, not just keyword matches.
 
 2. LEADERSHIP SIGNAL ({w_lead}%) — Does the JD indicate a leadership or
    growth opportunity?  Look for signals like: {lead_sample}
+   Consider both formal management AND domain-specific leadership
+   (clinical leadership, thought leadership, team influence, etc.)
 
 3. COMP POTENTIAL    ({w_comp}%) — Could this role realistically pay
-   {target_tc}+ total comp?  Big-tech senior/staff = likely yes.
-   Seed stage = likely no unless significant equity.
+   {target_tc}+ total comp?  Consider the company's prestige, industry
+   norms, role seniority, and geographic market.  Use your knowledge of
+   compensation ranges for this specific field and company.
 
 4. PLATFORM BUILDING ({w_plat}%) — Is this about BUILDING something new vs.
-   maintaining?  Look for "greenfield", "from scratch", "v1", "0 to 1",
-   "build the foundation", "establish best practices".
+   maintaining?  Look for new programs, initiatives, teams, departments,
+   clinics, product lines, or any signal of creating from the ground up.
 
-5. COMPANY TRAJECTORY ({w_traj}%) — Is the company on an upward trajectory?
-   Well-funded startup, growing team, new initiative?
+5. COMPANY TRAJECTORY ({w_traj}%) — Is the company/organization on an upward
+   trajectory?  Growing, well-resourced, expanding into new markets or
+   services, strong reputation in its industry?
 
-6. CULTURE FIT       ({w_cult}%) — Remote-friendly?  Modern practices?
-   Collaborative culture signals?
+6. CULTURE FIT       ({w_cult}%) — Does the work environment match the
+   candidate's preferences?  Remote-friendly, collaborative, supportive
+   of professional development, work-life balance?
 {career_progression_block}
 Also determine the **actual work arrangement** from the job description text
 (ignore the job board's remote/onsite label — they are often wrong):
@@ -93,10 +100,11 @@ Recommendation thresholds:
 
 _CAREER_PROGRESSION_BLOCK = """
 7. CAREER PROGRESSION ({w_prog}%) — Does this role represent an upgrade from
-   {current_title} at ~{current_tc} TC?  Look for title escalation (Staff,
-   Principal, Director, VP, CTO), expanded scope (team building, strategy,
-   cross-functional leadership), and comp increase potential.  Penalize
-   lateral moves or downgrades.
+   {current_title} at ~{current_tc} TC?  Look for title escalation, expanded
+   scope (managing more people/budget/impact), increased responsibility, and
+   comp increase potential.  Penalize lateral moves or downgrades.  Consider
+   what "advancement" means in this specific field — it may look different
+   across industries.
 """
 
 
@@ -117,19 +125,16 @@ def build_scorer_prompt(config: dict[str, Any] | None = None) -> str:
     w_cult = weights.get("culture_fit", 0.10)
     w_prog = weights.get("career_progression", 0.15)
 
-    # Technical skills sample
-    tech_list = kw.get("technical", [
-        "dbt", "Trino", "Spark", "Airflow", "Python", "SQL",
-        "data modeling", "lakehouse architecture",
-    ])
-    tech_sample = ", ".join(tech_list[:8])
+    # Technical skills sample — reads from profile, generic fallback
+    tech_list = kw.get("technical", [])
+    tech_sample = ", ".join(tech_list[:8]) if tech_list else "the candidate's core professional skills (see resume)"
 
-    # Leadership signals sample
-    lead_list = kw.get("leadership", [
-        "build the team", "founding engineer", "head of", "manager",
-        "lead", "architect", "own the roadmap",
-    ])
-    lead_sample = ", ".join(f'"{s}"' for s in lead_list[:6])
+    # Leadership signals sample — reads from profile, generic fallback
+    lead_list = kw.get("leadership", [])
+    if lead_list:
+        lead_sample = ", ".join(f'"{s}"' for s in lead_list[:6])
+    else:
+        lead_sample = '"team lead", "manager", "director", "head of", "mentor", "oversee"'
 
     # Career progression block (omitted when weight is 0)
     if w_prog > 0:
@@ -228,11 +233,10 @@ def build_resume_optimizer_prompt(config: dict[str, Any] | None = None) -> str:
     """Build the resume optimizer system prompt from profile config."""
     cfg = config or {}
     kw = cfg.get("keywords", {})
-    tech_list = kw.get("technical", [
-        "dbt", "Trino", "Spark", "Airflow", "Python", "SQL",
-    ])
+    tech_list = kw.get("technical", [])
+    tech_sample = ", ".join(tech_list[:10]) if tech_list else "the candidate's core professional skills"
     return _RESUME_OPTIMIZER_TEMPLATE.format(
-        tech_sample=", ".join(tech_list[:10]),
+        tech_sample=tech_sample,
     )
 
 
@@ -277,22 +281,23 @@ Structure (keep under 400 words total):
    and outcomes from the resume.
 
 3. DOMAIN EXPERTISE (1 paragraph) — Demonstrate understanding of the company's
-   landscape and how the candidate's experience with skills and tools
-   like {tech_sample} applies to the role's core requirements.
+   field and how the candidate's experience with {tech_sample} applies to the
+   role's core requirements.
 
 4. LEADERSHIP NARRATIVE (1 paragraph) — For leadership roles, tell the story
-   of building and scaling a team.  For IC roles, emphasize technical
-   leadership and mentoring.
+   of building and scaling a team or program.  For individual contributor
+   roles, emphasize subject-matter expertise and mentoring.
 
 5. CLOSING (2-3 sentences) — Express genuine interest tied to the company's
    mission; suggest a specific conversation topic for the interview.
 
 TONE GUIDELINES:
-- Big tech → Confident, metrics-driven, concise
-- Well-funded startups → Visionary, builder-mentality, entrepreneurial
-- Mid-stage companies → Balanced, emphasize scaling experience
-- Do not invent product launches, funding rounds, blog posts, technical stack
-  details, or recent news that are not present in the inputs.
+- Match the tone to the company culture and industry norms
+- Large established organizations → Professional, metrics-driven, concise
+- Startups/growth companies → Visionary, builder-mentality, entrepreneurial
+- Mission-driven organizations → Purpose-aligned, impact-focused
+- Do not invent product launches, funding rounds, blog posts, initiatives,
+  or recent news that are not present in the inputs.
 
 Return **valid JSON** (no markdown fences):
 
@@ -302,7 +307,7 @@ Return **valid JSON** (no markdown fences):
   "cover_letter_text": "<the full letter>",
   "key_hooks": ["<hook1>", ...],
   "company_specific_references": ["<detail grounded in the provided inputs>", ...],
-  "tone": "<big-tech | startup | mid-stage>"
+  "tone": "<professional | entrepreneurial | mission-driven>"
 }}
 """
 
@@ -311,11 +316,10 @@ def build_cover_letter_prompt(config: dict[str, Any] | None = None) -> str:
     """Build the cover letter system prompt from profile config."""
     cfg = config or {}
     kw = cfg.get("keywords", {})
-    tech_list = kw.get("technical", [
-        "dbt", "Trino", "lakehouse",
-    ])
+    tech_list = kw.get("technical", [])
+    tech_sample = ", ".join(tech_list[:6]) if tech_list else "their core professional skills"
     return _COVER_LETTER_TEMPLATE.format(
-        tech_sample=", ".join(tech_list[:6]),
+        tech_sample=tech_sample,
     )
 
 
@@ -339,22 +343,28 @@ Location: {location}
 # ---------------------------------------------------------------------------
 
 _COMPANY_RESEARCHER_TEMPLATE = """\
-You are a venture analyst turned career intelligence specialist.  You know how
-to read between the lines of a Series B announcement, estimate runway from
-headcount growth, and identify companies where talent is a strategic priority.
+You are a career intelligence specialist with deep knowledge across every
+industry — tech, healthcare, education, finance, manufacturing, government,
+and more.  You know how to assess company health, estimate compensation,
+and identify organizations where talent is a strategic priority.
 
 Build a conservative company intelligence profile covering:
 
-1. FUNDING & FINANCIALS — Funding stage, total raised, key investors, revenue
-   estimates, runway signals.
-2. TEAM & CULTURE — Headcount, engineering size, team size, Glassdoor
-   rating, culture themes.
-3. TECH STACK — Infrastructure, cloud provider, key technologies, open
-   source contributions.
-4. GROWTH SIGNALS — Open roles, product launches, customer / revenue growth.
-5. COMPENSATION INTEL — Base / equity / bonus ranges, whether {target_tc}+ TC
-   is realistic at this level.
-6. RED FLAGS — Layoffs, turnover, negative reviews, regulatory issues.
+1. FUNDING & FINANCIALS — Funding stage (if applicable), revenue estimates,
+   financial health, key investors or backing.  For non-profits, government,
+   or public institutions, assess budget stability and funding sources.
+2. TEAM & CULTURE — Headcount, team size for the relevant department,
+   Glassdoor rating, culture themes, work environment.
+3. TOOLS & INFRASTRUCTURE — Key systems, platforms, and technologies used.
+   For healthcare: EMR systems, clinical tools.  For tech: tech stack.
+   For education: LMS, pedagogical tools.  Adapt to the industry.
+4. GROWTH SIGNALS — Open roles, expansion, new programs/products/services,
+   market position, industry trajectory.
+5. COMPENSATION INTEL — Base / bonus / benefits ranges for this role level,
+   whether {target_tc}+ TC is realistic.  Consider industry and geographic
+   norms, not just tech benchmarks.
+6. RED FLAGS — Layoffs, turnover, negative reviews, regulatory issues,
+   financial instability.
 7. WHY JOIN — 2-3 compelling reasons for this specific role.
 8. INTERVIEW TIPS — Known process, common questions, prep advice.
 

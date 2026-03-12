@@ -1,50 +1,70 @@
 # AGENTS.md -- Launchboard
 
-AI-powered job search agent. Searches 5+ job boards, scores jobs against your resume
+AI-powered job search agent. Searches 14+ job boards, scores jobs against your resume
 using 7-dimension weighted scoring, generates tailored application materials via LLM,
-and optionally auto-applies through Greenhouse/Lever APIs.
+and optionally auto-applies through Greenhouse/Lever APIs. Works for any profession.
 
 ## Architecture
 
 ```
 src/job_finder/
   pipeline.py              # 7-stage orchestrator: search -> parse -> score -> optimize -> cover letter -> research -> auto-apply
-  llm_client.py            # Unified OpenAI-compatible client (7 provider presets, health check, JSON parsing)
+  llm_client.py            # Unified OpenAI-compatible client (10 provider presets, health check, JSON parsing)
   scorer.py                # TF-IDF + keyword scoring, 7 dimensions, no LLM needed
   company_classifier.py    # 8-tier company classification (FAANG+ through Unknown) + location filtering
-  prompts.py               # Templatized system prompts -- build_*_prompt(config) adapts to profile
+  prompts.py               # Templatized system prompts -- build_*_prompt(config) adapts to any profession
   main.py                  # CLI entry points (run, search, score)
   config/
     search_config.yaml     # Default config
-    profiles/*.yaml        # Per-user profiles (brian.yaml, _template.yaml)
+    profiles/*.yaml        # Per-user profiles (default.yaml, nurse_practitioner.yaml, _template.yaml)
   models/
     database.py            # SQLAlchemy ORM -- ApplicationRecord (50+ columns), SQLite
     schemas.py             # Pydantic models (JobListing, JobScore, ResumeOptimization, CoverLetter, CompanyIntel)
+  scoring/
+    core.py                # Scoring orchestrator -- blends keyword + company baselines
+    dimensions.py          # Individual dimension scorers (technical, leadership, comp, etc.)
+    helpers.py             # TF-IDF, keyword scoring, salary scoring utilities
+    signals.py             # Keyword lists, tier baselines, level maps (fallback defaults)
+    company_intel.py       # LLM-powered per-company baseline generation
   tools/
-    job_search_tool.py     # JobSpy wrapper -- scrapes Indeed, LinkedIn, Glassdoor, ZipRecruiter, Google
+    job_search_tool.py     # JobSpy wrapper -- Indeed, LinkedIn, Glassdoor, ZipRecruiter, Google
     resume_parser_tool.py  # PyPDF2 extraction with profile-aware resume detection
     auto_apply_tool.py     # Greenhouse + Lever API submission, ATS URL detection, dry-run support
-    yc_scraper_tool.py     # YC Work at a Startup scraper (embedded JSON + HTML fallback) -- startup pipeline
+    scrapers/              # Plugin registry -- each scraper is one decorated file
+      _registry.py         # @register_scraper decorator, ScraperMeta, run_scrapers()
+      _utils.py            # Shared helpers (_get_json, _match_roles, _parse_salary, etc.)
+      *.py                 # 14 scraper plugins (greenhouse, lever, ashby, workday, remotive, etc.)
 
-app.py                     # Streamlit UI -- 5 pages (Dashboard, Run Search, Applications, Analytics, Settings)
-components.py              # Reusable UI components (job cards, badges, pipeline steps, activity feed)
-assets/style.css           # Custom CSS (Tailwind-inspired design tokens)
+backend/
+  app/
+    main.py                # FastAPI application entry point
+    api/                   # REST endpoints (search, applications, settings, analytics, scrapers, etc.)
+    schemas/               # Pydantic request/response models
+    services/              # Business logic (pipeline orchestration, settings persistence)
+
+frontend/
+  src/
+    routes/                # TanStack Router pages (index, search, applications, analytics, settings)
+    components/            # React components (job cards, score badges, pipeline status)
+    api/                   # Typed API client functions
+    hooks/                 # Custom React hooks
 ```
 
 ## Commands
 
 ```bash
-# Run Streamlit UI
-streamlit run app.py
+# Run the web UI (recommended)
+make dev
+# Backend: http://localhost:8000   Frontend: http://localhost:5173
 
 # CLI -- full pipeline
-python -m job_finder.main --profile brian
+python -m job_finder.main --profile default
 
 # CLI -- search only
-python -m job_finder.main search --profile brian
+python -m job_finder.main search --profile default
 
 # Install
-pip install -e .
+make setup
 ```
 
 ## Development Conventions
@@ -58,11 +78,11 @@ pip install -e .
 - **Config**: YAML profiles loaded via `_load_search_config(profile)`. Profile name threads through pipeline/tools/DB
 - **Naming**: snake_case everywhere. Files match their primary class/function
 
-## LLM Integration -- Three Tiers
+## LLM Integration -- AI-First with Offline Fallback
 
 1. **No LLM** (default): `search_jobs()` + `score_job_basic()` work completely offline. TF-IDF + keyword matching provides baseline scoring.
 
-2. **LLM Scoring**: When `llm.is_configured`, `pipeline.score_job_with_ai()` sends resume + JD to LLM. Returns same dict shape as basic scorer.
+2. **LLM Scoring** (AI-first): When `llm.is_configured`, ALL jobs are scored by the LLM in parallel (8 workers). Individual failures fall back to keyword scoring. AI role expansion enriches search terms before scraping.
 
 3. **Full AI Pipeline**: For STRONG_APPLY/APPLY jobs -- generates resume tweaks, cover letters, and company research. All via `llm.chat_json()`.
 
@@ -82,11 +102,12 @@ def new_feature(self, ...) -> dict | None:
 - `technical_skills` (0.25) -- TF-IDF cosine similarity + keyword saturation curve
 - `leadership_signal` (0.15) -- leadership keyword detection
 - `career_progression` (0.15) -- title level extraction, scope signals, comp upgrade
-- `platform_building` (0.13) -- greenfield/build-from-scratch/founding engineer startup signals
+- `platform_building` (0.13) -- greenfield/build-from-scratch signals
 - `comp_potential` (0.12) -- salary data or inferred from company/level signals
 - `company_trajectory` (0.10) -- funding/growth signals
 - `culture_fit` (0.10) -- remote, modern practices, collaboration signals
 
+All dimensions and keywords are profile-configurable for any profession.
 Recommendations: STRONG_APPLY (>=70), APPLY (>=55), MAYBE (>=40), SKIP (<40). Thresholds configurable per profile.
 
 ## Auto-Apply Safety Rules
@@ -106,17 +127,15 @@ dimensions, company intel JSON, cover letter, resume tweaks, application method,
 timestamps. Deduplication by `job_url` (unique constraint). Lightweight migration via `_migrate_db()`
 adds missing columns to existing tables.
 
-## Startup & Source Coverage
+## Source Coverage
 
-Job sources: JobSpy (Indeed, LinkedIn, Glassdoor, ZipRecruiter, Google) + YC Work at a Startup scraper.
-Profile config has `additional_sources` (workatastartup, greenhouse, lever URLs) and `target_companies`
-with `startup_criteria` (funding stages, min funding amount, founding role preference). The company
-classifier knows 50+ VC-backed startups (OpenAI, Anthropic, Stripe, dbt Labs, Vercel, etc.) and
-classifies by funding stage/amount/employee count. Auto-apply detects Greenhouse/Lever from job URLs.
+JobSpy (Indeed, LinkedIn, Glassdoor, ZipRecruiter, Google) + 14 plugin scrapers (Remotive, Himalayas,
+We Work Remotely, Hacker News, RemoteOK, CryptoJobsList, Arbeitnow, The Muse, YC Work at a Startup,
+Greenhouse, Lever, Ashby, Workday). Adding a new scraper = one decorated file in `scrapers/`.
 
 ## Key Patterns to Reuse
 
-- **Progress callbacks**: `progress: Callable[[str], None] | None` -- pass `st.progress` or `print`
+- **Progress callbacks**: `progress: Callable[[str], None] | None` -- pass a callback or `print`
 - **Profile threading**: `profile` parameter flows from CLI/UI -> pipeline -> tools -> database
 - **Config-driven prompts**: `build_*_prompt(config)` reads keywords/weights/thresholds from YAML
 - **Graceful degradation**: every LLM method returns `None` when unavailable
@@ -131,4 +150,4 @@ classifies by funding stage/amount/employee count. Auto-apply detects Greenhouse
 - Skip `dry_run` safety -- auto-apply must default to dry-run
 - Mutate the scoring weight contract -- always return all 7 dimension scores + recommendation
 - Add cloud dependencies -- the system is local-first (SQLite, local PDFs)
-- Access `st.session_state` from library code -- keep Streamlit concerns in `app.py` and `components.py`
+- Mix frontend/backend concerns -- keep React in `frontend/`, FastAPI in `backend/`, pipeline in `src/`

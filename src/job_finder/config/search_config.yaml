@@ -68,37 +68,12 @@ additional_sources:
     enabled: true
   - name: "cryptojobslist"
     enabled: true
-  - name: "wellfound"
-    enabled: true
   - name: "workday"
     enabled: true
   - name: "arbeitnow"
     enabled: true
-  - name: "jobicy"
-    enabled: true
   - name: "themuse"
     enabled: true
-
-# Company targeting
-target_companies:
-  big_tech:
-    - "Netflix"
-    - "NVIDIA"
-    - "Airbnb"
-    - "Stripe"
-    - "Databricks"
-    - "Snowflake"
-    - "Confluent"
-    - "dbt Labs"
-    - "Fivetran"
-    - "Starburst"
-  startup_criteria:
-    funding_stages:
-      - "Series A"
-      - "Series B"
-      - "Series C"
-    min_funding_amount: 10000000  # $10M minimum
-    prefer_founding_roles: true
 
 # Career baseline — used for career progression scoring
 career_baseline:
@@ -131,6 +106,9 @@ search_settings:
   max_days_old: 14
   exclude_staffing_agencies: true
   country: "USA"
+  max_parallel_searches: 6  # Concurrent JobSpy workers (each hits 5 boards, so 6 = 30 requests)
+  max_unique_jobs: 300      # Stop early once this many unique jobs found
+  max_search_tasks: 20      # Hard cap on total JobSpy queries (term × location combos)
 
 # Applicant information (used for auto-apply)
 applicant_info:

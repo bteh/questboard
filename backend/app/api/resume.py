@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse
 
 from app.schemas.resume import ResumeStatus, ResumeUploadResponse
 from app.services import resume_service
+from app.dependencies import sanitize_profile
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +79,7 @@ def _analyze_and_update_profile(profile: str) -> None:
 @router.get("/{profile}", response_model=ResumeStatus)
 async def get_resume_status(profile: str):
     """Check if a resume exists for the given profile."""
+    profile = sanitize_profile(profile)
     return resume_service.get_resume_status(profile)
 
 
@@ -93,9 +95,12 @@ async def upload_resume(
     auto-extracts skills, seniority, and industry from the resume and
     populates the profile's target roles, keywords, and career baseline.
     """
+    profile = sanitize_profile(profile)
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(400, "Only PDF files are accepted")
     content = await file.read()
+    if len(content) > 10 * 1024 * 1024:
+        raise HTTPException(413, "File too large (max 10MB)")
     if not content:
         raise HTTPException(400, "Empty file")
 
@@ -110,6 +115,7 @@ async def upload_resume(
 @router.get("/{profile}/download")
 async def download_resume(profile: str):
     """Download the resume PDF for the given profile."""
+    profile = sanitize_profile(profile)
     path = resume_service.get_resume_path(profile)
     if not path:
         raise HTTPException(404, f"No resume found for profile '{profile}'")
@@ -119,6 +125,7 @@ async def download_resume(profile: str):
 @router.get("/{profile}/text")
 async def get_resume_text(profile: str):
     """Get parsed text content of the resume."""
+    profile = sanitize_profile(profile)
     text = resume_service.get_resume_text(profile)
     if text.startswith("ERROR"):
         raise HTTPException(404, text)
@@ -132,6 +139,7 @@ async def analyze_resume_endpoint(profile: str):
     Useful for re-analyzing after the user updates their resume or
     when they want to refresh the extracted data.
     """
+    profile = sanitize_profile(profile)
     resume_text = resume_service.get_resume_text(profile)
     if resume_text.startswith("ERROR"):
         raise HTTPException(404, resume_text)

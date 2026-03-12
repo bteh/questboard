@@ -12,6 +12,7 @@ import logging
 import os
 import re
 import threading
+import time
 import unicodedata
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Callable
@@ -41,6 +42,7 @@ from job_finder.company_classifier import (
     location_matches_preferences,
 )
 from job_finder.scoring import score_job_basic, get_company_baselines, normalize_company_key
+from job_finder.scoring.dimensions import _extract_level  # re-export for tests/consumers
 from job_finder.tools.job_search_tool import search_jobs
 from job_finder.tools.resume_parser_tool import find_resume, parse_resume
 
@@ -49,6 +51,29 @@ logger = logging.getLogger(__name__)
 _PROJECT_ROOT = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..")
 )
+
+
+def _validate_config(config: dict, source: str) -> dict:
+    """Run Pydantic profile validation and log any issues.
+
+    Always returns the original *config* dict so the pipeline keeps working
+    even if validation finds problems (graceful degradation).
+    """
+    try:
+        from job_finder.config.profile_schema import validate_profile_safe
+
+        _profile, errors = validate_profile_safe(config)
+        if _profile is None:
+            for err in errors:
+                logger.warning("Profile validation error (%s): %s", source, err)
+        elif errors:
+            for err in errors:
+                logger.warning("Profile validation warning (%s): %s", source, err)
+        else:
+            logger.debug("Profile validated successfully (%s)", source)
+    except Exception:  # noqa: BLE001
+        logger.debug("Profile validation unavailable, skipping", exc_info=True)
+    return config
 
 
 def _load_search_config(profile: str | None = None) -> dict:
@@ -63,7 +88,8 @@ def _load_search_config(profile: str | None = None) -> dict:
         profile_path = os.path.join(config_dir, "profiles", f"{profile}.yaml")
         if os.path.exists(profile_path):
             with open(profile_path, "r", encoding="utf-8") as f:
-                return yaml.safe_load(f) or {}
+                config = yaml.safe_load(f) or {}
+            return _validate_config(config, profile_path)
         logger.warning("Profile '%s' not found, using default config", profile)
 
     # Fallback: original search_config.yaml
@@ -71,7 +97,8 @@ def _load_search_config(profile: str | None = None) -> dict:
     if not os.path.exists(config_path):
         return {}
     with open(config_path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f) or {}
+        config = yaml.safe_load(f) or {}
+    return _validate_config(config, config_path)
 
 
 def _normalize_company(name: str) -> str:
@@ -143,12 +170,32 @@ _HIGH_VALUE_PATTERNS = re.compile(
     re.IGNORECASE,
 )
 
-# Short keywords that should never be merged away (industry-specific terms).
-# Users can add their own domain terms in profile keyword_searches.
-_TECH_KEYWORDS = {
-    "dbt", "trino", "lakehouse", "iceberg", "spark", "airflow", "flink",
-    "kafka", "snowflake", "databricks", "bigquery", "redshift", "pyspark",
+# Short specialty keywords that should never be merged away.
+# These are tools, technologies, and domain terms across industries that
+# represent distinct search intent.  Profiles can add their own via
+# keyword_searches and keywords.technical.
+_DEFAULT_SPECIALTY_KEYWORDS = {
+    # Common short terms across many fields
+    "sql", "python", "java", "aws", "gcp", "azure",
+    "react", "vue", "angular", "docker", "terraform",
+    "figma", "sketch", "emr", "ehr", "epic", "seo",
 }
+
+
+def _get_specialty_keywords(config: dict | None = None) -> set[str]:
+    """Build specialty keyword set from profile config + defaults.
+
+    Includes the profile's technical keywords so domain-specific terms
+    (e.g. "Epic", "Cerner" for nurses, "Figma" for designers) are always
+    preserved during search consolidation.
+    """
+    keywords = set(_DEFAULT_SPECIALTY_KEYWORDS)
+    if config:
+        # Add all short technical keywords from profile
+        for kw in config.get("keywords", {}).get("technical", []):
+            if len(kw) <= 6:  # short domain terms worth preserving
+                keywords.add(kw.lower())
+    return keywords
 
 
 def _strip_prefix(term: str, prefixes: list[str]) -> tuple[str, str]:
@@ -173,83 +220,103 @@ def _strip_prefix(term: str, prefixes: list[str]) -> tuple[str, str]:
 def _consolidate_search_terms(
     roles: list[str],
     keywords: list[str],
+    config: dict | None = None,
 ) -> list[str]:
-    """Reduce redundant JobSpy queries by grouping similar search terms.
+    """Reduce redundant JobSpy queries by merging similar search terms.
+
+    When a user configures multiple seniority variants of the same role
+    (e.g. "senior product manager", "director of product", "VP product"),
+    job boards return overlapping results for each variant.  This function
+    collapses them into fewer, broader queries to avoid wasting time on
+    duplicate searches.
+
+    Works for any profession — engineering, marketing, design, finance, etc.
 
     Strategy:
-    1. Strip seniority and management prefixes to find the *base role*.
-    2. Group terms sharing the same base role; keep both the base (broadest)
-       and the highest-seniority variant so job boards match senior titles.
-    3. Keep high-value niche terms that would not surface via the broad query
-       (e.g. ``"founding engineer data"``).
-    4. Dedup keywords against roles so the same base is not searched twice.
-    5. Always keep short technology keywords (``"dbt"``, ``"Trino"``, etc.)
-       as-is because they represent distinct intent.
+    1. Strip seniority/management prefixes ("senior", "director of", etc.)
+       to find the *base role*.  Group variants sharing the same base.
+    2. Keep one broad query per base instead of many overlapping variants.
+    3. Merge near-identical bases (e.g. "product manager" ≈ "product managing").
+    4. Always keep short technology/specialty keywords ("SQL", "Figma", etc.).
+    5. Keep high-value niche terms ("founding engineer", "first hire", etc.).
 
     Returns the consolidated list and logs what was merged.
     """
-    # Seniority tiers for picking the "highest" variant to keep
-    _SENIORITY_RANK = {
-        "principal": 5, "staff": 4, "head of": 4,
-        "senior": 3, "lead": 3, "founding": 3,
-        "junior": 1,
-    }
-    _MANAGEMENT_RANK = {
-        "vp of": 5, "vp": 5,
-        "director of": 4, "director": 4,
-        "senior manager": 3, "manager": 2,
-    }
-
     # --- Phase 1: group roles by base role ---
-    base_groups: dict[str, list[tuple[str, int]]] = {}  # base_role -> [(original_term, rank)]
+    # "senior product manager" and "VP product" both have base "product"
+    # "senior software engineer" and "staff software engineer" → "software engineer"
+    base_groups: dict[str, list[str]] = {}
 
     for term in roles:
         t = term.strip()
         if not t:
             continue
 
-        # Try stripping seniority first, then management
         pfx, base = _strip_prefix(t, _SENIORITY_PREFIXES)
-        rank = _SENIORITY_RANK.get(pfx, 0)
         if not pfx:
             pfx, base = _strip_prefix(t, _MANAGEMENT_PREFIXES)
-            rank = _MANAGEMENT_RANK.get(pfx, 0)
 
-        # Normalize the base for grouping
         base_key = re.sub(r"\s+", " ", base.lower().strip())
-        base_groups.setdefault(base_key, []).append((t, rank))
+        base_groups.setdefault(base_key, []).append(t)
 
-    # For each group: keep the base role (broadest) AND the highest-seniority
-    # variant if it's different from the base.  This ensures job boards that
-    # match on title keywords surface senior-level results too.
+    # For each group: keep the base role as the search query.
+    # When the base is a single generic word (e.g. "marketing" from
+    # "VP marketing" + "director of marketing"), use the shortest
+    # original term instead — single words return too much noise.
     consolidated: list[str] = []
     kept_bases: set[str] = set()
 
     for base_key, group in base_groups.items():
-        if len(group) == 1:
-            consolidated.append(group[0][0])
+        if " " not in base_key and len(group) > 1:
+            # Single-word base is too broad — pick shortest original term.
+            # e.g. "head of sales" + "VP sales" → search "vp sales" not "sales"
+            best = min(group, key=len)
+            consolidated.append(best.lower())
+            kept_bases.add(base_key)
+            logger.info(
+                "Consolidated %d terms into '%s' (base '%s' too broad): %s",
+                len(group), best, base_key, group,
+            )
         else:
-            # Always emit the base role for broad coverage
             consolidated.append(base_key)
-
-            # Also keep the highest-seniority variant for targeted results
-            best_term, best_rank = max(group, key=lambda x: x[1])
-            if best_rank > 0 and best_term.lower().strip() != base_key:
-                consolidated.append(best_term)
+            kept_bases.add(base_key)
+            if len(group) > 1:
                 logger.info(
-                    "Consolidated %d terms for '%s': base + senior variant '%s' (merged away: %s)",
-                    len(group), base_key, best_term,
-                    [t for t, _ in group if t != best_term and t.lower().strip() != base_key],
-                )
-            else:
-                logger.info(
-                    "Consolidated %d search terms into '%s': merged %s",
-                    len(group), base_key, [t for t, _ in group],
+                    "Consolidated %d terms into '%s': %s",
+                    len(group), base_key, group,
                 )
 
-        kept_bases.add(base_key)
+    # --- Phase 1b: merge overlapping multi-word bases ---
+    # "product manager" and "product management" return the same job board
+    # results.  Merge when one is a word-boundary prefix or suffix variant
+    # of another (e.g. -ing, -er, -ment differ by ≤3 chars).
+    merged: list[str] = []
+    sorted_bases = sorted(consolidated, key=len)
+    for term in sorted_bases:
+        is_covered = False
+        for kept in merged:
+            if " " not in kept:
+                continue  # single-word terms too broad to absorb others
+            # Word prefix: "product manager" covers "product manager operations"
+            if term.startswith(kept + " ") or term.startswith(kept + "-"):
+                logger.info("'%s' covered by broader query '%s' — skipping", term, kept)
+                is_covered = True
+                break
+            # Suffix variant: "product manager" ≈ "product managing" (≤3 char diff)
+            if term.startswith(kept) and len(term) - len(kept) <= 3:
+                logger.info("'%s' merged with '%s' (suffix variant) — skipping", term, kept)
+                is_covered = True
+                break
+        if not is_covered:
+            merged.append(term)
 
-    # --- Phase 2: process keywords ---
+    consolidated = merged
+    # Include original base keys so keyword overlap detection catches
+    # terms containing single-word bases (e.g. "sales" in "sales enablement")
+    kept_bases = set(merged) | set(base_groups.keys())
+
+    # --- Phase 2: process keyword searches ---
+    specialty_kw = _get_specialty_keywords(config)
     for kw in keywords:
         kw_stripped = kw.strip()
         if not kw_stripped:
@@ -257,36 +324,28 @@ def _consolidate_search_terms(
 
         kw_lower = kw_stripped.lower()
 
-        # Always keep short technology keywords
-        if kw_lower in _TECH_KEYWORDS or len(kw_lower) <= 4:
+        # Always keep short specialty keywords (tools, technologies, etc.)
+        if kw_lower in specialty_kw or len(kw_lower) <= 4:
             if kw_stripped not in consolidated:
                 consolidated.append(kw_stripped)
             continue
 
-        # Check if this keyword's base overlaps with an existing role base
-        _, kw_base = _strip_prefix(kw_stripped, _SENIORITY_PREFIXES)
-        if not _:
-            _, kw_base = _strip_prefix(kw_stripped, _MANAGEMENT_PREFIXES)
-        kw_base_key = re.sub(r"\s+", " ", kw_base.lower().strip())
-
-        if kw_base_key in kept_bases:
-            logger.info(
-                "Keyword '%s' overlaps with role base '%s' — skipping",
-                kw_stripped, kw_base_key,
-            )
-            continue
-
-        # Keep high-value niche terms regardless
+        # Keep high-value niche terms regardless of overlap
         if _HIGH_VALUE_PATTERNS.search(kw_stripped):
             if kw_stripped not in consolidated:
                 consolidated.append(kw_stripped)
                 logger.info("Keeping high-value keyword: '%s'", kw_stripped)
             continue
 
-        # Otherwise, add if not a duplicate
+        # Skip if this keyword is already covered by an existing role query
+        is_covered = any(base in kw_lower for base in kept_bases)
+        if is_covered:
+            logger.info("Keyword '%s' covered by existing role query — skipping", kw_stripped)
+            continue
+
         if kw_stripped not in consolidated:
             consolidated.append(kw_stripped)
-            kept_bases.add(kw_base_key)
+            kept_bases.add(kw_lower)
 
     logger.info(
         "Search term consolidation: %d roles + %d keywords → %d queries",
@@ -303,8 +362,12 @@ def _pick_best_job(group: list[dict]) -> dict:
         has_url = 1 if job.get("url") else 0
         # Prefer sources that tend to have richer descriptions
         source_rank = {
-            "indeed": 5, "linkedin": 4, "glassdoor": 3,
-            "zip_recruiter": 2, "google": 1,
+            "indeed": 5, "linkedin": 4,
+            "greenhouse": 4, "lever": 4, "ashby": 4, "workday": 4,
+            "glassdoor": 3, "workatastartup": 3,
+            "remotive": 2, "himalayas": 2, "remoteok": 2, "hackernews": 2,
+            "weworkremotely": 2, "cryptojobslist": 2, "arbeitnow": 2,
+            "themuse": 2, "zip_recruiter": 2, "google": 1,
         }
         src = source_rank.get((job.get("source") or "").lower(), 0)
         return (has_salary, desc_len, has_url, src)
@@ -362,6 +425,84 @@ def _deduplicate(jobs: list[dict]) -> list[dict]:
     return unique
 
 
+def _backfill_linkedin_descriptions(
+    jobs: list[dict],
+    max_workers: int = 8,
+    max_retries: int = 2,
+    retry_delay: float = 1.0,
+) -> None:
+    """Fetch descriptions for LinkedIn-only jobs that lack them.
+
+    Called after dedup for the small subset of jobs that only appeared on
+    LinkedIn and therefore have no description (because we skipped
+    ``linkedin_fetch_description`` during the fast search pass).
+
+    Modifies *jobs* in place.  Uses a simple requests GET + HTML parse.
+    Retries up to *max_retries* times on transient failures (non-200
+    status codes, network errors) with *retry_delay* seconds between
+    attempts.
+    """
+    import requests
+    from bs4 import BeautifulSoup
+
+    def _fetch_one(job: dict) -> None:
+        url = job.get("url", "")
+        if not url:
+            return
+        for attempt in range(1 + max_retries):
+            try:
+                resp = requests.get(
+                    url,
+                    headers={
+                        "User-Agent": (
+                            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                            "AppleWebKit/537.36 (KHTML, like Gecko) "
+                            "Chrome/120.0.0.0 Safari/537.36"
+                        ),
+                    },
+                    timeout=10,
+                    allow_redirects=True,
+                )
+                if resp.status_code != 200:
+                    if attempt < max_retries:
+                        logger.debug(
+                            "LinkedIn backfill got %d for %s, retrying (%d/%d)",
+                            resp.status_code, url, attempt + 1, max_retries,
+                        )
+                        time.sleep(retry_delay)
+                        continue
+                    logger.debug(
+                        "LinkedIn backfill gave up on %s after %d retries (status %d)",
+                        url, max_retries, resp.status_code,
+                    )
+                    return
+                soup = BeautifulSoup(resp.text, "html.parser")
+                # LinkedIn job pages embed description in a specific div
+                desc_el = (
+                    soup.select_one(".description__text")
+                    or soup.select_one(".show-more-less-html__markup")
+                    or soup.select_one("[class*='description']")
+                )
+                if desc_el:
+                    job["description"] = desc_el.get_text(separator="\n", strip=True)[:3000]
+                return  # success — no retry needed
+            except Exception as e:
+                if attempt < max_retries:
+                    logger.debug(
+                        "LinkedIn backfill failed for %s: %s, retrying (%d/%d)",
+                        url, e, attempt + 1, max_retries,
+                    )
+                    time.sleep(retry_delay)
+                else:
+                    logger.debug(
+                        "LinkedIn backfill gave up on %s after %d retries: %s",
+                        url, max_retries, e,
+                    )
+
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        list(pool.map(_fetch_one, jobs))
+
+
 class JobFinderPipeline:
     """Orchestrates the full job-search pipeline.
 
@@ -381,6 +522,71 @@ class JobFinderPipeline:
         self.profile_name = profile or "default"
         self.config = _load_search_config(profile)
 
+    # -- Stage 0.5: AI role expansion (optional) ----------------------------
+
+    def expand_roles_with_ai(
+        self,
+        roles: list[str],
+        progress: Callable[[str], None] | None = None,
+    ) -> list[str]:
+        """Use LLM to expand target roles into related job title keywords.
+
+        Given roles like ["nurse practitioner", "clinical director"], the LLM
+        returns additional relevant title keywords (e.g. "APRN", "primary care
+        provider", "FNP-C") that scrapers should match against.
+
+        Returns the original roles + AI-generated expansions.  Falls back to
+        just the original roles if the LLM is unavailable or fails.
+        """
+        if not self.llm or not self.llm.is_configured:
+            return roles
+        if not roles:
+            return roles
+
+        roles_str = ", ".join(f'"{r}"' for r in roles)
+        system_prompt = (
+            "You are a job search expert. Given a list of target job titles/roles, "
+            "generate additional related job title keywords that a candidate with "
+            "these roles would be qualified for and interested in.\n\n"
+            "Rules:\n"
+            "- ONLY return titles/keywords within the SAME profession and industry\n"
+            "- Do NOT cross industries (e.g. nursing roles should NOT include software engineering)\n"
+            "- Include common abbreviations, alternate titles, and related specializations\n"
+            "- Keep each keyword short (1-4 words)\n"
+            "- Return 10-20 additional keywords\n"
+            "- Reply with valid JSON: {\"expanded_keywords\": [\"keyword1\", \"keyword2\", ...]}"
+        )
+        user_msg = f"Target roles: {roles_str}"
+
+        try:
+            result = self.llm.chat_json(system_prompt, user_msg, temperature=0.2)
+            if result and "expanded_keywords" in result:
+                expanded = result["expanded_keywords"]
+                if isinstance(expanded, list) and expanded:
+                    # Merge with originals, dedup
+                    all_keywords = list(roles)
+                    seen = {r.lower() for r in roles}
+                    for kw in expanded:
+                        if isinstance(kw, str) and kw.strip():
+                            kw_lower = kw.strip().lower()
+                            if kw_lower not in seen:
+                                all_keywords.append(kw.strip())
+                                seen.add(kw_lower)
+                    logger.info(
+                        "AI role expansion: %d roles → %d keywords (+%d)",
+                        len(roles), len(all_keywords), len(all_keywords) - len(roles),
+                    )
+                    if progress:
+                        progress(
+                            f"AI expanded {len(roles)} roles → {len(all_keywords)} "
+                            f"keywords (+{len(all_keywords) - len(roles)} related titles)"
+                        )
+                    return all_keywords
+        except Exception as e:
+            logger.warning("AI role expansion failed (non-fatal): %s", e)
+
+        return roles
+
     # -- Stage 1: Search (no LLM) -----------------------------------------
 
     def search_all_jobs(
@@ -394,39 +600,96 @@ class JobFinderPipeline:
         JobSpy searches and additional scrapers run concurrently.
         Returns a deduplicated list of job dicts.
         """
-        roles_raw = roles or self.config.get("target_roles", [])
         locations = locations or self.config.get("locations", ["Los Angeles, CA"])
-        settings = self.config.get("search_settings", {})
-        results_per_board = settings.get("results_per_board", 25)
-        results_per_additional = settings.get("results_per_additional_source", 100)
-        max_days_old = settings.get("max_days_old", 14)
+        settings = self.config.get("search_settings") or {}
+        results_per_board = max(1, settings.get("results_per_board", 25))
+        results_per_additional = max(1, settings.get("results_per_additional_source", 50))
+        max_days_old = max(1, settings.get("max_days_old", 14))
+        jobspy_boards = self.config.get("job_boards") or None  # None → default boards
+
+        # When roles are passed explicitly (e.g. from the API, which already
+        # merges keywords into the roles list), don't re-read keyword_searches
+        # from config — that would double-count them.
+        if roles:
+            roles_raw = roles
+            keywords_raw: list[str] = []
+        else:
+            roles_raw = self.config.get("target_roles", [])
+            keywords_raw = self.config.get("keyword_searches", [])
 
         # Consolidate similar search terms to reduce redundant JobSpy queries
-        keywords_raw = self.config.get("keyword_searches", [])
-        consolidated = _consolidate_search_terms(roles_raw, keywords_raw)
+        consolidated = _consolidate_search_terms(roles_raw, keywords_raw, config=self.config)
 
-        # If consolidation reduced query count, increase results_per_board so
-        # each broad query covers more ground.
+        # Broader queries → slightly more results per query to compensate
         original_count = len(roles_raw) + len(keywords_raw)
         if consolidated and len(consolidated) < original_count:
-            results_per_board = min(100, results_per_board * 2)
+            ratio = original_count / len(consolidated)
+            boost = max(2, int(ratio))
+            results_per_board = min(50, results_per_board * boost)
             logger.info(
                 "Consolidated %d → %d search terms; bumped results_per_board to %d",
                 original_count, len(consolidated), results_per_board,
             )
 
-        # Build list of all JobSpy search tasks (consolidated term × location)
+        if not consolidated:
+            logger.warning(
+                "No search terms generated from roles=%s keywords=%s",
+                roles_raw, keywords_raw,
+            )
+            if progress:
+                progress("Warning: no search terms found — check target_roles and keyword_searches in config")
+
+        # Build search tasks, ordered so niche/specific queries run first.
+        # This ensures high-value targeted searches (technology keywords,
+        # founding roles) always execute before early stopping kicks in.
+        # Broad base-role queries that return mostly duplicates run last.
+        specialty_kw = _get_specialty_keywords(self.config)
+        def _query_priority(term: str) -> int:
+            """Lower = runs first.  Niche keywords before broad roles."""
+            t = term.lower()
+            if t in specialty_kw or len(t) <= 4:
+                return 0  # tech keywords first ("dbt", "SQL")
+            if _HIGH_VALUE_PATTERNS.search(term):
+                return 1  # founding/niche roles next
+            if " " in t:
+                return 2  # multi-word role queries ("data engineer")
+            return 3  # single-word broad queries last
+
+        prioritized = sorted(consolidated, key=_query_priority)
         search_tasks: list[tuple[str, str]] = []
-        for term in consolidated:
+        for term in prioritized:
             for loc in locations:
                 search_tasks.append((term, loc))
+
+        # Hard cap on total search tasks to avoid 8+ minute searches.
+        # High-priority (niche) queries are at the front, so trimming
+        # from the back drops only broad/duplicate-heavy queries.
+        max_tasks = max(12, settings.get("max_search_tasks", 20))
+        if len(search_tasks) > max_tasks:
+            trimmed = len(search_tasks) - max_tasks
+            search_tasks = search_tasks[:max_tasks]
+            logger.info(
+                "Capped search tasks from %d to %d (dropped %d low-priority queries)",
+                max_tasks + trimmed, max_tasks, trimmed,
+            )
+            if progress:
+                progress(f"Capped to {max_tasks} search queries (dropped {trimmed} low-priority duplicates)")
 
         total_tasks = len(search_tasks)
         counter = {"done": 0}
         lock = threading.Lock()
         all_jobs: list[dict] = []
+        # Track unique jobs for early stopping
+        seen_urls: set[str] = set()
+        unique_count = 0
+        max_unique = max(100, settings.get("max_unique_jobs", 300))
+        stop_early = threading.Event()
 
         def _search_one(task: tuple[str, str]) -> list[dict]:
+            nonlocal unique_count
+            # Skip if we already have enough unique jobs
+            if stop_early.is_set():
+                return []
             term, loc = task
             is_remote = True if loc.lower() == "remote" else None
             jobs = search_jobs(
@@ -436,20 +699,41 @@ class JobFinderPipeline:
                 hours_old=max_days_old * 24,
                 is_remote=is_remote,
                 country=settings.get("country", "USA"),
+                boards=jobspy_boards,
+                # Skip fetching full LinkedIn page per result (~2-3s each).
+                # Descriptions still come from Indeed, Glassdoor, Google.
+                # LinkedIn results keep title/company/location/salary/URL.
+                linkedin_fetch_description=False,
             )
             with lock:
+                if stop_early.is_set():
+                    return jobs  # another thread hit the threshold while we were searching
                 counter["done"] += 1
                 n = counter["done"]
+                # Count truly new URLs for early stopping
+                new_count = 0
+                for j in jobs:
+                    url = j.get("url", "")
+                    if url and url not in seen_urls:
+                        seen_urls.add(url)
+                        new_count += 1
+                unique_count += new_count
+                if unique_count >= max_unique:
+                    stop_early.set()
             if progress:
                 sources = ", ".join(set(j.get("source", "?") for j in jobs)) if jobs else "no boards"
-                progress(f"  [{n}/{total_tasks}] '{term}' in {loc} → {len(jobs)} results from {sources}")
+                suffix = " (stopping — enough results)" if stop_early.is_set() else ""
+                progress(f"  [{n}/{total_tasks}] '{term}' in {loc} → {len(jobs)} results from {sources}{suffix}")
             return jobs
 
         # --- Launch JobSpy searches + additional scrapers concurrently ---
         if progress:
             progress(f"Searching {total_tasks} role×location combos in parallel...")
 
-        max_jobspy_workers = min(total_tasks, settings.get("max_parallel_searches", 4))
+        # Cap workers to avoid overwhelming job board servers with concurrent
+        # requests.  Each worker hits 5 sites simultaneously, so 6 workers =
+        # 30 concurrent requests.  More than that risks IP blocks.
+        max_jobspy_workers = min(total_tasks, settings.get("max_parallel_searches", 6))
 
         # Prepare additional scraper arguments
         enabled_names: list[str] = []
@@ -458,6 +742,12 @@ class JobFinderPipeline:
 
             extra_sources = self.config.get("additional_sources", [])
             all_scrapers = get_registry()
+
+            # Warn about typos in config scraper names
+            config_names = {s.get("name") for s in extra_sources if s.get("name")}
+            unknown = config_names - set(all_scrapers.keys())
+            if unknown:
+                logger.warning("Config lists unknown scrapers (typo?): %s", unknown)
 
             for name, meta in all_scrapers.items():
                 if meta.search_fn is None:
@@ -487,6 +777,14 @@ class JobFinderPipeline:
             logger.warning("Could not load scraper registry: %s", e)
             watchlist_by_ats = {}
 
+        # Use AI to expand role keywords for better scraper filtering.
+        # This helps non-tech profiles (nurse, marketer, etc.) by generating
+        # related title keywords the LLM knows about, so scrapers can filter
+        # more intelligently beyond just substring matching.
+        scraper_roles = self.expand_roles_with_ai(roles_raw, progress=progress)
+        # Store expanded roles so filter_by_role uses them too
+        self._expanded_roles = scraper_roles
+
         # Run JobSpy searches in a thread pool, and additional scrapers
         # concurrently in their own thread.
         extra_jobs_result: list[dict] = []
@@ -497,7 +795,7 @@ class JobFinderPipeline:
                 from job_finder.tools.scrapers import run_scrapers
                 extra_jobs_result = run_scrapers(
                     names=enabled_names,
-                    roles=roles_raw,
+                    roles=scraper_roles,
                     max_results=results_per_additional,
                     progress=progress,
                     locations=locations,
@@ -520,12 +818,21 @@ class JobFinderPipeline:
         # Run JobSpy searches in parallel
         if search_tasks:
             with ThreadPoolExecutor(max_workers=max_jobspy_workers) as pool:
-                futures = [pool.submit(_search_one, t) for t in search_tasks]
+                futures = {pool.submit(_search_one, t): t for t in search_tasks}
                 for future in as_completed(futures):
                     try:
                         all_jobs.extend(future.result())
                     except Exception as e:
                         logger.warning("JobSpy search failed (non-fatal): %s", e)
+                    # Cancel queued (not yet running) tasks after early stop
+                    if stop_early.is_set():
+                        cancelled = 0
+                        for f in futures:
+                            if f.cancel():
+                                cancelled += 1
+                        if cancelled:
+                            logger.info("Early stop: cancelled %d queued searches", cancelled)
+                        break
 
         # Wait for additional scrapers to finish (with timeout to prevent hanging)
         if scraper_thread is not None:
@@ -541,6 +848,31 @@ class JobFinderPipeline:
         if progress:
             msg = f"Found {len(deduped)} unique jobs (from {len(all_jobs)} raw, {cross_source} cross-source duplicates merged)"
             progress(msg)
+
+        # Backfill descriptions for LinkedIn-only jobs that lack them.
+        # We skipped linkedin_fetch_description during search for speed.
+        # Jobs that appeared on multiple boards already have descriptions
+        # from Indeed/Glassdoor via dedup.  Only LinkedIn-exclusive jobs
+        # (no description at all) need backfilling.
+        no_desc = [
+            j for j in deduped
+            if not j.get("description")
+            and j.get("url")
+            and "linkedin.com" in j.get("url", "")
+        ]
+        if no_desc:
+            # Cap backfill to avoid spending minutes fetching descriptions.
+            # 50 jobs × 8 workers ≈ 7 rounds × ~3s = ~20s.
+            max_backfill = 50
+            if len(no_desc) > max_backfill:
+                logger.info(
+                    "Capping LinkedIn backfill from %d to %d jobs",
+                    len(no_desc), max_backfill,
+                )
+                no_desc = no_desc[:max_backfill]
+            if progress:
+                progress(f"Fetching descriptions for {len(no_desc)} LinkedIn-only jobs...")
+            _backfill_linkedin_descriptions(no_desc, max_workers=8)
 
         # Classify work type and fix is_remote for every job
         if progress:
@@ -613,7 +945,155 @@ class JobFinderPipeline:
             except Exception as e:
                 logger.debug("DB location purge failed (non-fatal): %s", e)
 
+        # --- Salary filter: remove jobs with known salary below minimum ---
+        comp_cfg = self.config.get("compensation", {})
+        min_base = comp_cfg.get("min_base", 0)
+        if min_base and min_base > 0:
+            # Allow 30% flex (e.g. min $190K filters out jobs < $133K)
+            hard_floor = min_base * 0.7
+            pre_count = len(deduped)
+            deduped = [
+                j for j in deduped
+                if not j.get("salary_max")  # keep jobs with unknown salary
+                or j["salary_max"] >= hard_floor
+            ]
+            dropped = pre_count - len(deduped)
+            if dropped and progress:
+                progress(f"Salary filter: removed {dropped} jobs below ${hard_floor:,.0f}")
+
+        # --- Level filter: remove jobs too far above or below current level ---
+        career_cfg = self.config.get("career_baseline", {})
+        current_title = career_cfg.get("current_title", "")
+        if current_title:
+            from job_finder.scoring.dimensions import _extract_level
+            current_level = _extract_level(current_title)
+            pre_count = len(deduped)
+            if current_level >= 3:
+                # Senior+ users: filter out jobs 2+ levels below
+                deduped = [
+                    j for j in deduped
+                    if _extract_level(j.get("title", "")) >= current_level - 1.5
+                ]
+            else:
+                # Junior/entry users: filter out jobs 2+ levels above
+                deduped = [
+                    j for j in deduped
+                    if _extract_level(j.get("title", "")) <= current_level + 2.0
+                ]
+            dropped = pre_count - len(deduped)
+            if dropped and progress:
+                progress(f"Level filter: removed {dropped} jobs outside {current_title} level range")
+
+        # --- Role relevance filter ---
+        deduped = self.filter_by_role(deduped, progress=progress)
+
+        # --- Staffing agency filter ---
+        deduped = self.filter_staffing_agencies(deduped, progress=progress)
+
         return deduped
+
+    # -- Role relevance filter ---------------------------------------------
+
+    def filter_by_role(
+        self,
+        jobs: list[dict],
+        *,
+        progress: Callable[[str], None] | None = None,
+    ) -> list[dict]:
+        """Remove jobs whose titles don't match any target role.
+
+        Custom scrapers already filter via ``_match_roles()``, but JobSpy
+        results (Indeed, LinkedIn, Glassdoor, etc.) come back unfiltered.
+        This catches irrelevant jobs that slipped through — e.g. a nurse
+        profile seeing "Lead Software Engineer" because the search term
+        "lead nurse practitioner" matched on "lead".
+
+        Uses the same ``_match_roles()`` logic as the scrapers for consistency.
+        When AI-expanded roles are available (from ``expand_roles_with_ai``),
+        those are used instead — they include related titles the LLM knows
+        about (e.g. "APRN" for a nurse profile) so legitimate jobs aren't
+        filtered out.
+        """
+        # Prefer AI-expanded roles (set by search_all_jobs) over raw config
+        target_roles = getattr(self, "_expanded_roles", None) or self.config.get("target_roles", [])
+        if not target_roles:
+            return jobs  # no roles configured → pass everything
+
+        from job_finder.tools.scrapers._utils import _match_roles
+
+        pre_count = len(jobs)
+        filtered = [j for j in jobs if _match_roles(j.get("title", ""), target_roles)]
+        dropped = pre_count - len(filtered)
+        if dropped:
+            logger.info("Role filter: removed %d/%d jobs not matching target roles", dropped, pre_count)
+            if progress:
+                progress(f"Role filter: removed {dropped} jobs not matching target roles")
+
+        # Also purge existing DB records that don't match roles
+        try:
+            from job_finder.models.database import purge_non_matching_roles
+            purged = purge_non_matching_roles(
+                target_roles=target_roles,
+                profile=self.profile_name,
+            )
+            if purged and progress:
+                progress(f"Purged {purged} existing jobs not matching target roles")
+        except Exception as e:
+            logger.debug("DB role purge failed (non-fatal): %s", e)
+
+        return filtered
+
+    # -- Staffing agency filter -------------------------------------------
+
+    # Common staffing / recruitment agencies (lowercase for matching)
+    _STAFFING_AGENCIES: set[str] = {
+        "robert half", "teksystems", "randstad", "insight global",
+        "adecco", "kelly services", "manpowergroup", "hays", "kforce",
+        "apex systems", "aston carter", "aerotek", "modis",
+        "beacon hill staffing", "cybercoders", "dice staffing",
+        "express employment", "jobot", "michael page", "page group",
+        "phaidon international", "recruiting from scratch",
+        "signature consultants", "staffing solutions enterprises",
+        "talent acquisition concepts", "talentbridge",
+    }
+
+    def filter_staffing_agencies(
+        self,
+        jobs: list[dict],
+        *,
+        progress: Callable[[str], None] | None = None,
+    ) -> list[dict]:
+        """Remove jobs posted by known staffing/recruitment agencies.
+
+        Reads ``search_settings.exclude_staffing_agencies`` from config.
+        Returns the (possibly filtered) list.
+        """
+        settings = self.config.get("search_settings") or {}
+        if not settings.get("exclude_staffing_agencies", False):
+            return jobs
+
+        pre_count = len(jobs)
+        filtered = [
+            j for j in jobs
+            if not self._is_staffing_agency(j.get("company", ""))
+        ]
+        dropped = pre_count - len(filtered)
+        if dropped:
+            logger.info("Staffing agency filter: removed %d jobs", dropped)
+            if progress:
+                progress(f"Staffing agency filter: removed {dropped} jobs from recruitment agencies")
+        return filtered
+
+    @classmethod
+    def _is_staffing_agency(cls, company: str) -> bool:
+        """Return True if *company* matches a known staffing agency (case-insensitive)."""
+        if not company:
+            return False
+        company_lower = company.lower().strip()
+        for agency in cls._STAFFING_AGENCIES:
+            if agency in company_lower:
+                return True
+        return False
 
     # -- Stage 2: Resume parsing (no LLM) ---------------------------------
 
@@ -647,10 +1127,17 @@ class JobFinderPipeline:
         use_ai: bool = True,
         progress: Callable[[str], None] | None = None,
     ) -> list[dict]:
-        """Score all jobs with a two-pass approach for speed.
+        """Score all jobs — AI-first when LLM is available.
 
-        Pass 1: Basic keyword scoring for ALL jobs (fast, no LLM).
-        Pass 2: AI scoring for top candidates only (when use_ai=True).
+        When LLM is configured:
+          AI scores ALL jobs in parallel. The LLM understands any profession
+          (nursing, engineering, marketing, etc.) without hardcoded keywords.
+          Keyword scoring is skipped entirely.
+
+        When no LLM:
+          Falls back to keyword scoring using the profile's YAML keywords
+          (not hardcoded defaults), so non-tech profiles still get reasonable
+          scores from their own domain keywords.
 
         Each job dict is *mutated* to include score fields.
         """
@@ -664,124 +1151,135 @@ class JobFinderPipeline:
                     job.get("employee_count"),
                 )
 
-        # Pass 0.5: LLM company intel for known companies (parallel, cached)
-        # Uses AI knowledge of Levels.fyi / Blind / Glassdoor data to get
-        # per-company baselines instead of coarse tier defaults.
-        company_intel_cache: dict[str, dict[str, float]] = {}
-        ai_intel = use_ai and self.llm and self.llm.is_configured
-        if ai_intel:
-            # Deduplicate by normalized name so "Stripe, Inc." and "stripe" → one call
-            seen_keys: dict[str, tuple[str, str, str]] = {}
-            for job in jobs:
-                ct = job.get("company_type", "Unknown")
-                if ct == "Unknown":
-                    continue
-                raw = job.get("company", "")
-                key = normalize_company_key(raw)
-                if not key or key in seen_keys:
-                    continue
-                context_parts = []
-                if job.get("funding_stage"):
-                    context_parts.append(f"Funding: {job['funding_stage']}")
-                if job.get("employee_count"):
-                    context_parts.append(f"Employees: {job['employee_count']}")
-                seen_keys[key] = (raw, ct, ", ".join(context_parts))
+        ai_available = use_ai and self.llm and self.llm.is_configured
 
-            if seen_keys and progress:
-                progress(f"Getting AI company intel for {len(seen_keys)} known companies...")
+        if ai_available:
+            return self._score_jobs_ai(jobs, resume_text, progress)
+        else:
+            return self._score_jobs_keyword(jobs, resume_text, progress)
 
-            def _fetch_intel(args: tuple[str, str, str]) -> tuple[str, dict[str, float] | None]:
-                name, ct, ctx = args
-                return normalize_company_key(name), get_company_baselines(
-                    self.llm, name, ct, context=ctx,
-                )
+    def _score_jobs_ai(
+        self,
+        jobs: list[dict],
+        resume_text: str,
+        progress: Callable[[str], None] | None = None,
+    ) -> list[dict]:
+        """AI-first scoring: LLM scores ALL jobs in parallel.
 
-            with ThreadPoolExecutor(max_workers=8) as pool:
-                for key, baselines in pool.map(_fetch_intel, seen_keys.values()):
-                    if key and baselines:
-                        company_intel_cache[key] = baselines
-
-        # Pass 1: Fast keyword scoring for all jobs
+        The LLM scorer prompt is profile-aware — it reads the profile's
+        keywords, weights, compensation targets, and career baseline.
+        It works for any profession without hardcoded signal lists.
+        """
         if progress:
-            progress(f"Quick-scoring {len(jobs)} jobs against resume keywords...")
-        for i, job in enumerate(jobs, 1):
-            # Use LLM company baselines if available, else fall back to tier
-            co_baselines = company_intel_cache.get(
-                normalize_company_key(job.get("company", ""))
-            )
-            score_data = score_job_basic(
-                job_description=job.get("description", ""),
-                resume_text=resume_text,
-                job_title=job.get("title", ""),
-                company=job.get("company", ""),
-                company_type=job.get("company_type", "Unknown"),
-                salary_min=job.get("salary_min"),
-                salary_max=job.get("salary_max"),
-                is_remote=job.get("is_remote", False),
-                config=self.config,
-                company_baselines=co_baselines,
-            )
-            job.update(score_data)
-            # Log progress every 100 jobs to avoid spam
-            if progress and (i % 100 == 0 or i == len(jobs)):
-                progress(f"  Quick-scored {i}/{len(jobs)} jobs")
+            progress(f"AI-scoring {len(jobs)} jobs in parallel...")
 
-        # Sort by basic score
+        def _score_one(job: dict) -> tuple[dict, dict | None]:
+            return job, self.score_job_with_ai(job, resume_text)
+
+        done = 0
+        work_type_corrections = 0
+        failed = 0
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            futures = {pool.submit(_score_one, j): j for j in jobs}
+            for future in as_completed(futures):
+                try:
+                    job, ai_score = future.result()
+                except Exception as e:
+                    logger.warning("AI scoring failed for a job: %s", e)
+                    failed += 1
+                    continue
+                done += 1
+                if ai_score:
+                    # Check if AI corrected the work type
+                    ai_wt = ai_score.get("work_type")
+                    if ai_wt in ("remote", "hybrid", "onsite") and ai_wt != job.get("work_type"):
+                        work_type_corrections += 1
+                        logger.info(
+                            "AI corrected work type for %s @ %s: %s → %s",
+                            job.get("title"), job.get("company"),
+                            job.get("work_type"), ai_wt,
+                        )
+                    job.update(ai_score)
+                    # Keep work_type / is_remote consistent
+                    if ai_wt in ("remote", "hybrid", "onsite"):
+                        job["work_type"] = ai_wt
+                        job["is_remote"] = ai_wt == "remote"
+                else:
+                    # LLM returned None — fall back to keyword scoring for this job
+                    self._keyword_score_single(job, resume_text)
+                    failed += 1
+                if progress and (done % 10 == 0 or done == len(jobs)):
+                    progress(f"  AI-scored {done}/{len(jobs)} jobs")
+
+        if work_type_corrections and progress:
+            progress(f"  AI corrected work type for {work_type_corrections} jobs")
+        if failed and progress:
+            progress(f"  {failed} jobs fell back to keyword scoring")
+
         jobs.sort(key=lambda j: j.get("overall_score", 0), reverse=True)
 
-        # Summary after basic pass
+        above_55 = sum(1 for j in jobs if (j.get("overall_score") or 0) >= 55)
+        above_40 = sum(1 for j in jobs if (j.get("overall_score") or 0) >= 40)
+        if progress:
+            progress(f"Scoring done: {above_55} strong matches, {above_40} worth reviewing")
+
+        return jobs
+
+    def _score_jobs_keyword(
+        self,
+        jobs: list[dict],
+        resume_text: str,
+        progress: Callable[[str], None] | None = None,
+    ) -> list[dict]:
+        """Keyword fallback: scores all jobs using profile keywords + TF-IDF.
+
+        Used when no LLM is configured. Reads keywords from the profile
+        YAML so non-tech profiles get domain-appropriate scoring.
+        """
+        # LLM company intel for known companies (parallel, cached)
+        company_intel_cache: dict[str, dict[str, float]] = {}
+
+        if progress:
+            progress(f"Keyword-scoring {len(jobs)} jobs (no LLM configured)...")
+        for i, job in enumerate(jobs, 1):
+            self._keyword_score_single(job, resume_text, company_intel_cache)
+            if progress and (i % 100 == 0 or i == len(jobs)):
+                progress(f"  Scored {i}/{len(jobs)} jobs")
+
+        jobs.sort(key=lambda j: j.get("overall_score", 0), reverse=True)
+
         above_40 = sum(1 for j in jobs if (j.get("overall_score") or 0) >= 40)
         above_55 = sum(1 for j in jobs if (j.get("overall_score") or 0) >= 55)
         if progress:
-            progress(f"Quick-score done: {above_55} strong matches, {above_40} worth reviewing, {len(jobs) - above_40} filtered out")
-
-        # Pass 2: AI scoring for top candidates only (parallel)
-        ai_available = use_ai and self.llm and self.llm.is_configured
-        if ai_available:
-            # Only AI-score jobs with basic score >= 50, cap at 25
-            ai_threshold = self.config.get("scoring", {}).get("ai_threshold", 50)
-            ai_candidates = [j for j in jobs if (j.get("overall_score") or 0) >= ai_threshold][:25]
-            if ai_candidates:
-                if progress:
-                    progress(f"AI-scoring top {len(ai_candidates)} jobs in parallel (skipping {len(jobs) - len(ai_candidates)} low-relevance)...")
-
-                def _score_one(job: dict) -> tuple[dict, dict | None]:
-                    return job, self.score_job_with_ai(job, resume_text)
-
-                done = 0
-                work_type_corrections = 0
-                with ThreadPoolExecutor(max_workers=8) as pool:
-                    futures = {pool.submit(_score_one, j): j for j in ai_candidates}
-                    for future in as_completed(futures):
-                        job, ai_score = future.result()
-                        done += 1
-                        if ai_score:
-                            # Check if AI corrected the work type
-                            ai_wt = ai_score.get("work_type")
-                            if ai_wt in ("remote", "hybrid", "onsite") and ai_wt != job.get("work_type"):
-                                work_type_corrections += 1
-                                logger.info(
-                                    "AI corrected work type for %s @ %s: %s → %s",
-                                    job.get("title"), job.get("company"),
-                                    job.get("work_type"), ai_wt,
-                                )
-                            job.update(ai_score)
-                            # Keep work_type / is_remote consistent
-                            if ai_wt in ("remote", "hybrid", "onsite"):
-                                job["work_type"] = ai_wt
-                                job["is_remote"] = ai_wt == "remote"
-                        if progress and (done % 5 == 0 or done == len(ai_candidates)):
-                            progress(f"  AI-scored {done}/{len(ai_candidates)} jobs")
-
-                if work_type_corrections and progress:
-                    progress(f"  AI corrected work type for {work_type_corrections} jobs")
-
-                # Re-sort after AI scoring
-                jobs.sort(key=lambda j: j.get("overall_score", 0), reverse=True)
-            elif progress:
-                progress("No jobs scored high enough for AI analysis")
+            progress(f"Keyword-score done: {above_55} strong matches, {above_40} worth reviewing, {len(jobs) - above_40} filtered out")
 
         return jobs
+
+    def _keyword_score_single(
+        self,
+        job: dict,
+        resume_text: str,
+        company_intel_cache: dict[str, dict[str, float]] | None = None,
+    ) -> None:
+        """Apply keyword-based scoring to a single job (mutates in place)."""
+        co_baselines = None
+        if company_intel_cache:
+            co_baselines = company_intel_cache.get(
+                normalize_company_key(job.get("company", ""))
+            )
+        score_data = score_job_basic(
+            job_description=job.get("description", ""),
+            resume_text=resume_text,
+            job_title=job.get("title", ""),
+            company=job.get("company", ""),
+            company_type=job.get("company_type", "Unknown"),
+            salary_min=job.get("salary_min"),
+            salary_max=job.get("salary_max"),
+            is_remote=job.get("is_remote", False),
+            config=self.config,
+            company_baselines=co_baselines,
+        )
+        job.update(score_data)
 
     # -- Stage 4: Resume optimization (LLM only) --------------------------
 
@@ -950,6 +1448,7 @@ class JobFinderPipeline:
         locations: list[str] | None = None,
         use_ai: bool = True,
         enhance: bool = True,
+        search_run_id: str | None = None,
     ) -> list[dict]:
         """Execute the complete pipeline: search -> score -> enhance -> save -> auto-apply.
 
@@ -974,8 +1473,6 @@ class JobFinderPipeline:
         init_db()
 
         # 1. Search
-        if progress:
-            progress("Searching job boards...")
         jobs = self.search_all_jobs(roles=roles, locations=locations, progress=progress)
         if not jobs:
             if progress:
@@ -1115,6 +1612,7 @@ class JobFinderPipeline:
                 profile=self.profile_name,
                 company_type=ct,
                 work_type=job.get("work_type", ""),
+                search_run_id=search_run_id,
             )
             if rec:
                 job["db_id"] = rec.id

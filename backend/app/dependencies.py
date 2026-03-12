@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import re
 import sys
 import os
 
 from dotenv import load_dotenv
+from fastapi import HTTPException
 
 # Ensure src/ is importable when running from backend/
 _src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "src"))
@@ -22,6 +24,23 @@ load_dotenv(_ENV_PATH, override=False)
 
 from job_finder.llm_client import LLMClient, PRESETS
 from job_finder.pipeline import JobFinderPipeline, _load_search_config
+
+_PROFILE_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
+
+
+def sanitize_profile(name: str) -> str:
+    """Validate and return a safe profile name.
+
+    Only alphanumeric characters, hyphens, and underscores are allowed.
+    Raises HTTPException(400) if the name contains path separators,
+    dot-dot sequences, or any other disallowed characters.
+    """
+    if not name or not _PROFILE_RE.match(name):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid profile name: only alphanumeric characters, hyphens, and underscores are allowed",
+        )
+    return name
 
 
 def get_llm() -> LLMClient:

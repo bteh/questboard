@@ -80,7 +80,7 @@ def run_scrapers(
     max_days_old : max age of listings in days (used by scrapers that support it)
     watchlist_by_ats : mapping of ATS name → list of company slugs from user watchlist
     """
-    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout, as_completed
 
     active = names or [
         name for name, meta in _REGISTRY.items()
@@ -118,17 +118,38 @@ def run_scrapers(
 
     all_jobs: list[dict] = []
     workers = min(len(active), 8)
+    # Per-scraper timeout prevents a single slow/hung scraper from blocking
+    # the entire pipeline.  Scrapers that exceed this are logged and skipped.
+    scraper_timeout = 60  # seconds
+
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {pool.submit(_run_one, n): n for n in active}
-        for future in as_completed(futures):
-            name, jobs = future.result()
-            meta = _REGISTRY.get(name)
-            display = meta.display_name if meta else name
-            if jobs:
-                all_jobs.extend(jobs)
-                if progress:
-                    progress(f"  Found {len(jobs)} jobs from {display}")
-            elif progress:
-                progress(f"  {display}: no results")
+        try:
+            for future in as_completed(futures, timeout=scraper_timeout * 2):
+                try:
+                    name, jobs = future.result(timeout=scraper_timeout)
+                except FuturesTimeout:
+                    name = futures.get(future, "unknown")
+                    logger.warning("Scraper %s timed out after %ds", name, scraper_timeout)
+                    if progress:
+                        meta = _REGISTRY.get(name)
+                        display = meta.display_name if meta else name
+                        progress(f"  {display}: timed out")
+                    continue
+                except Exception as e:
+                    logger.warning("Scraper result error: %s", e)
+                    continue
+                meta = _REGISTRY.get(name)
+                display = meta.display_name if meta else name
+                if jobs:
+                    all_jobs.extend(jobs)
+                    if progress:
+                        progress(f"  Found {len(jobs)} jobs from {display}")
+                elif progress:
+                    progress(f"  {display}: no results")
+        except FuturesTimeout:
+            logger.warning("Scraper pool timed out after %ds — using partial results", scraper_timeout * 2)
+            if progress:
+                progress("Warning: some scrapers timed out, using partial results")
 
     return all_jobs

@@ -1,16 +1,16 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createRoute, useNavigate } from '@tanstack/react-router';
 import { Route as rootRoute } from './__root';
-import { Upload, CheckCircle2, Loader2, ChevronDown, Globe, ArrowRight, Search, DollarSign, Building2, X, ExternalLink, FileText } from 'lucide-react';
+import { Upload, CheckCircle2, Loader2, ChevronDown, Globe, ArrowRight, Search, DollarSign, X, FileText, Shield, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PageHeader } from '@/components/layout/page-header';
-import { useLLMStatus, useUpdateLLM, useTestConnection, useLLMPresets, useProviderModels, useProfilePreferences, useUpdateProfilePreferences } from '@/hooks/use-settings';
+import { useLLMStatus, useUpdateLLM, useTestConnection, useLLMPresets, useProviderModels, useProfiles, useProfilePreferences, useUpdateProfilePreferences } from '@/hooks/use-settings';
 import { useResumeStatus, useUploadResume } from '@/hooks/use-resume';
-import { useWatchlist, useAddCompany, useRemoveCompany } from '@/hooks/use-watchlist';
+import { useProfile } from '@/contexts/profile-context';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { getVisibleProviderGroups } from '@/lib/llm-providers';
@@ -67,10 +67,8 @@ function SettingsPage() {
   const { data: llm, isLoading: llmLoading } = useLLMStatus();
   const { data: presets } = useLLMPresets();
   const { data: resume } = useResumeStatus();
-  const { data: watchlistData } = useWatchlist();
-  const addCompany = useAddCompany();
-  const removeCompany = useRemoveCompany();
-  const [companyInput, setCompanyInput] = useState('');
+  const { data: profiles } = useProfiles();
+  const { profile, setProfile } = useProfile();
 
   const devMode = typeof window !== 'undefined' && (
     localStorage.getItem('launchboard-dev-mode') === 'true'
@@ -185,15 +183,36 @@ function SettingsPage() {
     current_tc: 100_000,
     min_base: 80_000,
     target_total_comp: 150_000,
+    auto_apply_enabled: false,
+    auto_apply_dry_run: true,
+    scoring_technical: 0.25,
+    scoring_leadership: 0.15,
+    scoring_career_progression: 0.15,
+    scoring_platform: 0.13,
+    scoring_comp: 0.12,
+    scoring_trajectory: 0.10,
+    scoring_culture: 0.10,
+    threshold_strong_apply: 70,
+    threshold_apply: 55,
+    threshold_maybe: 40,
+    exclude_staffing_agencies: true,
+    include_equity: true,
+    min_acceptable_tc: null,
   });
   const [prefsInitialized, setPrefsInitialized] = useState(false);
 
   useEffect(() => {
     if (prefsData?.preferences && !prefsInitialized) {
-      setPrefsForm(prefsData.preferences);
+      // Merge with defaults so missing fields don't become undefined
+      setPrefsForm((prev) => ({ ...prev, ...prefsData.preferences }));
       setPrefsInitialized(true);
     }
   }, [prefsData, prefsInitialized]);
+
+  const handleProfileSwitch = (name: string) => {
+    setProfile(name);
+    setPrefsInitialized(false);
+  };
 
   const handleSavePrefs = () => {
     updatePrefs.mutate(prefsForm, {
@@ -208,38 +227,47 @@ function SettingsPage() {
   const llmDone = llm?.available === true;
   const prefsDone = prefsData?.preferences?.current_title !== '';
   const resumeDone = resume?.exists === true;
-  const watchlistCount = watchlistData?.companies?.length ?? 0;
-  const watchlistDone = watchlistCount > 0;
   const allDone = llmDone && resumeDone;
-
-  const handleAddCompany = () => {
-    const name = companyInput.trim();
-    if (!name) return;
-    addCompany.mutate(name, {
-      onSuccess: () => {
-        setCompanyInput('');
-        toast.success(`Added ${name}`, { description: 'Detecting career page...' });
-      },
-      onError: () => toast.error(`Failed to add ${name}`),
-    });
-  };
 
   return (
     <div>
       <PageHeader title="Settings" description="Configure your job search agent" />
 
       <div className="max-w-2xl space-y-8">
+        {/* Profile switcher */}
+        {profiles && profiles.length > 1 && (
+          <div className="flex items-center gap-3">
+            <Users className="h-4 w-4 text-text-muted shrink-0" />
+            <Label className="text-sm font-medium text-text-secondary shrink-0">Profile</Label>
+            <div className="flex flex-wrap gap-2">
+              {profiles.map((p) => (
+                <button
+                  key={p.name}
+                  type="button"
+                  onClick={() => handleProfileSwitch(p.name)}
+                  className={cn(
+                    'rounded-full px-3 py-1 text-sm font-medium transition-all cursor-pointer',
+                    profile === p.name
+                      ? 'bg-brand text-white shadow-sm'
+                      : 'bg-bg-subtle text-text-secondary hover:bg-bg-muted',
+                  )}
+                >
+                  {p.display_name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Setup progress — compact step indicators */}
         <div className="flex items-center gap-3">
           <StepDot step={1} done={llmDone} active={!llmDone} />
           <div className={cn('h-px flex-1', llmDone ? 'bg-success' : 'bg-border-default')} />
           <StepDot step={2} done={!!prefsDone} active={llmDone && !prefsDone} />
           <div className={cn('h-px flex-1', prefsDone ? 'bg-success' : 'bg-border-default')} />
-          <StepDot step={3} done={watchlistDone} active={!!prefsDone && !watchlistDone} />
-          <div className={cn('h-px flex-1', watchlistDone ? 'bg-success' : 'bg-border-default')} />
-          <StepDot step={4} done={resumeDone} active={watchlistDone && !resumeDone} />
+          <StepDot step={3} done={resumeDone} active={!!prefsDone && !resumeDone} />
           <div className={cn('h-px flex-1', allDone ? 'bg-success' : 'bg-border-default')} />
-          <StepDot step={5} done={allDone} active={llmDone && resumeDone} label="Search" />
+          <StepDot step={4} done={allDone} active={llmDone && resumeDone} label="Search" />
         </div>
 
         {/* ── Step 1: LLM Provider ── */}
@@ -519,42 +547,6 @@ function SettingsPage() {
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <Label className="text-sm font-medium">Level (select all that apply)</Label>
-                <div className="flex flex-wrap gap-1.5">
-                  {[
-                    { value: 'junior', label: 'Entry / Junior' },
-                    { value: 'mid', label: 'Mid-Level' },
-                    { value: 'senior', label: 'Senior' },
-                    { value: 'staff', label: 'Staff / Principal' },
-                    { value: 'lead', label: 'Lead / Manager' },
-                    { value: 'director', label: 'Director / VP+' },
-                  ].map((opt) => {
-                    const selected = prefsForm.current_level.includes(opt.value);
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => setPrefsForm((p) => ({
-                          ...p,
-                          current_level: selected
-                            ? p.current_level.filter((v) => v !== opt.value)
-                            : [...p.current_level, opt.value],
-                        }))}
-                        className={cn(
-                          'rounded-lg border px-2.5 py-1.5 text-xs transition-all cursor-pointer',
-                          selected
-                            ? 'border-brand bg-brand-light text-brand font-medium'
-                            : 'border-border-default text-text-secondary hover:border-brand/40',
-                        )}
-                      >
-                        {opt.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs font-medium text-text-secondary">Current Total Pay</Label>
@@ -585,6 +577,60 @@ function SettingsPage() {
                 </div>
               </div>
 
+              {/* ── Auto-Apply ── */}
+              <div className="border-t border-border-default pt-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-text-muted" />
+                  <Label className="text-sm font-medium">Auto-Apply</Label>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-text-secondary">Enable auto-apply</p>
+                    <p className="text-xs text-text-muted">Automatically submit applications for strong matches via Greenhouse/Lever.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPrefsForm((p) => ({ ...p, auto_apply_enabled: !p.auto_apply_enabled }))}
+                    className={cn(
+                      'relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer',
+                      prefsForm.auto_apply_enabled ? 'bg-brand' : 'bg-bg-muted',
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        'inline-block h-4 w-4 rounded-full bg-white transition-transform shadow-sm',
+                        prefsForm.auto_apply_enabled ? 'translate-x-6' : 'translate-x-1',
+                      )}
+                    />
+                  </button>
+                </div>
+
+                {prefsForm.auto_apply_enabled && (
+                  <div className="flex items-center justify-between rounded-lg border border-border-default bg-bg-subtle px-3.5 py-3">
+                    <div>
+                      <p className="text-sm text-text-secondary">Dry run mode</p>
+                      <p className="text-xs text-text-muted">When enabled, logs what would happen without actually submitting applications.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setPrefsForm((p) => ({ ...p, auto_apply_dry_run: !p.auto_apply_dry_run }))}
+                      className={cn(
+                        'relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer',
+                        prefsForm.auto_apply_dry_run ? 'bg-brand' : 'bg-bg-muted',
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'inline-block h-4 w-4 rounded-full bg-white transition-transform shadow-sm',
+                          prefsForm.auto_apply_dry_run ? 'translate-x-6' : 'translate-x-1',
+                        )}
+                      />
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <Button onClick={handleSavePrefs} disabled={updatePrefs.isPending} className="w-full sm:w-auto">
                 {updatePrefs.isPending ? (
                   <>
@@ -602,114 +648,7 @@ function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* ── Step 3: Target Companies ── */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className={cn(
-                  'flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold',
-                  watchlistDone ? 'bg-success/15 text-success' : 'bg-brand-light text-brand',
-                )}>
-                  {watchlistDone ? <CheckCircle2 className="h-5 w-5" /> : '3'}
-                </div>
-                <div>
-                  <CardTitle className="text-base">Target Companies</CardTitle>
-                  <p className="text-sm text-text-tertiary">We'll search their career pages directly during every job search.</p>
-                </div>
-              </div>
-              {watchlistDone && (
-                <span className="text-xs text-success font-medium bg-success/10 rounded-full px-2.5 py-1">
-                  {watchlistCount} {watchlistCount === 1 ? 'company' : 'companies'}
-                </span>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {/* Add company input */}
-              <div className="flex gap-2">
-                <Input
-                  value={companyInput}
-                  onChange={(e) => setCompanyInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddCompany(); } }}
-                  placeholder="e.g. Netflix, Stripe, SpaceX..."
-                  className="h-9"
-                  disabled={addCompany.isPending}
-                />
-                <Button
-                  onClick={handleAddCompany}
-                  disabled={!companyInput.trim() || addCompany.isPending}
-                  size="sm"
-                  className="shrink-0 h-9"
-                >
-                  {addCompany.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    'Add'
-                  )}
-                </Button>
-              </div>
-
-              {/* Company tags */}
-              {watchlistData?.companies && watchlistData.companies.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {watchlistData.companies.map((company) => (
-                    <div
-                      key={company.name}
-                      className={cn(
-                        'inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm transition-all group',
-                        company.ats !== 'unknown'
-                          ? 'border-brand/30 bg-brand-light/30'
-                          : 'border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/30',
-                      )}
-                    >
-                      <Building2 className="h-3.5 w-3.5 text-text-muted shrink-0" />
-                      <span className="font-medium text-text-primary">{company.name}</span>
-                      {company.ats !== 'unknown' && (
-                        <span className="text-[10px] text-text-muted uppercase tracking-wider">
-                          {company.ats}
-                        </span>
-                      )}
-                      {company.job_count > 0 && (
-                        <span className="text-[10px] text-text-muted">
-                          {company.job_count} jobs
-                        </span>
-                      )}
-                      {company.careers_url && (
-                        <a
-                          href={company.careers_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-text-muted hover:text-brand transition-colors"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                        </a>
-                      )}
-                      <button
-                        type="button"
-                        onClick={() => removeCompany.mutate(company.name)}
-                        className="text-text-muted hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Empty state */}
-              {(!watchlistData?.companies || watchlistData.companies.length === 0) && (
-                <p className="text-xs text-text-muted">
-                  Add companies you'd love to work at. We'll automatically find their job pages and include their open roles in every search.
-                </p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* ── Step 4: Resume ── */}
+        {/* ── Step 3: Resume ── */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -718,7 +657,7 @@ function SettingsPage() {
                   'flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold',
                   resumeDone ? 'bg-success/15 text-success' : 'bg-brand-light text-brand',
                 )}>
-                  {resumeDone ? <CheckCircle2 className="h-5 w-5" /> : '4'}
+                  {resumeDone ? <CheckCircle2 className="h-5 w-5" /> : '3'}
                 </div>
                 <div>
                   <CardTitle className="text-base">Upload Your Resume</CardTitle>
@@ -777,7 +716,7 @@ function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* ── Step 5: Ready to go CTA ── */}
+        {/* ── Step 4: Ready to go CTA ── */}
         <Card className={cn(
           'transition-all',
           allDone
@@ -791,7 +730,7 @@ function SettingsPage() {
                   'flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold',
                   allDone ? 'bg-success/15 text-success' : 'bg-bg-muted text-text-muted',
                 )}>
-                  {allDone ? <CheckCircle2 className="h-5 w-5" /> : '5'}
+                  {allDone ? <CheckCircle2 className="h-5 w-5" /> : '4'}
                 </div>
                 <div>
                   <p className={cn('text-sm font-medium', allDone ? 'text-success' : 'text-text-secondary')}>

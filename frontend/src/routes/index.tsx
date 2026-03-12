@@ -10,6 +10,7 @@ import { JobCard } from '@/components/jobs/job-card';
 import { ActivityItem } from '@/components/shared/activity-item';
 import { useDashboardStats } from '@/hooks/use-analytics';
 import { useApplications } from '@/hooks/use-applications';
+import { useProfile } from '@/contexts/profile-context';
 import { useSearchContext } from '@/contexts/search-context';
 import { useSourceLabels } from '@/hooks/use-scrapers';
 
@@ -21,6 +22,7 @@ export const Route = createRoute({
 
 function DashboardPage() {
   const navigate = useNavigate();
+  const { profile } = useProfile();
   const { state: searchState } = useSearchContext();
   const sourceLabels = useSourceLabels();
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
@@ -28,10 +30,18 @@ function DashboardPage() {
     sort_by: 'overall_score',
     sort_order: 'desc',
     page_size: 5,
+    profile,
+  });
+
+  const { data: recentData, isLoading: recentLoading } = useApplications({
+    sort_by: 'date_found',
+    sort_order: 'desc',
+    page_size: 5,
+    profile,
   });
 
   const topJobs = appData?.items || [];
-  const recentActivity = useMemo(() => appData?.items?.slice(0, 5) || [], [appData?.items]);
+  const recentActivity = useMemo(() => recentData?.items?.slice(0, 5) || [], [recentData?.items]);
 
   const metrics = [
     { label: 'Total Found', value: stats?.total_jobs ?? 0, icon: Briefcase, bg: 'bg-brand-light', fg: 'text-brand' },
@@ -128,7 +138,7 @@ function DashboardPage() {
           <h2 className="text-lg font-semibold text-text-primary mb-4">Recent Activity</h2>
           <Card>
             <CardContent className="p-4">
-              {appsLoading ? (
+              {recentLoading ? (
                 <div className="space-y-3">
                   {Array.from({ length: 5 }).map((_, i) => (
                     <Skeleton key={i} className="h-10 w-full" />

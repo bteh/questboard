@@ -64,12 +64,50 @@ def _strip_html(html: str) -> str:
     return text.strip()[:3000]
 
 
+_COMPANY_NAME_CORRECTIONS: dict[str, str] = {
+    "Openai": "OpenAI",
+    "Dbt Labs": "dbt Labs",
+    "Mongodb": "MongoDB",
+    "Linkedin": "LinkedIn",
+    "Github": "GitHub",
+    "Grammarly": "Grammarly",
+    "Hashicorp": "HashiCorp",
+    "Snowflake": "Snowflake",
+    "Databricks": "Databricks",
+    "Cloudflare": "Cloudflare",
+}
+
+
+_LOWERCASE_WORDS = {"and", "of", "the", "in", "at", "by", "for", "on", "to"}
+
+
+def _clean_company_name(slug: str) -> str:
+    """Convert a URL slug to a properly-cased company name.
+
+    1. Strip numeric suffixes added by Lever for disambiguation (e.g. "notion-2")
+    2. Replace hyphens with spaces
+    3. Apply ``.title()`` for basic capitalisation, lowercasing conjunctions/prepositions
+    4. Apply corrections dict for known companies
+    """
+    # Strip trailing numeric disambiguation suffix (e.g. "notion-2" -> "notion")
+    cleaned = re.sub(r"-\d+$", "", slug)
+    # Replace hyphens with spaces, then title-case
+    words = cleaned.replace("-", " ").title().split()
+    # Lowercase minor words (but never the first word)
+    for i in range(1, len(words)):
+        if words[i].lower() in _LOWERCASE_WORDS:
+            words[i] = words[i].lower()
+    name = " ".join(words)
+    # Apply corrections for known companies
+    return _COMPANY_NAME_CORRECTIONS.get(name, name)
+
+
 def _match_roles(title: str, roles: list[str] | None) -> bool:
     """Check if a job title matches any of the target roles (fuzzy).
 
     When *roles* are provided, each is checked as a substring of the title.
-    If none match, a broad fallback catches common professional keywords
-    across ALL industries (not just engineering) so no profession is excluded.
+    Returns False if none match — no broad fallback so that role filtering
+    stays precise to the user's profile.
     """
     if not roles:
         return True
@@ -77,23 +115,7 @@ def _match_roles(title: str, roles: list[str] | None) -> bool:
     for r in roles:
         if r.lower() in title_lower:
             return True
-    # Broad fallback — universal professional keywords across all industries.
-    # These cover seniority markers and generic role words, not domain-specific
-    # terms, so a nurse, marketer, designer, or salesperson won't be filtered out.
-    broad = [
-        # Seniority / level markers (universal)
-        "senior", "staff", "principal", "lead", "junior", "associate",
-        "director", "head of", "vp ", "chief ", "founding",
-        "manager", "supervisor", "coordinator",
-        # Generic role words (cross-industry)
-        "engineer", "analyst", "specialist", "consultant", "architect",
-        "designer", "developer", "scientist", "researcher", "strategist",
-        "advisor", "administrator", "operator", "planner", "producer",
-        # Domain-neutral skill areas
-        "data", "platform", "operations", "product", "project",
-        "machine learning", "ml ", "ai ",
-    ]
-    return any(kw in title_lower for kw in broad)
+    return False
 
 
 def _match_roles_crypto(title: str, roles: list[str] | None) -> bool:

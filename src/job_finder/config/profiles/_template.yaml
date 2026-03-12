@@ -1,7 +1,7 @@
 # Profile Template — Copy this file and rename to create a new profile
 # Example: cp _template.yaml my_profile.yaml
 #
-# Then select the profile in the Streamlit UI sidebar, or run:
+# Then select the profile in the Settings page, or run:
 #   python -m job_finder.main --profile my_profile
 #
 # This template works for ANY profession — engineers, marketers, designers,
@@ -102,7 +102,6 @@ career_baseline:
   current_level: "mid"                 # intern, junior, associate, mid, senior, staff, principal, manager, director, vp
   current_tc: 80000                    # Current total compensation
   min_acceptable_tc: 70000
-  preferred_direction: "any"           # up, up_or_lateral_leadership, any
 
 # --- COMPENSATION ---
 compensation:
@@ -112,10 +111,13 @@ compensation:
 
 # --- SEARCH SETTINGS ---
 search_settings:
-  results_per_board: 25
-  max_days_old: 14
+  results_per_board: 25               # Results per job board per query
+  max_days_old: 14                    # Only show listings from the last N days
   exclude_staffing_agencies: true
   country: "USA"
+  max_parallel_searches: 6            # Concurrent search threads (6 × 5 boards = 30 requests)
+  max_unique_jobs: 300                # Stop searching after finding this many unique jobs
+  max_search_tasks: 20                # Hard cap on total JobSpy queries (term × location combos)
 
 # --- JOB BOARDS ---
 job_boards:
@@ -151,14 +153,6 @@ additional_sources:
     enabled: true
   - name: "cryptojobslist"
     enabled: false           # Enable if targeting crypto/Web3
-
-# Company targeting (leave empty if no preference)
-target_companies:
-  big_tech: []
-  startup_criteria:
-    funding_stages: []
-    min_funding_amount: 0
-    prefer_founding_roles: false
 
 # --- AUTO-APPLY ---
 applicant_info:

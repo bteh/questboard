@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.schemas.watchlist import WatchlistAddRequest, WatchlistResponse
 from app.services import watchlist_service
+from app.dependencies import sanitize_profile
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +18,7 @@ router = APIRouter(tags=["watchlist"])
 @router.get("/profiles/{profile}/watchlist", response_model=WatchlistResponse)
 async def get_watchlist(profile: str):
     """Get the company watchlist for a profile."""
+    profile = sanitize_profile(profile)
     return watchlist_service.get_watchlist(profile)
 
 
@@ -26,6 +28,7 @@ async def add_company(profile: str, req: WatchlistAddRequest):
 
     Tries Greenhouse, Lever, and Ashby APIs to find the company's career page.
     """
+    profile = sanitize_profile(profile)
     if not req.name.strip():
         raise HTTPException(400, "Company name is required")
     try:
@@ -38,6 +41,7 @@ async def add_company(profile: str, req: WatchlistAddRequest):
 @router.delete("/profiles/{profile}/watchlist/{name}", response_model=WatchlistResponse)
 async def remove_company(profile: str, name: str):
     """Remove a company from the watchlist."""
+    profile = sanitize_profile(profile)
     try:
         return watchlist_service.remove_company(profile, name)
     except Exception as e:

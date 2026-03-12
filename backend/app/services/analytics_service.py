@@ -6,19 +6,24 @@ from sqlalchemy.orm import Session
 from app.models.application import ApplicationRecord
 
 
-def get_dashboard_stats(db: Session) -> dict:
-    total = db.query(func.count(ApplicationRecord.id)).scalar() or 0
-    avg_score = db.query(func.avg(ApplicationRecord.overall_score)).scalar()
+def _base_query(db: Session, profile: str | None = None):
+    """Return a base query, optionally filtered by profile."""
+    q = db.query(ApplicationRecord)
+    if profile:
+        q = q.filter(ApplicationRecord.profile == profile)
+    return q
+
+
+def get_dashboard_stats(db: Session, profile: str | None = None) -> dict:
+    base = _base_query(db, profile)
+    total = base.count()
+    avg_score = base.with_entities(func.avg(ApplicationRecord.overall_score)).scalar()
 
     def count_rec(rec):
-        return db.query(func.count(ApplicationRecord.id)).filter(
-            ApplicationRecord.recommendation == rec
-        ).scalar() or 0
+        return base.filter(ApplicationRecord.recommendation == rec).count()
 
     def count_status(st):
-        return db.query(func.count(ApplicationRecord.id)).filter(
-            ApplicationRecord.status == st
-        ).scalar() or 0
+        return base.filter(ApplicationRecord.status == st).count()
 
     applied = count_status("applied")
     interviewing = count_status("interviewing")
@@ -42,21 +47,23 @@ def get_dashboard_stats(db: Session) -> dict:
     }
 
 
-def get_score_distribution(db: Session) -> list[dict]:
+def get_score_distribution(db: Session, profile: str | None = None) -> list[dict]:
+    base = _base_query(db, profile)
     results = []
     ranges = [(0, 20), (20, 40), (40, 55), (55, 70), (70, 100)]
     labels = ["0-20", "20-40", "40-55", "55-70", "70-100"]
     colors = ["#ef4444", "#f97316", "#eab308", "#22c55e", "#10b981"]
     for (lo, hi), label, color in zip(ranges, labels, colors):
-        count = db.query(func.count(ApplicationRecord.id)).filter(
+        count = base.filter(
             ApplicationRecord.overall_score >= lo,
             ApplicationRecord.overall_score < hi,
-        ).scalar() or 0
+        ).count()
         results.append({"label": label, "value": count, "color": color})
     return results
 
 
-def get_recommendation_breakdown(db: Session) -> list[dict]:
+def get_recommendation_breakdown(db: Session, profile: str | None = None) -> list[dict]:
+    base = _base_query(db, profile)
     recs = [
         ("STRONG_APPLY", "#10b981"),
         ("APPLY", "#3b82f6"),
@@ -65,16 +72,15 @@ def get_recommendation_breakdown(db: Session) -> list[dict]:
     ]
     results = []
     for rec, color in recs:
-        count = db.query(func.count(ApplicationRecord.id)).filter(
-            ApplicationRecord.recommendation == rec
-        ).scalar() or 0
+        count = base.filter(ApplicationRecord.recommendation == rec).count()
         results.append({"label": rec, "value": count, "color": color})
     return results
 
 
-def get_source_breakdown(db: Session) -> list[dict]:
+def get_source_breakdown(db: Session, profile: str | None = None) -> list[dict]:
+    base = _base_query(db, profile)
     rows = (
-        db.query(ApplicationRecord.source, func.count(ApplicationRecord.id))
+        base.with_entities(ApplicationRecord.source, func.count(ApplicationRecord.id))
         .group_by(ApplicationRecord.source)
         .order_by(func.count(ApplicationRecord.id).desc())
         .limit(10)
@@ -83,7 +89,8 @@ def get_source_breakdown(db: Session) -> list[dict]:
     return [{"label": source or "Unknown", "value": count, "color": None} for source, count in rows]
 
 
-def get_pipeline_funnel(db: Session) -> list[dict]:
+def get_pipeline_funnel(db: Session, profile: str | None = None) -> list[dict]:
+    base = _base_query(db, profile)
     statuses = [
         ("found", "#6b7280"),
         ("reviewed", "#3b82f6"),
@@ -94,9 +101,7 @@ def get_pipeline_funnel(db: Session) -> list[dict]:
     ]
     results = []
     for status, color in statuses:
-        count = db.query(func.count(ApplicationRecord.id)).filter(
-            ApplicationRecord.status == status
-        ).scalar() or 0
+        count = base.filter(ApplicationRecord.status == status).count()
         results.append({"label": status, "value": count, "color": color})
     return results
 

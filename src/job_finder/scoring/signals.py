@@ -153,7 +153,10 @@ LEVEL_MAP: dict[str, float] = {
     # Education
     "teacher": 2, "professor": 4, "department chair": 6, "dean": 8,
     # General
-    "consultant": 3, "advisor": 3, "fellow": 5, "executive": 7,
+    "consultant": 3, "advisor": 3, "fellow": 5,
+    "chief executive": 7, "executive officer": 7,
+    "executive director": 6, "executive vice president": 9,
+    "sales executive": 3, "executive assistant": 1,
     "chief": 10, "president": 10, "ceo": 10,
 }
 
