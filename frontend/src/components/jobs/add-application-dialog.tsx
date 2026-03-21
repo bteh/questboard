@@ -64,7 +64,7 @@ export function AddApplicationDialog() {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div>
             <Label htmlFor="job_title">Job Title *</Label>
-            <Input id="job_title" {...register('job_title')} placeholder="e.g. Senior Software Engineer" aria-invalid={!!errors.job_title} className={errors.job_title ? 'border-danger' : ''} />
+            <Input id="job_title" {...register('job_title')} placeholder="e.g. Product Manager, Data Analyst" aria-invalid={!!errors.job_title} className={errors.job_title ? 'border-danger' : ''} />
             {errors.job_title && <p className="text-xs text-danger mt-1" role="alert">{errors.job_title.message}</p>}
           </div>
           <div>

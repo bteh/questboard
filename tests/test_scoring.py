@@ -105,5 +105,44 @@ class MinAcceptableTCTest(unittest.TestCase):
         )
 
 
+class CurrentLevelTest(unittest.TestCase):
+    """Explicit current_level should influence progression scoring."""
+
+    def test_explicit_current_level_changes_progression_score(self) -> None:
+        senior_cfg = {
+            "career_baseline": {
+                "current_level": "senior",
+                "current_tc": 100_000,
+            },
+        }
+        junior_cfg = {
+            "career_baseline": {
+                "current_level": "junior",
+                "current_tc": 100_000,
+            },
+        }
+
+        senior_score = score_career_progression(
+            "Senior Product Manager",
+            "Own roadmap and cross-functional delivery",
+            None,
+            140_000,
+            senior_cfg,
+        )
+        junior_score = score_career_progression(
+            "Senior Product Manager",
+            "Own roadmap and cross-functional delivery",
+            None,
+            140_000,
+            junior_cfg,
+        )
+
+        self.assertGreater(
+            senior_score,
+            junior_score,
+            "Explicit current_level should be used when scoring career progression.",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

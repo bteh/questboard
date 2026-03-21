@@ -15,6 +15,7 @@ import threading
 import time
 import unicodedata
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from difflib import SequenceMatcher
 from typing import Any, Callable
 
 import yaml
@@ -42,7 +43,11 @@ from job_finder.company_classifier import (
     location_matches_preferences,
 )
 from job_finder.scoring import score_job_basic, get_company_baselines, normalize_company_key
-from job_finder.scoring.dimensions import _extract_level  # re-export for tests/consumers
+from job_finder.scoring.dimensions import (
+    _extract_level,
+    resolve_current_level,
+)  # re-export for tests/consumers
+from job_finder.scoring.helpers import annualize_amount
 from job_finder.tools.job_search_tool import search_jobs
 from job_finder.tools.resume_parser_tool import find_resume, parse_resume
 
@@ -51,6 +56,7 @@ logger = logging.getLogger(__name__)
 _PROJECT_ROOT = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "..", "..")
 )
+_SAFE_PROFILE_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
 def _validate_config(config: dict, source: str) -> dict:
@@ -79,13 +85,27 @@ def _validate_config(config: dict, source: str) -> dict:
 def _load_search_config(profile: str | None = None) -> dict:
     """Load config for the given profile.
 
-    Looks for ``config/profiles/{profile}.yaml`` first, then falls back
-    to ``config/search_config.yaml`` for backward compatibility.
+    Prefers ``config/profiles/default.yaml`` for the default profile so the
+    runtime uses the real editable default profile instead of the legacy sample
+    search config. Falls back to ``config/search_config.yaml`` only when no
+    profile file exists.
     """
     config_dir = os.path.join(os.path.dirname(__file__), "config")
+    profiles_dir = os.path.join(config_dir, "profiles")
+
+    if profile and not _SAFE_PROFILE_RE.fullmatch(profile):
+        logger.warning("Ignoring unsafe profile name '%s'; using default config", profile)
+        profile = None
+
+    if profile == "default" or not profile:
+        profile_path = os.path.join(profiles_dir, "default.yaml")
+        if os.path.exists(profile_path):
+            with open(profile_path, "r", encoding="utf-8") as f:
+                config = yaml.safe_load(f) or {}
+            return _validate_config(config, profile_path)
 
     if profile and profile != "default":
-        profile_path = os.path.join(config_dir, "profiles", f"{profile}.yaml")
+        profile_path = os.path.join(profiles_dir, f"{profile}.yaml")
         if os.path.exists(profile_path):
             with open(profile_path, "r", encoding="utf-8") as f:
                 config = yaml.safe_load(f) or {}
@@ -137,9 +157,53 @@ def _normalize_title(title: str) -> str:
     return re.sub(r"\s+", " ", t).strip()
 
 
-def _dedup_key(company: str, title: str) -> str:
-    """Create a normalized key for fuzzy dedup on company + title."""
-    return f"{_normalize_company(company)}||{_normalize_title(title)}"
+def _normalize_location(location: str) -> str:
+    """Normalize a location string for dedup comparison."""
+    if not location:
+        return ""
+    t = unicodedata.normalize("NFKD", location.lower().strip())
+    if "remote" in t:
+        return "remote"
+    if "hybrid" in t:
+        return "hybrid"
+    t = re.sub(r"[^a-z0-9\s]", " ", t)
+    return re.sub(r"\s+", " ", t).strip()
+
+
+def _normalize_description(text: str) -> str:
+    """Normalize descriptions so obviously identical postings cluster together."""
+    if not text:
+        return ""
+    t = unicodedata.normalize("NFKD", text.lower())
+    t = re.sub(r"[^a-z0-9\s]", " ", t)
+    return re.sub(r"\s+", " ", t).strip()
+
+
+def _descriptions_look_duplicate(left: str, right: str) -> bool:
+    """Return True only when two descriptions look like the same posting."""
+    left_norm = _normalize_description(left)
+    right_norm = _normalize_description(right)
+    if not left_norm or not right_norm:
+        return False
+
+    shorter, longer = sorted((left_norm, right_norm), key=len)
+    if len(shorter) >= 120 and shorter in longer:
+        return True
+
+    return SequenceMatcher(
+        None,
+        left_norm[:1600],
+        right_norm[:1600],
+    ).ratio() >= 0.82
+
+
+def _dedup_key(company: str, title: str, location: str = "") -> str:
+    """Create a normalized key for cautious fuzzy dedup."""
+    return "||".join((
+        _normalize_company(company),
+        _normalize_title(title),
+        _normalize_location(location),
+    ))
 
 
 # -- Seniority / management prefixes used for search-term consolidation ------
@@ -391,38 +455,98 @@ def _pick_best_job(group: list[dict]) -> dict:
 
 
 def _deduplicate(jobs: list[dict]) -> list[dict]:
-    """Remove duplicate jobs based on URL and fuzzy company+title matching.
+    """Remove duplicates while preserving distinct openings.
 
     When the same job appears from multiple sources (e.g. Indeed, Glassdoor,
     Google Jobs), keeps the version with the richest data and merges salary
-    info from siblings.  This runs BEFORE scoring so each unique job is
-    scored exactly once, eliminating inconsistent scores for the same posting.
+    info from siblings. Fuzzy merges only happen when company, title, and
+    location all match and the descriptions look materially identical.
     """
-    seen_urls: set[str] = set()
+    url_groups: dict[str, list[dict]] = {}
     groups: dict[str, list[dict]] = {}
-    no_key: list[dict] = []
+    unique: list[dict] = []
 
     for job in jobs:
         url = job.get("url", "")
-        # Exact URL dedup (fast path)
-        if url and url in seen_urls:
-            continue
         if url:
-            seen_urls.add(url)
+            url_groups.setdefault(url, []).append(job)
+        else:
+            unique.append(job)
 
+    collapsed: list[dict] = []
+    for group in url_groups.values():
+        collapsed.append(_pick_best_job(group) if len(group) > 1 else group[0])
+    collapsed.extend(unique)
+
+    unique = []
+    no_key: list[dict] = []
+    for job in collapsed:
         company = job.get("company", "")
         title = job.get("title", "")
-        if company and title:
-            key = _dedup_key(company, title)
+        location = job.get("location", "")
+        if company and title and _normalize_location(location):
+            key = _dedup_key(company, title, location)
             groups.setdefault(key, []).append(job)
         else:
             no_key.append(job)
 
-    unique: list[dict] = []
     for group in groups.values():
-        unique.append(_pick_best_job(group) if len(group) > 1 else group[0])
+        if len(group) == 1:
+            unique.append(group[0])
+            continue
+
+        clusters: list[list[dict]] = []
+        for job in group:
+            placed = False
+            for cluster in clusters:
+                if _descriptions_look_duplicate(
+                    job.get("description", ""),
+                    cluster[0].get("description", ""),
+                ):
+                    cluster.append(job)
+                    placed = True
+                    break
+            if not placed:
+                clusters.append([job])
+
+        for cluster in clusters:
+            unique.append(_pick_best_job(cluster) if len(cluster) > 1 else cluster[0])
+
     unique.extend(no_key)
     return unique
+
+
+def _filter_jobs_by_level(
+    jobs: list[dict],
+    career_cfg: dict | None,
+    *,
+    progress: Callable[[str], None] | None = None,
+) -> list[dict]:
+    """Filter jobs that are too far above or below the configured level."""
+    career_cfg = career_cfg or {}
+    current_title = str(career_cfg.get("current_title", "") or "").strip()
+    current_level_label = str(career_cfg.get("current_level", "") or "").strip()
+    if not current_title and not current_level_label:
+        return jobs
+
+    current_level = resolve_current_level(career_cfg)
+    pre_count = len(jobs)
+    if current_level >= 3:
+        filtered = [
+            job for job in jobs
+            if _extract_level(job.get("title", "")) >= current_level - 1.5
+        ]
+    else:
+        filtered = [
+            job for job in jobs
+            if _extract_level(job.get("title", "")) <= current_level + 2.0
+        ]
+
+    dropped = pre_count - len(filtered)
+    if dropped and progress:
+        level_label = current_title or current_level_label
+        progress(f"Level filter: removed {dropped} jobs outside {level_label} level range")
+    return filtered
 
 
 def _backfill_linkedin_descriptions(
@@ -521,6 +645,7 @@ class JobFinderPipeline:
         self.llm = llm
         self.profile_name = profile or "default"
         self.config = _load_search_config(profile)
+        self._preloaded_resume_text: str | None = None
 
     # -- Stage 0.5: AI role expansion (optional) ----------------------------
 
@@ -602,9 +727,10 @@ class JobFinderPipeline:
         """
         locations = locations or self.config.get("locations", ["Los Angeles, CA"])
         settings = self.config.get("search_settings") or {}
-        results_per_board = max(1, settings.get("results_per_board", 25))
-        results_per_additional = max(1, settings.get("results_per_additional_source", 50))
+        results_per_board = max(1, settings.get("results_per_board", 50))
+        results_per_additional = max(1, settings.get("results_per_additional_source", 100))
         max_days_old = max(1, settings.get("max_days_old", 14))
+        search_distance = settings.get("search_radius_miles")  # None = JobSpy default (50 miles)
         jobspy_boards = self.config.get("job_boards") or None  # None → default boards
 
         # When roles are passed explicitly (e.g. from the API, which already
@@ -620,12 +746,12 @@ class JobFinderPipeline:
         # Consolidate similar search terms to reduce redundant JobSpy queries
         consolidated = _consolidate_search_terms(roles_raw, keywords_raw, config=self.config)
 
-        # Broader queries → slightly more results per query to compensate
+        # Broader queries → more results per query to compensate
         original_count = len(roles_raw) + len(keywords_raw)
         if consolidated and len(consolidated) < original_count:
             ratio = original_count / len(consolidated)
             boost = max(2, int(ratio))
-            results_per_board = min(50, results_per_board * boost)
+            results_per_board = min(200, results_per_board * boost)
             logger.info(
                 "Consolidated %d → %d search terms; bumped results_per_board to %d",
                 original_count, len(consolidated), results_per_board,
@@ -664,7 +790,7 @@ class JobFinderPipeline:
         # Hard cap on total search tasks to avoid 8+ minute searches.
         # High-priority (niche) queries are at the front, so trimming
         # from the back drops only broad/duplicate-heavy queries.
-        max_tasks = max(12, settings.get("max_search_tasks", 20))
+        max_tasks = max(12, settings.get("max_search_tasks", 30))
         if len(search_tasks) > max_tasks:
             trimmed = len(search_tasks) - max_tasks
             search_tasks = search_tasks[:max_tasks]
@@ -682,7 +808,7 @@ class JobFinderPipeline:
         # Track unique jobs for early stopping
         seen_urls: set[str] = set()
         unique_count = 0
-        max_unique = max(100, settings.get("max_unique_jobs", 300))
+        max_unique = max(100, settings.get("max_unique_jobs", 500))
         stop_early = threading.Event()
 
         def _search_one(task: tuple[str, str]) -> list[dict]:
@@ -704,6 +830,7 @@ class JobFinderPipeline:
                 # Descriptions still come from Indeed, Glassdoor, Google.
                 # LinkedIn results keep title/company/location/salary/URL.
                 linkedin_fetch_description=False,
+                distance=search_distance,
             )
             with lock:
                 if stop_early.is_set():
@@ -819,20 +946,22 @@ class JobFinderPipeline:
         if search_tasks:
             with ThreadPoolExecutor(max_workers=max_jobspy_workers) as pool:
                 futures = {pool.submit(_search_one, t): t for t in search_tasks}
+                early_stopped = False
                 for future in as_completed(futures):
                     try:
                         all_jobs.extend(future.result())
                     except Exception as e:
                         logger.warning("JobSpy search failed (non-fatal): %s", e)
-                    # Cancel queued (not yet running) tasks after early stop
-                    if stop_early.is_set():
+                    # Cancel queued (not yet started) tasks after early stop,
+                    # but keep collecting results from already-running tasks.
+                    if stop_early.is_set() and not early_stopped:
+                        early_stopped = True
                         cancelled = 0
                         for f in futures:
                             if f.cancel():
                                 cancelled += 1
                         if cancelled:
                             logger.info("Early stop: cancelled %d queued searches", cancelled)
-                        break
 
         # Wait for additional scrapers to finish (with timeout to prevent hanging)
         if scraper_thread is not None:
@@ -897,15 +1026,25 @@ class JobFinderPipeline:
         # from the search locations so filtering always works.
         loc_prefs = self.config.get("location_preferences", {})
         if loc_prefs.get("filter_enabled", False):
+            pref_locations = loc_prefs.get("preferred_locations", [])
             pref_states = loc_prefs.get("preferred_states", [])
             pref_cities = loc_prefs.get("preferred_cities", [])
             remote_only = loc_prefs.get("remote_only", False)
+            include_remote = loc_prefs.get("include_remote", True)
         else:
             # Auto-derive from search locations (e.g. "Los Angeles, CA" → state=CA, city=Los Angeles)
             from job_finder.company_classifier import parse_location as _parse_loc
+            pref_locations = [
+                loc for loc in locations
+                if loc.lower() not in ("remote", "united states", "usa", "us", "anywhere")
+            ]
             pref_states = []
             pref_cities = []
             remote_only = False
+            include_remote = any(
+                loc.lower() in ("remote", "united states", "usa", "us", "anywhere")
+                for loc in locations
+            )
             for loc in locations:
                 if loc.lower() in ("remote", "united states", "usa", "us", "anywhere"):
                     continue
@@ -915,7 +1054,13 @@ class JobFinderPipeline:
                 if parsed["city"] and parsed["city"] not in pref_cities:
                     pref_cities.append(parsed["city"])
 
-        if pref_states or pref_cities or remote_only:
+        logger.info(
+            "Location filter config: filter_enabled=%s, pref_locations=%s, "
+            "pref_states=%s, pref_cities=%s, remote_only=%s, include_remote=%s",
+            loc_prefs.get("filter_enabled"), pref_locations, pref_states,
+            pref_cities, remote_only, include_remote,
+        )
+        if pref_locations or pref_states or pref_cities or remote_only or not include_remote:
             pre_count = len(deduped)
             deduped = [
                 j for j in deduped
@@ -924,7 +1069,9 @@ class JobFinderPipeline:
                     j.get("is_remote", False),
                     preferred_states=pref_states,
                     preferred_cities=pref_cities,
+                    preferred_locations=pref_locations,
                     remote_only=remote_only,
+                    include_remote=include_remote,
                     work_type=j.get("work_type", ""),
                 )
             ]
@@ -938,51 +1085,43 @@ class JobFinderPipeline:
                 purged = purge_non_matching_locations(
                     preferred_states=pref_states,
                     preferred_cities=pref_cities,
+                    preferred_locations=pref_locations,
+                    include_remote=include_remote,
+                    remote_only=remote_only,
                     profile=self.profile_name,
                 )
                 if purged and progress:
                     progress(f"Purged {purged} existing jobs outside preferred locations")
             except Exception as e:
                 logger.debug("DB location purge failed (non-fatal): %s", e)
+        else:
+            logger.warning("Location filter SKIPPED — no preferences configured")
 
         # --- Salary filter: remove jobs with known salary below minimum ---
         comp_cfg = self.config.get("compensation", {})
-        min_base = comp_cfg.get("min_base", 0)
+        min_base = annualize_amount(
+            comp_cfg.get("min_base", 0),
+            comp_cfg.get("pay_period", "annual"),
+        ) or 0
         if min_base and min_base > 0:
             # Allow 30% flex (e.g. min $190K filters out jobs < $133K)
             hard_floor = min_base * 0.7
             pre_count = len(deduped)
             deduped = [
                 j for j in deduped
-                if not j.get("salary_max")  # keep jobs with unknown salary
-                or j["salary_max"] >= hard_floor
+                if not (j.get("salary_max_annualized") or j.get("salary_max"))
+                or (j.get("salary_max_annualized") or j.get("salary_max")) >= hard_floor
             ]
             dropped = pre_count - len(deduped)
             if dropped and progress:
                 progress(f"Salary filter: removed {dropped} jobs below ${hard_floor:,.0f}")
 
         # --- Level filter: remove jobs too far above or below current level ---
-        career_cfg = self.config.get("career_baseline", {})
-        current_title = career_cfg.get("current_title", "")
-        if current_title:
-            from job_finder.scoring.dimensions import _extract_level
-            current_level = _extract_level(current_title)
-            pre_count = len(deduped)
-            if current_level >= 3:
-                # Senior+ users: filter out jobs 2+ levels below
-                deduped = [
-                    j for j in deduped
-                    if _extract_level(j.get("title", "")) >= current_level - 1.5
-                ]
-            else:
-                # Junior/entry users: filter out jobs 2+ levels above
-                deduped = [
-                    j for j in deduped
-                    if _extract_level(j.get("title", "")) <= current_level + 2.0
-                ]
-            dropped = pre_count - len(deduped)
-            if dropped and progress:
-                progress(f"Level filter: removed {dropped} jobs outside {current_title} level range")
+        deduped = _filter_jobs_by_level(
+            deduped,
+            self.config.get("career_baseline", {}),
+            progress=progress,
+        )
 
         # --- Role relevance filter ---
         deduped = self.filter_by_role(deduped, progress=progress)
@@ -1097,8 +1236,24 @@ class JobFinderPipeline:
 
     # -- Stage 2: Resume parsing (no LLM) ---------------------------------
 
+    def set_resume_text(self, text: str) -> None:
+        """Pre-load resume text so the pipeline skips file-based lookup."""
+        self._preloaded_resume_text = text
+
+    def require_preloaded_resume(self) -> None:
+        """Block file-based resume fallback (for hosted/multi-user mode).
+
+        After calling this, ``get_resume_text`` will return an error
+        instead of scanning the shared ``knowledge/`` directory.
+        """
+        self._preloaded_resume_text = self._preloaded_resume_text or ""
+
     def get_resume_text(self, path: str = "") -> str:
         """Return the full text of the candidate's resume."""
+        if self._preloaded_resume_text is not None:
+            if self._preloaded_resume_text:
+                return self._preloaded_resume_text
+            return "ERROR: No resume uploaded. Please upload your resume in Settings."
         if not path:
             path = self.config.get("profile", {}).get("resume_path", "")
         return parse_resume(path, profile=self.profile_name)
@@ -1275,6 +1430,7 @@ class JobFinderPipeline:
             company_type=job.get("company_type", "Unknown"),
             salary_min=job.get("salary_min"),
             salary_max=job.get("salary_max"),
+            salary_period=job.get("salary_period", ""),
             is_remote=job.get("is_remote", False),
             config=self.config,
             company_baselines=co_baselines,
@@ -1590,6 +1746,10 @@ class JobFinderPipeline:
                 is_remote=job.get("is_remote", False),
                 salary_min=job.get("salary_min"),
                 salary_max=job.get("salary_max"),
+                salary_currency=job.get("salary_currency", ""),
+                salary_period=job.get("salary_period", ""),
+                salary_min_annualized=job.get("salary_min_annualized"),
+                salary_max_annualized=job.get("salary_max_annualized"),
                 overall_score=job.get("overall_score"),
                 technical_score=job.get("technical_score"),
                 leadership_score=job.get("leadership_score"),
@@ -1613,6 +1773,7 @@ class JobFinderPipeline:
                 company_type=ct,
                 work_type=job.get("work_type", ""),
                 search_run_id=search_run_id,
+                workspace_id=self.config.get("workspace", {}).get("workspace_id"),
             )
             if rec:
                 job["db_id"] = rec.id

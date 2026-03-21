@@ -6,8 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.dependencies import _src_dir  # noqa: F401 — ensures src/ is on sys.path
 from app.api.router import api_router
-from app.models.database import init_db
+from app.models.database import get_db, init_db
 from app.services.scheduler_service import start_scheduler, stop_scheduler
+from app.services import workspace_service
 
 _DEFAULT_CORS_ORIGINS = ["http://localhost:5173", "http://localhost:3000"]
 
@@ -23,6 +24,15 @@ def _get_cors_origins() -> list[str]:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    db_gen = get_db()
+    try:
+        db = next(db_gen)
+        workspace_service.cleanup_expired_workspaces(db)
+    finally:
+        try:
+            next(db_gen)
+        except StopIteration:
+            pass
     start_scheduler()
     yield
     stop_scheduler()

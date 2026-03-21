@@ -1,5 +1,5 @@
 import { apiGet, apiPut, apiPost } from '@/lib/api-client';
-import type { LLMStatus, LLMConfig, LLMTestResult, ProviderPreset, ProviderModel, ProfilePreferences, ProfilePreferencesResponse, ProfileSummary } from '@/types/settings';
+import type { LLMStatus, LLMConfig, LLMTestResult, OllamaDetectResult, LocalAIDetectResult, ProviderPreset, ProviderModel, ProfilePreferences, ProfilePreferencesResponse, ProfileSummary } from '@/types/settings';
 
 export function getLLMStatus(): Promise<LLMStatus> {
   return apiGet<LLMStatus>('/settings/llm');
@@ -11,6 +11,14 @@ export function updateLLMConfig(config: LLMConfig): Promise<LLMStatus> {
 
 export function testLLMConnection(): Promise<LLMTestResult> {
   return apiPost<LLMTestResult>('/settings/llm/test');
+}
+
+export function detectOllama(): Promise<OllamaDetectResult> {
+  return apiGet<OllamaDetectResult>('/settings/llm/detect-ollama');
+}
+
+export function detectLocalAI(): Promise<LocalAIDetectResult> {
+  return apiGet<LocalAIDetectResult>('/settings/llm/detect-local');
 }
 
 export function getLLMPresets(includeInternal = false): Promise<ProviderPreset[]> {

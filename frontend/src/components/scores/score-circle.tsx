@@ -20,7 +20,7 @@ export function ScoreCircle({ score, size = 'md' }: ScoreCircleProps) {
   const pct = Math.min(Math.max(score, 0), 100);
   const offset = circumference * (1 - pct / 100);
 
-  const label = pct >= 70 ? 'Strong match — highly recommended' : pct >= 55 ? 'Good match — worth applying' : pct >= 40 ? 'Possible match — review carefully' : 'Weak match — may not be the right fit';
+  const label = pct >= 70 ? 'Strong match — high resume fit' : pct >= 55 ? 'Good match — moderate resume fit' : pct >= 40 ? 'Moderate match — worth reviewing' : 'Low match — limited resume overlap';
 
   return (
     <div className="relative shrink-0" style={{ width: px, height: px }} title={`Match score: ${Math.round(score)} / 100 — ${label}`}>

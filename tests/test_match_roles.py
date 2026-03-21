@@ -1,13 +1,11 @@
-"""Tests for _match_roles — verifying profile-specific role filtering.
+"""Tests for _match_roles — verifying cross-profession role filtering.
 
-Bug: A nurse practitioner profile with roles like ["nurse practitioner", "FNP",
-"advanced practice"] was seeing "Lead Software Engineer" and "Software Engineer 5"
-in search results. The _match_roles function's broad fallback matched generic
-keywords ("engineer", "lead", "senior") even when specific roles were provided.
+Regression: non-tech roles (e.g. nursing) were seeing unrelated software jobs in
+results because the broad fallback matched generic keywords ("engineer", "lead").
+Fix: _match_roles only matches explicit role keywords, no broad fallback.
 
-Fix: Two layers:
-1. _match_roles no longer has a broad fallback — only matches explicit role keywords
-2. Pipeline uses AI (LLM) to expand roles into related titles before scraping
+These tests use inline role lists (not profile files) to verify the filtering
+logic works across different professions.
 """
 
 from __future__ import annotations
@@ -19,7 +17,7 @@ import pytest
 from job_finder.tools.scrapers._utils import _match_roles
 
 
-# -- Nurse practitioner profile roles (from nurse_practitioner.yaml) ----------
+# -- Non-tech roles (used to verify cross-profession filtering) ---------------
 
 NURSE_ROLES = [
     "nurse practitioner",

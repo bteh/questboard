@@ -1,3 +1,5 @@
+import type { WorkplacePreference } from '@/lib/profile-preferences';
+
 export interface LLMConfig {
   provider: string;
   base_url: string;
@@ -11,6 +13,27 @@ export interface LLMStatus {
   provider: string;
   model: string;
   label: string;
+  runtime_configurable: boolean;
+  key_storage: 'keychain' | 'local_file';
+  auto_detected: string;
+}
+
+export interface OllamaDetectResult {
+  detected: boolean;
+  models: string[];
+  recommended_model: string;
+}
+
+export interface LocalAIServer {
+  port: number;
+  base_url: string;
+  model: string;
+  models: string[];
+  label: string;
+}
+
+export interface LocalAIDetectResult {
+  servers: LocalAIServer[];
 }
 
 export interface LLMTestResult {
@@ -35,8 +58,11 @@ export interface ProviderModel {
 }
 
 export interface ProfilePreferences {
+  preferred_locations: string[];
+  workplace_preference: WorkplacePreference;
+  max_days_old: number;
   current_title: string;
-  current_level: string[];
+  current_level: string;
   current_tc: number;
   min_base: number;
   target_total_comp: number;

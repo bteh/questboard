@@ -19,6 +19,16 @@ keyword_searches:
   - "lakehouse"
   - "data platform"
   - "iceberg data engineer"
+  - "founding engineer data"
+  - "build data team"
+  - "head of data"
+  - "data leader"
+  # Crypto / Web3
+  - "blockchain"
+  - "web3"
+  - "crypto"
+  - "defi"
+  - "onchain"
 
 locations:
   - "Los Angeles, CA"
@@ -54,6 +64,10 @@ additional_sources:
     enabled: true
   - name: "workday"
     enabled: true
+  - name: "arbeitnow"
+    enabled: true
+  - name: "themuse"
+    enabled: true
 
 # Scoring weights
 scoring:
@@ -72,11 +86,11 @@ compensation:
 
 # Search frequency
 search_settings:
-  results_per_board: 25
+  results_per_board: 50
   results_per_additional_source: 100
   max_days_old: 14
   exclude_staffing_agencies: true
   country: "USA"
   max_parallel_searches: 6
-  max_unique_jobs: 300
-  max_search_tasks: 20
+  max_unique_jobs: 500
+  max_search_tasks: 30

@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 
 logger = logging.getLogger(__name__)
+_SAFE_PROFILE_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
 def find_resume(profile: str | None = None) -> str | None:
@@ -19,6 +21,10 @@ def find_resume(profile: str | None = None) -> str | None:
 
     Returns the absolute path of the first PDF found, or *None*.
     """
+    if profile and not _SAFE_PROFILE_RE.fullmatch(profile):
+        logger.warning("Ignoring unsafe profile name '%s' during resume lookup", profile)
+        profile = None
+
     knowledge_dirs = [
         os.path.join(os.getcwd(), "knowledge"),
         os.path.abspath(
@@ -46,15 +52,20 @@ def find_resume(profile: str | None = None) -> str | None:
             if os.path.exists(profile_path):
                 return profile_path
 
-    # Priority 2-3: generic fallback
+    # Priority 2: default_resume.pdf
+    for knowledge_dir in unique_dirs:
+        default_path = os.path.join(knowledge_dir, "default_resume.pdf")
+        if os.path.exists(default_path):
+            return default_path
+
+    # Priority 3: any PDF with "resume" in the name
     for knowledge_dir in unique_dirs:
         pdfs = [
             f for f in os.listdir(knowledge_dir) if f.lower().endswith(".pdf")
         ]
         if not pdfs:
             continue
-        # Prefer files with "resume" in the name
-        resume_pdfs = [f for f in pdfs if "resume" in f.lower()]
+        resume_pdfs = sorted(f for f in pdfs if "resume" in f.lower())
         target = resume_pdfs[0] if resume_pdfs else pdfs[0]
         return os.path.join(knowledge_dir, target)
     return None

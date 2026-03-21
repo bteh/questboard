@@ -6,16 +6,18 @@ from sqlalchemy.orm import Session
 from app.models.application import ApplicationRecord
 
 
-def _base_query(db: Session, profile: str | None = None):
+def _base_query(db: Session, profile: str | None = None, workspace_id: str | None = None):
     """Return a base query, optionally filtered by profile."""
     q = db.query(ApplicationRecord)
-    if profile:
+    if workspace_id:
+        q = q.filter(ApplicationRecord.workspace_id == workspace_id)
+    elif profile:
         q = q.filter(ApplicationRecord.profile == profile)
     return q
 
 
-def get_dashboard_stats(db: Session, profile: str | None = None) -> dict:
-    base = _base_query(db, profile)
+def get_dashboard_stats(db: Session, profile: str | None = None, workspace_id: str | None = None) -> dict:
+    base = _base_query(db, profile, workspace_id)
     total = base.count()
     avg_score = base.with_entities(func.avg(ApplicationRecord.overall_score)).scalar()
 
@@ -47,8 +49,8 @@ def get_dashboard_stats(db: Session, profile: str | None = None) -> dict:
     }
 
 
-def get_score_distribution(db: Session, profile: str | None = None) -> list[dict]:
-    base = _base_query(db, profile)
+def get_score_distribution(db: Session, profile: str | None = None, workspace_id: str | None = None) -> list[dict]:
+    base = _base_query(db, profile, workspace_id)
     results = []
     ranges = [(0, 20), (20, 40), (40, 55), (55, 70), (70, 100)]
     labels = ["0-20", "20-40", "40-55", "55-70", "70-100"]
@@ -62,8 +64,8 @@ def get_score_distribution(db: Session, profile: str | None = None) -> list[dict
     return results
 
 
-def get_recommendation_breakdown(db: Session, profile: str | None = None) -> list[dict]:
-    base = _base_query(db, profile)
+def get_recommendation_breakdown(db: Session, profile: str | None = None, workspace_id: str | None = None) -> list[dict]:
+    base = _base_query(db, profile, workspace_id)
     recs = [
         ("STRONG_APPLY", "#10b981"),
         ("APPLY", "#3b82f6"),
@@ -77,8 +79,8 @@ def get_recommendation_breakdown(db: Session, profile: str | None = None) -> lis
     return results
 
 
-def get_source_breakdown(db: Session, profile: str | None = None) -> list[dict]:
-    base = _base_query(db, profile)
+def get_source_breakdown(db: Session, profile: str | None = None, workspace_id: str | None = None) -> list[dict]:
+    base = _base_query(db, profile, workspace_id)
     rows = (
         base.with_entities(ApplicationRecord.source, func.count(ApplicationRecord.id))
         .group_by(ApplicationRecord.source)
@@ -89,8 +91,8 @@ def get_source_breakdown(db: Session, profile: str | None = None) -> list[dict]:
     return [{"label": source or "Unknown", "value": count, "color": None} for source, count in rows]
 
 
-def get_pipeline_funnel(db: Session, profile: str | None = None) -> list[dict]:
-    base = _base_query(db, profile)
+def get_pipeline_funnel(db: Session, profile: str | None = None, workspace_id: str | None = None) -> list[dict]:
+    base = _base_query(db, profile, workspace_id)
     statuses = [
         ("found", "#6b7280"),
         ("reviewed", "#3b82f6"),
@@ -106,16 +108,17 @@ def get_pipeline_funnel(db: Session, profile: str | None = None) -> list[dict]:
     return results
 
 
-def get_top_companies(db: Session, limit: int = 10) -> list[dict]:
+def get_top_companies(db: Session, limit: int = 10, workspace_id: str | None = None) -> list[dict]:
     """Top N companies by average overall score."""
+    query = db.query(
+        ApplicationRecord.company,
+        func.avg(ApplicationRecord.overall_score).label("avg_score"),
+        func.count(ApplicationRecord.id).label("job_count"),
+    ).filter(ApplicationRecord.overall_score.isnot(None))
+    if workspace_id:
+        query = query.filter(ApplicationRecord.workspace_id == workspace_id)
     rows = (
-        db.query(
-            ApplicationRecord.company,
-            func.avg(ApplicationRecord.overall_score).label("avg_score"),
-            func.count(ApplicationRecord.id).label("job_count"),
-        )
-        .filter(ApplicationRecord.overall_score.isnot(None))
-        .group_by(ApplicationRecord.company)
+        query.group_by(ApplicationRecord.company)
         .order_by(func.avg(ApplicationRecord.overall_score).desc())
         .limit(limit)
         .all()
@@ -130,15 +133,17 @@ def get_top_companies(db: Session, limit: int = 10) -> list[dict]:
     ]
 
 
-def get_company_types(db: Session) -> list[dict]:
+def get_company_types(db: Session, workspace_id: str | None = None) -> list[dict]:
     """Jobs grouped by company type classification."""
+    query = db.query(
+        ApplicationRecord.company_type,
+        func.count(ApplicationRecord.id).label("count"),
+        func.avg(ApplicationRecord.overall_score).label("avg_score"),
+    )
+    if workspace_id:
+        query = query.filter(ApplicationRecord.workspace_id == workspace_id)
     rows = (
-        db.query(
-            ApplicationRecord.company_type,
-            func.count(ApplicationRecord.id).label("count"),
-            func.avg(ApplicationRecord.overall_score).label("avg_score"),
-        )
-        .group_by(ApplicationRecord.company_type)
+        query.group_by(ApplicationRecord.company_type)
         .order_by(func.count(ApplicationRecord.id).desc())
         .all()
     )

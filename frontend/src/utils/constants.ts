@@ -89,12 +89,12 @@ export const COMPANY_TYPE_DESCRIPTIONS: Record<string, string> = {
 };
 
 export const SCORE_DIMENSIONS = [
-  { key: 'technical_score', label: 'Skills Match', tooltip: 'How well your skills match the job requirements', weight: 0.25 },
-  { key: 'leadership_score', label: 'Leadership', tooltip: 'Opportunities to lead, manage, or grow into leadership', weight: 0.15 },
-  { key: 'career_progression_score', label: 'Career Growth', tooltip: 'Whether this role is a step up from your current position', weight: 0.15 },
-  { key: 'platform_building_score', label: 'Builder Opportunity', tooltip: 'Chance to build something new or shape a team from early stages', weight: 0.13 },
+  { key: 'technical_score', label: 'Skills Match', tooltip: 'How well your experience and skills match the job requirements', weight: 0.25 },
+  { key: 'leadership_score', label: 'Leadership', tooltip: 'Opportunities to lead, manage, or mentor others', weight: 0.15 },
+  { key: 'career_progression_score', label: 'Career Growth', tooltip: 'Whether this role advances your career from your current level', weight: 0.15 },
+  { key: 'platform_building_score', label: 'Growth & Scope', tooltip: 'Opportunity to build something new, expand a program, or shape a team', weight: 0.13 },
   { key: 'comp_potential_score', label: 'Compensation', tooltip: 'Expected pay relative to your target salary', weight: 0.12 },
-  { key: 'company_trajectory_score', label: 'Company Growth', tooltip: 'Company stability, growth trajectory, and market position', weight: 0.10 },
+  { key: 'company_trajectory_score', label: 'Company Outlook', tooltip: 'Company stability, growth trajectory, and market position', weight: 0.10 },
   { key: 'culture_fit_score', label: 'Culture & Benefits', tooltip: 'Remote work, benefits, work-life balance, and team culture', weight: 0.10 },
 ] as const;
 

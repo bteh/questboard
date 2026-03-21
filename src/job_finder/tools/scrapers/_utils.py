@@ -103,17 +103,32 @@ def _clean_company_name(slug: str) -> str:
 
 
 def _match_roles(title: str, roles: list[str] | None) -> bool:
-    """Check if a job title matches any of the target roles (fuzzy).
+    """Check if a job title matches any of the target roles.
 
-    When *roles* are provided, each is checked as a substring of the title.
+    Matching strategy (in order):
+    1. Exact substring — "data engineer" in "Senior Data Engineer" ✓
+    2. Word overlap  — all significant words of the role appear in the title
+       (any order), so "Platform Engineer, Data" matches role "data platform engineer"
+
     Returns False if none match — no broad fallback so that role filtering
     stays precise to the user's profile.
     """
     if not roles:
         return True
     title_lower = title.lower()
+    # Noise words to ignore during word-overlap matching
+    _NOISE = {"a", "an", "the", "and", "or", "of", "for", "in", "at", "to", "with", "&"}
+    # Strip punctuation for word-level matching
+    import re as _re
+    title_words = set(_re.findall(r"[a-z0-9]+", title_lower))
     for r in roles:
-        if r.lower() in title_lower:
+        role_lower = r.lower()
+        # Fast path: exact substring
+        if role_lower in title_lower:
+            return True
+        # Word overlap: all meaningful role words present in title (any order)
+        role_words = set(_re.findall(r"[a-z0-9]+", role_lower)) - _NOISE
+        if role_words and role_words.issubset(title_words):
             return True
     return False
 

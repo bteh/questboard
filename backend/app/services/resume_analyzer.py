@@ -13,10 +13,23 @@ manual YAML editing.
 
 from __future__ import annotations
 
+import copy
 import logging
+import os
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+_PROFILE_ROOT = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "src", "job_finder", "config", "profiles")
+)
+_AUTO_PROFILE_KEYS = (
+    "target_roles",
+    "keyword_searches",
+    "keywords",
+    "career_baseline",
+    "_resume_analysis",
+)
 
 _EXTRACTION_PROMPT = """\
 You are an expert career analyst. Analyze this resume and extract structured
@@ -115,11 +128,52 @@ def analyze_resume(resume_text: str, llm: Any | None = None) -> dict | None:
         return None
 
 
-def apply_analysis_to_profile(profile_config: dict, analysis: dict) -> dict:
+def _clean_list(values: Any, limit: int) -> list[str]:
+    """Normalize a list-like value into a de-duplicated list of strings."""
+    if not isinstance(values, list):
+        return []
+
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if not isinstance(value, str):
+            continue
+        item = value.strip()
+        if not item:
+            continue
+        lowered = item.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        cleaned.append(item)
+        if len(cleaned) >= limit:
+            break
+    return cleaned
+
+
+def _normalize_level(value: Any) -> str:
+    """Coerce legacy list-based level values into a single level string."""
+    if isinstance(value, list):
+        for item in value:
+            if isinstance(item, str) and item.strip():
+                return item.strip()
+        return "mid"
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    return "mid"
+
+
+def apply_analysis_to_profile(
+    profile_config: dict,
+    analysis: dict,
+    *,
+    force_overwrite: bool = False,
+) -> dict:
     """Merge LLM-extracted resume data into a profile config dict.
 
-    Only fills in fields that are empty/default — never overwrites
-    user-customized values.
+    When ``force_overwrite`` is true, resume-derived fields are refreshed even
+    when they already have values. This is used after uploading a new resume
+    or explicitly re-running analysis.
 
     Parameters
     ----------
@@ -136,55 +190,69 @@ def apply_analysis_to_profile(profile_config: dict, analysis: dict) -> dict:
     if not analysis:
         return profile_config
 
-    cfg = dict(profile_config)  # shallow copy
+    cfg = copy.deepcopy(profile_config or {})
 
-    # Auto-fill target_roles if empty or still has template defaults
-    current_roles = cfg.get("target_roles", [])
-    if not current_roles or current_roles == [""] or current_roles == ["software engineer", "data analyst"]:
-        suggested = analysis.get("suggested_target_roles", [])
-        if suggested:
-            cfg["target_roles"] = suggested[:15]
+    suggested_roles = _clean_list(analysis.get("suggested_target_roles"), 15)
+    suggested_keywords = _clean_list(analysis.get("suggested_keywords"), 10)
+    extracted_skills = _clean_list(analysis.get("skills"), 20)
+    leadership_signals = _clean_list(analysis.get("leadership_signals"), 10)
+    high_comp_signals = _clean_list(analysis.get("high_comp_signals"), 10)
+    current_title = str(analysis.get("current_title", "")).strip()
+    seniority = str(analysis.get("seniority", "")).strip()
 
-    # Auto-fill keyword_searches if empty
-    current_kw = cfg.get("keyword_searches", [])
-    if not current_kw or current_kw == [""]:
-        suggested = analysis.get("suggested_keywords", [])
-        if suggested:
-            cfg["keyword_searches"] = suggested[:10]
+    current_roles = _clean_list(cfg.get("target_roles"), 100)
+    if force_overwrite:
+        if suggested_roles:
+            cfg["target_roles"] = suggested_roles
+    elif not current_roles and suggested_roles:
+        cfg["target_roles"] = suggested_roles
 
-    # Auto-fill keywords.technical if empty or still has template defaults
-    keywords = cfg.get("keywords", {})
-    current_tech = keywords.get("technical", [])
-    if not current_tech or current_tech == [""]:
-        skills = analysis.get("skills", [])
-        if skills:
-            keywords["technical"] = skills[:20]
+    current_kw = _clean_list(cfg.get("keyword_searches"), 100)
+    if force_overwrite:
+        if suggested_keywords:
+            cfg["keyword_searches"] = suggested_keywords
+    elif not current_kw and suggested_keywords:
+        cfg["keyword_searches"] = suggested_keywords
 
-    # Auto-fill keywords.leadership if empty
-    current_lead = keywords.get("leadership", [])
-    if not current_lead or current_lead == ["mentorship", "lead", "manager"]:
-        signals = analysis.get("leadership_signals", [])
-        if signals:
-            keywords["leadership"] = signals[:10]
+    keywords = dict(cfg.get("keywords") or {})
+    current_tech = _clean_list(keywords.get("technical"), 100)
+    if force_overwrite:
+        if extracted_skills:
+            keywords["technical"] = extracted_skills
+    elif not current_tech and extracted_skills:
+        keywords["technical"] = extracted_skills
 
-    # Auto-fill high_comp_signals if empty
-    current_comp = keywords.get("high_comp_signals", [])
-    if not current_comp:
-        comp_signals = analysis.get("high_comp_signals", [])
-        if comp_signals:
-            keywords["high_comp_signals"] = comp_signals[:10]
+    current_lead = _clean_list(keywords.get("leadership"), 100)
+    if force_overwrite:
+        if leadership_signals:
+            keywords["leadership"] = leadership_signals
+    elif not current_lead and leadership_signals:
+        keywords["leadership"] = leadership_signals
+
+    current_comp = _clean_list(keywords.get("high_comp_signals"), 100)
+    if force_overwrite:
+        if high_comp_signals:
+            keywords["high_comp_signals"] = high_comp_signals
+    elif not current_comp and high_comp_signals:
+        keywords["high_comp_signals"] = high_comp_signals
 
     cfg["keywords"] = keywords
 
-    # Auto-fill career_baseline if empty
-    baseline = cfg.get("career_baseline", {})
-    if not baseline.get("current_title"):
-        baseline["current_title"] = analysis.get("current_title", "")
-    if baseline.get("current_level", "mid") == "mid" and analysis.get("seniority"):
-        baseline["current_level"] = analysis["seniority"]
+    baseline = dict(cfg.get("career_baseline") or {})
+    baseline_level = _normalize_level(baseline.get("current_level"))
+    baseline["current_level"] = baseline_level
+    if force_overwrite:
+        if current_title:
+            baseline["current_title"] = current_title
+        if seniority:
+            baseline["current_level"] = seniority
+    else:
+        if not str(baseline.get("current_title", "")).strip() and current_title:
+            baseline["current_title"] = current_title
+        if baseline_level == "mid" and seniority:
+            baseline["current_level"] = seniority
     cfg["career_baseline"] = baseline
 
-    # Store the raw analysis for reference
     cfg["_resume_analysis"] = {
         "industry": analysis.get("industry", ""),
         "seniority": analysis.get("seniority", ""),
@@ -192,3 +260,53 @@ def apply_analysis_to_profile(profile_config: dict, analysis: dict) -> dict:
     }
 
     return cfg
+
+
+def persist_analysis_to_profile(
+    profile: str,
+    analysis: dict,
+    profile_config: dict | None = None,
+    *,
+    force_overwrite: bool = True,
+) -> dict:
+    """Persist resume-derived fields back into the profile YAML."""
+    if not analysis:
+        return profile_config or {}
+
+    import yaml
+
+    if profile_config is None:
+        from app.dependencies import get_config
+
+        profile_config = get_config(profile if profile != "default" else None)
+
+    profile_path = os.path.join(_PROFILE_ROOT, f"{profile}.yaml")
+    os.makedirs(_PROFILE_ROOT, exist_ok=True)
+
+    if os.path.exists(profile_path):
+        with open(profile_path, "r", encoding="utf-8") as f:
+            persisted = yaml.safe_load(f) or {}
+    else:
+        persisted = copy.deepcopy(profile_config or {})
+
+    updated = apply_analysis_to_profile(
+        persisted or profile_config or {},
+        analysis,
+        force_overwrite=force_overwrite,
+    )
+
+    for key in _AUTO_PROFILE_KEYS:
+        if key in updated:
+            persisted[key] = updated[key]
+
+    with open(profile_path, "w", encoding="utf-8") as f:
+        yaml.dump(
+            persisted,
+            f,
+            default_flow_style=False,
+            sort_keys=False,
+            allow_unicode=True,
+        )
+
+    logger.info("Auto-configured profile '%s' from resume analysis", profile)
+    return persisted

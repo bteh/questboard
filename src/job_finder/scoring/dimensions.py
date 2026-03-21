@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import re
 
-from job_finder.scoring.helpers import keyword_score, salary_score, tfidf_similarity
+from job_finder.scoring.helpers import annualize_amount, keyword_score, salary_score, tfidf_similarity
 from job_finder.scoring.signals import (
     CULTURE_ENTERPRISE_SIGNALS,
     CULTURE_STARTUP_SIGNALS,
@@ -54,11 +54,13 @@ def score_comp(
     comp_signals: list[str],
     min_base: int = 80_000,
     target_tc: int = 150_000,
+    salary_period: str = "",
 ) -> float:
     return salary_score(
         salary_min, salary_max, combined,
         min_base=min_base, target_tc=target_tc,
         high_comp_signals=comp_signals,
+        salary_period=salary_period,
     )
 
 
@@ -100,6 +102,24 @@ def score_culture(
 
 # \u2500\u2500 Career progression \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
+def _match_level(text: str) -> float | None:
+    """Return the best-matching numeric level for text, if any."""
+    if not text:
+        return None
+
+    title_lower = text.lower()
+    matched: list[tuple[int, float]] = []  # (keyword_length, level)
+    for keyword, level in LEVEL_MAP.items():
+        pattern = r'\b' + re.escape(keyword) + r'\b'
+        if re.search(pattern, title_lower):
+            matched.append((len(keyword), level))
+    if not matched:
+        return None
+
+    matched.sort(key=lambda x: x[0], reverse=True)
+    return matched[0][1]
+
+
 def _extract_level(title: str) -> float:
     """Extract a numeric level from a job title.
 
@@ -107,17 +127,29 @@ def _extract_level(title: str) -> float:
     "account executive" (level 2) is matched before the shorter
     "executive" phrases, and the most-specific match wins.
     """
-    title_lower = title.lower()
-    matched: list[tuple[int, float]] = []  # (keyword_length, level)
-    for keyword, level in LEVEL_MAP.items():
-        pattern = r'\b' + re.escape(keyword) + r'\b'
-        if re.search(pattern, title_lower):
-            matched.append((len(keyword), level))
-    if not matched:
+    matched = _match_level(title)
+    if matched is None:
         return 2.0
-    # Return the level of the longest (most specific) matching keyword
-    matched.sort(key=lambda x: x[0], reverse=True)
-    return matched[0][1]
+    return matched
+
+
+def resolve_current_level(baseline: dict | None) -> float:
+    """Resolve the user's current level from explicit level or title."""
+    baseline = baseline or {}
+
+    explicit_level = baseline.get("current_level")
+    if isinstance(explicit_level, str):
+        matched = _match_level(explicit_level.strip())
+        if matched is not None:
+            return matched
+
+    current_title = baseline.get("current_title")
+    if isinstance(current_title, str):
+        matched = _match_level(current_title.strip())
+        if matched is not None:
+            return matched
+
+    return 2.0
 
 
 def score_career_progression(
@@ -129,8 +161,10 @@ def score_career_progression(
 ) -> float:
     """Score whether this job represents a career upgrade (0\u2013100)."""
     baseline = config.get("career_baseline", {})
-    current_level = _extract_level(baseline.get("current_title", "software engineer"))
-    current_tc = baseline.get("current_tc", 100_000)
+    current_level = resolve_current_level(baseline)
+    compensation_cfg = config.get("compensation", {})
+    user_period = compensation_cfg.get("pay_period", "annual")
+    current_tc = annualize_amount(baseline.get("current_tc", 100_000), user_period) or 100_000
     job_level = _extract_level(job_title)
 
     score = 50.0  # neutral
@@ -162,7 +196,7 @@ def score_career_progression(
             score -= 15
 
         # Penalty when salary is below min_acceptable_tc
-        min_acceptable_tc = baseline.get("min_acceptable_tc", current_tc)
+        min_acceptable_tc = annualize_amount(baseline.get("min_acceptable_tc", current_tc), user_period) or current_tc
         if salary_max < min_acceptable_tc:
             score -= 20
 

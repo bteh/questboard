@@ -17,7 +17,7 @@ src/job_finder/
   main.py                  # CLI entry points (run, search, score)
   config/
     search_config.yaml     # Default config
-    profiles/*.yaml        # Per-user profiles (default.yaml, nurse_practitioner.yaml, _template.yaml)
+    profiles/*.yaml        # Per-user profiles (default.yaml, _template.yaml)
   models/
     database.py            # SQLAlchemy ORM -- ApplicationRecord (50+ columns), SQLite
     schemas.py             # Pydantic models (JobListing, JobScore, ResumeOptimization, CoverLetter, CompanyIntel)
@@ -34,19 +34,7 @@ src/job_finder/
     scrapers/              # Plugin registry -- each scraper is one decorated file
       _registry.py         # @register_scraper decorator, ScraperMeta, run_scrapers()
       _utils.py            # Shared helpers (_get_json, _match_roles, _parse_salary, etc.)
-      greenhouse.py        # ATS scraper plugins (auto-discovered on import)
-      lever.py
-      ashby.py
-      workday.py
-      remotive.py
-      himalayas.py
-      weworkremotely.py
-      hackernews.py
-      remoteok.py
-      cryptojobslist.py
-      arbeitnow.py
-      themuse.py
-      yc_workatastartup.py
+      *.py                 # 14 scraper plugins (greenhouse, lever, ashby, workday, remotive, etc.)
 
 backend/
   app/
@@ -109,7 +97,6 @@ cd frontend && npm run typecheck
 - Offline search, scoring, persistence, and ATS detection are deterministic local code paths.
 - LLM outputs are drafts. Cover letters and company research are not grounded by web browsing in the current pipeline, so factual company claims must be verified manually.
 - Deduplication is currently keyed to job URLs; exact duplicates are removed reliably, but cross-board duplicates with different URLs can survive.
-- Profiles are supported, but this is still a local single-user tool rather than a true multi-user platform.
 
 **Pattern for new LLM features:**
 ```python
@@ -172,8 +159,8 @@ adds missing columns to existing tables.
 
 **Plugin scrapers** (14 sources via `src/job_finder/tools/scrapers/`): Remotive, Himalayas,
 We Work Remotely, Hacker News Who's Hiring, RemoteOK, CryptoJobsList, Arbeitnow, The Muse,
-YC Work at a Startup, plus ATS scrapers for Greenhouse, Lever, Ashby, and Workday (100+ company
-career pages). Adding a new scraper = one decorated file, auto-discovered on import.
+YC Work at a Startup, plus ATS scrapers for Greenhouse, Lever, Ashby, and Workday (company
+lists driven by user watchlist). Adding a new scraper = one decorated file, auto-discovered on import.
 
 ## Key Patterns to Reuse
 

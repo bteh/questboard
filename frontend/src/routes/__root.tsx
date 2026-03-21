@@ -7,6 +7,7 @@ import { queryClient } from '@/lib/query-client';
 import { ProfileProvider } from '@/contexts/profile-context';
 import { SearchProvider } from '@/contexts/search-context';
 import { ThemeProvider } from '@/contexts/theme-context';
+import { WorkspaceProvider, useWorkspace } from '@/contexts/workspace-context';
 import { ErrorBoundary } from '@/components/shared/error-boundary';
 import { Sidebar } from '@/components/layout/sidebar';
 import { OnboardingWizard, useOnboarding } from '@/components/onboarding/onboarding-wizard';
@@ -46,9 +47,12 @@ const PAGE_TITLES: Record<string, string> = {
 };
 
 function OnboardingGate() {
+  const { isLoading, error } = useWorkspace();
   const { shouldShow, dismiss } = useOnboarding();
   const [open, setOpen] = useState(true);
 
+  if (isLoading) return null;
+  if (error) return null;
   if (!shouldShow || !open) return null;
 
   return (
@@ -85,6 +89,7 @@ function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
+      <WorkspaceProvider>
       <ProfileProvider>
         <SearchProvider>
         <TooltipProvider>
@@ -117,6 +122,7 @@ function RootLayout() {
         </TooltipProvider>
         </SearchProvider>
       </ProfileProvider>
+      </WorkspaceProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

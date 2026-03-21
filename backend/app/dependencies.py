@@ -7,7 +7,8 @@ import sys
 import os
 
 from dotenv import load_dotenv
-from fastapi import HTTPException
+from fastapi import Depends, HTTPException, Request
+from sqlalchemy.orm import Session
 
 # Ensure src/ is importable when running from backend/
 _src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "src"))
@@ -24,6 +25,7 @@ load_dotenv(_ENV_PATH, override=False)
 
 from job_finder.llm_client import LLMClient, PRESETS
 from job_finder.pipeline import JobFinderPipeline, _load_search_config
+from app.models.database import get_db
 
 _PROFILE_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
 
@@ -66,3 +68,23 @@ def get_pipeline(profile: str | None = None) -> JobFinderPipeline:
 def get_config(profile: str | None = None) -> dict:
     """Load search config for a profile."""
     return _load_search_config(profile)
+
+
+def get_workspace_context(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Return the active hosted workspace/session context."""
+    from app.services import workspace_service
+
+    return workspace_service.require_workspace_context(db, request, validate_csrf=False)
+
+
+def get_workspace_context_csrf(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Return the active hosted workspace/session context and validate CSRF."""
+    from app.services import workspace_service
+
+    return workspace_service.require_workspace_context(db, request, validate_csrf=True)

@@ -1,54 +1,58 @@
 # Contributing to Launchboard
 
-Thanks for your interest in improving Launchboard! This guide covers how to set up a development environment, follow project conventions, and submit changes.
+Thanks for your interest in improving Launchboard! This guide covers setup, conventions, and how to submit changes.
+
+## Prerequisites
+
+- **Python 3.11+** ([python.org](https://python.org)) — `pyenv` users: `.python-version` handles this
+- **Node.js 18+** ([nodejs.org](https://nodejs.org)) — `nvm` users: `.nvmrc` handles this
 
 ## Development Setup
 
 ```bash
 git clone https://github.com/bteh/launchboard.git
 cd launchboard
-make setup              # installs Python + Node deps, creates .env
-
-# Or manually:
-python -m venv .venv && source .venv/bin/activate
-pip install -e .
-cd frontend && npm install && cd ..
-pip install -e backend/
-cp .env.example .env
+make setup    # creates venv, installs Python + Node deps, copies .env
 ```
+
+`make setup` creates a `.venv/` virtual environment. All `make` commands use it automatically — you never need to activate it.
 
 ## Running
 
 ```bash
-# Web UI (recommended)
-make dev
-# Backend: http://localhost:8000   Frontend: http://localhost:5173
-
-# CLI
-python -m job_finder.main --profile default
+make dev      # starts backend (localhost:8000) + frontend (localhost:5173)
+make backend  # backend only
+make frontend # frontend only
 ```
 
-## Project Principles
+## Troubleshooting
 
-1. **LLM-optional always.** Every new feature must have a useful non-LLM fallback. Search and basic scoring working offline is non-negotiable.
+```bash
+make doctor   # checks Python/Node versions, venv, deps, .env, ports
+make reset    # recreates venv from scratch if something breaks
+```
 
-2. **No frameworks.** The pipeline is plain Python functions and classes. No CrewAI, no LangChain. Keep the dependency tree shallow.
+## Where to Contribute
 
-3. **Profile-driven.** New features should read from the YAML profile config. Hard-coded values are bugs.
+### Easy wins
+- **Add a job source** — One file in `src/job_finder/tools/scrapers/`. Auto-discovered. See below.
+- **Frontend polish** — Components, accessibility, responsive design.
+- **Bug fixes** — Check open issues.
 
-4. **Profession-agnostic.** Prompts, scoring, and search terms adapt to any career field via profile config. No tech-specific assumptions.
+### Medium
+- **Scoring improvements** — New signals, dimension tuning, better keyword lists.
+- **LLM prompts** — Improve cover letter quality, scoring accuracy, company research.
+- **Tests** — More coverage for scoring, scrapers, and API endpoints.
 
-5. **Graceful degradation.** LLM calls return `None` on failure. Network calls catch exceptions. The pipeline never crashes on a single bad job listing.
+### Larger efforts
+- **Docker Compose** — One-command deployment with bundled Ollama.
+- **Auth** — OAuth (Google/GitHub) for the hosted version.
+- **PostgreSQL** — Migration from SQLite for concurrent multi-user access.
+- **New AI features** — Interview prep, salary intelligence, scoring calibration.
 
-6. **Local-first.** SQLite, local PDFs, no cloud storage required.
+See the Roadmap section in [README.md](README.md) for the full vision.
 
-## Code Style
-
-- **Python 3.10+** with `from __future__ import annotations`
-- Type hints on all function signatures (use `str | None`, not `Optional`)
-- Logging via `logger = logging.getLogger(__name__)`, never `print()` in library code
-- `print()` is acceptable in CLI entry points (`main.py`, `setup.py`)
-- Snake_case everywhere. Files match their primary class/function.
+---
 
 ## Adding a New Scraper
 
@@ -72,7 +76,7 @@ def search_myboard(roles=None, max_results=50, **kwargs) -> list[dict]:
     ...
 ```
 
-Auto-discovered on import. Metadata flows to backend API. Frontend picks it up dynamically.
+Auto-discovered on import. Metadata flows to the API and frontend automatically.
 
 ## Adding a New Scoring Dimension
 
@@ -97,14 +101,29 @@ def new_feature(self, ...) -> dict | None:
     return self.llm.chat_json(system_prompt, user_msg)
 ```
 
+---
+
+## Project Principles
+
+1. **AI-enhanced, not AI-dependent.** Every feature must have a useful non-AI fallback. Search and basic scoring offline is non-negotiable.
+2. **No frameworks.** Plain Python functions and classes. No CrewAI, no LangChain. Shallow dependency tree.
+3. **Profession-agnostic.** Prompts, scoring, and search adapt to any career field via profile config. No tech-specific assumptions.
+4. **Graceful degradation.** LLM calls return `None` on failure. Network calls catch exceptions. The pipeline never crashes on a single bad listing.
+5. **Local-first.** SQLite, local files, no cloud required. Cloud features are additive.
+
+## Code Style
+
+- **Python 3.10+** with `from __future__ import annotations`
+- Type hints on all function signatures (`str | None`, not `Optional`)
+- Logging via `logger = logging.getLogger(__name__)`, never `print()` in library code
+- `print()` is acceptable in CLI entry points (`main.py`, `setup.py`)
+- Snake_case everywhere. Files match their primary class/function.
+
 ## Testing
 
 ```bash
-# Run tests
-pytest tests/
-
-# Type check frontend
-cd frontend && npm run typecheck
+make test       # Python tests
+make typecheck  # TypeScript type checking
 ```
 
 ## Pull Requests
@@ -120,4 +139,4 @@ Open an issue on GitHub with:
 - What you expected
 - What happened instead
 - Steps to reproduce
-- Your OS and Python version
+- Your OS and Python/Node versions

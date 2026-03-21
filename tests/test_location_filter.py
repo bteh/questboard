@@ -50,18 +50,43 @@ class ParseLocationTest(unittest.TestCase):
     def test_foreign_country_mexico(self) -> None:
         p = parse_location("Mexico City, Mexico")
         self.assertNotIn(p["state"], set())  # No US state match
+        self.assertEqual(p["city"], "Mexico City")
+        self.assertEqual(p["country_name"], "mexico")
         self.assertTrue(p.get("country", "") != "US" or p["state"] == "")
+
+    def test_city_only_location(self) -> None:
+        p = parse_location("Seattle")
+        self.assertEqual(p["city"], "Seattle")
+        self.assertEqual(p["state"], "")
+
+    def test_state_name_only_location(self) -> None:
+        p = parse_location("California")
+        self.assertEqual(p["state"], "CA")
+
+    def test_country_name_only_location(self) -> None:
+        p = parse_location("Germany")
+        self.assertEqual(p["country"], "non-us")
+        self.assertEqual(p["country_name"], "germany")
 
 
 class LocationFilterTest(unittest.TestCase):
     """Jobs outside preferred locations should be rejected."""
 
-    def _matches(self, job_location: str, is_remote: bool = False, work_type: str = "") -> bool:
+    def _matches(
+        self,
+        job_location: str,
+        is_remote: bool = False,
+        work_type: str = "",
+        include_remote: bool = True,
+        remote_only: bool = False,
+    ) -> bool:
         return location_matches_preferences(
             job_location,
             is_remote,
             preferred_states=["CA"],
             preferred_cities=["Los Angeles"],
+            include_remote=include_remote,
+            remote_only=remote_only,
             work_type=work_type,
         )
 
@@ -73,6 +98,9 @@ class LocationFilterTest(unittest.TestCase):
 
     def test_remote_always_matches(self) -> None:
         self.assertTrue(self._matches("United States", True, work_type="remote"))
+
+    def test_remote_rejected_when_remote_excluded(self) -> None:
+        self.assertFalse(self._matches("United States", True, work_type="remote", include_remote=False))
 
     def test_india_rejected(self) -> None:
         self.assertFalse(self._matches("Hyderabad, India"))
@@ -89,6 +117,27 @@ class LocationFilterTest(unittest.TestCase):
 
     def test_santa_clara_reversed_matches(self) -> None:
         self.assertTrue(self._matches("US, CA, Santa Clara"))
+
+    def test_country_preference_matches_non_us_job(self) -> None:
+        self.assertTrue(location_matches_preferences(
+            "Berlin, Germany",
+            False,
+            preferred_locations=["Germany"],
+        ))
+
+    def test_city_country_preference_matches_non_us_job(self) -> None:
+        self.assertTrue(location_matches_preferences(
+            "Berlin, Germany",
+            False,
+            preferred_locations=["Berlin, Germany"],
+        ))
+
+    def test_other_country_preference_rejects_non_us_job(self) -> None:
+        self.assertFalse(location_matches_preferences(
+            "Berlin, Germany",
+            False,
+            preferred_locations=["France"],
+        ))
 
 
 if __name__ == "__main__":

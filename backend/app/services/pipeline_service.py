@@ -11,6 +11,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from typing import Any
 
 from app.dependencies import get_pipeline
 
@@ -50,6 +51,7 @@ class PipelineRun:
     run_id: str
     profile: str
     mode: str
+    workspace_id: str | None = None
     status: str = "pending"  # pending | running | completed | failed
     started_at: datetime | None = None
     completed_at: datetime | None = None
@@ -162,12 +164,18 @@ def start_run(
     roles: list[str],
     locations: list[str],
     keywords: list[str],
+    companies: list[str] | None = None,
     include_remote: bool,
+    workplace_preference: str,
     max_days_old: int,
     use_ai: bool,
     profile: str,
     mode: str,
     loop: asyncio.AbstractEventLoop,
+    workspace_id: str | None = None,
+    config_override: dict | None = None,
+    llm_override: Any | None = None,
+    snapshot=None,
 ) -> PipelineRun:
     """Launch a pipeline run in a background thread. Returns immediately."""
     _cleanup_old_runs()
@@ -178,6 +186,7 @@ def start_run(
         run_id=run_id,
         profile=profile,
         mode=mode,
+        workspace_id=workspace_id,
         status="pending",
         queue=queue,
         loop=loop,
@@ -189,17 +198,25 @@ def start_run(
     if keywords:
         all_roles.extend(keywords)
 
-    if include_remote and "Remote" not in locations:
-        locations = list(locations) + ["Remote"]
+    effective_locations = list(locations)
+    if workplace_preference == "remote_only":
+        effective_locations = ["Remote"]
+    elif include_remote and "Remote" not in effective_locations:
+        effective_locations = list(effective_locations) + ["Remote"]
 
     _executor.submit(
         _execute_pipeline,
         run,
         all_roles,
-        locations,
+        effective_locations,
         use_ai,
         mode,
+        workplace_preference,
         max_days_old,
+        workspace_id,
+        config_override or {},
+        llm_override,
+        companies or [],
     )
     return run
 
@@ -210,7 +227,12 @@ def _execute_pipeline(
     locations: list[str],
     use_ai: bool,
     mode: str,
+    workplace_preference: str,
     max_days_old: int | None = None,
+    workspace_id: str | None = None,
+    config_override: dict | None = None,
+    llm_override: Any | None = None,
+    target_companies: list[str] | None = None,
 ) -> None:
     """Run the pipeline in a worker thread."""
     run.status = "running"
@@ -229,9 +251,88 @@ def _execute_pipeline(
 
     try:
         pipeline = get_pipeline(profile=run.profile)
+        if llm_override is not None:
+            pipeline.llm = llm_override if getattr(llm_override, "is_configured", False) else None
+        if config_override:
+            for key, value in config_override.items():
+                if isinstance(value, dict) and isinstance(pipeline.config.get(key), dict):
+                    merged = dict(pipeline.config.get(key, {}))
+                    merged.update(value)
+                    pipeline.config[key] = merged
+                else:
+                    pipeline.config[key] = value
+
+        # Inject AI-suggested target companies into the pipeline config.
+        # The pipeline's watchlist logic converts these to ATS slugs and
+        # routes them to Greenhouse/Lever/Ashby scrapers automatically.
+        if target_companies:
+            from app.services.watchlist_service import _generate_slugs
+            existing = pipeline.config.get("watchlist", [])
+            existing_names = {e.get("name", "").lower() for e in existing}
+            for company_name in target_companies:
+                if company_name.lower() in existing_names:
+                    continue
+                slugs = _generate_slugs(company_name)
+                if slugs:
+                    # Try all ATS types — scrapers handle misses gracefully
+                    for ats in ("greenhouse", "lever", "ashby"):
+                        existing.append({
+                            "name": company_name,
+                            "slug": slugs[0],
+                            "ats": ats,
+                            "job_count": 0,
+                            "careers_url": "",
+                        })
+                    existing_names.add(company_name.lower())
+            pipeline.config["watchlist"] = existing
+            logger.info("Injected %d AI-suggested companies into pipeline watchlist (%d ATS entries)", len(target_companies), len(existing))
+            _send_event(run, "progress", f"Targeting {len(target_companies)} companies from resume analysis")
+
+        # Load workspace resume — MUST succeed in workspace mode to prevent
+        # cross-user data leaks via shared filesystem fallback.
+        if workspace_id:
+            from app.dependencies import get_db
+            from app.services import workspace_service
+            db = next(get_db())
+            try:
+                resume_text = workspace_service.get_resume_text(db, workspace_id)
+                if resume_text:
+                    pipeline.set_resume_text(resume_text)
+                    logger.info("Loaded workspace resume for %s (%d chars)", workspace_id, len(resume_text))
+            finally:
+                db.close()
+            # Block file-based fallback regardless — workspace pipelines must
+            # never read from the shared knowledge/ directory.
+            pipeline.require_preloaded_resume()
 
         if max_days_old is not None:
             pipeline.config.setdefault("search_settings", {})["max_days_old"] = max_days_old
+
+        from job_finder.company_classifier import parse_location
+
+        preferred_locations = [
+            location for location in locations
+            if location.strip().lower() not in {"remote", "anywhere", "united states", "usa", "us"}
+        ]
+        preferred_states: list[str] = []
+        preferred_cities: list[str] = []
+        for location in preferred_locations:
+            parsed = parse_location(location)
+            if parsed.get("state") and parsed["state"] not in preferred_states:
+                preferred_states.append(parsed["state"])
+            if parsed.get("city") and parsed["city"] not in preferred_cities:
+                preferred_cities.append(parsed["city"])
+
+        pipeline.config["locations"] = list(locations)
+        pipeline.config["location_preferences"] = {
+            "filter_enabled": bool(preferred_locations) or workplace_preference != "remote_friendly",
+            "preferred_locations": preferred_locations,
+            "preferred_states": preferred_states,
+            "preferred_cities": preferred_cities,
+            "remote_only": workplace_preference == "remote_only",
+            "include_remote": workplace_preference != "location_only",
+            "workplace_preference": workplace_preference,
+        }
 
         tracker = _ProgressTracker(run, mode)
         progress_cb = tracker
@@ -243,7 +344,13 @@ def _execute_pipeline(
             run.jobs_found = len(jobs) if jobs else 0
             # Save to DB
             if jobs:
-                _save_search_results(pipeline, jobs, progress_cb, search_run_id=run.run_id)
+                _save_search_results(
+                    pipeline,
+                    jobs,
+                    progress_cb,
+                    search_run_id=run.run_id,
+                    workspace_id=workspace_id,
+                )
         else:
             # search_score: AI scoring only (no enhancement)
             # full_pipeline: AI scoring + enhancement (resume tweaks, cover letters)
@@ -264,7 +371,7 @@ def _execute_pipeline(
             )
 
         # Auto-merge any cross-source duplicates in the DB
-        merged = _auto_deduplicate(pipeline.profile_name)
+        merged = _auto_deduplicate(pipeline.profile_name, workspace_id=workspace_id)
         if merged > 0:
             _send_event(run, "progress", f"Merged {merged} cross-source duplicates")
 
@@ -289,25 +396,77 @@ def _execute_pipeline(
                 "sources": sources,
             }),
         )
+        if workspace_id:
+            try:
+                from app.models.database import get_db
+                from app.services import workspace_service
+
+                db_gen = get_db()
+                db = next(db_gen)
+                try:
+                    workspace_service.update_search_run_status(
+                        db,
+                        run.run_id,
+                        status=run.status,
+                        jobs_found=run.jobs_found,
+                        jobs_scored=run.jobs_scored,
+                        strong_matches=run.strong_matches,
+                        completed_at=run.completed_at,
+                    )
+                finally:
+                    try:
+                        next(db_gen)
+                    except StopIteration:
+                        pass
+            except Exception:
+                logger.warning("Failed to update workspace search run", exc_info=True)
     except Exception as e:
         logger.exception("Pipeline run %s failed", run.run_id)
         run.status = "failed"
         run.error = str(e)
         run.completed_at = _utcnow()
         _send_event(run, "error", str(e))
+        if workspace_id:
+            try:
+                from app.models.database import get_db
+                from app.services import workspace_service
+
+                db_gen = get_db()
+                db = next(db_gen)
+                try:
+                    workspace_service.update_search_run_status(
+                        db,
+                        run.run_id,
+                        status=run.status,
+                        jobs_found=run.jobs_found,
+                        jobs_scored=run.jobs_scored,
+                        strong_matches=run.strong_matches,
+                        error=str(e),
+                        completed_at=run.completed_at,
+                    )
+                finally:
+                    try:
+                        next(db_gen)
+                    except StopIteration:
+                        pass
+            except Exception:
+                logger.warning("Failed to update workspace search run", exc_info=True)
 
 
-def _auto_deduplicate(profile: str | None = None) -> int:
+def _auto_deduplicate(profile: str | None = None, workspace_id: str | None = None) -> int:
     """Merge cross-source duplicates in the DB after a pipeline run."""
     try:
         from job_finder.pipeline import _normalize_company, _normalize_title
         from app.models.application import ApplicationRecord
         from app.models.database import get_db
 
-        session = next(get_db())
+        session_gen = get_db()
+        session = next(session_gen)
         try:
             query = session.query(ApplicationRecord)
-            if profile:
+            if workspace_id:
+                query = query.filter(ApplicationRecord.workspace_id == workspace_id)
+            elif profile:
                 query = query.filter(ApplicationRecord.profile == profile)
             all_records = query.all()
 
@@ -367,13 +526,22 @@ def _auto_deduplicate(profile: str | None = None) -> int:
                 session.commit()
             return removed
         finally:
-            session.close()
+            try:
+                next(session_gen)
+            except StopIteration:
+                pass
     except Exception:
         logger.warning("Auto-dedup failed", exc_info=True)
         return 0
 
 
-def _save_search_results(pipeline, jobs: list[dict], progress_cb, search_run_id: str | None = None) -> None:
+def _save_search_results(
+    pipeline,
+    jobs: list[dict],
+    progress_cb,
+    search_run_id: str | None = None,
+    workspace_id: str | None = None,
+) -> None:
     """Save search-only results to DB (mirrors app.py search_only logic)."""
     import json as _json
     from job_finder.models.database import init_db, save_application
@@ -409,6 +577,7 @@ def _save_search_results(pipeline, jobs: list[dict], progress_cb, search_run_id:
             company_type=ct,
             work_type=wt,
             search_run_id=search_run_id,
+            workspace_id=workspace_id,
         )
     progress_cb(f"Saved {len(jobs)} jobs to database")
 
@@ -460,6 +629,9 @@ def get_run(run_id: str) -> PipelineRun | None:
     return _runs.get(run_id)
 
 
-def list_runs(limit: int = 20) -> list[PipelineRun]:
-    runs = sorted(_runs.values(), key=lambda r: r.started_at or _utcnow(), reverse=True)
+def list_runs(limit: int = 20, workspace_id: str | None = None) -> list[PipelineRun]:
+    runs = list(_runs.values())
+    if workspace_id is not None:
+        runs = [run for run in runs if run.workspace_id == workspace_id]
+    runs = sorted(runs, key=lambda r: r.started_at or _utcnow(), reverse=True)
     return runs[:limit]

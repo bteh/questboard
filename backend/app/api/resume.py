@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, BackgroundTasks
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import FileResponse
 
 from app.schemas.resume import ResumeStatus, ResumeUploadResponse
@@ -17,10 +17,9 @@ router = APIRouter(prefix="/resume", tags=["resume"])
 
 
 def _analyze_and_update_profile(profile: str) -> None:
-    """Background task: analyze resume with LLM and auto-configure profile."""
+    """Analyze a resume and persist updated profile fields."""
     try:
-        from app.services.resume_analyzer import analyze_resume, apply_analysis_to_profile
-        from app.services.settings_service import update_profile_preferences
+        from app.services.resume_analyzer import analyze_resume, persist_analysis_to_profile
         from app.dependencies import get_llm, get_config
 
         resume_text = resume_service.get_resume_text(profile)
@@ -32,48 +31,16 @@ def _analyze_and_update_profile(profile: str) -> None:
         if not analysis:
             return
 
-        # Load current config and merge analysis
         config = get_config(profile)
-        updated = apply_analysis_to_profile(config, analysis)
-
-        # Write updated profile back — only the auto-populated fields
-        import yaml
-        import os
-
-        config_dir = os.path.join(
-            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..")),
-            "src", "job_finder", "config", "profiles",
+        persist_analysis_to_profile(
+            profile,
+            analysis,
+            profile_config=config,
+            force_overwrite=True,
         )
-        profile_path = os.path.join(config_dir, f"{profile}.yaml")
-
-        if os.path.exists(profile_path):
-            with open(profile_path, "r", encoding="utf-8") as f:
-                existing = yaml.safe_load(f) or {}
-        else:
-            existing = {}
-
-        # Always overwrite auto-populated fields with fresh analysis.
-        # These fields are machine-generated from the resume, so a new resume
-        # should always produce fresh values. User-editable fields (like
-        # weights, thresholds, locations) are NOT touched here.
-        for key in ("target_roles", "keyword_searches", "keywords", "career_baseline", "_resume_analysis"):
-            if key not in updated:
-                continue
-            updated_val = updated.get(key)
-            if key == "keywords":
-                existing["keywords"] = updated_val or {}
-            elif key == "career_baseline":
-                existing["career_baseline"] = updated_val or {}
-            else:
-                existing[key] = updated_val
-
-        with open(profile_path, "w", encoding="utf-8") as f:
-            yaml.dump(existing, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
-
-        logger.info("Auto-configured profile '%s' from resume analysis", profile)
 
     except Exception as e:
-        logger.warning("Resume analysis background task failed (non-fatal): %s", e)
+        logger.warning("Resume analysis update failed (non-fatal): %s", e)
 
 
 @router.get("/{profile}", response_model=ResumeStatus)
@@ -86,12 +53,11 @@ async def get_resume_status(profile: str):
 @router.post("/{profile}/upload", response_model=ResumeUploadResponse)
 async def upload_resume(
     profile: str,
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
 ):
     """Upload a resume PDF for the given profile.
 
-    After saving the file, kicks off a background LLM analysis that
+    After saving the file, analyzes the resume when an LLM is configured and
     auto-extracts skills, seniority, and industry from the resume and
     populates the profile's target roles, keywords, and career baseline.
     """
@@ -105,9 +71,7 @@ async def upload_resume(
         raise HTTPException(400, "Empty file")
 
     result = resume_service.upload_resume(profile, file.filename, content)
-
-    # Trigger async resume analysis in the background
-    background_tasks.add_task(_analyze_and_update_profile, profile)
+    _analyze_and_update_profile(profile)
 
     return result
 
@@ -144,8 +108,8 @@ async def analyze_resume_endpoint(profile: str):
     if resume_text.startswith("ERROR"):
         raise HTTPException(404, resume_text)
 
-    from app.services.resume_analyzer import analyze_resume, apply_analysis_to_profile
-    from app.dependencies import get_llm
+    from app.services.resume_analyzer import analyze_resume, persist_analysis_to_profile
+    from app.dependencies import get_llm, get_config
 
     llm = get_llm()
     analysis = analyze_resume(resume_text, llm)
@@ -155,8 +119,16 @@ async def analyze_resume_endpoint(profile: str):
             "LLM not available — configure an LLM provider in Settings to enable resume analysis",
         )
 
+    updated = persist_analysis_to_profile(
+        profile,
+        analysis,
+        profile_config=get_config(profile),
+        force_overwrite=True,
+    )
+
     return {
         "profile": profile,
         "analysis": analysis,
-        "message": "Resume analyzed successfully. Profile keywords and roles will be updated.",
+        "updated_profile": updated,
+        "message": "Resume analyzed successfully and profile fields were updated.",
     }

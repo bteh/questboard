@@ -15,42 +15,7 @@ from job_finder.tools.scrapers._utils import (
 
 logger = logging.getLogger(__name__)
 
-_GREENHOUSE_COMPANIES = [
-    # AI / ML
-    "anthropic", "openai", "cohere", "mistral", "huggingface",
-    "scaleai", "deepmind", "inflection", "adept", "character",
-    "wandb", "runwayml", "stabilityai", "perplexityai", "anyscale",
-    "modal", "together", "replicatehq", "midjourney",
-    # Data infrastructure
-    "databricks", "dbt-labs", "fivetran", "confluent", "starburst",
-    "snowflake", "clickhouse", "motherduck", "tabular", "preset",
-    "astronomer", "airbyte", "meltano", "census", "hightouch",
-    "montecarlodata", "atlan", "greatexpectations",
-    "tecaborhq",  # Tecton — slug needs verification
-    "dbtlabsinc",  # dbt Labs alternate slug
-    # Fintech
-    "stripe", "plaid", "ramp", "brex", "affirm", "coinbase",
-    "mercury", "rippling", "carta", "nerdwallet", "chime",
-    "sardine",
-    # Developer tools / Cloud
-    "figma", "notion", "airtable", "vercel", "netlify",
-    "gitlab", "hashicorp", "snyk", "datadog", "pagerduty",
-    "cloudflare", "postman", "linear", "retool", "supabase",
-    "planetscale", "neondatabase", "railway", "render", "temporal",
-    "webflow",
-    # Security
-    "wiz", "lacework", "orcasecurity",
-    # Consumer / Marketplace
-    "airbnb", "instacart", "duolingo", "pinterest", "discord",
-    "reddit", "spotify", "lyft", "doordash", "faire",
-    # Enterprise / SaaS
-    "hubspot", "sqsp", "gusto", "docusign", "grammarly",
-    "canva", "miro", "loom", "calendly", "lattice",
-    "amplitude", "segment", "mixpanel", "launchdarkly", "contentful",
-    # Deep tech / Hardware
-    "anduril", "palantir", "rivian", "relativity", "astranis",
-    "samsara", "verkada", "zipline", "crusoe", "gecko-robotics",
-]
+_GREENHOUSE_COMPANIES: list[str] = []  # Populated at runtime via watchlist + config
 
 
 def _fetch_company_jobs(slug: str, roles: list[str] | None) -> list[dict]:
@@ -107,6 +72,9 @@ def search_greenhouse(
     company_list = list(companies or _GREENHOUSE_COMPANIES)
     if watchlist_companies:
         company_list.extend(s for s in watchlist_companies if s not in company_list)
+    if not company_list:
+        logger.info("Greenhouse: no companies configured — add companies to your watchlist")
+        return []
     logger.info("Fetching from Greenhouse API for %d companies...", len(company_list))
 
     results: list[dict] = []

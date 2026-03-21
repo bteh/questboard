@@ -20,6 +20,7 @@ from job_finder.scoring.dimensions import (
     score_technical,
     score_trajectory,
 )
+from job_finder.scoring.helpers import annualize_amount
 from job_finder.scoring.signals import (
     HIGH_COMP_SIGNALS,
     LEADERSHIP_KEYWORDS,
@@ -38,6 +39,7 @@ def score_job_basic(
     company_type: str = "Unknown",
     salary_min: float | None = None,
     salary_max: float | None = None,
+    salary_period: str = "",
     is_remote: bool = False,
     config: dict[str, Any] | None = None,
     company_baselines: dict[str, float] | None = None,
@@ -87,6 +89,10 @@ def score_job_basic(
 
     # When include_equity is false, strip equity-specific signals from comp scoring
     include_equity = cfg.get("compensation", {}).get("include_equity", True)
+    compensation_cfg = cfg.get("compensation", {})
+    user_pay_period = compensation_cfg.get("pay_period", "annual")
+    normalized_min_base = annualize_amount(compensation_cfg.get("min_base", 80_000), user_pay_period) or 80_000
+    normalized_target_tc = annualize_amount(compensation_cfg.get("target_total_comp", 150_000), user_pay_period) or 150_000
     if not include_equity:
         _equity_signals = {
             "equity", "rsu", "stock options", "signing bonus",
@@ -107,8 +113,9 @@ def score_job_basic(
 
     comp_kw = score_comp(
         salary_min, salary_max, combined, comp_signals,
-        min_base=cfg.get("compensation", {}).get("min_base", 80_000),
-        target_tc=cfg.get("compensation", {}).get("target_total_comp", 150_000),
+        min_base=int(normalized_min_base),
+        target_tc=int(normalized_target_tc),
+        salary_period=salary_period,
     )
     plat_kw = score_platform(combined, plat_keywords)
     traj_kw = score_trajectory(combined, trajectory_keywords=traj_keywords)

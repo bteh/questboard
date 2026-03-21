@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import unittest
 
-from job_finder.pipeline import JobFinderPipeline
+from job_finder.pipeline import JobFinderPipeline, _filter_jobs_by_level
 
 
 class StaffingAgencyFilterTest(unittest.TestCase):
@@ -158,6 +158,27 @@ class RoleFilterTest(unittest.TestCase):
         self.assertEqual(len(filtered), 1)
         # Should have logged removal
         self.assertTrue(any("2" in msg for msg in progress_msgs))
+
+
+class LevelFilterTest(unittest.TestCase):
+    """Explicit current_level should affect pre-scoring job filtering."""
+
+    def test_current_level_filters_even_without_current_title(self) -> None:
+        jobs = [
+            {"title": "Associate Product Manager", "company": "A", "url": "http://a"},
+            {"title": "Senior Product Manager", "company": "B", "url": "http://b"},
+            {"title": "Staff Product Manager", "company": "C", "url": "http://c"},
+        ]
+
+        filtered = _filter_jobs_by_level(
+            jobs,
+            {"current_level": "senior"},
+        )
+
+        titles = {job["title"] for job in filtered}
+        self.assertNotIn("Associate Product Manager", titles)
+        self.assertIn("Senior Product Manager", titles)
+        self.assertIn("Staff Product Manager", titles)
 
 
 if __name__ == "__main__":

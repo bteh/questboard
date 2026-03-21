@@ -17,8 +17,7 @@ export function useUploadResume() {
     mutationFn: (file: File) => uploadResume(profile, file),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['resume'] });
-      // Also invalidate profile preferences — the background analyzer
-      // will update target_roles, keywords, and career_baseline from the new resume
+      queryClient.invalidateQueries({ queryKey: ['search', 'defaults'] });
       queryClient.invalidateQueries({ queryKey: ['settings', 'preferences'] });
     },
   });

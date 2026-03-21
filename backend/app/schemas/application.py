@@ -17,6 +17,10 @@ class ApplicationBase(BaseModel):
     work_type: str = ""
     salary_min: float | None = None
     salary_max: float | None = None
+    salary_currency: str = ""
+    salary_period: str = ""
+    salary_min_annualized: float | None = None
+    salary_max_annualized: float | None = None
 
 
 class ApplicationResponse(ApplicationBase):

@@ -78,7 +78,7 @@ class AuditTrailTest(unittest.TestCase):
             "profile": {"name": "Template", "description": "Template profile"},
             "career_baseline": {
                 "current_title": "Engineer",
-                "current_level": ["mid"],
+                "current_level": "mid",
                 "current_tc": 100_000,
             },
             "compensation": {
@@ -94,7 +94,7 @@ class AuditTrailTest(unittest.TestCase):
             "profile": {"name": "Test User", "description": "Test profile"},
             "career_baseline": {
                 "current_title": "Software Engineer",
-                "current_level": ["mid"],
+                "current_level": "mid",
                 "current_tc": 120_000,
             },
             "compensation": {
@@ -118,7 +118,7 @@ class AuditTrailTest(unittest.TestCase):
             mock_get_config.return_value = {
                 "career_baseline": {
                     "current_title": "Senior Software Engineer",
-                    "current_level": ["senior"],
+                    "current_level": "senior",
                     "current_tc": 150_000,
                 },
                 "compensation": {
@@ -132,7 +132,7 @@ class AuditTrailTest(unittest.TestCase):
                     "test",
                     {
                         "current_title": "Senior Software Engineer",
-                        "current_level": ["senior"],
+                        "current_level": "senior",
                         "current_tc": 150_000,
                         "min_base": 120_000,
                         "target_total_comp": 200_000,
@@ -152,7 +152,7 @@ class AuditTrailTest(unittest.TestCase):
             mock_get_config.return_value = {
                 "career_baseline": {
                     "current_title": "Software Engineer",
-                    "current_level": ["mid"],
+                    "current_level": "mid",
                     "current_tc": 120_000,
                 },
                 "compensation": {
@@ -166,7 +166,7 @@ class AuditTrailTest(unittest.TestCase):
                     "test",
                     {
                         "current_title": "Software Engineer",
-                        "current_level": ["mid"],
+                        "current_level": "mid",
                         "current_tc": 120_000,
                         "min_base": 120_000,
                         "target_total_comp": 180_000,
@@ -186,7 +186,7 @@ class AuditTrailTest(unittest.TestCase):
             mock_get_config.return_value = {
                 "career_baseline": {
                     "current_title": "Staff Engineer",
-                    "current_level": ["staff"],
+                    "current_level": "staff",
                     "current_tc": 200_000,
                 },
                 "compensation": {
@@ -199,7 +199,7 @@ class AuditTrailTest(unittest.TestCase):
                 "test",
                 {
                     "current_title": "Staff Engineer",
-                    "current_level": ["staff"],
+                    "current_level": "staff",
                     "current_tc": 200_000,
                     "min_base": 150_000,
                     "target_total_comp": 250_000,
@@ -230,7 +230,7 @@ class AuditTrailTest(unittest.TestCase):
             mock_get_config.return_value = {
                 "career_baseline": {
                     "current_title": "Software Engineer",
-                    "current_level": ["mid"],
+                    "current_level": "mid",
                     "current_tc": 120_000,
                 },
                 "compensation": {
@@ -243,7 +243,7 @@ class AuditTrailTest(unittest.TestCase):
                 "test",
                 {
                     "current_title": "Software Engineer",
-                    "current_level": ["mid"],
+                    "current_level": "mid",
                     "current_tc": 120_000,
                     "min_base": 100_000,
                     "target_total_comp": 180_000,

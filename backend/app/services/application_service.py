@@ -29,6 +29,7 @@ def get_applications(
     is_remote: bool | None = None,
     work_type: str | None = None,
     profile: str | None = None,
+    workspace_id: str | None = None,
     search_run_id: str | None = None,
     sort_by: str = "overall_score",
     sort_dir: str = "desc",
@@ -53,7 +54,9 @@ def get_applications(
         query = query.filter(ApplicationRecord.is_remote == is_remote)
     if work_type:
         query = query.filter(ApplicationRecord.work_type == work_type)
-    if profile:
+    if workspace_id:
+        query = query.filter(ApplicationRecord.workspace_id == workspace_id)
+    elif profile:
         query = query.filter(ApplicationRecord.profile == profile)
     if search_run_id:
         query = query.filter(ApplicationRecord.search_run_id == search_run_id)
@@ -83,11 +86,14 @@ def get_applications(
     return items, total
 
 
-def get_application(db: Session, app_id: int) -> ApplicationRecord | None:
-    return db.query(ApplicationRecord).filter(ApplicationRecord.id == app_id).first()
+def get_application(db: Session, app_id: int, workspace_id: str | None = None) -> ApplicationRecord | None:
+    query = db.query(ApplicationRecord).filter(ApplicationRecord.id == app_id)
+    if workspace_id:
+        query = query.filter(ApplicationRecord.workspace_id == workspace_id)
+    return query.first()
 
 
-def create_application(db: Session, data) -> ApplicationRecord:
+def create_application(db: Session, data, workspace_id: str | None = None) -> ApplicationRecord:
     """Create a new application record from an ApplicationCreate schema."""
     record = ApplicationRecord(
         job_title=data.job_title,
@@ -102,6 +108,7 @@ def create_application(db: Session, data) -> ApplicationRecord:
         status=data.status,
         notes=data.notes,
         profile=data.profile,
+        workspace_id=workspace_id,
     )
     db.add(record)
     db.commit()
@@ -110,9 +117,12 @@ def create_application(db: Session, data) -> ApplicationRecord:
 
 
 def update_application(
-    db: Session, app_id: int, **kwargs
+    db: Session, app_id: int, workspace_id: str | None = None, **kwargs
 ) -> ApplicationRecord | None:
-    record = db.query(ApplicationRecord).filter(ApplicationRecord.id == app_id).first()
+    query = db.query(ApplicationRecord).filter(ApplicationRecord.id == app_id)
+    if workspace_id:
+        query = query.filter(ApplicationRecord.workspace_id == workspace_id)
+    record = query.first()
     if not record:
         return None
     for key, value in kwargs.items():
@@ -126,11 +136,18 @@ def update_application(
     return record
 
 
-def check_urls(db: Session, ids: list[int] | None = None, limit: int = 100) -> dict:
+def check_urls(
+    db: Session,
+    ids: list[int] | None = None,
+    limit: int = 100,
+    workspace_id: str | None = None,
+) -> dict:
     """HEAD-check job URLs and update url_status. Returns summary counts."""
     import requests as req
 
     query = db.query(ApplicationRecord).filter(ApplicationRecord.job_url.isnot(None))
+    if workspace_id:
+        query = query.filter(ApplicationRecord.workspace_id == workspace_id)
     if ids:
         query = query.filter(ApplicationRecord.id.in_(ids))
     else:
@@ -157,8 +174,11 @@ def check_urls(db: Session, ids: list[int] | None = None, limit: int = 100) -> d
     return {"checked": len(records), "alive": alive, "dead": dead + errors}
 
 
-def delete_application(db: Session, app_id: int) -> bool:
-    record = db.query(ApplicationRecord).filter(ApplicationRecord.id == app_id).first()
+def delete_application(db: Session, app_id: int, workspace_id: str | None = None) -> bool:
+    query = db.query(ApplicationRecord).filter(ApplicationRecord.id == app_id)
+    if workspace_id:
+        query = query.filter(ApplicationRecord.workspace_id == workspace_id)
+    record = query.first()
     if not record:
         return False
     db.delete(record)

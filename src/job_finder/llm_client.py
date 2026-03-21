@@ -9,86 +9,97 @@ from __future__ import annotations
 import json
 import logging
 import os
+from typing import Any
 
 import requests
 from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
 
+
+def _get_keychain_key() -> str:
+    """Try to read the LLM API key from the OS keychain."""
+    try:
+        from job_finder.secrets import get_secret
+        return get_secret("llm_api_key")
+    except Exception:
+        return ""
+
+
 # Provider presets -------------------------------------------------------
 
 PRESETS: dict[str, dict[str, str]] = {
     # ── Free cloud providers (recommended for public users) ──
+    "groq": {
+        "base_url": "https://api.groq.com/openai/v1",
+        "model": "llama-3.3-70b-versatile",
+        "api_key": "",
+        "label": "Groq",
+        "needs_api_key": "true",
+    },
     "gemini": {
         "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
         "model": "gemini-2.5-flash",
         "api_key": "",
-        "label": "Google Gemini (free tier available)",
-        "needs_api_key": "true",
-    },
-    "groq": {
-        "base_url": "https://api.groq.com/openai/v1",
-        "model": "meta-llama/llama-4-maverick-17b-128e-instruct",
-        "api_key": "",
-        "label": "Groq (free tier available)",
+        "label": "Google Gemini",
         "needs_api_key": "true",
     },
     "openrouter": {
         "base_url": "https://openrouter.ai/api/v1",
         "model": "meta-llama/llama-4-maverick:free",
         "api_key": "",
-        "label": "OpenRouter (free models available)",
+        "label": "OpenRouter",
         "needs_api_key": "true",
     },
     "cerebras": {
         "base_url": "https://api.cerebras.ai/v1",
-        "model": "llama-4-scout-17b-16e",
+        "model": "qwen3-32b",
         "api_key": "",
-        "label": "Cerebras (free tier available)",
+        "label": "Cerebras",
         "needs_api_key": "true",
     },
     "sambanova": {
         "base_url": "https://api.sambanova.ai/v1",
         "model": "Meta-Llama-3.3-70B-Instruct",
         "api_key": "",
-        "label": "SambaNova (free tier available)",
-        "needs_api_key": "true",
-    },
-    # ── Paid API providers ──
-    "anthropic-api": {
-        "base_url": "https://api.anthropic.com/v1",
-        "model": "claude-sonnet-4-6",
-        "api_key": "",
-        "label": "Anthropic API (pay-per-use)",
-        "needs_api_key": "true",
-    },
-    "openai-api": {
-        "base_url": "https://api.openai.com/v1",
-        "model": "gpt-5.4",
-        "api_key": "",
-        "label": "OpenAI API (pay-per-use)",
+        "label": "SambaNova",
         "needs_api_key": "true",
     },
     "mistral": {
         "base_url": "https://api.mistral.ai/v1",
         "model": "mistral-small-latest",
         "api_key": "",
-        "label": "Mistral (free experiment tier)",
+        "label": "Mistral",
         "needs_api_key": "true",
     },
+    # ── Paid / trial API providers ──
     "deepseek": {
         "base_url": "https://api.deepseek.com/v1",
         "model": "deepseek-chat",
         "api_key": "",
-        "label": "DeepSeek (1M tokens/month free)",
+        "label": "DeepSeek",
+        "needs_api_key": "true",
+    },
+    "anthropic-api": {
+        "base_url": "https://api.anthropic.com/v1",
+        "model": "claude-sonnet-4-6",
+        "api_key": "",
+        "label": "Anthropic",
+        "needs_api_key": "true",
+    },
+    "openai-api": {
+        "base_url": "https://api.openai.com/v1",
+        "model": "gpt-4.1-mini",
+        "api_key": "",
+        "label": "OpenAI",
         "needs_api_key": "true",
     },
     # ── Local models ──
     "ollama": {
         "base_url": "http://localhost:11434/v1",
-        "model": "llama3.1",
+        "model": "llama3.2:3b",
         "api_key": "ollama",
-        "label": "Ollama (local)",
+        "label": "Ollama",
     },
     # ── Internal / proxy (hidden from public UI) ──
     "claude-proxy": {
@@ -135,7 +146,7 @@ class LLMClient:
         preset = PRESETS.get(self.provider, {})
 
         self.base_url = base_url or os.getenv("LLM_BASE_URL", "") or preset.get("base_url", "")
-        self.api_key = api_key or os.getenv("LLM_API_KEY", "") or preset.get("api_key", "")
+        self.api_key = api_key or os.getenv("LLM_API_KEY", "") or _get_keychain_key() or preset.get("api_key", "")
         self.model = model or os.getenv("LLM_MODEL", "") or preset.get("model", "")
 
         self._client = None
@@ -146,7 +157,7 @@ class LLMClient:
                 self._client = OpenAI(
                     api_key=self.api_key or "not-needed",
                     base_url=self.base_url,
-                    timeout=120.0,
+                    timeout=180.0,
                 )
             except ImportError:
                 logger.warning("openai package not installed. LLM features disabled.")
@@ -158,17 +169,20 @@ class LLMClient:
         """Return True if a provider is set up (may still be offline)."""
         return self._client is not None and bool(self.model)
 
+
     def is_available(self) -> bool:
-        """Health-check: try to reach the endpoint."""
+        """Health-check: try to reach the endpoint with auth."""
         if not self.is_configured:
             return False
         try:
             url = self.base_url.rstrip("/")
-            # Try /models first (standard OpenAI), fall back to /health
+            headers: dict[str, str] = {}
+            if self.api_key:
+                headers["Authorization"] = f"Bearer {self.api_key}"
             for path in ["/models", "/../health"]:
                 try:
-                    r = requests.get(f"{url}{path}", timeout=5)
-                    if r.status_code < 500:
+                    r = requests.get(f"{url}{path}", headers=headers, timeout=5)
+                    if r.status_code < 400:
                         return True
                 except requests.ConnectionError:
                     continue
@@ -182,6 +196,8 @@ class LLMClient:
         user_message: str,
         temperature: float = 0.7,
         max_tokens: int = 4096,
+        model: str | None = None,
+        json_mode: bool = False,
     ) -> str | None:
         """Send a chat completion request and return the assistant text.
 
@@ -189,18 +205,31 @@ class LLMClient:
         """
         if not self.is_configured:
             return None
+        kwargs: dict[str, Any] = {
+            "model": model or self.model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ],
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        }
+        if json_mode:
+            kwargs["response_format"] = {"type": "json_object"}
         try:
-            resp = self._client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_message},
-                ],
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
+            resp = self._client.chat.completions.create(**kwargs)
             return resp.choices[0].message.content
         except Exception as exc:
+            # Fall back without json_mode if the provider rejects it
+            if json_mode and ("response_format" in str(exc) or "json" in str(exc).lower()):
+                logger.debug("Provider rejected response_format, retrying without it")
+                kwargs.pop("response_format", None)
+                try:
+                    resp = self._client.chat.completions.create(**kwargs)
+                    return resp.choices[0].message.content
+                except Exception as exc2:
+                    logger.error("LLM call failed: %s", exc2)
+                    return None
             logger.error("LLM call failed: %s", exc)
             return None
 
@@ -210,12 +239,18 @@ class LLMClient:
         user_message: str,
         temperature: float = 0.3,
         max_tokens: int = 4096,
+        model: str | None = None,
     ) -> dict | None:
         """Like :meth:`chat` but parses the response as JSON.
 
         The *system_prompt* should instruct the model to reply with valid JSON.
+        Uses ``response_format: json_object`` when the provider supports it.
         """
-        raw = self.chat(system_prompt, user_message, temperature=temperature, max_tokens=max_tokens)
+        raw = self.chat(
+            system_prompt, user_message,
+            temperature=temperature, max_tokens=max_tokens,
+            model=model, json_mode=True,
+        )
         if raw is None:
             return None
         # Strip markdown code fences if the model wraps its answer

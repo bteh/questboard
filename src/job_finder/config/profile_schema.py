@@ -5,12 +5,9 @@ Provides ``validate_profile`` (raises on error) and ``validate_profile_safe``
 """
 from __future__ import annotations
 
-import logging
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator, model_validator
-
-logger = logging.getLogger(__name__)
+from pydantic import BaseModel, Field, field_validator
 
 
 # ---------------------------------------------------------------------------
@@ -34,6 +31,18 @@ class CareerBaselineConfig(BaseModel):
     current_tc: float = 0.0
     min_acceptable_tc: float = 0.0
 
+    @field_validator("current_level", mode="before")
+    @classmethod
+    def _normalize_level(cls, v: Any) -> str:
+        if isinstance(v, list):
+            for item in v:
+                if isinstance(item, str) and item.strip():
+                    return item.strip()
+            return "mid"
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+        return "mid"
+
 
 class CompensationConfig(BaseModel):
     """Compensation filters and expectations."""
@@ -41,6 +50,8 @@ class CompensationConfig(BaseModel):
     min_base: float = Field(default=0.0, ge=0)
     target_total_comp: float = Field(default=0.0, ge=0)
     include_equity: bool = False
+    currency: str = "USD"
+    pay_period: str = "annual"
 
 
 class ScoringThresholdsConfig(BaseModel):
@@ -101,11 +112,11 @@ class ResumeAnalysis(BaseModel):
 class ProfileConfig(BaseModel):
     """Full YAML profile schema.
 
-    Only ``target_roles`` is required.  Everything else has sensible defaults
-    so that a minimal profile with just target roles works out of the box.
+    Starter profiles may begin blank and then be populated from resume analysis
+    or manual UI edits. Everything else has sensible defaults.
     """
 
-    target_roles: list[str]
+    target_roles: list[str] = Field(default_factory=list)
     keyword_searches: list[str] | None = None
     keywords: KeywordsConfig | None = None
     career_baseline: CareerBaselineConfig | None = None
@@ -125,20 +136,13 @@ class ProfileConfig(BaseModel):
     @field_validator("target_roles", mode="before")
     @classmethod
     def _strip_empty_roles(cls, v: Any) -> list[str]:
-        """Remove empty/blank strings from target_roles before length check."""
+        """Remove empty/blank strings from target_roles."""
+        if v is None:
+            return []
         if not isinstance(v, list):
             raise ValueError("target_roles must be a list of strings")
         cleaned = [s for s in v if isinstance(s, str) and s.strip()]
         return cleaned
-
-    @field_validator("target_roles", mode="after")
-    @classmethod
-    def _target_roles_not_empty(cls, v: list[str]) -> list[str]:
-        if not v:
-            raise ValueError(
-                "target_roles must contain at least one non-empty role"
-            )
-        return v
 
 
 # ---------------------------------------------------------------------------

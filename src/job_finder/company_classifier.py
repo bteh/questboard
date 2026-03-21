@@ -325,6 +325,11 @@ _NON_US_COUNTRIES = {
     "united arab emirates", "uae", "saudi arabia", "qatar", "dubai",
 }
 
+_COUNTRY_ALIASES = {
+    "uk": "united kingdom",
+    "uae": "united arab emirates",
+}
+
 _REMOTE_KEYWORDS = {"remote", "work from home", "wfh", "anywhere", "distributed"}
 _HYBRID_KEYWORDS = {"hybrid", "in-office", "in office", "on-site", "onsite", "days in office", "office days"}
 _ONSITE_KEYWORDS = {"on-site only", "onsite only", "in-person", "in person", "no remote"}
@@ -351,7 +356,13 @@ def parse_location(raw_location: str, is_remote: bool = False) -> dict:
     "Country, ST, City" (reversed), and non-US locations.  Returns
     ``country="non-us"`` when a known foreign country is detected.
     """
-    result: dict = {"city": "", "state": "", "is_remote": is_remote, "country": ""}
+    result: dict = {
+        "city": "",
+        "state": "",
+        "is_remote": is_remote,
+        "country": "",
+        "country_name": "",
+    }
 
     if not raw_location:
         return result
@@ -365,12 +376,14 @@ def parse_location(raw_location: str, is_remote: bool = False) -> dict:
             result["is_remote"] = True
             break
 
-    # Detect non-US countries early (before stripping)
-    for country in _NON_US_COUNTRIES:
+    matched_non_us_token = ""
+    for country in sorted(_NON_US_COUNTRIES, key=len, reverse=True):
         # Match as whole word at end or as a comma-separated part
         if re.search(r"(?:^|,\s*)" + re.escape(country) + r"(?:\s*$|,)", loc_lower):
             result["country"] = "non-us"
-            return result
+            result["country_name"] = _COUNTRY_ALIASES.get(country, country)
+            matched_non_us_token = country
+            break
 
     # Strip remote/hybrid noise to find underlying city
     cleaned = re.sub(
@@ -386,6 +399,13 @@ def parse_location(raw_location: str, is_remote: bool = False) -> dict:
         cleaned,
         flags=re.IGNORECASE,
     )
+    if matched_non_us_token:
+        cleaned = re.sub(
+            r"(?:,\s*|\b)" + re.escape(matched_non_us_token) + r"\s*$",
+            "",
+            cleaned,
+            flags=re.IGNORECASE,
+        )
     cleaned = cleaned.strip(" ,-()/")
 
     # Try "City, ST" or "City, ST ZIP"
@@ -394,6 +414,7 @@ def parse_location(raw_location: str, is_remote: bool = False) -> dict:
         result["city"] = match.group(1).strip()
         result["state"] = match.group(2).strip()
         result["country"] = "US"
+        result["country_name"] = "united states"
         return result
 
     # Try "City, Full State Name" (e.g. "O'Fallon, Missouri")
@@ -405,6 +426,7 @@ def parse_location(raw_location: str, is_remote: bool = False) -> dict:
             result["city"] = match.group(1).strip()
             result["state"] = abbr
             result["country"] = "US"
+            result["country_name"] = "united states"
             return result
 
     # Try reversed "ST, City" or "Country, ST, City" format
@@ -415,6 +437,7 @@ def parse_location(raw_location: str, is_remote: bool = False) -> dict:
             if part.upper() in _US_STATES and len(part.strip()) == 2:
                 result["state"] = part.upper()
                 result["country"] = "US"
+                result["country_name"] = "united states"
                 # City is the part after the state code, or before if reversed
                 remaining = [p for j, p in enumerate(parts) if j != i and p.upper() not in _US_STATES and len(p) > 2]
                 if remaining:
@@ -426,9 +449,77 @@ def parse_location(raw_location: str, is_remote: bool = False) -> dict:
     if match and match.group(1) in _US_STATES:
         result["state"] = match.group(1)
         result["country"] = "US"
+        result["country_name"] = "united states"
+        return result
+
+    # Try a full state name only, with optional "State" suffix
+    state_name_only = cleaned.strip().lower().removesuffix(" state").strip()
+    abbr = _STATE_NAME_TO_ABBR.get(state_name_only)
+    if abbr:
+        result["state"] = abbr
+        result["country"] = "US"
+        result["country_name"] = "united states"
+        return result
+
+    # Fallback: keep city-like text so city-only preferences such as
+    # "Seattle" or "New York" still participate in matching.
+    if re.match(r"^[A-Za-z\s.'-]+$", cleaned.strip()):
+        result["city"] = cleaned.strip()
+        if result["country"] == "non-us":
+            return result
         return result
 
     return result
+
+
+def _normalize_location_text(value: str) -> str:
+    """Return a normalized lowercase string for broad location matching."""
+    return re.sub(r"[^a-z0-9\s,]", "", value.lower()).strip(" ,")
+
+
+def _matches_preferred_location_strings(
+    job_location: str,
+    parsed_job_location: dict,
+    preferred_locations: list[str] | None,
+) -> bool:
+    """Match canonical raw preferred locations against a job location."""
+    if not preferred_locations:
+        return False
+
+    job_norm = _normalize_location_text(job_location)
+
+    for preferred in preferred_locations:
+        if not preferred:
+            continue
+
+        pref_norm = _normalize_location_text(preferred)
+        if pref_norm and (pref_norm in job_norm or job_norm in pref_norm):
+            return True
+
+        parsed_pref = parse_location(preferred)
+
+        pref_country = parsed_pref.get("country_name", "")
+        job_country = parsed_job_location.get("country_name", "")
+        if pref_country and job_country and pref_country == job_country:
+            pref_city = _normalize_location_text(parsed_pref.get("city", ""))
+            job_city = _normalize_location_text(parsed_job_location.get("city", ""))
+            if not pref_city or pref_city == job_city:
+                return True
+
+        pref_state = parsed_pref.get("state", "")
+        job_state = parsed_job_location.get("state", "")
+        if pref_state and job_state and pref_state.upper() == job_state.upper():
+            pref_city = _normalize_location_text(parsed_pref.get("city", ""))
+            job_city = _normalize_location_text(parsed_job_location.get("city", ""))
+            if not pref_city or pref_city == job_city:
+                return True
+
+        pref_city = _normalize_location_text(parsed_pref.get("city", ""))
+        job_city = _normalize_location_text(parsed_job_location.get("city", ""))
+        if pref_city and job_city and pref_city == job_city:
+            return True
+
+    return False
 
 
 def _has_physical_location(location: str) -> bool:
@@ -528,7 +619,9 @@ def location_matches_preferences(
     is_remote: bool,
     preferred_states: list[str] | None = None,
     preferred_cities: list[str] | None = None,
+    preferred_locations: list[str] | None = None,
     remote_only: bool = False,
+    include_remote: bool = True,
     work_type: str = "",
 ) -> bool:
     """Check if a job location matches user preferences.
@@ -536,11 +629,12 @@ def location_matches_preferences(
     Rules:
     1. If remote_only=True, only truly remote jobs pass (hybrid/onsite rejected).
     2. Fully remote jobs pass (unless they're actually hybrid).
-    3. Hybrid and onsite jobs must match state/city preferences.
+    3. Hybrid and onsite jobs can match canonical preferred_locations
+       directly (city/country/region), or fall back to state/city rules.
     4. If no preferences configured -> pass (no filtering).
     """
     # No preferences = no filtering
-    if not preferred_states and not preferred_cities and not remote_only:
+    if not preferred_states and not preferred_cities and not preferred_locations and not remote_only and include_remote:
         return True
 
     # Use work_type if provided, otherwise fall back to basic detection
@@ -550,24 +644,37 @@ def location_matches_preferences(
     if remote_only:
         return wt == "remote"
 
-    # Rule 2: Fully remote passes (but NOT hybrid)
+    # Rule 2: Respect explicit remote exclusion
+    if wt == "remote" and not include_remote:
+        return False
+
+    # Rule 3: Fully remote passes (but NOT hybrid)
     if wt == "remote":
         return True
 
-    # Rule 3: Hybrid and onsite must match state/city
+    # Rule 4: Hybrid and onsite must match state/city
     parsed = parse_location(job_location, is_remote)
+
+    if _matches_preferred_location_strings(job_location, parsed, preferred_locations):
+        return True
 
     # Non-US locations: reject when user has US state/city preferences
     if parsed.get("country") == "non-us":
         return False
 
     # If location is empty or unparseable AND the raw string looks non-empty,
-    # reject it — it's likely a foreign or unrecognized location.
+    # check if any preferred location words appear before rejecting.
     if not parsed["city"] and not parsed["state"]:
-        # Truly empty location string → keep (benefit of the doubt)
         if not job_location or not job_location.strip():
-            return True
-        # Has text but couldn't parse → reject (likely non-US or unusual format)
+            return True  # empty → benefit of the doubt
+        # Check if unparseable text contains a preferred city/location name
+        loc_lower = job_location.lower()
+        for city in (preferred_cities or []):
+            if city.lower() in loc_lower:
+                return True
+        for loc in (preferred_locations or []):
+            if loc.lower().split(",")[0].strip() in loc_lower:
+                return True
         return False
 
     # City-level matching with metro area awareness
@@ -584,8 +691,10 @@ def location_matches_preferences(
             if pref_metro and pref_metro == job_metro:
                 return True
 
-    # State-level match — any job in a preferred state passes
-    if preferred_states and parsed["state"]:
+    # State-level match — only when user specified states without cities.
+    # If the user picked specific cities (e.g. "Los Angeles"), don't let
+    # every job in that state (e.g. San Francisco) slip through.
+    if preferred_states and parsed["state"] and not preferred_cities:
         if parsed["state"].upper() in [s.upper() for s in preferred_states]:
             return True
 

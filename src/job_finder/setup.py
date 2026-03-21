@@ -346,9 +346,14 @@ def run_setup():
     if llm_provider:
         print(f"  LLM provider: {llm_provider}")
     else:
-        print("  LLM: not configured (search + basic scoring still work)")
-        print("  To enable AI features, set LLM_PROVIDER in .env")
-        print("  Fastest free option: LLM_PROVIDER=gemini + get a key at https://aistudio.google.com")
+        # Check if Ollama is available
+        if shutil.which("ollama"):
+            print("  LLM: Ollama is installed — run 'ollama pull llama3.2:3b' to enable AI")
+        else:
+            print("  LLM: not configured (search + basic scoring still work)")
+            print("  Easiest options to enable AI:")
+            print("    • Run: bash scripts/setup-ai.sh   (installs Ollama, free, private)")
+            print("    • Or set LLM_PROVIDER=gemini + get a free key at https://aistudio.google.com/apikey")
 
     # Summary
     print()

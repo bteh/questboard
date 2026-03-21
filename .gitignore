@@ -52,3 +52,5 @@ Thumbs.db
 
 # Stray pip artifacts
 =*
+data/workspaces/
+data/settings_audit.log

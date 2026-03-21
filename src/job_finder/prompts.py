@@ -3,7 +3,7 @@
 Prompts are templatized so they adapt to the active profile's keywords,
 compensation targets, and scoring weights.  The ``build_*_prompt(config)``
 functions fill in profile-specific values; when called with an empty dict
-they produce the original data-engineering-focused prompts (backward compat).
+they produce profession-agnostic default prompts (backward compat).
 """
 
 from __future__ import annotations

@@ -32,6 +32,12 @@ keyword_searches:
   - "build data team"
   - "head of data"
   - "data leader"
+  # Crypto / Web3
+  - "blockchain"
+  - "web3"
+  - "crypto"
+  - "defi"
+  - "onchain"
 
 locations:
   - "Los Angeles, CA"
@@ -101,14 +107,14 @@ compensation:
 
 # Search frequency
 search_settings:
-  results_per_board: 25
-  results_per_additional_source: 100  # Higher limit for additional scrapers (they only run once per search)
+  results_per_board: 50
+  results_per_additional_source: 100
   max_days_old: 14
   exclude_staffing_agencies: true
   country: "USA"
   max_parallel_searches: 6  # Concurrent JobSpy workers (each hits 5 boards, so 6 = 30 requests)
-  max_unique_jobs: 300      # Stop early once this many unique jobs found
-  max_search_tasks: 20      # Hard cap on total JobSpy queries (term × location combos)
+  max_unique_jobs: 500      # Stop early once this many unique jobs found
+  max_search_tasks: 30      # Hard cap on total JobSpy queries (term × location combos)
 
 # Applicant information (used for auto-apply)
 applicant_info:

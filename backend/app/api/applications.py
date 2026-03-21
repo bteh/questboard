@@ -4,7 +4,7 @@ import csv
 import io
 import json
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -17,10 +17,15 @@ from app.schemas.application import (
     StatusUpdate,
 )
 from app.schemas.apply import PrepareResponse, SubmitRequest, SubmitResponse
-from app.services import application_service
+from app.services import application_service, workspace_service
 from app.services import apply_service
+from app.dependencies import sanitize_profile
 
 router = APIRouter(prefix="/applications", tags=["applications"])
+
+
+def _sanitize_optional_profile(profile: str | None) -> str | None:
+    return sanitize_profile(profile) if profile else None
 
 
 def _to_response(record) -> ApplicationResponse:
@@ -49,6 +54,10 @@ def _to_response(record) -> ApplicationResponse:
         work_type=getattr(record, "work_type", "") or "",
         salary_min=record.salary_min,
         salary_max=record.salary_max,
+        salary_currency=getattr(record, "salary_currency", "") or "",
+        salary_period=getattr(record, "salary_period", "") or "",
+        salary_min_annualized=getattr(record, "salary_min_annualized", None),
+        salary_max_annualized=getattr(record, "salary_max_annualized", None),
         overall_score=record.overall_score,
         technical_score=record.technical_score,
         leadership_score=record.leadership_score,
@@ -86,6 +95,7 @@ def _to_response(record) -> ApplicationResponse:
 
 @router.get("", response_model=ApplicationListResponse)
 def list_applications(
+    request: Request,
     status: str | None = None,
     min_score: float | None = None,
     recommendation: str | None = None,
@@ -102,6 +112,7 @@ def list_applications(
     page_size: int = Query(25, ge=1, le=100),
     db: Session = Depends(get_db),
 ):
+    workspace = workspace_service.get_workspace_context_optional(db, request)
     items, total = application_service.get_applications(
         db,
         status=status,
@@ -112,7 +123,8 @@ def list_applications(
         company_type=company_type,
         is_remote=is_remote,
         work_type=work_type,
-        profile=profile,
+        profile=None if workspace else profile,
+        workspace_id=workspace.workspace.id if workspace else None,
         search_run_id=search_run_id,
         sort_by=sort_by,
         sort_dir=sort_dir,
@@ -129,16 +141,23 @@ def list_applications(
 
 @router.post("", response_model=ApplicationResponse, status_code=201)
 def create_application(
+    request: Request,
     body: ApplicationCreate,
     db: Session = Depends(get_db),
 ):
     """Manually add a job application."""
-    record = application_service.create_application(db, body)
+    workspace = workspace_service.get_workspace_context_optional(db, request)
+    record = application_service.create_application(
+        db,
+        body,
+        workspace_id=workspace.workspace.id if workspace else None,
+    )
     return _to_response(record)
 
 
 @router.get("/export/csv")
 def export_csv(
+    request: Request,
     status: str | None = None,
     min_score: float | None = None,
     recommendation: str | None = None,
@@ -153,6 +172,7 @@ def export_csv(
     db: Session = Depends(get_db),
 ):
     """Export filtered applications as CSV."""
+    workspace = workspace_service.get_workspace_context_optional(db, request)
     items, _ = application_service.get_applications(
         db,
         status=status,
@@ -163,7 +183,8 @@ def export_csv(
         company_type=company_type,
         is_remote=is_remote,
         work_type=work_type,
-        profile=profile,
+        profile=None if workspace else profile,
+        workspace_id=workspace.workspace.id if workspace else None,
         sort_by=sort_by,
         sort_dir=sort_dir,
         page=1,
@@ -192,8 +213,13 @@ def export_csv(
 
 
 @router.get("/{app_id}", response_model=ApplicationResponse)
-def get_application(app_id: int, db: Session = Depends(get_db)):
-    record = application_service.get_application(db, app_id)
+def get_application(app_id: int, request: Request, db: Session = Depends(get_db)):
+    workspace = workspace_service.get_workspace_context_optional(db, request)
+    record = application_service.get_application(
+        db,
+        app_id,
+        workspace_id=workspace.workspace.id if workspace else None,
+    )
     if not record:
         raise HTTPException(status_code=404, detail="Application not found")
     return _to_response(record)
@@ -203,10 +229,15 @@ def get_application(app_id: int, db: Session = Depends(get_db)):
 def update_application(
     app_id: int,
     update: ApplicationUpdate,
+    request: Request,
     db: Session = Depends(get_db),
 ):
+    workspace = workspace_service.get_workspace_context_optional(db, request)
     record = application_service.update_application(
-        db, app_id, **update.model_dump(exclude_unset=True)
+        db,
+        app_id,
+        workspace_id=workspace.workspace.id if workspace else None,
+        **update.model_dump(exclude_unset=True),
     )
     if not record:
         raise HTTPException(status_code=404, detail="Application not found")
@@ -217,20 +248,32 @@ def update_application(
 def update_status(
     app_id: int,
     body: StatusUpdate,
+    request: Request,
     db: Session = Depends(get_db),
 ):
+    workspace = workspace_service.get_workspace_context_optional(db, request)
     kwargs = {"status": body.status}
     if body.notes:
         kwargs["notes"] = body.notes
-    record = application_service.update_application(db, app_id, **kwargs)
+    record = application_service.update_application(
+        db,
+        app_id,
+        workspace_id=workspace.workspace.id if workspace else None,
+        **kwargs,
+    )
     if not record:
         raise HTTPException(status_code=404, detail="Application not found")
     return _to_response(record)
 
 
 @router.delete("/{app_id}")
-def delete_application(app_id: int, db: Session = Depends(get_db)):
-    deleted = application_service.delete_application(db, app_id)
+def delete_application(app_id: int, request: Request, db: Session = Depends(get_db)):
+    workspace = workspace_service.get_workspace_context_optional(db, request)
+    deleted = application_service.delete_application(
+        db,
+        app_id,
+        workspace_id=workspace.workspace.id if workspace else None,
+    )
     if not deleted:
         raise HTTPException(status_code=404, detail="Application not found")
     return {"deleted": True}
@@ -238,16 +281,24 @@ def delete_application(app_id: int, db: Session = Depends(get_db)):
 
 @router.post("/check-urls")
 def check_urls(
+    request: Request,
     ids: list[int] | None = None,
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
 ):
     """Check if job posting URLs are still live. Updates url_status in DB."""
-    return application_service.check_urls(db, ids=ids, limit=limit)
+    workspace = workspace_service.get_workspace_context_optional(db, request)
+    return application_service.check_urls(
+        db,
+        ids=ids,
+        limit=limit,
+        workspace_id=workspace.workspace.id if workspace else None,
+    )
 
 
 @router.post("/deduplicate")
 def deduplicate_applications(
+    request: Request,
     profile: str | None = None,
     db: Session = Depends(get_db),
 ):
@@ -257,23 +308,33 @@ def deduplicate_applications(
     keeping the record with the richest data and deleting the rest.
     Returns the number of duplicate records removed.
     """
-    from job_finder.pipeline import _normalize_company, _normalize_title
+    from job_finder.pipeline import (
+        _descriptions_look_duplicate,
+        _normalize_company,
+        _normalize_location,
+        _normalize_title,
+    )
 
+    profile = _sanitize_optional_profile(profile)
     from app.models.application import ApplicationRecord
 
+    workspace = workspace_service.get_workspace_context_optional(db, request)
     query = db.query(ApplicationRecord)
-    if profile:
+    if workspace:
+        query = query.filter(ApplicationRecord.workspace_id == workspace.workspace.id)
+    elif profile:
         query = query.filter(ApplicationRecord.profile == profile)
     all_records = query.all()
 
-    # Group by normalized (company, title)
+    # Group by normalized (company, title, location) so distinct openings survive.
     groups: dict[str, list] = {}
     for rec in all_records:
         co = _normalize_company(rec.company or "")
         ti = _normalize_title(rec.job_title or "")
-        if not co or not ti:
+        loc = _normalize_location(rec.location or "")
+        if not co or not ti or not loc:
             continue
-        key = f"{co}||{ti}"
+        key = f"{co}||{ti}||{loc}"
         groups.setdefault(key, []).append(rec)
 
     removed = 0
@@ -281,50 +342,65 @@ def deduplicate_applications(
         if len(group) <= 1:
             continue
 
-        # Pick the best record to keep
-        def _richness(rec):
-            desc_len = len(rec.description or "")
-            has_salary = 1 if (rec.salary_min or rec.salary_max) else 0
-            has_score = 1 if rec.overall_score else 0
-            score = rec.overall_score or 0
-            has_cover = 1 if rec.cover_letter else 0
-            has_intel = 1 if rec.company_intel_json else 0
-            # Prefer manually-updated records (status != "found")
-            has_status = 1 if rec.status and rec.status != "found" else 0
-            return (has_status, has_cover, has_intel, has_salary, has_score, score, desc_len)
+        clusters: list[list] = []
+        for rec in group:
+            placed = False
+            for cluster in clusters:
+                if _descriptions_look_duplicate(
+                    rec.description or "",
+                    cluster[0].description or "",
+                ):
+                    cluster.append(rec)
+                    placed = True
+                    break
+            if not placed:
+                clusters.append([rec])
 
-        group.sort(key=_richness, reverse=True)
-        keeper = group[0]
+        for cluster in clusters:
+            if len(cluster) <= 1:
+                continue
 
-        # Merge useful data from duplicates into keeper
-        for dup in group[1:]:
-            if not keeper.salary_min and dup.salary_min:
-                keeper.salary_min = dup.salary_min
-            if not keeper.salary_max and dup.salary_max:
-                keeper.salary_max = dup.salary_max
-            if not keeper.cover_letter and dup.cover_letter:
-                keeper.cover_letter = dup.cover_letter
-            if not keeper.company_intel_json and dup.company_intel_json:
-                keeper.company_intel_json = dup.company_intel_json
-            if not keeper.resume_tweaks_json and dup.resume_tweaks_json:
-                keeper.resume_tweaks_json = dup.resume_tweaks_json
-            if dup.overall_score and (not keeper.overall_score or dup.overall_score > keeper.overall_score):
-                keeper.overall_score = dup.overall_score
-                keeper.technical_score = dup.technical_score
-                keeper.leadership_score = dup.leadership_score
-                keeper.platform_building_score = dup.platform_building_score
-                keeper.comp_potential_score = dup.comp_potential_score
-                keeper.company_trajectory_score = dup.company_trajectory_score
-                keeper.culture_fit_score = dup.culture_fit_score
-                keeper.career_progression_score = dup.career_progression_score
-                keeper.recommendation = dup.recommendation
-                keeper.score_reasoning = dup.score_reasoning
-                keeper.key_strengths = dup.key_strengths
-                keeper.key_gaps = dup.key_gaps
-            if len(dup.description or "") > len(keeper.description or ""):
-                keeper.description = dup.description
-            db.delete(dup)
-            removed += 1
+            def _richness(rec):
+                desc_len = len(rec.description or "")
+                has_salary = 1 if (rec.salary_min or rec.salary_max) else 0
+                has_score = 1 if rec.overall_score else 0
+                score = rec.overall_score or 0
+                has_cover = 1 if rec.cover_letter else 0
+                has_intel = 1 if rec.company_intel_json else 0
+                has_status = 1 if rec.status and rec.status != "found" else 0
+                return (has_status, has_cover, has_intel, has_salary, has_score, score, desc_len)
+
+            cluster.sort(key=_richness, reverse=True)
+            keeper = cluster[0]
+
+            for dup in cluster[1:]:
+                if not keeper.salary_min and dup.salary_min:
+                    keeper.salary_min = dup.salary_min
+                if not keeper.salary_max and dup.salary_max:
+                    keeper.salary_max = dup.salary_max
+                if not keeper.cover_letter and dup.cover_letter:
+                    keeper.cover_letter = dup.cover_letter
+                if not keeper.company_intel_json and dup.company_intel_json:
+                    keeper.company_intel_json = dup.company_intel_json
+                if not keeper.resume_tweaks_json and dup.resume_tweaks_json:
+                    keeper.resume_tweaks_json = dup.resume_tweaks_json
+                if dup.overall_score and (not keeper.overall_score or dup.overall_score > keeper.overall_score):
+                    keeper.overall_score = dup.overall_score
+                    keeper.technical_score = dup.technical_score
+                    keeper.leadership_score = dup.leadership_score
+                    keeper.platform_building_score = dup.platform_building_score
+                    keeper.comp_potential_score = dup.comp_potential_score
+                    keeper.company_trajectory_score = dup.company_trajectory_score
+                    keeper.culture_fit_score = dup.culture_fit_score
+                    keeper.career_progression_score = dup.career_progression_score
+                    keeper.recommendation = dup.recommendation
+                    keeper.score_reasoning = dup.score_reasoning
+                    keeper.key_strengths = dup.key_strengths
+                    keeper.key_gaps = dup.key_gaps
+                if len(dup.description or "") > len(keeper.description or ""):
+                    keeper.description = dup.description
+                db.delete(dup)
+                removed += 1
 
     if removed > 0:
         db.commit()
@@ -342,6 +418,7 @@ def purge_non_matching_locations(
     states/cities are removed. Auto-derives from search locations if no
     explicit location_preferences section is configured.
     """
+    profile = _sanitize_optional_profile(profile)
     from job_finder.pipeline import _load_search_config
     from job_finder.models.database import (
         init_db,
@@ -352,13 +429,25 @@ def purge_non_matching_locations(
     loc_prefs = config.get("location_preferences", {})
 
     if loc_prefs.get("filter_enabled", False):
+        pref_locations = loc_prefs.get("preferred_locations", [])
         pref_states = loc_prefs.get("preferred_states", [])
         pref_cities = loc_prefs.get("preferred_cities", [])
+        remote_only = loc_prefs.get("remote_only", False)
+        include_remote = loc_prefs.get("include_remote", True)
     else:
         # Auto-derive from search locations
         from job_finder.company_classifier import parse_location
+        pref_locations = [
+            loc for loc in config.get("locations", [])
+            if loc.lower() not in ("remote", "united states", "usa", "us", "anywhere")
+        ]
         pref_states = []
         pref_cities = []
+        remote_only = False
+        include_remote = any(
+            loc.lower() in ("remote", "united states", "usa", "us", "anywhere")
+            for loc in config.get("locations", [])
+        )
         for loc in config.get("locations", []):
             if loc.lower() in ("remote", "united states", "usa", "us", "anywhere"):
                 continue
@@ -368,13 +457,16 @@ def purge_non_matching_locations(
             if parsed["city"] and parsed["city"] not in pref_cities:
                 pref_cities.append(parsed["city"])
 
-    if not pref_states and not pref_cities:
+    if not pref_locations and not pref_states and not pref_cities and include_remote and not remote_only:
         return {"purged": 0, "message": "No location preferences configured"}
 
     init_db()
     purged = _purge(
         preferred_states=pref_states,
         preferred_cities=pref_cities,
+        preferred_locations=pref_locations,
+        include_remote=include_remote,
+        remote_only=remote_only,
         profile=profile,
     )
     return {"purged": purged, "message": f"Removed {purged} jobs outside preferred locations"}
@@ -382,18 +474,23 @@ def purge_non_matching_locations(
 
 @router.post("/purge-all")
 def purge_all_applications(
+    request: Request,
     profile: str | None = None,
     confirm: bool = Query(False, description="Must be true to confirm purge"),
     db: Session = Depends(get_db),
 ):
     """Delete all saved applications. Requires confirm=true as a safety check."""
+    profile = _sanitize_optional_profile(profile)
     if not confirm:
         return {"purged": 0, "message": "Pass ?confirm=true to confirm deletion"}
 
     from app.models.application import ApplicationRecord
 
+    workspace = workspace_service.get_workspace_context_optional(db, request)
     query = db.query(ApplicationRecord)
-    if profile:
+    if workspace:
+        query = query.filter(ApplicationRecord.workspace_id == workspace.workspace.id)
+    elif profile:
         query = query.filter(ApplicationRecord.profile == profile)
     count = query.count()
     query.delete()
@@ -410,6 +507,7 @@ def backfill_scores(
     Scores all DB records that have NULL overall_score using keyword-based
     scoring (no LLM required). Returns the number of records scored.
     """
+    profile = sanitize_profile(profile)
     from job_finder.models.database import (
         init_db,
         backfill_scores as _backfill,
@@ -423,6 +521,7 @@ def backfill_scores(
 @router.post("/{app_id}/prepare", response_model=PrepareResponse)
 def prepare_application(
     app_id: int,
+    request: Request,
     profile: str = "default",
     db: Session = Depends(get_db),
 ):
@@ -430,7 +529,12 @@ def prepare_application(
 
     Generates missing materials via LLM when available and saves them to the DB.
     """
-    result = apply_service.prepare_application(db, app_id, profile=profile)
+    profile = sanitize_profile(profile)
+    workspace = workspace_service.get_workspace_context_optional(db, request)
+    result = apply_service.prepare_application(
+        db, app_id, profile=profile,
+        workspace_id=workspace.workspace.id if workspace else None,
+    )
     if result is None:
         raise HTTPException(status_code=404, detail="Application not found")
     return PrepareResponse(**result)
@@ -439,6 +543,7 @@ def prepare_application(
 @router.post("/{app_id}/apply", response_model=SubmitResponse)
 def submit_application(
     app_id: int,
+    request: Request,
     body: SubmitRequest,
     profile: str = "default",
     db: Session = Depends(get_db),
@@ -447,12 +552,15 @@ def submit_application(
 
     Defaults to dry_run=True for safety. Set dry_run=False for live submission.
     """
+    profile = sanitize_profile(profile)
+    workspace = workspace_service.get_workspace_context_optional(db, request)
     result = apply_service.submit_application(
         db,
         app_id,
         cover_letter=body.cover_letter,
         dry_run=body.dry_run,
         profile=profile,
+        workspace_id=workspace.workspace.id if workspace else None,
     )
     if result is None:
         raise HTTPException(status_code=404, detail="Application not found")

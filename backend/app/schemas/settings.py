@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
+from typing import Literal
+
+from pydantic import BaseModel, Field
 
 
 class LLMConfig(BaseModel):
@@ -16,6 +18,28 @@ class LLMStatus(BaseModel):
     provider: str = ""
     model: str = ""
     label: str = ""
+    runtime_configurable: bool = False
+    key_storage: str = "local_file"
+    auto_detected: str = ""
+
+
+class OllamaDetectResult(BaseModel):
+    detected: bool = False
+    models: list[str] = Field(default_factory=list)
+    recommended_model: str = ""
+
+
+class LocalAIServer(BaseModel):
+    """A detected local AI server."""
+    port: int
+    base_url: str
+    model: str = ""
+    models: list[str] = Field(default_factory=list)
+    label: str = ""
+
+
+class LocalAIDetectResult(BaseModel):
+    servers: list[LocalAIServer] = Field(default_factory=list)
 
 
 class LLMTestResult(BaseModel):
@@ -49,8 +73,11 @@ class ProfileDetail(BaseModel):
 
 class ProfilePreferences(BaseModel):
     """User-editable profile preferences (subset of full profile config)."""
+    preferred_locations: list[str] = Field(default_factory=list)
+    workplace_preference: Literal["remote_friendly", "remote_only", "location_only"] = "remote_friendly"
+    max_days_old: int = 14
     current_title: str = ""
-    current_level: list[str] = ["mid"]
+    current_level: str = "mid"
     current_tc: int = 100_000
     min_base: int = 80_000
     target_total_comp: int = 150_000
@@ -98,5 +125,3 @@ class DatabaseInfo(BaseModel):
     exists: bool = False
     size_mb: float = 0.0
     record_count: int = 0
-
-

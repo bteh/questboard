@@ -15,33 +15,7 @@ from job_finder.tools.scrapers._utils import (
 
 logger = logging.getLogger(__name__)
 
-_LEVER_COMPANIES = [
-    # AI / ML
-    "anyscale", "weights-and-biases", "labelbox", "runway",
-    "midjourney", "replicate", "modal-labs", "together-ai",
-    "writer", "cohere", "character",
-    # Data infrastructure
-    "dbtlabs", "tecton", "dagster", "prefect", "getdbt",
-    "materialize", "vectorize", "weaviate", "pinecone",
-    "modeanalytics", "hex", "preset", "rudderstack",
-    "elementl",  # Dagster parent company — alternate slug
-    # Fintech
-    "plaid", "mercury-2", "column", "unit-finance",
-    "lithic", "stytch", "alloy-2",
-    # Developer tools
-    "render", "fly", "railway", "neon", "turso",
-    "prisma", "grafana-labs", "temporalio",
-    "hashicorp", "postman", "circleci", "kong",
-    # Growth startups / Design
-    "notion-2", "coda-2", "descript", "replit",
-    "jasper-ai", "copy-ai", "resend",
-    "cal-com", "tinybird", "axiom-co",
-    "canva", "figma", "mural",
-    # Enterprise / Collaboration
-    "vanta", "drata", "teleport", "tailscale", "ngrok",
-    "sourcegraph", "gitpod", "coder-2",
-    "miro", "loom", "calendly", "lattice",
-]
+_LEVER_COMPANIES: list[str] = []  # Populated at runtime via watchlist + config
 
 
 def _fetch_company_postings(slug: str, roles: list[str] | None) -> list[dict]:
@@ -99,6 +73,9 @@ def search_lever(
     company_list = list(companies or _LEVER_COMPANIES)
     if watchlist_companies:
         company_list.extend(s for s in watchlist_companies if s not in company_list)
+    if not company_list:
+        logger.info("Lever: no companies configured — add companies to your watchlist")
+        return []
     logger.info("Fetching from Lever API for %d companies...", len(company_list))
 
     results: list[dict] = []

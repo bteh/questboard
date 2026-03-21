@@ -7,6 +7,29 @@ import re
 
 from job_finder.scoring.signals import HIGH_COMP_SIGNALS
 
+PAY_PERIOD_FACTORS: dict[str, float] = {
+    "hourly": 2080.0,
+    "monthly": 12.0,
+    "annual": 1.0,
+    "yearly": 1.0,
+}
+
+
+def annualize_amount(amount: float | int | None, period: str | None) -> float | None:
+    """Convert an amount into an annualized number when the period is known."""
+    if amount is None:
+        return None
+    try:
+        numeric = float(amount)
+    except (TypeError, ValueError):
+        return None
+    if numeric <= 0:
+        return None
+    factor = PAY_PERIOD_FACTORS.get((period or "annual").lower())
+    if factor is None:
+        return None
+    return numeric * factor
+
 
 # ── Keyword helpers ───────────────────────────────────────────────────────
 
@@ -62,19 +85,21 @@ def salary_score(
     min_base: int = 80_000,
     target_tc: int = 150_000,
     high_comp_signals: list[str] | None = None,
+    salary_period: str | None = None,
 ) -> float:
     """Estimate comp-potential score (0–100)."""
-    if salary_max and salary_max > 0:
-        if salary_max > target_tc * 2:
+    annual_salary_max = annualize_amount(salary_max, salary_period) if salary_period else salary_max
+    if annual_salary_max and annual_salary_max > 0:
+        if annual_salary_max > target_tc * 2:
             # Way above target — likely a more senior role than user can land
             return 40.0
-        if salary_max >= target_tc:
+        if annual_salary_max >= target_tc:
             return 95.0
-        if salary_max >= min_base:
+        if annual_salary_max >= min_base:
             return 75.0
-        if salary_max >= min_base * 0.8:
+        if annual_salary_max >= min_base * 0.8:
             return 50.0
-        if salary_max >= min_base * 0.6:
+        if annual_salary_max >= min_base * 0.6:
             return 30.0
         return 15.0
 

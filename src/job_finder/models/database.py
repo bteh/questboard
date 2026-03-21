@@ -14,6 +14,7 @@ from sqlalchemy import (
     Column,
     DateTime,
     Float,
+    ForeignKey,
     Integer,
     String,
     Text,
@@ -52,6 +53,10 @@ class ApplicationRecord(Base):
     # Salary info
     salary_min = Column(Float, nullable=True)
     salary_max = Column(Float, nullable=True)
+    salary_currency = Column(String(16), default="")
+    salary_period = Column(String(20), default="")
+    salary_min_annualized = Column(Float, nullable=True)
+    salary_max_annualized = Column(Float, nullable=True)
     estimated_total_comp = Column(String(200), default="")
 
     # Scoring
@@ -83,6 +88,7 @@ class ApplicationRecord(Base):
     application_method = Column(String(100), default="")  # manual, greenhouse, lever
     profile = Column(String(100), default="default")  # which profile found this job
     search_run_id = Column(String(12), nullable=True)  # links to the pipeline run that found this job
+    workspace_id = Column(String(64), ForeignKey("workspaces.id"), nullable=True, index=True)
 
     # Status tracking
     status = Column(String(50), default="found")
@@ -171,6 +177,26 @@ def _migrate_db(engine) -> None:
             conn.execute(
                 text("ALTER TABLE applications ADD COLUMN search_run_id VARCHAR(12)")
             )
+        if "workspace_id" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN workspace_id VARCHAR(64)")
+            )
+        if "salary_currency" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN salary_currency VARCHAR(16) DEFAULT ''")
+            )
+        if "salary_period" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN salary_period VARCHAR(20) DEFAULT ''")
+            )
+        if "salary_min_annualized" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN salary_min_annualized FLOAT")
+            )
+        if "salary_max_annualized" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN salary_max_annualized FLOAT")
+            )
         # Convert empty job_url strings to NULL (allows multiple NULLs in unique column)
         conn.execute(text("UPDATE applications SET job_url = NULL WHERE job_url = ''"))
 
@@ -215,6 +241,10 @@ def save_application(
     is_remote: bool = False,
     salary_min: float | None = None,
     salary_max: float | None = None,
+    salary_currency: str = "",
+    salary_period: str = "",
+    salary_min_annualized: float | None = None,
+    salary_max_annualized: float | None = None,
     overall_score: float | None = None,
     technical_score: float | None = None,
     leadership_score: float | None = None,
@@ -239,6 +269,7 @@ def save_application(
     work_type: str = "",
     notes: str = "",
     search_run_id: str | None = None,
+    workspace_id: str | None = None,
 ) -> ApplicationRecord | None:
     """Save a new application record to the database. Returns None if duplicate URL."""
     # Store empty URLs as None so SQLite unique constraint allows multiples
@@ -291,6 +322,18 @@ def save_application(
                         if not cand.salary_max and salary_max:
                             cand.salary_max = salary_max
                             updated = True
+                        if not cand.salary_currency and salary_currency:
+                            cand.salary_currency = salary_currency
+                            updated = True
+                        if not cand.salary_period and salary_period:
+                            cand.salary_period = salary_period
+                            updated = True
+                        if not cand.salary_min_annualized and salary_min_annualized:
+                            cand.salary_min_annualized = salary_min_annualized
+                            updated = True
+                        if not cand.salary_max_annualized and salary_max_annualized:
+                            cand.salary_max_annualized = salary_max_annualized
+                            updated = True
                         if overall_score and (not cand.overall_score or overall_score > cand.overall_score):
                             cand.overall_score = overall_score
                             cand.technical_score = technical_score
@@ -320,6 +363,9 @@ def save_application(
                         if search_run_id and cand.search_run_id != search_run_id:
                             cand.search_run_id = search_run_id
                             updated = True
+                        if workspace_id and cand.workspace_id != workspace_id:
+                            cand.workspace_id = workspace_id
+                            updated = True
                         if updated:
                             cand.updated_at = _utcnow()
                             session.commit()
@@ -348,6 +394,10 @@ def save_application(
             is_remote=is_remote,
             salary_min=salary_min,
             salary_max=salary_max,
+            salary_currency=salary_currency,
+            salary_period=salary_period,
+            salary_min_annualized=salary_min_annualized,
+            salary_max_annualized=salary_max_annualized,
             overall_score=overall_score,
             technical_score=technical_score,
             leadership_score=leadership_score,
@@ -372,6 +422,7 @@ def save_application(
             work_type=work_type,
             notes=notes,
             search_run_id=search_run_id,
+            workspace_id=workspace_id,
         )
         session.add(record)
         session.commit()
@@ -431,6 +482,7 @@ def get_all_applications(
     min_score: float | None = None,
     profile: str | None = None,
     company_type: str | None = None,
+    workspace_id: str | None = None,
 ) -> list[ApplicationRecord]:
     """Retrieve applications with optional filters."""
     session = get_session()
@@ -438,6 +490,8 @@ def get_all_applications(
         query = session.query(ApplicationRecord)
         if profile:
             query = query.filter(ApplicationRecord.profile == profile)
+        if workspace_id:
+            query = query.filter(ApplicationRecord.workspace_id == workspace_id)
         if status:
             query = query.filter(ApplicationRecord.status == status)
         if min_score is not None:
@@ -454,14 +508,18 @@ def get_all_applications(
 def purge_non_matching_locations(
     preferred_states: list[str] | None = None,
     preferred_cities: list[str] | None = None,
+    preferred_locations: list[str] | None = None,
+    include_remote: bool = True,
+    remote_only: bool = False,
     profile: str | None = None,
+    workspace_id: str | None = None,
 ) -> int:
     """Delete existing records that don't match location preferences.
 
     Remote jobs are always kept. When ``profile`` is provided, only records
     for that profile are considered. Returns the number of deleted records.
     """
-    if not preferred_states and not preferred_cities:
+    if not preferred_states and not preferred_cities and not preferred_locations and include_remote and not remote_only:
         return 0
 
     from job_finder.company_classifier import (
@@ -474,6 +532,8 @@ def purge_non_matching_locations(
         query = session.query(ApplicationRecord)
         if profile:
             query = query.filter(ApplicationRecord.profile == profile)
+        if workspace_id:
+            query = query.filter(ApplicationRecord.workspace_id == workspace_id)
         records = query.all()
         deleted = 0
         for rec in records:
@@ -489,6 +549,9 @@ def purge_non_matching_locations(
                 rec.is_remote or False,
                 preferred_states,
                 preferred_cities,
+                preferred_locations,
+                remote_only=remote_only,
+                include_remote=include_remote,
                 work_type=wt,
             ):
                 session.delete(rec)
@@ -505,6 +568,7 @@ def purge_non_matching_locations(
 def purge_non_matching_roles(
     target_roles: list[str],
     profile: str | None = None,
+    workspace_id: str | None = None,
 ) -> int:
     """Delete existing records whose titles don't match any target role.
 
@@ -522,6 +586,8 @@ def purge_non_matching_roles(
         query = session.query(ApplicationRecord)
         if profile:
             query = query.filter(ApplicationRecord.profile == profile)
+        if workspace_id:
+            query = query.filter(ApplicationRecord.workspace_id == workspace_id)
         records = query.all()
         deleted = 0
         for rec in records:
@@ -570,6 +636,7 @@ def backfill_company_types() -> int:
 def backfill_scores(
     profile: str | None = None,
     progress: Callable[[str], None] | None = None,
+    workspace_id: str | None = None,
 ) -> int:
     """Score all DB records that have NULL overall_score.
 
@@ -600,6 +667,8 @@ def backfill_scores(
         )
         if profile:
             query = query.filter(ApplicationRecord.profile == profile)
+        if workspace_id:
+            query = query.filter(ApplicationRecord.workspace_id == workspace_id)
         records = query.all()
 
         if not records:
@@ -621,6 +690,7 @@ def backfill_scores(
                     company_type=rec.company_type or "Unknown",
                     salary_min=rec.salary_min,
                     salary_max=rec.salary_max,
+                    salary_period=rec.salary_period or "",
                     is_remote=rec.is_remote or False,
                     config=config,
                 )

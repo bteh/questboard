@@ -1,299 +1,228 @@
 # Launchboard
 
-**Your personal AI agent for the job search grind.**
+**AI-powered job search agent.** Upload your resume, tell it what you're looking for, and Launchboard searches 14+ job boards, scores every listing against your background, generates tailored cover letters, and tracks your entire pipeline. Works for any profession.
 
-Launchboard searches 14+ job boards, scores listings against your resume across 7 dimensions, generates tailored cover letters and resume tweaks, drafts company research for interview prep, and optionally auto-applies through ATS APIs. Works for any profession -- data engineering, nursing, marketing, finance, and beyond. The core pipeline, database, and resume handling run locally on your machine.
-
-The job market rewards quality over volume. Launchboard is built on a simple thesis: the best job search tool is one that thinks like a hiring manager, not a spray-and-pray bot.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ---
 
-## What It Does Today
+## How It Works
 
-**Search** -- Searches 14+ sources in parallel: Indeed, LinkedIn, Glassdoor, ZipRecruiter, Google Jobs (via JobSpy), plus Remotive, Arbeitnow, Himalayas, RemoteOK, We Work Remotely, Hacker News Who's Hiring, The Muse, CryptoJobsList, and ATS boards from 100+ companies via Greenhouse, Lever, Ashby, and Workday APIs. YC Work at a Startup scraper extracts listings from Inertia.js page data. AI-powered role expansion enriches search terms for any profession. Post-search filters catch irrelevant results. Deduplication is URL-based.
+1. **Upload your resume** — Launchboard extracts your skills, experience, and career level automatically.
+2. **Set your preferences** — Target roles, keywords, locations, salary range. Takes 2 minutes.
+3. **Search** — Searches 14+ job boards in parallel. AI enriches your search terms so you don't miss relevant postings.
+4. **Score** — Every job is rated on 7 dimensions (skills match, compensation, career growth, culture fit, and more). Jobs are ranked into STRONG APPLY, APPLY, MAYBE, and SKIP.
+5. **Enhance** — For top matches, generates tailored cover letters, resume tweaks, and company research.
+6. **Track** — Full pipeline from "found" to "offer" with analytics dashboard.
 
-**Score** -- Rates every job on 7 weighted dimensions: technical match (TF-IDF + keywords), leadership signal, compensation potential, platform-building opportunity, company trajectory, culture fit, and career progression. All dimensions are profile-configurable -- a nurse's keywords differ from an engineer's. Works without any LLM. With an LLM connected, ALL jobs are scored by AI in parallel for context-aware accuracy.
+---
 
-**Classify** -- Automatically categorizes companies into 8 tiers (FAANG+, Big Tech, Elite Startup, Growth Stage, Early Startup, Midsize, Enterprise, Unknown) using known-company lists (including 50+ VC-backed startups like OpenAI, Anthropic, Stripe, dbt Labs, Vercel), funding stage heuristics, and employee count data. Filter your dashboard by tier to focus on the company stage that fits you.
+## Quick Start
 
-**Enhance** -- For top-scoring jobs, generates tailored resume bullet tweaks, cover letters grounded in your resume plus the job description, and company-intel drafts. These LLM-generated materials are starting points, not verified facts.
+**Prerequisites:** Python 3.11+ and Node.js 18+.
 
-**Auto-Apply** -- Submits applications through Greenhouse and Lever endpoints for STRONG_APPLY jobs when those ATS links are detected. Opt-in only, dry-run by default, with a hard cap per run.
+```bash
+git clone https://github.com/bteh/launchboard.git
+cd launchboard
+make setup    # installs everything, offers to set up AI automatically
+make dev      # opens the web UI
+```
 
-**Track** -- Every job flows into a SQLite database with 50+ fields. Track status from "found" through "offer." Export to CSV. Full analytics dashboard with score distributions, pipeline funnels, and company breakdowns.
+That's it. Open [localhost:5173](http://localhost:5173), upload your resume, set your preferences, and search.
+
+`make setup` creates a Python virtual environment, installs all dependencies, and walks you through AI setup (Ollama local or Gemini free). You don't need to activate the venv — all `make` commands handle it.
+
+### Connect AI
+
+Launchboard uses AI to score jobs against your resume, generate cover letters, and research companies. The fastest option:
+
+**Google Gemini (free, 30 seconds, no credit card):**
+1. Get a key at [aistudio.google.com](https://aistudio.google.com/apikey)
+2. In the app → Settings → paste your key → Connect
+
+**Or run AI locally (completely private):**
+```bash
+# make setup offers this automatically, or do it manually:
+brew install ollama && ollama pull llama3.2:3b
+```
+
+All 10 providers are configurable in Settings:
+
+| Provider | Cost | Notes |
+|----------|------|-------|
+| Google Gemini | Free (250/day) | Recommended — best free model |
+| Groq | Free (1,000/day) | Fastest |
+| Cerebras | Free | Generous free tier |
+| OpenRouter | Free (200/day) | 29 free models |
+| Mistral | Free | European provider |
+| DeepSeek | Free credits | Strong reasoning |
+| SambaNova | Trial credits | Powerful models |
+| OpenAI API | Paid | GPT-4o (separate from ChatGPT Plus) |
+| Anthropic API | Paid | Claude (separate from Claude Pro) |
+| Ollama | Free (local) | Private, runs on your machine |
+
+Any OpenAI-compatible endpoint also works — configure it under **Custom Provider** in Settings.
+
+> **Note:** ChatGPT Plus and Claude Pro/Max are chat subscriptions. They don't include API access for third-party apps. The free options above work great.
+
+---
+
+## What It Does
+
+**Search** — 14+ sources in parallel: Indeed, LinkedIn, Glassdoor, ZipRecruiter, Google Jobs, Remotive, Arbeitnow, Himalayas, RemoteOK, We Work Remotely, Hacker News Who's Hiring, The Muse, CryptoJobsList, YC Work at a Startup, plus direct ATS board scraping via Greenhouse, Lever, Ashby, and Workday APIs (add companies through your watchlist). AI-powered role expansion enriches search terms for any profession.
+
+**Score** — 7 weighted dimensions, all configurable per profile:
+
+| Dimension | Default Weight | What It Measures |
+|-----------|---------------|------------------|
+| Technical Skills | 25% | TF-IDF cosine similarity + keyword matching |
+| Leadership Signal | 15% | "head of", "founding", "own the roadmap" |
+| Career Progression | 15% | Title escalation, scope, comp upgrade |
+| Platform Building | 13% | Greenfield, "0 to 1", "build from scratch" |
+| Comp Potential | 12% | Salary data or inferred signals |
+| Company Trajectory | 10% | Funding, growth, hiring momentum |
+| Culture Fit | 10% | Remote, modern practices, collaboration |
+
+Works without AI (keyword matching). With AI connected, every job gets context-aware scoring.
+
+**Classify** — 8-tier company classification (FAANG+ through Unknown) using funding signals, employee data, and known-company lists. Filter your dashboard by company stage.
+
+**Enhance** — For top-scoring jobs: tailored cover letters, resume bullet tweaks, and company research. LLM-generated — always review before sending.
+
+**Auto-Apply** — Submits through Greenhouse and Lever APIs for STRONG_APPLY jobs. Opt-in, dry-run by default, capped per run.
+
+**Track** — SQLite database with 50+ fields. Status tracking, CSV export, analytics dashboard with score distributions and pipeline funnels.
 
 ---
 
 ## Architecture
 
 ```
-                    YAML Profile
-                        |
-                        v
-               +------------------+
-               |    Pipeline      |  search -> score -> enhance -> save -> auto-apply
-               +------------------+
-              /         |          \
-             v          v           v
-        +--------+  +--------+  +---------+
-        | Search |  | Score  |  | Enhance |
-        +--------+  +--------+  +---------+
-        | JobSpy |  | TF-IDF |  | LLM     |  <-- LLM is optional
-        | YC     |  | KW     |  | Client  |      at every stage
-        +--------+  +--------+  +---------+
-                        |
-                        v
-               +------------------+
-               |    SQLite DB     |  ApplicationRecord (50+ columns)
-               +------------------+
-                   /          \
-                  v            v
-      +----------------+  +------------------+
-      | FastAPI Backend |  | React Frontend   |
-      | REST API        |  | TanStack Router  |
-      | SSE streaming   |  | Tailwind CSS     |
-      +----------------+  +------------------+
+                    Upload Resume + Set Preferences
+                              |
+                              v
+                   +--------------------+
+                   |     Pipeline       |  search → score → enhance → save
+                   +--------------------+
+                  /         |            \
+                 v          v             v
+          +--------+   +--------+   +---------+
+          | Search |   | Score  |   | Enhance |
+          +--------+   +--------+   +---------+
+          | 14+    |   | TF-IDF |   | LLM     |  ← AI is additive,
+          | boards |   | + LLM  |   | covers  |    never required
+          +--------+   +--------+   +---------+
+                           |
+                           v
+                  +------------------+
+                  |    SQLite DB     |  50+ columns per job
+                  +------------------+
+                     /           \
+                    v             v
+        +----------------+  +------------------+
+        | FastAPI Backend |  | React Frontend   |
+        | REST API + SSE  |  | TanStack Router  |
+        +----------------+  +------------------+
 ```
-
-**Web UI:** FastAPI backend + React frontend. Run with `make dev`.
-
-**Key design decision:** LLM features are additive, never required. Search works with zero API keys. Resume-based scoring requires a PDF resume. AI features unlock progressively as you connect a provider.
 
 ---
 
-## Quick Start
+## Self-Hosting
+
+### Docker (recommended for deployment)
 
 ```bash
-# Clone and install
-git clone https://github.com/bteh/launchboard.git
-cd launchboard
-make setup          # installs Python + Node deps, creates .env
-
-# Add your resume
-cp your_resume.pdf knowledge/yourname_resume.pdf
-
-# Create your profile
-cp src/job_finder/config/profiles/_template.yaml src/job_finder/config/profiles/yourname.yaml
-
-# Launch the web UI
-make dev
-# Backend: http://localhost:8000   Frontend: http://localhost:5173
+docker compose up
 ```
 
-Searching and offline scoring do not require API keys. Resume-based scoring does require a PDF resume in `knowledge/`. LLM-generated cover letters and company research should always be reviewed before you send or rely on them.
+Runs the full stack: backend, frontend, and optionally Ollama for local AI. Configure your LLM provider in `.env` before starting.
 
-## Reliability Boundaries
+### Manual
 
-- Search, offline scoring, tracking, and ATS detection are deterministic local code paths.
-- LLM-generated cover letters, resume tweaks, and company research are drafts. Verify company facts, recent news, funding details, and interview-process claims yourself.
-- Auto-apply is opt-in and `dry_run: true` by default.
-- Multiple profiles are supported for local use, but this is not a shared multi-user product yet. If you and your friends want separate histories and settings, use separate profiles at minimum; separate clones or data directories are safer.
+```bash
+make setup    # one-time setup
+make dev      # start development servers
+```
 
-### Connect an LLM (optional, unlocks full AI pipeline)
+### Environment Variables
 
-The fastest free option is Google Gemini:
-
-1. Get an API key at [aistudio.google.com](https://aistudio.google.com) (30 seconds, free tier)
-2. In the app, go to **Settings > LLM Provider**
-3. Select "Google Gemini", paste your key, click **Save & Test**
-
-Other supported providers (all configurable in Settings):
-
-| Provider | Cost | Notes |
-|----------|------|-------|
-| Google Gemini | Free (250 req/day) | Recommended free option |
-| Groq | Free (1,000 req/day) | Fastest inference |
-| OpenRouter | Free (200 req/day) | 27+ free models |
-| Cerebras | Free (1M tokens/day) | Ultra-fast |
-| SambaNova | Free | Large Llama models |
-| Mistral | Free (1B tokens/month) | European provider |
-| DeepSeek | Free credits + cheap | Strong reasoning |
-| Anthropic API | Pay-per-use | Claude models |
-| OpenAI API | Pay-per-use | GPT models |
-| Ollama | Free (local) | Run models on your machine |
+```bash
+# .env — LLM configuration (set via Settings UI or here)
+LLM_PROVIDER=gemini                  # Provider name
+LLM_BASE_URL=                        # Auto-filled from provider
+LLM_API_KEY=your-api-key-here        # From provider's dashboard
+LLM_MODEL=gemini-2.5-flash           # Model identifier
+```
 
 ---
 
 ## Profile System
 
-Launchboard uses YAML profiles to customize everything per user. Each profile controls:
-
-- **Target roles and keywords** -- what to search for
-- **Scoring weights** -- which dimensions matter most to you
-- **Compensation targets** -- salary thresholds for scoring
-- **Career baseline** -- your current title/level for progression scoring
-- **Location preferences** -- geographic filtering with remote-always-passes logic
-- **Auto-apply settings** -- applicant info, ATS preferences, safety controls
+YAML profiles customize everything per user: target roles, scoring weights, compensation targets, location preferences, and auto-apply settings.
 
 ```bash
-# Create your profile
-cp src/job_finder/config/profiles/_template.yaml src/job_finder/config/profiles/yourname.yaml
-
-# Add your profile-specific resume
-cp your_resume.pdf knowledge/yourname_resume.pdf
+# Create your profile from the template
+cp src/job_finder/config/profiles/_template.yaml \
+   src/job_finder/config/profiles/yourname.yaml
 ```
 
-Select your profile in the sidebar. The entire pipeline adapts: search queries, scoring weights, prompt templates, and database tagging all key off the active profile.
+Or use the web UI — Settings handles everything without touching YAML.
 
 ---
 
-## Scoring Deep Dive
-
-Every job is scored on 7 dimensions, each producing a 0-100 sub-score. The overall score is a weighted sum.
-
-| Dimension | Default Weight | What It Measures |
-|-----------|---------------|------------------|
-| Technical Skills | 25% | TF-IDF cosine similarity + keyword saturation curve |
-| Leadership Signal | 15% | Keywords like "head of", "founding", "own the roadmap" |
-| Career Progression | 15% | Title escalation, scope expansion, comp upgrade vs. your baseline |
-| Platform Building | 13% | Greenfield, "0 to 1", "build from scratch" signals |
-| Comp Potential | 12% | Salary data or inferred from company/level signals |
-| Company Trajectory | 10% | Funding, growth, hiring signals |
-| Culture Fit | 10% | Remote, modern practices, collaboration signals |
-
-**Recommendations** are derived from the overall score:
-- **STRONG_APPLY** (70+) -- Drop everything and apply. Full AI enhancement.
-- **APPLY** (55-69) -- Worth pursuing. Resume tweaks generated.
-- **MAYBE** (40-54) -- Review manually.
-- **SKIP** (<40) -- Likely not a fit.
-
-All thresholds and weights are configurable per profile.
-
----
-
-## Product Roadmap
+## Roadmap
 
 ### Done
-
-- [x] 12+ source parallel search (JobSpy, Remotive, Arbeitnow, Himalayas, RemoteOK, We Work Remotely, Hacker News, The Muse, CryptoJobsList, Greenhouse, Lever, Ashby, YC Work at a Startup, Workday)
-- [x] Plugin-based scraper registry — add a new source with one decorated file
-- [x] 7-dimension weighted scoring (TF-IDF + keywords, works offline)
-- [x] 10 free LLM provider integrations + live model fetching from provider APIs
-- [x] Auto-apply via Greenhouse and Lever APIs (opt-in, dry-run default)
-- [x] Resume upload with auto-analysis (extracts skills, roles, career baseline)
-- [x] FastAPI backend with SSE streaming + React frontend
-- [x] SQLite application tracker with 50+ fields
-- [x] 8-tier company classification with 50+ known startups
-- [x] Profile-driven config (YAML)
+- [x] 14-source parallel search with plugin scraper registry
+- [x] 7-dimension weighted scoring (works offline, enhanced with AI)
+- [x] 10 LLM provider integrations + custom provider support
+- [x] AI auto-suggests search params from resume (no manual config needed)
+- [x] Auto-apply via Greenhouse and Lever APIs
+- [x] Resume upload with automatic skill/role extraction
+- [x] FastAPI backend + React frontend with SSE streaming
+- [x] Company classification (8 tiers)
+- [x] Watchlist-driven ATS scraping (add any company, auto-detects ATS)
+- [x] Multi-user workspaces with data isolation
+- [x] Hosted mode gating for local-only features
+- [x] Profile-driven configuration
 
 ### Next
+- [ ] **Auth** — OAuth (Google/GitHub) for the hosted version
+- [ ] **Docker deployment** — One-command self-hosting with bundled AI
+- [ ] **PostgreSQL** — Migration from SQLite for concurrent multi-user access
+- [ ] **Interview Prep** — STAR-format answers from resume + job description
+- [ ] **Salary Intelligence** — Cross-reference comp data, negotiation points
+- [ ] **Scoring Calibration** — Feed back outcomes to tune weights
+- [ ] **Scheduled Scanning** — Background searches with notifications
+- [ ] **Browser Extension** — Score any job page inline
 
-- [ ] **Interview Prep** -- STAR-format answers from resume + JD
-- [ ] **Salary Intelligence** -- Cross-reference comp data, negotiation talking points
-- [ ] **Scoring Calibration** -- Feed back outcomes to tune weights
-- [ ] **Scheduled Scanning** -- Background search with notifications
-- [ ] **Browser Extension** -- Score any job page in-browser
-
----
-
-## Configuration Reference
-
-### Environment Variables (`.env`)
-
-```bash
-LLM_PROVIDER=claude-proxy              # Provider preset name (or empty for no LLM)
-LLM_BASE_URL=http://localhost:8317/v1  # Auto-filled from preset
-LLM_API_KEY=not-needed                 # Required for anthropic-api, openai-api, gemini
-LLM_MODEL=claude-sonnet-4-20250514    # Model identifier
-```
-
-### Profile YAML Structure
-
-```yaml
-profile:
-  name: "Display Name"
-  description: "What you're targeting"
-
-target_roles: [...]           # Job titles to search
-keyword_searches: [...]       # Technology/specialty keywords
-locations: [...]              # "City, ST" or "Remote"
-
-location_preferences:         # Post-search filtering
-  filter_enabled: true
-  preferred_states: ["CA"]
-  preferred_cities: ["Los Angeles"]
-
-keywords:
-  technical: [...]            # Your skills (matched against JDs)
-  leadership: [...]           # Growth/leadership signals
-  platform_building: [...]    # Build-from-scratch signals
-  high_comp_signals: [...]    # Company/level comp indicators
-
-scoring:                      # Weights (must sum to 1.0)
-  technical_skills: 0.25
-  leadership_signal: 0.15
-  career_progression: 0.15
-  platform_building: 0.13
-  comp_potential: 0.12
-  company_trajectory: 0.10
-  culture_fit: 0.10
-  thresholds:
-    strong_apply: 70
-    apply: 55
-    maybe: 40
-
-career_baseline:
-  current_title: "Senior Data Engineer"
-  current_tc: 200000
-
-compensation:
-  min_base: 190000
-  target_total_comp: 300000
-
-auto_apply:
-  enabled: false
-  dry_run: true
-  max_applications_per_run: 5
-```
+### Vision
+Launchboard is open source and local-first. The long-term vision is a hosted version where anyone can sign up, upload a resume, and start searching — no setup required. The open-source repo will always be the full product.
 
 ---
 
 ## Contributing
 
-### Setup
-
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/bteh/launchboard.git
 cd launchboard
-python -m venv .venv && source .venv/bin/activate
-pip install -e .
-cp .env.example .env
+make setup && make dev
 ```
 
-### Project Principles
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide. The easiest way to contribute:
 
-1. **LLM-optional always.** Every new feature must have a useful non-LLM fallback. Search and basic scoring working offline is non-negotiable.
+- **Add a job source** — One decorated file in `src/job_finder/tools/scrapers/`. Auto-discovered.
+- **Improve scoring** — Add signals, tune dimensions, or add new ones.
+- **Frontend polish** — Components, UX, accessibility.
+- **Bug reports** — Open an issue with steps to reproduce.
 
-2. **No frameworks.** The pipeline is plain Python functions and classes. No CrewAI, no LangChain. Keep the dependency tree shallow.
+### Principles
 
-3. **Profile-driven.** New features should read from the YAML profile config. Hard-coded values are bugs.
-
-4. **Graceful degradation.** LLM calls return `None` on failure. Network calls catch exceptions. The pipeline never crashes on a single bad job listing.
-
-5. **Local-first.** SQLite, local PDFs, no cloud storage required. Cloud features are additive, never required.
-
-### Adding a New Job Source
-
-Create one file in `src/job_finder/tools/scrapers/`:
-
-```python
-from job_finder.tools.scrapers._registry import register_scraper
-from job_finder.tools.scrapers._utils import _get_json, _match_roles
-
-@register_scraper(
-    name="myboard",
-    display_name="My Board",
-    url="https://myboard.com",
-    description="Jobs from My Board",
-    category="remote",
-)
-def search_myboard(roles=None, max_results=50, **kwargs) -> list[dict]:
-    ...
-```
-
-Auto-discovered on import. Metadata flows to the API and frontend automatically.
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for full contributor guide.
+1. **AI-enhanced, not AI-dependent.** Search and basic scoring always work offline.
+2. **No frameworks.** Plain Python, no CrewAI/LangChain. Keep dependencies shallow.
+3. **Profession-agnostic.** Works for nurses, marketers, and engineers alike.
+4. **Graceful degradation.** LLM calls return `None` on failure. Pipeline never crashes.
+5. **Local-first.** SQLite, local files, no cloud required.
 
 ---
 
@@ -305,11 +234,18 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for full contributor guide.
 | Scoring | scikit-learn (TF-IDF), custom keyword matching |
 | LLM | openai SDK (any compatible endpoint) |
 | Database | SQLAlchemy + SQLite |
-| Models | Pydantic v2 |
 | Backend | FastAPI, uvicorn, SSE streaming |
 | Frontend | React 19, TanStack Router, Tailwind CSS, Recharts |
-| Config | PyYAML, python-dotenv |
-| PDF | PyPDF2 |
+| Config | PyYAML, python-dotenv, Pydantic v2 |
+
+---
+
+## Reliability Boundaries
+
+- Search, offline scoring, tracking, and ATS detection are deterministic local code.
+- LLM-generated cover letters, resume tweaks, and company research are drafts. Verify facts yourself.
+- Auto-apply is opt-in, `dry_run: true` by default, capped per run.
+- Deduplication is URL-based. Cross-board duplicates with different URLs can survive.
 
 ---
 

@@ -7,6 +7,7 @@ export function useSearchDefaults(profile: string) {
   return useQuery({
     queryKey: ['search', 'defaults', profile],
     queryFn: () => getSearchDefaults(profile),
+    staleTime: 2 * 60 * 1000,
   });
 }
 

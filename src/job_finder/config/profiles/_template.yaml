@@ -23,14 +23,12 @@ profile:
 #   Sales:      "account executive", "sales manager", "director of sales"
 #   Operations: "operations manager", "program manager", "chief of staff"
 #   Healthcare: "nurse practitioner", "clinical director", "nurse manager"
-target_roles:
-  - ""
+target_roles: []
   # Add your target roles here...
 
 # Keyword-based searches (skills, specialties, industry terms)
 # These are searched as freetext on job boards
-keyword_searches:
-  - ""
+keyword_searches: []
   # Add keywords specific to your field...
 
 # Where to search
@@ -49,8 +47,7 @@ keywords:
   # Marketers: SEO, analytics, campaign management, HubSpot, etc.
   # Designers: Figma, user research, prototyping, design systems, etc.
   # Nurses: patient care, EMR, clinical protocols, triage, etc.
-  technical:
-    - ""
+  technical: []
     # Add your skills...
 
   # Leadership / growth signals to look for in job postings
@@ -105,6 +102,8 @@ career_baseline:
 
 # --- COMPENSATION ---
 compensation:
+  currency: "USD"
+  pay_period: "annual"
   min_base: 60000
   target_total_comp: 100000
   include_equity: false                # Set true if targeting tech/startup roles with equity

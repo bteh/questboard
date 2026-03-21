@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +15,8 @@ from app.schemas.settings import (
     LLMConfig,
     LLMStatus,
     LLMTestResult,
+    LocalAIDetectResult,
+    OllamaDetectResult,
     ProfileDetail,
     ProfilePreferences,
     ProfilePreferencesResponse,
@@ -23,6 +26,9 @@ from app.schemas.settings import (
 )
 from app.services import settings_service
 from app.dependencies import sanitize_profile
+from app.models.database import get_db
+from app.services import workspace_service
+from app.config import get_settings
 
 router = APIRouter(tags=["settings"])
 
@@ -31,18 +37,49 @@ router = APIRouter(tags=["settings"])
 
 
 @router.get("/settings/llm", response_model=LLMStatus)
-async def get_llm_config():
+async def get_llm_config(
+    request: Request,
+    db: Session = Depends(get_db),
+):
     """Get current LLM configuration and connection status."""
-    return settings_service.get_llm_status()
+    import asyncio
+
+    workspace = workspace_service.get_workspace_context_optional(db, request)
+    if workspace and get_settings().hosted_mode:
+        return workspace_service.get_workspace_llm_status(db, workspace.workspace.id)
+    return await asyncio.to_thread(settings_service.get_llm_status)
 
 
 @router.put("/settings/llm", response_model=LLMStatus)
-async def update_llm_config(config: LLMConfig):
+async def update_llm_config(
+    config: LLMConfig,
+    request: Request,
+    db: Session = Depends(get_db),
+):
     """Update LLM provider configuration."""
+    base = config.base_url.rstrip("/")
+    if base and not _is_safe_url(base):
+        raise HTTPException(
+            400,
+            "Invalid base_url: must use https:// or http://localhost / http://127.0.0.1",
+        )
+    workspace = workspace_service.get_workspace_context_optional(db, request)
+    if workspace and get_settings().hosted_mode:
+        workspace = workspace_service.require_workspace_context(db, request, validate_csrf=True)
+        return workspace_service.save_workspace_llm_config(
+            db,
+            workspace.workspace.id,
+            provider=config.provider,
+            base_url=base,
+            api_key=config.api_key,
+            model=config.model,
+        )
+    if not settings_service.runtime_llm_config_allowed():
+        raise HTTPException(403, detail="Runtime LLM configuration is disabled")
     try:
         return settings_service.update_llm_config(
             provider=config.provider,
-            base_url=config.base_url,
+            base_url=base,
             api_key=config.api_key,
             model=config.model,
         )
@@ -51,9 +88,31 @@ async def update_llm_config(config: LLMConfig):
         raise HTTPException(500, detail=str(e))
 
 
+@router.get("/settings/llm/detect-ollama", response_model=OllamaDetectResult)
+async def detect_ollama():
+    """Probe localhost for Ollama and return available models."""
+    import asyncio
+
+    return await asyncio.to_thread(settings_service.detect_ollama)
+
+
+@router.get("/settings/llm/detect-local", response_model=LocalAIDetectResult)
+async def detect_local_ai():
+    """Scan common localhost ports for OpenAI-compatible AI servers."""
+    import asyncio
+
+    return await asyncio.to_thread(settings_service.detect_local_ai)
+
+
 @router.post("/settings/llm/test", response_model=LLMTestResult)
-async def test_llm_connection():
+async def test_llm_connection(
+    request: Request,
+    db: Session = Depends(get_db),
+):
     """Test the current LLM connection."""
+    workspace = workspace_service.get_workspace_context_optional(db, request)
+    if workspace and get_settings().hosted_mode:
+        return workspace_service.test_workspace_llm_connection(db, workspace.workspace.id)
     return settings_service.test_llm_connection()
 
 
@@ -100,6 +159,9 @@ async def fetch_provider_models(req: FetchModelsRequest):
     arbitrary provider URLs.
     """
     import requests as http_requests
+
+    if not settings_service.runtime_llm_config_allowed() and not get_settings().hosted_mode:
+        raise HTTPException(403, detail="Runtime LLM configuration is disabled")
 
     base = req.base_url.rstrip("/")
 
@@ -190,7 +252,10 @@ async def update_profile_preferences(name: str, prefs: ProfilePreferences):
     """Update user-editable preferences for a profile."""
     name = sanitize_profile(name)
     try:
-        return settings_service.update_profile_preferences(name, prefs.model_dump())
+        return settings_service.update_profile_preferences(
+            name,
+            prefs.model_dump(exclude_unset=True),
+        )
     except Exception as e:
         logger.exception("Failed to update profile preferences")
         raise HTTPException(500, detail=str(e))

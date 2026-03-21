@@ -51,6 +51,7 @@ def search_jobs(
     country: str = "USA",
     linkedin_fetch_description: bool = True,
     boards: list[str] | None = None,
+    distance: int | None = None,
 ) -> list[dict]:
     """Search multiple job boards via JobSpy and return normalised dicts.
 
@@ -91,6 +92,8 @@ def search_jobs(
         # JobSpy Pydantic model rejects None
         if is_remote is not None:
             scrape_kwargs["is_remote"] = bool(is_remote)
+        if distance is not None:
+            scrape_kwargs["distance"] = distance
 
         jobs_df: pd.DataFrame = scrape_jobs(**scrape_kwargs)
 

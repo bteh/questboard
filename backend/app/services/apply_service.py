@@ -22,6 +22,7 @@ def prepare_application(
     db: Session,
     app_id: int,
     profile: str = "default",
+    workspace_id: str | None = None,
 ) -> dict | None:
     """Load an application record and prepare materials for submission.
 
@@ -46,8 +47,14 @@ def prepare_application(
     # ATS detection
     ats_type = detect_ats_type(job_url) if job_url else None
 
-    # Resume text -- needed for cover letter and resume-tweak generation
-    resume_text = parse_resume(profile=profile)
+    # Resume text -- workspace-aware to prevent cross-user data leaks
+    if workspace_id:
+        from app.services import workspace_service
+        resume_text = workspace_service.get_resume_text(db, workspace_id)
+        if not resume_text:
+            resume_text = "ERROR: No resume uploaded. Please upload your resume in Settings."
+    else:
+        resume_text = parse_resume(profile=profile)
     has_resume = not resume_text.startswith("ERROR")
 
     # Build a job dict that the pipeline methods expect
@@ -132,6 +139,7 @@ def submit_application(
     cover_letter: str | None = None,
     dry_run: bool = True,
     profile: str = "default",
+    workspace_id: str | None = None,
 ) -> dict | None:
     """Submit an application to the detected ATS.
 
@@ -165,8 +173,15 @@ def submit_application(
     # Resolve the cover letter to send (user-edited takes precedence)
     cl_text = cover_letter if cover_letter is not None else (record.cover_letter or "")
 
-    # Locate the resume PDF for attachment
-    resume_path = config.get("profile", {}).get("resume_path", "")
+    # Locate the resume PDF for attachment — workspace-aware
+    resume_path = ""
+    if workspace_id:
+        from app.services import workspace_service
+        resume_record = workspace_service.get_workspace_resume(db, workspace_id)
+        if resume_record and resume_record.file_path:
+            resume_path = resume_record.file_path
+    if not resume_path:
+        resume_path = config.get("profile", {}).get("resume_path", "")
     if not resume_path:
         resume_path = find_resume(profile=profile) or ""
 

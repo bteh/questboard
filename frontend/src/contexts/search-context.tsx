@@ -1,7 +1,7 @@
 import { createContext, useContext, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { sseUrl } from '@/lib/api-client';
-import type { RunResult, SearchRequest, ProgressUpdate } from '@/types/search';
+import type { RunResult, SearchRequest, ProgressUpdate, SearchRunSnapshot } from '@/types/search';
 
 type SearchState = 'idle' | 'running' | 'completed' | 'failed';
 
@@ -13,8 +13,9 @@ interface SearchContextValue {
   error: string | null;
   mode: SearchRequest['mode'];
   progress: ProgressUpdate | null;
+  snapshot: SearchRunSnapshot | null;
   /** Called after the backend returns a run_id from POST /search/run */
-  activate: (runId: string, mode: SearchRequest['mode']) => void;
+  activate: (runId: string, mode: SearchRequest['mode'], snapshot: SearchRunSnapshot) => void;
   reset: () => void;
 }
 
@@ -26,6 +27,7 @@ const SearchContext = createContext<SearchContextValue>({
   error: null,
   mode: 'search_score',
   progress: null,
+  snapshot: null,
   activate: () => {},
   reset: () => {},
 });
@@ -39,6 +41,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
   const [result, setResult] = useState<RunResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<ProgressUpdate | null>(null);
+  const [snapshot, setSnapshot] = useState<SearchRunSnapshot | null>(null);
   const esRef = useRef<EventSource | null>(null);
 
   const cleanup = useCallback(() => {
@@ -48,10 +51,11 @@ export function SearchProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const activate = useCallback((id: string, m: SearchRequest['mode']) => {
+  const activate = useCallback((id: string, m: SearchRequest['mode'], runSnapshot: SearchRunSnapshot) => {
     cleanup();
     setRunId(id);
     setMode(m);
+    setSnapshot(runSnapshot);
     setState('running');
     setMessages([]);
     setResult(null);
@@ -67,6 +71,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
     setResult(null);
     setError(null);
     setProgress(null);
+    setSnapshot(null);
   }, [cleanup]);
 
   // SSE connection — runs whenever runId changes, independent of which page is mounted
@@ -133,7 +138,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
   }, [runId, state, queryClient]);
 
   return (
-    <SearchContext.Provider value={{ state, runId, messages, result, error, mode, progress, activate, reset }}>
+    <SearchContext.Provider value={{ state, runId, messages, result, error, mode, progress, snapshot, activate, reset }}>
       {children}
     </SearchContext.Provider>
   );
