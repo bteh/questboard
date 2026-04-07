@@ -66,9 +66,11 @@ def _subtitle(item: dict[str, Any]) -> str:
 
 
 def _to_suggestion(item: dict[str, Any], provider: str) -> LocationSuggestion:
+    kind = item.get("kind", "manual")
     return LocationSuggestion(
         label=item["label"],
-        kind=item.get("kind", "manual"),
+        kind=kind,
+        match_scope="city" if kind == "city" else "region" if kind == "region" else "country" if kind == "country" else "city",
         subtitle=_subtitle(item),
         city=item.get("city", "") or "",
         region=item.get("region", "") or "",
@@ -148,6 +150,7 @@ def _search_pelias(query: str, limit: int) -> list[LocationSuggestion]:
             LocationSuggestion(
                 label=props.get("label", ""),
                 kind=kind,
+                match_scope="city" if kind == "city" else "region" if kind == "region" else "country",
                 subtitle=" · ".join(
                     part for part in [props.get("region"), props.get("country")] if part
                 ),

@@ -3,7 +3,9 @@ export type LocationKind = 'city' | 'country' | 'region';
 export interface LocationOption {
   label: string;
   kind: LocationKind;
+  city?: string;
   country?: string;
+  country_code?: string;
   region?: string;
   aliases?: string[];
 }

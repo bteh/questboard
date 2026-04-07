@@ -96,6 +96,9 @@ class LocationFilterTest(unittest.TestCase):
     def test_santa_monica_metro_matches(self) -> None:
         self.assertTrue(self._matches("Santa Monica, CA"))
 
+    def test_irvine_rejected_for_la_city_preference(self) -> None:
+        self.assertFalse(self._matches("Irvine, CA"))
+
     def test_remote_always_matches(self) -> None:
         self.assertTrue(self._matches("United States", True, work_type="remote"))
 
@@ -111,12 +114,39 @@ class LocationFilterTest(unittest.TestCase):
     def test_mexico_rejected(self) -> None:
         self.assertFalse(self._matches("Mexico City, Mexico"))
 
-    def test_san_jose_ca_matches(self) -> None:
-        """San Jose is in CA (same state as LA preference)."""
-        self.assertTrue(self._matches("San Jose, California, United States of America"))
+    def test_san_jose_ca_rejected_for_la_city_preference(self) -> None:
+        """A Los Angeles metro preference should not expand to the whole state."""
+        self.assertFalse(self._matches("San Jose, California, United States of America"))
 
-    def test_santa_clara_reversed_matches(self) -> None:
-        self.assertTrue(self._matches("US, CA, Santa Clara"))
+    def test_santa_clara_reversed_rejected_for_la_city_preference(self) -> None:
+        self.assertFalse(self._matches("US, CA, Santa Clara"))
+
+    def test_state_only_preference_matches_other_ca_cities(self) -> None:
+        self.assertTrue(location_matches_preferences(
+            "San Jose, California, United States of America",
+            False,
+            preferred_locations=["California"],
+            preferred_states=["CA"],
+            preferred_cities=[],
+        ))
+
+    def test_mixed_city_and_state_preferences_keep_statewide_intent(self) -> None:
+        self.assertTrue(location_matches_preferences(
+            "San Jose, California, United States of America",
+            False,
+            preferred_locations=["Los Angeles, CA", "California"],
+            preferred_states=["CA"],
+            preferred_cities=["Los Angeles"],
+        ))
+
+    def test_multiple_city_preferences_do_not_become_statewide(self) -> None:
+        self.assertFalse(location_matches_preferences(
+            "San Francisco, CA",
+            False,
+            preferred_locations=["Los Angeles, CA", "San Diego, CA"],
+            preferred_states=["CA"],
+            preferred_cities=["Los Angeles", "San Diego"],
+        ))
 
     def test_country_preference_matches_non_us_job(self) -> None:
         self.assertTrue(location_matches_preferences(
@@ -137,6 +167,92 @@ class LocationFilterTest(unittest.TestCase):
             "Berlin, Germany",
             False,
             preferred_locations=["France"],
+        ))
+
+
+class StructuredPlaceFilterTest(unittest.TestCase):
+    def test_city_scope_with_full_state_name_matches_exact_city(self) -> None:
+        self.assertTrue(location_matches_preferences(
+            "Los Angeles, CA",
+            False,
+            preferred_places=[{
+                "label": "Los Angeles, CA",
+                "kind": "city",
+                "match_scope": "city",
+                "city": "Los Angeles",
+                "region": "California",
+                "country": "United States",
+            }],
+        ))
+
+    def test_city_scope_does_not_expand_to_metro(self) -> None:
+        self.assertFalse(location_matches_preferences(
+            "Santa Monica, CA",
+            False,
+            preferred_places=[{
+                "label": "Los Angeles, CA",
+                "kind": "city",
+                "match_scope": "city",
+                "city": "Los Angeles",
+                "region": "CA",
+                "country": "United States",
+            }],
+        ))
+
+    def test_metro_scope_matches_nearby_city(self) -> None:
+        self.assertTrue(location_matches_preferences(
+            "Santa Monica, CA",
+            False,
+            preferred_places=[{
+                "label": "Los Angeles, CA",
+                "kind": "city",
+                "match_scope": "metro",
+                "city": "Los Angeles",
+                "region": "CA",
+                "country": "United States",
+            }],
+        ))
+
+    def test_region_scope_matches_same_state(self) -> None:
+        self.assertTrue(location_matches_preferences(
+            "San Francisco, CA",
+            False,
+            preferred_places=[{
+                "label": "California, United States",
+                "kind": "region",
+                "match_scope": "region",
+                "region": "CA",
+                "country": "United States",
+            }],
+        ))
+
+    def test_city_scope_rejects_other_california_cities(self) -> None:
+        self.assertFalse(location_matches_preferences(
+            "San Francisco, CA",
+            False,
+            preferred_places=[{
+                "label": "Los Angeles, CA",
+                "kind": "city",
+                "match_scope": "city",
+                "city": "Los Angeles",
+                "region": "CA",
+                "country": "United States",
+            }],
+        ))
+
+    def test_city_scope_rejects_country_only_hybrid_jobs(self) -> None:
+        self.assertFalse(location_matches_preferences(
+            "United States",
+            False,
+            work_type="hybrid",
+            preferred_places=[{
+                "label": "Los Angeles, CA",
+                "kind": "city",
+                "match_scope": "city",
+                "city": "Los Angeles",
+                "region": "California",
+                "country": "United States",
+            }],
         ))
 
 

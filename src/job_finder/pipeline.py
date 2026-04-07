@@ -516,6 +516,89 @@ def _deduplicate(jobs: list[dict]) -> list[dict]:
     return unique
 
 
+def _resolve_location_filter_preferences(
+    locations: list[str],
+    loc_prefs: dict[str, Any] | None,
+) -> tuple[list[str], list[str], list[str], list[dict[str, Any]], bool, bool]:
+    """Resolve post-search location filtering from explicit prefs or raw locations."""
+    loc_prefs = loc_prefs or {}
+    from job_finder.company_classifier import parse_location as _parse_loc
+
+    def _derive_state_city_lists(values: list[str]) -> tuple[list[str], list[str]]:
+        states: list[str] = []
+        cities: list[str] = []
+        for value in values:
+            parsed = _parse_loc(value)
+            if parsed["state"] and parsed["state"] not in states:
+                states.append(parsed["state"])
+            if parsed["city"] and parsed["city"] not in cities:
+                cities.append(parsed["city"])
+        return states, cities
+
+    def _derive_place_payloads(values: list[str]) -> list[dict[str, Any]]:
+        places: list[dict[str, Any]] = []
+        for value in values:
+            parsed = _parse_loc(value)
+            scope = "city"
+            if parsed.get("country") == "non-us" and not parsed.get("city"):
+                scope = "country"
+            elif parsed.get("state") and not parsed.get("city"):
+                scope = "region"
+            elif parsed.get("country_name") and not parsed.get("city") and not parsed.get("state"):
+                scope = "country"
+            places.append({
+                "label": value,
+                "kind": "manual",
+                "match_scope": scope,
+                "city": parsed.get("city", ""),
+                "region": parsed.get("state", ""),
+                "country": parsed.get("country_name", ""),
+                "country_code": parsed.get("country", ""),
+            })
+        return places
+
+    if loc_prefs.get("filter_enabled", False):
+        preferred_locations = list(loc_prefs.get("preferred_locations", []))
+        preferred_states = list(loc_prefs.get("preferred_states", []))
+        preferred_cities = list(loc_prefs.get("preferred_cities", []))
+        preferred_places = list(loc_prefs.get("preferred_places", []))
+        if preferred_locations and not (preferred_states or preferred_cities):
+            derived_states, derived_cities = _derive_state_city_lists(preferred_locations)
+            preferred_states = derived_states
+            preferred_cities = derived_cities
+        if preferred_locations and not preferred_places:
+            preferred_places = _derive_place_payloads(preferred_locations)
+        return (
+            preferred_locations,
+            preferred_states,
+            preferred_cities,
+            preferred_places,
+            bool(loc_prefs.get("remote_only", False)),
+            bool(loc_prefs.get("include_remote", True)),
+        )
+
+    pref_locations = [
+        loc for loc in locations
+        if loc.lower() not in ("remote", "united states", "usa", "us", "anywhere")
+    ]
+    pref_states: list[str] = []
+    pref_cities: list[str] = []
+    remote_only = bool(loc_prefs.get("remote_only", False))
+    if "include_remote" in loc_prefs:
+        include_remote = bool(loc_prefs.get("include_remote", True))
+    else:
+        include_remote = not locations or any(
+            loc.lower() in ("remote", "united states", "usa", "us", "anywhere")
+            for loc in locations
+        )
+
+    derived_states, derived_cities = _derive_state_city_lists(pref_locations)
+    pref_states.extend([state for state in derived_states if state not in pref_states])
+    pref_cities.extend([city for city in derived_cities if city not in pref_cities])
+
+    return pref_locations, pref_states, pref_cities, _derive_place_payloads(pref_locations), remote_only, include_remote
+
+
 def _filter_jobs_by_level(
     jobs: list[dict],
     career_cfg: dict | None,
@@ -1025,42 +1108,18 @@ class JobFinderPipeline:
         # Use explicit location_preferences if configured, otherwise auto-derive
         # from the search locations so filtering always works.
         loc_prefs = self.config.get("location_preferences", {})
-        if loc_prefs.get("filter_enabled", False):
-            pref_locations = loc_prefs.get("preferred_locations", [])
-            pref_states = loc_prefs.get("preferred_states", [])
-            pref_cities = loc_prefs.get("preferred_cities", [])
-            remote_only = loc_prefs.get("remote_only", False)
-            include_remote = loc_prefs.get("include_remote", True)
-        else:
-            # Auto-derive from search locations (e.g. "Los Angeles, CA" → state=CA, city=Los Angeles)
-            from job_finder.company_classifier import parse_location as _parse_loc
-            pref_locations = [
-                loc for loc in locations
-                if loc.lower() not in ("remote", "united states", "usa", "us", "anywhere")
-            ]
-            pref_states = []
-            pref_cities = []
-            remote_only = False
-            include_remote = any(
-                loc.lower() in ("remote", "united states", "usa", "us", "anywhere")
-                for loc in locations
-            )
-            for loc in locations:
-                if loc.lower() in ("remote", "united states", "usa", "us", "anywhere"):
-                    continue
-                parsed = _parse_loc(loc)
-                if parsed["state"] and parsed["state"] not in pref_states:
-                    pref_states.append(parsed["state"])
-                if parsed["city"] and parsed["city"] not in pref_cities:
-                    pref_cities.append(parsed["city"])
+        pref_locations, pref_states, pref_cities, pref_places, remote_only, include_remote = _resolve_location_filter_preferences(
+            locations,
+            loc_prefs,
+        )
 
         logger.info(
             "Location filter config: filter_enabled=%s, pref_locations=%s, "
-            "pref_states=%s, pref_cities=%s, remote_only=%s, include_remote=%s",
+            "pref_states=%s, pref_cities=%s, pref_places=%s, remote_only=%s, include_remote=%s",
             loc_prefs.get("filter_enabled"), pref_locations, pref_states,
-            pref_cities, remote_only, include_remote,
+            pref_cities, pref_places, remote_only, include_remote,
         )
-        if pref_locations or pref_states or pref_cities or remote_only or not include_remote:
+        if pref_locations or pref_states or pref_cities or pref_places or remote_only or not include_remote:
             pre_count = len(deduped)
             deduped = [
                 j for j in deduped
@@ -1073,6 +1132,7 @@ class JobFinderPipeline:
                     remote_only=remote_only,
                     include_remote=include_remote,
                     work_type=j.get("work_type", ""),
+                    preferred_places=pref_places,
                 )
             ]
             if progress:
@@ -1086,6 +1146,7 @@ class JobFinderPipeline:
                     preferred_states=pref_states,
                     preferred_cities=pref_cities,
                     preferred_locations=pref_locations,
+                    preferred_places=pref_places,
                     include_remote=include_remote,
                     remote_only=remote_only,
                     profile=self.profile_name,
@@ -1309,15 +1370,97 @@ class JobFinderPipeline:
         ai_available = use_ai and self.llm and self.llm.is_configured
 
         if ai_available:
+            settings = self.config.get("search_settings") or {}
+            ai_score_top_n = int(settings.get("ai_score_top_n", 60) or 0)
+            if ai_score_top_n > 0 and len(jobs) > ai_score_top_n:
+                if progress:
+                    progress(
+                        f"Keyword pre-scoring {len(jobs)} jobs to shortlist top "
+                        f"{ai_score_top_n} for AI review..."
+                    )
+                self._score_jobs_keyword(
+                    jobs,
+                    resume_text,
+                    progress=None,
+                    emit_summary=False,
+                )
+                shortlisted = jobs[:ai_score_top_n]
+                self._score_jobs_ai(
+                    shortlisted,
+                    resume_text,
+                    progress,
+                    total_jobs=len(jobs),
+                    emit_summary=False,
+                )
+                jobs.sort(key=lambda j: j.get("overall_score", 0), reverse=True)
+                self._emit_scoring_summary(jobs, progress)
+                return jobs
             return self._score_jobs_ai(jobs, resume_text, progress)
         else:
             return self._score_jobs_keyword(jobs, resume_text, progress)
+
+    def _emit_scoring_summary(
+        self,
+        jobs: list[dict],
+        progress: Callable[[str], None] | None = None,
+        *,
+        prefix: str = "Scoring done",
+    ) -> None:
+        """Emit a concise scoring summary for the current job set."""
+        above_55 = sum(1 for j in jobs if (j.get("overall_score") or 0) >= 55)
+        above_40 = sum(1 for j in jobs if (j.get("overall_score") or 0) >= 40)
+        if progress:
+            progress(f"{prefix}: {above_55} strong matches, {above_40} worth reviewing")
+
+    def _reapply_location_filter_after_ai(
+        self,
+        jobs: list[dict],
+        progress: Callable[[str], None] | None = None,
+    ) -> list[dict]:
+        """Re-check location eligibility after AI updates work_type/is_remote.
+
+        Job boards frequently label hybrid roles as remote. We already filter by
+        location once before scoring, but if AI later corrects a job from remote
+        to hybrid/onsite we need to re-run the same location gate or those jobs
+        leak back into the final saved results.
+        """
+        loc_prefs = self.config.get("location_preferences", {})
+        pref_locations, pref_states, pref_cities, pref_places, remote_only, include_remote = _resolve_location_filter_preferences(
+            self.config.get("locations", []),
+            loc_prefs,
+        )
+        if not (pref_locations or pref_states or pref_cities or pref_places or remote_only or not include_remote):
+            return jobs
+
+        filtered = [
+            job for job in jobs
+            if location_matches_preferences(
+                job.get("location", ""),
+                job.get("is_remote", False),
+                preferred_states=pref_states,
+                preferred_cities=pref_cities,
+                preferred_locations=pref_locations,
+                remote_only=remote_only,
+                include_remote=include_remote,
+                work_type=job.get("work_type", ""),
+                preferred_places=pref_places,
+            )
+        ]
+        dropped = len(jobs) - len(filtered)
+        if dropped and progress:
+            progress(
+                f"  Removed {dropped} jobs after AI updated remote vs local location details"
+            )
+        return filtered
 
     def _score_jobs_ai(
         self,
         jobs: list[dict],
         resume_text: str,
         progress: Callable[[str], None] | None = None,
+        *,
+        total_jobs: int | None = None,
+        emit_summary: bool = True,
     ) -> list[dict]:
         """AI-first scoring: LLM scores ALL jobs in parallel.
 
@@ -1326,7 +1469,13 @@ class JobFinderPipeline:
         It works for any profession without hardcoded signal lists.
         """
         if progress:
-            progress(f"AI-scoring {len(jobs)} jobs in parallel...")
+            if total_jobs and total_jobs != len(jobs):
+                progress(
+                    f"AI-scoring top {len(jobs)} of {total_jobs} shortlisted jobs "
+                    "in parallel..."
+                )
+            else:
+                progress(f"AI-scoring {len(jobs)} jobs in parallel...")
 
         def _score_one(job: dict) -> tuple[dict, dict | None]:
             return job, self.score_job_with_ai(job, resume_text)
@@ -1364,19 +1513,23 @@ class JobFinderPipeline:
                     self._keyword_score_single(job, resume_text)
                     failed += 1
                 if progress and (done % 10 == 0 or done == len(jobs)):
-                    progress(f"  AI-scored {done}/{len(jobs)} jobs")
+                    if total_jobs and total_jobs != len(jobs):
+                        progress(f"  AI-scored {done}/{len(jobs)} shortlisted jobs")
+                    else:
+                        progress(f"  AI-scored {done}/{len(jobs)} jobs")
 
         if work_type_corrections and progress:
             progress(f"  AI corrected work type for {work_type_corrections} jobs")
         if failed and progress:
             progress(f"  {failed} jobs fell back to keyword scoring")
 
+        if work_type_corrections:
+            jobs = self._reapply_location_filter_after_ai(jobs, progress)
+
         jobs.sort(key=lambda j: j.get("overall_score", 0), reverse=True)
 
-        above_55 = sum(1 for j in jobs if (j.get("overall_score") or 0) >= 55)
-        above_40 = sum(1 for j in jobs if (j.get("overall_score") or 0) >= 40)
-        if progress:
-            progress(f"Scoring done: {above_55} strong matches, {above_40} worth reviewing")
+        if emit_summary:
+            self._emit_scoring_summary(jobs, progress)
 
         return jobs
 
@@ -1385,6 +1538,8 @@ class JobFinderPipeline:
         jobs: list[dict],
         resume_text: str,
         progress: Callable[[str], None] | None = None,
+        *,
+        emit_summary: bool = True,
     ) -> list[dict]:
         """Keyword fallback: scores all jobs using profile keywords + TF-IDF.
 
@@ -1403,10 +1558,13 @@ class JobFinderPipeline:
 
         jobs.sort(key=lambda j: j.get("overall_score", 0), reverse=True)
 
-        above_40 = sum(1 for j in jobs if (j.get("overall_score") or 0) >= 40)
-        above_55 = sum(1 for j in jobs if (j.get("overall_score") or 0) >= 55)
-        if progress:
-            progress(f"Keyword-score done: {above_55} strong matches, {above_40} worth reviewing, {len(jobs) - above_40} filtered out")
+        if emit_summary and progress:
+            above_40 = sum(1 for j in jobs if (j.get("overall_score") or 0) >= 40)
+            above_55 = sum(1 for j in jobs if (j.get("overall_score") or 0) >= 55)
+            progress(
+                f"Keyword-score done: {above_55} strong matches, {above_40} worth "
+                f"reviewing, {len(jobs) - above_40} filtered out"
+            )
 
         return jobs
 

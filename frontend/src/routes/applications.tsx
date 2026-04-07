@@ -14,6 +14,7 @@ import { JobCard } from '@/components/jobs/job-card';
 import { JobTable } from '@/components/jobs/job-table';
 import { useQuery } from '@tanstack/react-query';
 import { useApplications } from '@/hooks/use-applications';
+import { pickLatestCompletedRun, useSearchRuns } from '@/hooks/use-search';
 import { useProfile } from '@/contexts/profile-context';
 import { useSourceLabels } from '@/hooks/use-scrapers';
 import { getSources } from '@/api/analytics';
@@ -29,6 +30,7 @@ export const Route = createRoute({
   component: ApplicationsPage,
   validateSearch: (search: Record<string, unknown>) => ({
     run: (search.run as string) || undefined,
+    scope: search.scope === 'all' ? 'all' : undefined,
   }),
 });
 
@@ -69,9 +71,13 @@ const SOURCE_LABEL_MAP: Record<string, string> = {
 function ApplicationsPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const { run: searchRunId } = Route.useSearch();
+  const { run: searchRunId, scope } = Route.useSearch();
   const { profile } = useProfile();
   const sourceLabels = useSourceLabels();
+  const { data: runs } = useSearchRuns(10);
+  const latestCompletedRun = useMemo(() => pickLatestCompletedRun(runs), [runs]);
+  const effectiveRunId = scope === 'all' ? undefined : (searchRunId ?? latestCompletedRun?.run_id);
+  const isExplicitRunScope = !!searchRunId;
   const urlCheck = useMutation({
     mutationFn: () => checkUrls(undefined, 100),
     onSuccess: (result) => {
@@ -89,8 +95,8 @@ function ApplicationsPage() {
     onError: () => toast.error('Failed to clear applications'),
   });
   const { data: sourcesData } = useQuery({
-    queryKey: ['analytics', 'sources'],
-    queryFn: getSources,
+    queryKey: ['analytics', 'sources', profile ?? 'default', effectiveRunId],
+    queryFn: () => getSources(profile, effectiveRunId),
     staleTime: 5 * 60 * 1000,
   });
   const sourceOptions = useMemo(() =>
@@ -103,7 +109,7 @@ function ApplicationsPage() {
   const [showFilters, setShowFilters] = useState(true);
   const [searchInput, setSearchInput] = useState('');
   const [selectedJobId, setSelectedJobId] = useState<number | null>(null);
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [filters, setFilters] = useState<ApplicationFilters>({
     sort_by: 'overall_score',
     sort_order: 'desc',
@@ -111,7 +117,7 @@ function ApplicationsPage() {
     page_size: 25,
   });
 
-  const { data, isLoading } = useApplications({ ...filters, profile, search_run_id: searchRunId });
+  const { data, isLoading } = useApplications({ ...filters, profile, search_run_id: effectiveRunId });
 
   const updateFilter = useCallback((key: keyof ApplicationFilters, value: unknown) => {
     setFilters((prev) => ({ ...prev, [key]: value, page: 1 }));
@@ -119,11 +125,13 @@ function ApplicationsPage() {
 
   // Debounced search
   useEffect(() => {
-    clearTimeout(searchTimer.current);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
     searchTimer.current = setTimeout(() => {
       updateFilter('search', searchInput || undefined);
     }, 300);
-    return () => clearTimeout(searchTimer.current);
+    return () => {
+      if (searchTimer.current) clearTimeout(searchTimer.current);
+    };
   }, [searchInput, updateFilter]);
 
   const clearAllFilters = useCallback(() => {
@@ -168,20 +176,40 @@ function ApplicationsPage() {
           <p className="mt-0.5 text-sm text-text-tertiary tabular-nums">
             {total > 0 ? (
               <>
-                {total} {searchRunId ? 'jobs from latest search' : 'jobs tracked'}
+                {total} {effectiveRunId ? (isExplicitRunScope ? 'jobs from this search' : 'jobs from your latest search') : 'jobs tracked'}
                 {hasActiveFilters && <span> · {items.length} matching filters</span>}
               </>
             ) : (
-              searchRunId ? 'No jobs found in this search' : 'No jobs tracked yet'
+              effectiveRunId ? (isExplicitRunScope ? 'No jobs found in this search' : 'No jobs found in your latest search') : 'No jobs tracked yet'
             )}
           </p>
-          {searchRunId && (
+          {effectiveRunId && (
+            <div className="mt-1 flex items-center gap-3">
+              <button
+                type="button"
+                className="text-xs text-brand hover:text-brand-dark font-medium cursor-pointer"
+                onClick={() => navigate({ to: '/applications', search: { scope: 'all', run: undefined } })}
+              >
+                Show all jobs
+              </button>
+              {scope === 'all' && latestCompletedRun && (
+                <button
+                  type="button"
+                  className="text-xs text-text-muted hover:text-text-secondary font-medium cursor-pointer"
+                  onClick={() => navigate({ to: '/applications', search: { run: undefined, scope: undefined } })}
+                >
+                  Back to latest search
+                </button>
+              )}
+            </div>
+          )}
+          {!effectiveRunId && scope === 'all' && latestCompletedRun && (
             <button
               type="button"
               className="mt-1 text-xs text-brand hover:text-brand-dark font-medium cursor-pointer"
-              onClick={() => navigate({ to: '/applications', search: {} })}
+              onClick={() => navigate({ to: '/applications', search: { run: undefined, scope: undefined } })}
             >
-              Show all jobs
+              Back to latest search
             </button>
           )}
         </div>
@@ -535,7 +563,7 @@ function FilterSelect({
       </span>
       <Select
         value={value || 'all'}
-        onValueChange={(v) => onValueChange(v === 'all' ? undefined : v)}
+        onValueChange={(v) => onValueChange(!v || v === 'all' ? undefined : v)}
       >
         <SelectTrigger className="h-8 text-xs min-w-[120px]">
           <SelectValue placeholder={placeholder} />

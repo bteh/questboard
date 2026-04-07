@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ComponentProps } from 'react';
 import { X } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,8 @@ interface TagListInputProps {
   helperText?: string;
   emptyText?: string;
   className?: string;
+  inputProps?: Omit<ComponentProps<'input'>, 'value' | 'onChange' | 'onKeyDown' | 'onBlur'>
+    & Partial<Record<`data-${string}`, string | undefined>>;
 }
 
 export function TagListInput({
@@ -20,6 +22,7 @@ export function TagListInput({
   helperText,
   emptyText = 'None added yet.',
   className,
+  inputProps,
 }: TagListInputProps) {
   const [draft, setDraft] = useState('');
 
@@ -53,6 +56,7 @@ export function TagListInput({
         }}
         placeholder={placeholder}
         className="h-9"
+        {...inputProps}
       />
 
       {value.length > 0 ? (

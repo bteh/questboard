@@ -108,16 +108,19 @@ def _match_level(text: str) -> float | None:
         return None
 
     title_lower = text.lower()
-    matched: list[tuple[int, float]] = []  # (keyword_length, level)
+    matched: list[tuple[int, int, float]] = []  # (position, keyword_length, level)
     for keyword, level in LEVEL_MAP.items():
         pattern = r'\b' + re.escape(keyword) + r'\b'
-        if re.search(pattern, title_lower):
-            matched.append((len(keyword), level))
+        found = re.search(pattern, title_lower)
+        if found:
+            matched.append((found.start(), len(keyword), level))
     if not matched:
         return None
 
-    matched.sort(key=lambda x: x[0], reverse=True)
-    return matched[0][1]
+    # Prefer the earliest explicit level signal in the title.
+    # When multiple matches start at the same position, prefer the longest phrase.
+    matched.sort(key=lambda x: (x[0], -x[1]))
+    return matched[0][2]
 
 
 def _extract_level(title: str) -> float:

@@ -37,7 +37,6 @@ locations:
 # Job boards to scrape via JobSpy
 job_boards:
   - "indeed"
-  - "linkedin"
   - "glassdoor"
   - "zip_recruiter"
   - "google"

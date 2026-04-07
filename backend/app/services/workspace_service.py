@@ -6,6 +6,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import secrets
 import shutil
 import uuid
@@ -19,7 +20,13 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.models.workspace import (
+    FileAsset,
+    Profile,
+    UsageCounter,
+    WorkerHeartbeat,
+    WorkspaceMembership,
     Workspace,
+    WorkspaceSearchEvent,
     WorkspacePreferences,
     WorkspaceResume,
     WorkspaceSearchRun,
@@ -27,6 +34,10 @@ from app.models.workspace import (
 )
 from app.schemas.workspace import (
     CompensationPreference,
+    HostedBootstrapResponse,
+    HostedFeatureFlags,
+    HostedUserProfile,
+    HostedWorkspaceSummary,
     OnboardingState,
     PlaceSelection,
     SearchSnapshot,
@@ -34,8 +45,29 @@ from app.schemas.workspace import (
     WorkspaceResumeStatus,
     WorkspaceSessionResponse,
 )
+from app.services.workspace_naming import allocate_workspace_slug
 
 logger = logging.getLogger(__name__)
+
+_DEFAULT_JOBSPY_BOARDS = ["indeed", "glassdoor", "zip_recruiter", "google"]
+_LINKEDIN_JOBSPY_BOARD = "linkedin"
+_DESKTOP_SESSION_HEADER = "X-Launchboard-Session"
+
+_TITLE_KEYWORDS = {
+    "engineer", "engineering", "manager", "director", "designer", "analyst",
+    "scientist", "developer", "architect", "consultant", "specialist",
+    "coordinator", "practitioner", "teacher", "recruiter", "operations",
+    "marketing", "product", "success", "revenue", "platform", "nurse",
+}
+_DATE_TOKENS = {
+    "january", "jan", "february", "feb", "march", "mar", "april", "apr",
+    "may", "june", "jun", "july", "jul", "august", "aug", "september", "sep",
+    "october", "oct", "november", "nov", "december", "dec", "present",
+}
+_RESUME_STOP_TOKENS = {
+    "work", "experience", "summary", "skills", "projects", "education",
+    "linkedin", "phone", "email", "remote", "hybrid", "onsite", "on-site",
+}
 
 
 def _utcnow() -> datetime:
@@ -86,13 +118,29 @@ def _clean_string_list(values: Any, limit: int = 25) -> list[str]:
 
 
 def _default_place(label: str) -> dict[str, Any]:
+    from job_finder.company_classifier import parse_location
+
+    parsed = parse_location(label)
+    match_scope = "city"
+    kind = "manual"
+    if parsed.get("country") == "non-us" and not parsed.get("city"):
+        match_scope = "country"
+        kind = "country"
+    elif parsed.get("state") and not parsed.get("city"):
+        match_scope = "region"
+        kind = "region"
+    elif parsed.get("country_name") and not parsed.get("city") and not parsed.get("state"):
+        match_scope = "country"
+        kind = "country"
+
     return {
         "label": label,
-        "kind": "manual",
-        "city": "",
-        "region": "",
-        "country": "",
-        "country_code": "",
+        "kind": kind,
+        "match_scope": match_scope,
+        "city": parsed.get("city", ""),
+        "region": parsed.get("state", ""),
+        "country": parsed.get("country_name", ""),
+        "country_code": parsed.get("country", ""),
         "lat": None,
         "lon": None,
         "provider": "manual",
@@ -100,18 +148,56 @@ def _default_place(label: str) -> dict[str, Any]:
     }
 
 
+def _normalize_place_item(place: dict[str, Any] | PlaceSelection | str) -> dict[str, Any]:
+    if isinstance(place, PlaceSelection):
+        raw = place.model_dump()
+    elif isinstance(place, dict):
+        raw = dict(place)
+    elif isinstance(place, str) and place.strip():
+        raw = {"label": place.strip()}
+    else:
+        return _default_place("")
+
+    label = str(raw.get("label", "") or "").strip()
+    base = _default_place(label)
+    kind = str(raw.get("kind", "") or "").strip()
+    if kind and not (kind == "manual" and base["kind"] != "manual"):
+        base["kind"] = kind
+    if raw.get("match_scope"):
+        base["match_scope"] = raw["match_scope"]
+    for key in ("city", "region", "country", "country_code", "provider", "provider_id"):
+        value = raw.get(key)
+        if value not in (None, ""):
+            base[key] = value
+    for key in ("lat", "lon"):
+        if raw.get(key) is not None:
+            base[key] = raw[key]
+    return base
+
+
 def _serialize_places(places: list[dict[str, Any]] | list[PlaceSelection] | None) -> str:
     normalized: list[dict[str, Any]] = []
     for place in places or []:
-        if isinstance(place, PlaceSelection):
-            normalized.append(place.model_dump())
-        elif isinstance(place, dict) and place.get("label"):
-            item = _default_place(str(place["label"]))
-            item.update({k: v for k, v in place.items() if k in item})
+        item = _normalize_place_item(place)
+        if item.get("label"):
             normalized.append(item)
-        elif isinstance(place, str) and place.strip():
-            normalized.append(_default_place(place.strip()))
     return json.dumps(normalized)
+
+
+def _normalize_local_workspace_identity(db: Session, workspace: Workspace) -> Workspace:
+    name = (workspace.name or "").strip()
+    if not name or name == "Workspace":
+        workspace.name = "Local workspace"
+
+    slug = (workspace.slug or "").strip()
+    if not slug or slug == workspace.id:
+        workspace.slug = allocate_workspace_slug(
+            db,
+            "local workspace",
+            exclude_workspace_id=workspace.id,
+        )
+
+    return workspace
 
 
 def _deserialize_places(payload: str | None) -> list[PlaceSelection]:
@@ -125,15 +211,38 @@ def _deserialize_places(payload: str | None) -> list[PlaceSelection]:
         return []
     places: list[PlaceSelection] = []
     for item in raw:
-        if isinstance(item, dict):
+        if isinstance(item, (dict, str)):
             try:
-                places.append(PlaceSelection.model_validate(item))
+                places.append(PlaceSelection.model_validate(_normalize_place_item(item)))
             except Exception:
                 continue
     return places
 
 
 def _seed_preferences_from_default() -> WorkspacePreferencesSchema:
+    if _desktop_mode_enabled():
+        return WorkspacePreferencesSchema(
+            roles=[],
+            keywords=[],
+            companies=[],
+            preferred_places=[],
+            workplace_preference="remote_friendly",
+            max_days_old=14,
+            include_linkedin_jobs=False,
+            current_title="",
+            current_level="mid",
+            compensation=CompensationPreference(
+                currency="USD",
+                pay_period="annual",
+                current_comp=None,
+                min_base=None,
+                target_total_comp=None,
+                min_acceptable_tc=None,
+                include_equity=True,
+            ),
+            exclude_staffing_agencies=True,
+        )
+
     from app.dependencies import get_config
 
     cfg = get_config(None)
@@ -141,14 +250,21 @@ def _seed_preferences_from_default() -> WorkspacePreferencesSchema:
     comp = cfg.get("compensation", {})
     search = cfg.get("search_settings", {})
     loc_prefs = cfg.get("location_preferences", {})
+    watchlist = cfg.get("watchlist", [])
     preferred_locations = loc_prefs.get("preferred_locations") or cfg.get("locations") or []
     preferred_places = [_default_place(label) for label in _clean_string_list(preferred_locations, 10)]
+    job_boards = [str(board).strip().lower() for board in cfg.get("job_boards", []) if str(board).strip()]
     return WorkspacePreferencesSchema(
         roles=_clean_string_list(cfg.get("target_roles"), 15),
         keywords=_clean_string_list(cfg.get("keyword_searches"), 20),
+        companies=_clean_string_list(
+            [entry.get("name", "") for entry in watchlist if isinstance(entry, dict)],
+            60,
+        ),
         preferred_places=[PlaceSelection.model_validate(place) for place in preferred_places],
         workplace_preference=loc_prefs.get("workplace_preference", "remote_friendly"),
         max_days_old=int(search.get("max_days_old", 14) or 14),
+        include_linkedin_jobs=_LINKEDIN_JOBSPY_BOARD in job_boards,
         current_title=str(career.get("current_title", "") or ""),
         current_level=str(career.get("current_level", "mid") or "mid"),
         compensation=CompensationPreference(
@@ -175,12 +291,18 @@ def _prefs_to_schema(prefs: WorkspacePreferences | None) -> WorkspacePreferences
         keywords = json.loads(prefs.keywords_json or "[]")
     except json.JSONDecodeError:
         keywords = []
+    try:
+        companies = json.loads(prefs.target_companies_json or "[]")
+    except json.JSONDecodeError:
+        companies = []
     return WorkspacePreferencesSchema(
         roles=_clean_string_list(roles, 15),
         keywords=_clean_string_list(keywords, 20),
+        companies=_clean_string_list(companies, 60),
         preferred_places=_deserialize_places(prefs.preferred_places_json),
         workplace_preference=prefs.workplace_preference or "remote_friendly",
         max_days_old=int(prefs.max_days_old or 14),
+        include_linkedin_jobs=bool(getattr(prefs, "include_linkedin_jobs", False)),
         current_title=prefs.current_title or "",
         current_level=prefs.current_level or "mid",
         compensation=CompensationPreference(
@@ -203,7 +325,7 @@ def _resume_to_schema(resume: WorkspaceResume | None) -> WorkspaceResumeStatus:
     if parse_status not in {"missing", "parsed", "warning", "error"}:
         parse_status = "error"
     return WorkspaceResumeStatus(
-        exists=bool(resume.file_path),
+        exists=bool(resume.file_path or resume.storage_path or resume.file_asset_id),
         filename=resume.original_filename or "",
         file_size=int(resume.file_size or 0),
         parse_status=parse_status,
@@ -214,17 +336,80 @@ def _resume_to_schema(resume: WorkspaceResume | None) -> WorkspaceResumeStatus:
 @dataclass
 class WorkspaceContext:
     workspace: Workspace
-    session: WorkspaceSession
+    session: WorkspaceSession | None = None
+    profile: Profile | None = None
+    membership: WorkspaceMembership | None = None
+    auth_subject: str | None = None
+
+
+def _authenticate_hosted_user(db: Session, request: Request) -> WorkspaceContext:
+    from app.services import auth_service
+
+    user = auth_service.authenticate_request(request.headers.get("Authorization"))
+    profile, workspace, membership = auth_service.ensure_profile_and_workspace(db, user)
+    now = _utcnow()
+    profile.last_seen_at = now
+    workspace.last_active_at = now
+    db.commit()
+    return WorkspaceContext(
+        workspace=workspace,
+        profile=profile,
+        membership=membership,
+        auth_subject=user.user_id,
+    )
+
+
+def get_hosted_bootstrap(db: Session, request: Request) -> HostedBootstrapResponse:
+    context = _authenticate_hosted_user(db, request)
+    settings = get_settings()
+    return HostedBootstrapResponse(
+        hosted_mode=True,
+        auth_required=True,
+        csrf_required=False,
+        llm_optional=True,
+        user=HostedUserProfile(
+            id=context.profile.id,
+            email=context.profile.email,
+            full_name=context.profile.full_name,
+            avatar_url=context.profile.avatar_url or "",
+            auth_provider=context.profile.auth_provider or "supabase",
+            email_verified=bool(context.profile.email_verified),
+        ),
+        workspace=HostedWorkspaceSummary(
+            id=context.workspace.id,
+            name=context.workspace.name or "Workspace",
+            slug=context.workspace.slug or "",
+            role=context.membership.role if context.membership else "owner",
+            plan=context.workspace.plan or context.profile.plan or "free",
+            subscription_status=(
+                context.workspace.subscription_status
+                or context.profile.subscription_status
+                or "inactive"
+            ),
+        ),
+        features=HostedFeatureFlags(
+            platform_managed_ai=bool(settings.hosted_platform_managed_ai),
+            runtime_llm_configurable=bool(settings.allow_workspace_llm_config),
+            billing_enabled=False,
+        ),
+    )
 
 
 def cleanup_expired_workspaces(db: Session) -> int:
+    from app.models.application import ApplicationRecord
+
     now = _utcnow()
     expired = db.query(Workspace).filter(Workspace.expires_at < now).all()
     removed = 0
     for workspace in expired:
+        db.query(ApplicationRecord).filter(ApplicationRecord.workspace_id == workspace.id).delete()
+        db.query(FileAsset).filter(FileAsset.workspace_id == workspace.id).delete()
+        db.query(UsageCounter).filter(UsageCounter.workspace_id == workspace.id).delete()
+        db.query(WorkspaceMembership).filter(WorkspaceMembership.workspace_id == workspace.id).delete()
         db.query(WorkspaceSession).filter(WorkspaceSession.workspace_id == workspace.id).delete()
         db.query(WorkspaceResume).filter(WorkspaceResume.workspace_id == workspace.id).delete()
         db.query(WorkspacePreferences).filter(WorkspacePreferences.workspace_id == workspace.id).delete()
+        db.query(WorkspaceSearchEvent).filter(WorkspaceSearchEvent.workspace_id == workspace.id).delete()
         db.query(WorkspaceSearchRun).filter(WorkspaceSearchRun.workspace_id == workspace.id).delete()
         root = _workspace_root(workspace.id)
         if root.exists():
@@ -260,6 +445,18 @@ def _set_workspace_cookies(response: Response, session_token: str, csrf_token: s
     )
 
 
+def _desktop_mode_enabled() -> bool:
+    return os.environ.get("LAUNCHBOARD_DESKTOP_MODE", "").strip().lower() == "true"
+
+
+def _session_token_from_request(request: Request) -> str | None:
+    if _desktop_mode_enabled():
+        header_token = (request.headers.get(_DESKTOP_SESSION_HEADER, "") or "").strip()
+        if header_token:
+            return header_token
+    return request.cookies.get(get_settings().session_cookie_name)
+
+
 def _session_from_cookie(db: Session, session_token: str | None) -> WorkspaceContext | None:
     if not session_token:
         return None
@@ -287,30 +484,37 @@ def bootstrap_workspace_session(db: Session, request: Request, response: Respons
     cleanup_expired_workspaces(db)
 
     settings = get_settings()
-    current = _session_from_cookie(db, request.cookies.get(settings.session_cookie_name))
+    request_session_token = _session_token_from_request(request)
+    current = _session_from_cookie(db, request_session_token)
     now = _utcnow()
     expires_at = now + _workspace_ttl()
     csrf_token = secrets.token_urlsafe(24)
+    desktop_mode = _desktop_mode_enabled()
 
     if current:
+        _normalize_local_workspace_identity(db, current.workspace)
         current.workspace.last_active_at = now
         current.workspace.expires_at = expires_at
         current.session.last_seen_at = now
         current.session.expires_at = expires_at
         current.session.csrf_token_hash = _hash_token(csrf_token)
         db.commit()
-        session_token = request.cookies.get(settings.session_cookie_name, "")
+        session_token = request_session_token or request.cookies.get(settings.session_cookie_name, "")
         _set_workspace_cookies(response, session_token, csrf_token, expires_at)
         return WorkspaceSessionResponse(
             workspace_id=current.workspace.id,
             expires_at=expires_at,
             hosted_mode=settings.hosted_mode,
+            session_token=session_token if desktop_mode else None,
+            csrf_token=csrf_token if desktop_mode else None,
         )
 
     workspace_id = uuid.uuid4().hex
     session_token = secrets.token_urlsafe(32)
     workspace = Workspace(
         id=workspace_id,
+        name="Local workspace",
+        slug=allocate_workspace_slug(db, "local workspace"),
         mode="anonymous",
         created_at=now,
         updated_at=now,
@@ -343,6 +547,7 @@ def bootstrap_workspace_session(db: Session, request: Request, response: Respons
             preferred_places_json=_serialize_places(seeded.preferred_places),
             workplace_preference=seeded.workplace_preference,
             max_days_old=seeded.max_days_old,
+            include_linkedin_jobs=seeded.include_linkedin_jobs,
             current_title=seeded.current_title,
             current_level=seeded.current_level,
             current_comp=seeded.compensation.current_comp,
@@ -363,22 +568,31 @@ def bootstrap_workspace_session(db: Session, request: Request, response: Respons
         workspace_id=workspace_id,
         expires_at=expires_at,
         hosted_mode=settings.hosted_mode,
+        session_token=session_token if desktop_mode else None,
+        csrf_token=csrf_token if desktop_mode else None,
     )
 
 
 def require_workspace_context(db: Session, request: Request, *, validate_csrf: bool = False) -> WorkspaceContext:
     settings = get_settings()
-    context = _session_from_cookie(db, request.cookies.get(settings.session_cookie_name))
+    if settings.hosted_mode:
+        return _authenticate_hosted_user(db, request)
+    session_token = _session_token_from_request(request)
+    context = _session_from_cookie(db, session_token)
     if not context:
         raise HTTPException(status_code=401, detail="Session missing or expired")
 
     if validate_csrf:
-        cookie_token = request.cookies.get(settings.csrf_cookie_name, "")
         header_token = request.headers.get("X-CSRF-Token", "")
-        if not cookie_token or not header_token or cookie_token != header_token:
-            raise HTTPException(status_code=403, detail="Invalid CSRF token")
-        if _hash_token(cookie_token) != context.session.csrf_token_hash:
-            raise HTTPException(status_code=403, detail="Invalid CSRF token")
+        if _desktop_mode_enabled() and session_token:
+            if not header_token or _hash_token(header_token) != context.session.csrf_token_hash:
+                raise HTTPException(status_code=403, detail="Invalid CSRF token")
+        else:
+            cookie_token = request.cookies.get(settings.csrf_cookie_name, "")
+            if not cookie_token or not header_token or cookie_token != header_token:
+                raise HTTPException(status_code=403, detail="Invalid CSRF token")
+            if _hash_token(cookie_token) != context.session.csrf_token_hash:
+                raise HTTPException(status_code=403, detail="Invalid CSRF token")
 
     now = _utcnow()
     expires_at = now + _workspace_ttl()
@@ -392,7 +606,9 @@ def require_workspace_context(db: Session, request: Request, *, validate_csrf: b
 
 def get_workspace_context_optional(db: Session, request: Request) -> WorkspaceContext | None:
     settings = get_settings()
-    context = _session_from_cookie(db, request.cookies.get(settings.session_cookie_name))
+    if settings.hosted_mode:
+        return _authenticate_hosted_user(db, request)
+    context = _session_from_cookie(db, _session_token_from_request(request))
     if not context:
         return None
     now = _utcnow()
@@ -426,9 +642,11 @@ def save_workspace_preferences(
 
     record.roles_json = json.dumps(_clean_string_list(preferences.roles, 15))
     record.keywords_json = json.dumps(_clean_string_list(preferences.keywords, 20))
+    record.target_companies_json = json.dumps(_clean_string_list(preferences.companies, 60))
     record.preferred_places_json = _serialize_places(preferences.preferred_places)
     record.workplace_preference = preferences.workplace_preference
     record.max_days_old = preferences.max_days_old
+    record.include_linkedin_jobs = bool(preferences.include_linkedin_jobs)
     record.current_title = preferences.current_title.strip()
     record.current_level = preferences.current_level.strip() or "mid"
     record.current_comp = preferences.compensation.current_comp
@@ -450,10 +668,23 @@ def get_workspace_llm(
     *,
     fallback_to_global: bool = True,
 ):
-    record = _get_workspace_preferences_record(db, workspace_id)
-    has_workspace_config = bool(
-        record and (record.llm_provider or record.llm_base_url or record.llm_model)
-    )
+    settings = get_settings()
+    if settings.hosted_mode and settings.hosted_platform_managed_ai and not settings.allow_workspace_llm_config:
+        fallback_to_global = True
+        has_workspace_config = False
+    else:
+        if _desktop_mode_enabled():
+            # The desktop app should behave like a clean end-user workspace
+            # instead of silently inheriting developer shell/.env AI settings.
+            fallback_to_global = False
+        if settings.dev_hosted_auth_enabled and settings.allow_workspace_llm_config:
+            # The local hosted sandbox should behave like a real user workspace,
+            # not silently inherit the developer's machine-wide .env model.
+            fallback_to_global = False
+        record = _get_workspace_preferences_record(db, workspace_id)
+        has_workspace_config = bool(
+            record and (record.llm_provider or record.llm_base_url or record.llm_model)
+        )
     if has_workspace_config:
         from job_finder.llm_client import LLMClient
 
@@ -476,6 +707,7 @@ def get_workspace_llm(
 
 def get_workspace_llm_status(db: Session, workspace_id: str) -> dict[str, Any]:
     llm = get_workspace_llm(db, workspace_id, fallback_to_global=True)
+    settings = get_settings()
     configured = bool(llm and llm.is_configured)
     available = False
     if configured:
@@ -490,7 +722,7 @@ def get_workspace_llm_status(db: Session, workspace_id: str) -> dict[str, Any]:
         "provider": info.get("provider", "") if configured else "",
         "model": info.get("model", "") if configured else "",
         "label": info.get("label", "") if configured else "",
-        "runtime_configurable": True,
+        "runtime_configurable": bool(settings.allow_workspace_llm_config),
     }
 
 
@@ -503,6 +735,14 @@ def save_workspace_llm_config(
     api_key: str,
     model: str,
 ) -> dict[str, Any]:
+    settings = get_settings()
+    if settings.hosted_mode and not settings.allow_workspace_llm_config:
+        raise HTTPException(status_code=403, detail="Hosted AI is platform-managed")
+    if settings.hosted_mode and settings.allow_workspace_llm_config and not os.getenv("LAUNCHBOARD_SECRET"):
+        raise HTTPException(
+            status_code=503,
+            detail="Hosted BYO AI requires LAUNCHBOARD_SECRET so workspace keys can be stored safely.",
+        )
     record = _get_workspace_preferences_record(db, workspace_id)
     if not record:
         seeded = _seed_preferences_from_default()
@@ -513,6 +753,7 @@ def save_workspace_llm_config(
             preferred_places_json=_serialize_places(seeded.preferred_places),
             workplace_preference=seeded.workplace_preference,
             max_days_old=seeded.max_days_old,
+            include_linkedin_jobs=seeded.include_linkedin_jobs,
             current_title=seeded.current_title,
             current_level=seeded.current_level,
             current_comp=seeded.compensation.current_comp,
@@ -550,7 +791,6 @@ def test_workspace_llm_connection(db: Session, workspace_id: str) -> dict[str, A
     try:
         available = llm.is_available()
     except Exception as exc:
-        from job_finder.secrets import decrypt_value as _  # ensure import works
         import re
 
         raw = str(exc)
@@ -577,11 +817,48 @@ def get_workspace_resume(db: Session, workspace_id: str) -> WorkspaceResume | No
     return db.query(WorkspaceResume).filter(WorkspaceResume.workspace_id == workspace_id).first()
 
 
+def get_file_asset(db: Session, asset_id: int | None) -> FileAsset | None:
+    if not asset_id:
+        return None
+    return db.query(FileAsset).filter(FileAsset.id == asset_id).first()
+
+
 def get_resume_text(db: Session, workspace_id: str) -> str:
     record = get_workspace_resume(db, workspace_id)
     if not record or not record.extracted_text:
         return ""
     return record.extracted_text
+
+
+def materialize_workspace_resume_pdf(db: Session, workspace_id: str) -> str:
+    record = get_workspace_resume(db, workspace_id)
+    if not record:
+        return ""
+    if record.file_path and Path(record.file_path).exists():
+        return record.file_path
+
+    if record.file_asset_id:
+        from app.services import file_storage
+
+        asset = get_file_asset(db, record.file_asset_id)
+        if asset:
+            return file_storage.materialize_object(
+                bucket=asset.bucket,
+                storage_path=asset.storage_path,
+                local_path="",
+                suffix=".pdf",
+            )
+
+    if record.storage_path:
+        from app.services import file_storage
+
+        return file_storage.materialize_object(
+            bucket=get_settings().supabase_storage_bucket,
+            storage_path=record.storage_path,
+            local_path="",
+            suffix=".pdf",
+        )
+    return ""
 
 
 def _scan_upload(_file_path: Path) -> tuple[bool, str]:
@@ -602,10 +879,10 @@ def save_workspace_resume(
     if not content.startswith(b"%PDF"):
         raise HTTPException(status_code=400, detail="Uploaded file is not a valid PDF")
 
-    root = _workspace_root(workspace_id)
-    root.mkdir(parents=True, exist_ok=True)
+    runtime_root = Path(get_settings().data_dir) / "runtime" / "uploads"
+    runtime_root.mkdir(parents=True, exist_ok=True)
     stored_filename = f"{uuid.uuid4().hex}.pdf"
-    file_path = root / stored_filename
+    file_path = runtime_root / stored_filename
     file_path.write_bytes(content)
 
     clean, warning = _scan_upload(file_path)
@@ -632,21 +909,59 @@ def save_workspace_resume(
     else:
         extracted_text = parsed_text
 
-    text_path = root / "resume.txt"
-    if extracted_text:
-        text_path.write_text(extracted_text, encoding="utf-8")
-    elif text_path.exists():
-        text_path.unlink()
+    storage_record = None
+    from app.services import file_storage
+
+    uploaded = file_storage.save_workspace_file(
+        workspace_id,
+        kind="resume",
+        original_filename=original_filename,
+        content=content,
+        mime_type="application/pdf",
+    )
 
     record = db.query(WorkspaceResume).filter(WorkspaceResume.workspace_id == workspace_id).first()
     if not record:
         record = WorkspaceResume(workspace_id=workspace_id)
         db.add(record)
 
+    prior_asset = get_file_asset(db, record.file_asset_id)
+    if prior_asset:
+        try:
+            file_storage.delete_object(
+                bucket=prior_asset.bucket,
+                storage_path=prior_asset.storage_path,
+                local_path="",
+            )
+        except Exception:
+            logger.warning("Failed to delete prior workspace asset %s", prior_asset.id, exc_info=True)
+        db.delete(prior_asset)
+
+    owner_user_id = db.query(Workspace).filter(Workspace.id == workspace_id).first()
+    storage_record = FileAsset(
+        workspace_id=workspace_id,
+        owner_user_id=owner_user_id.owner_user_id if owner_user_id else None,
+        kind="resume",
+        storage_provider=uploaded.storage_provider,
+        bucket=uploaded.bucket,
+        storage_path=uploaded.storage_path,
+        original_filename=Path(original_filename).name,
+        mime_type=uploaded.mime_type,
+        byte_size=uploaded.byte_size,
+        sha256=uploaded.sha256,
+        metadata_json=json.dumps({"parse_status": parse_status}),
+    )
+    db.add(storage_record)
+    db.flush()
+
     record.original_filename = Path(original_filename).name
     record.stored_filename = stored_filename
-    record.file_path = str(file_path)
-    record.text_path = str(text_path) if extracted_text else ""
+    record.file_asset_id = storage_record.id
+    record.file_path = uploaded.local_path
+    record.text_path = ""
+    record.storage_provider = uploaded.storage_provider
+    record.storage_path = uploaded.storage_path
+    record.file_sha256 = uploaded.sha256
     record.mime_type = "application/pdf"
     record.file_size = len(content)
     record.parse_status = parse_status
@@ -678,6 +993,10 @@ def save_workspace_resume(
             )
 
     db.commit()
+    try:
+        file_path.unlink(missing_ok=True)
+    except Exception:
+        pass
     return _resume_to_schema(record), analysis
 
 
@@ -685,19 +1004,24 @@ def get_onboarding_state(db: Session, workspace_id: str) -> OnboardingState:
     prefs = get_workspace_preferences(db, workspace_id)
     resume = _resume_to_schema(get_workspace_resume(db, workspace_id))
     llm = get_workspace_llm(db, workspace_id, fallback_to_global=True)
+    has_started_search = (
+        db.query(WorkspaceSearchRun.id)
+        .filter(WorkspaceSearchRun.workspace_id == workspace_id)
+        .first()
+        is not None
+    )
     llm_available = False
     if llm and llm.is_configured:
         try:
             llm_available = llm.is_available()
         except Exception:
             llm_available = False
-    meaningful_places = _meaningful_place_labels(prefs.preferred_places)
     needs_resume = not resume.exists
-    has_search_terms = bool(prefs.current_title or prefs.roles or prefs.keywords or meaningful_places)
-    needs_preferences = not has_search_terms and not resume.exists
-    ready_to_search = resume.exists or has_search_terms
+    ready_to_search = workspace_search_is_runnable(prefs, resume_exists=resume.exists)
+    needs_preferences = not ready_to_search
     return OnboardingState(
         workspace_id=workspace_id,
+        has_started_search=has_started_search,
         needs_resume=needs_resume,
         needs_preferences=needs_preferences,
         ready_to_search=ready_to_search,
@@ -723,6 +1047,68 @@ def derive_search_terms_from_resume(
     roles: list[str] = []
     keywords: list[str] = []
 
+    def _clean_candidate(value: str) -> str:
+        candidate = re.sub(r"\s+", " ", value).strip(" ,-/")
+        if candidate.count(",") >= 2:
+            candidate = candidate.split(",", 1)[0].strip()
+        return candidate[:120]
+
+    def _looks_like_title(value: str) -> bool:
+        lowered = value.lower()
+        if len(value) < 5 or len(value) > 120:
+            return False
+        if len(value.split()) < 2:
+            return False
+        if "@" in value or "http" in lowered:
+            return False
+        if not any(keyword in lowered for keyword in _TITLE_KEYWORDS):
+            return False
+        if any(token in lowered for token in ("work experience", "professional summary", "curriculum vitae")):
+            return False
+        return True
+
+    def _extract_title_from_text(text: str) -> str:
+        lines = [
+            re.sub(r"\s+", " ", line).strip(" \t•●·|-")
+            for line in text.splitlines()
+        ]
+        compact_lines = [line for line in lines if line]
+
+        for line in compact_lines[:30]:
+            if _looks_like_title(line):
+                return _clean_candidate(line)
+
+        tokens = re.findall(r"\([A-Za-z][A-Za-z0-9&/().,+-]*|&|[A-Za-z][A-Za-z0-9&/().,+-]*", text)
+        search_window = tokens[:180]
+        date_idx = next(
+            (
+                idx
+                for idx, token in enumerate(search_window)
+                if token.lower().strip(".,") in _DATE_TOKENS or re.fullmatch(r"(19|20)\d{2}", token)
+            ),
+            None,
+        )
+        if date_idx is None:
+            return ""
+
+        collected: list[str] = []
+        for token in reversed(search_window[max(0, date_idx - 18):date_idx]):
+            lowered = token.lower().strip(".,")
+            if lowered in _RESUME_STOP_TOKENS:
+                if collected:
+                    break
+                continue
+            if token.isdigit():
+                if collected:
+                    break
+                continue
+            collected.append(token)
+            if len(collected) >= 10:
+                break
+
+        candidate = _clean_candidate(" ".join(reversed(collected)))
+        return candidate if _looks_like_title(candidate) else ""
+
     # 1) Use current_title from preferences as a role
     if prefs.current_title:
         roles.append(prefs.current_title)
@@ -740,21 +1126,9 @@ def derive_search_terms_from_resume(
 
     # 3) If still no roles, extract from resume text (basic heuristic)
     if not roles and record and record.extracted_text:
-        text = record.extracted_text
-        # Look for common resume patterns: lines that look like job titles
-        # (short capitalized lines near the top, after skipping name/contact)
-        lines = [line.strip() for line in text.split("\n") if line.strip()]
-        for line in lines[1:20]:  # skip first line (usually name)
-            # Skip contact info, links, and very long lines
-            if len(line) > 60 or "@" in line or "http" in line.lower():
-                continue
-            if any(ch.isdigit() for ch in line[:4]):  # phone, dates
-                continue
-            # A short capitalized line is likely a title or section header
-            words = line.split()
-            if 2 <= len(words) <= 6 and words[0][0].isupper():
-                roles.append(line)
-                break
+        candidate = _extract_title_from_text(record.extracted_text)
+        if candidate:
+            roles.append(candidate)
 
     return roles[:5], keywords[:10]
 
@@ -772,13 +1146,47 @@ def _meaningful_place_labels(places: list[PlaceSelection]) -> list[str]:
     ]
 
 
+def workspace_locations_are_runnable(preferences: WorkspacePreferencesSchema) -> bool:
+    """Return True when the current workplace preference has enough location context to search."""
+    if preferences.workplace_preference != "location_only":
+        return True
+    return bool(_meaningful_place_labels(preferences.preferred_places))
+
+
+def effective_workplace_preference(
+    workplace_preference: str,
+    places: list[PlaceSelection] | None = None,
+) -> str:
+    labels = _meaningful_place_labels(list(places or []))
+    if workplace_preference == "remote_friendly" and not labels:
+        return "remote_only"
+    return workplace_preference
+
+
+def workspace_search_is_runnable(
+    preferences: WorkspacePreferencesSchema,
+    *,
+    resume_exists: bool = False,
+) -> bool:
+    """Return True when a hosted workspace has enough information to launch a search."""
+    has_search_terms = bool(
+        preferences.current_title.strip()
+        or preferences.roles
+        or preferences.keywords
+        or resume_exists
+    )
+    return has_search_terms and workspace_locations_are_runnable(preferences)
+
+
 def build_search_snapshot(preferences: WorkspacePreferencesSchema) -> SearchSnapshot:
     return SearchSnapshot(
         roles=preferences.roles,
         keywords=preferences.keywords,
+        companies=preferences.companies,
         preferred_places=preferences.preferred_places,
         workplace_preference=preferences.workplace_preference,
         max_days_old=preferences.max_days_old,
+        include_linkedin_jobs=preferences.include_linkedin_jobs,
         current_title=preferences.current_title,
         current_level=preferences.current_level,
         compensation=preferences.compensation,
@@ -794,6 +1202,7 @@ def register_search_run(
     mode: str,
     snapshot: SearchSnapshot,
     started_at: datetime | None,
+    request_payload: dict[str, Any] | None = None,
 ) -> None:
     record = db.query(WorkspaceSearchRun).filter(WorkspaceSearchRun.run_id == run_id).first()
     if not record:
@@ -805,9 +1214,105 @@ def register_search_run(
     record.status = status
     record.mode = mode
     record.snapshot_json = snapshot.model_dump_json()
+    record.request_json = json.dumps(request_payload or {})
+    record.available_at = started_at or _utcnow()
+    record.completed_at = None
+    record.error = ""
     if started_at:
         record.started_at = started_at
     db.commit()
+
+
+def get_search_run(
+    db: Session,
+    workspace_id: str,
+    run_id: str,
+) -> WorkspaceSearchRun | None:
+    return (
+        db.query(WorkspaceSearchRun)
+        .filter(
+            WorkspaceSearchRun.workspace_id == workspace_id,
+            WorkspaceSearchRun.run_id == run_id,
+        )
+        .first()
+    )
+
+
+def list_search_runs(
+    db: Session,
+    workspace_id: str,
+    *,
+    limit: int = 20,
+) -> list[WorkspaceSearchRun]:
+    return (
+        db.query(WorkspaceSearchRun)
+        .filter(WorkspaceSearchRun.workspace_id == workspace_id)
+        .order_by(WorkspaceSearchRun.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+
+
+def append_search_event(
+    db: Session,
+    workspace_id: str,
+    run_id: str,
+    event_type: str,
+    payload: str,
+) -> WorkspaceSearchEvent:
+    record = WorkspaceSearchEvent(
+        workspace_id=workspace_id,
+        run_id=run_id,
+        event_type=event_type,
+        payload=payload,
+    )
+    db.add(record)
+    touch_search_run_heartbeat(db, run_id)
+    db.commit()
+    db.refresh(record)
+    return record
+
+
+def list_search_events(
+    db: Session,
+    workspace_id: str,
+    run_id: str,
+    *,
+    after_id: int = 0,
+    limit: int = 200,
+) -> list[WorkspaceSearchEvent]:
+    query = (
+        db.query(WorkspaceSearchEvent)
+        .filter(
+            WorkspaceSearchEvent.workspace_id == workspace_id,
+            WorkspaceSearchEvent.run_id == run_id,
+        )
+        .order_by(WorkspaceSearchEvent.id.asc())
+    )
+    if after_id > 0:
+        query = query.filter(WorkspaceSearchEvent.id > after_id)
+    return query.limit(limit).all()
+
+
+def get_progress_messages(
+    db: Session,
+    workspace_id: str,
+    run_id: str,
+    *,
+    limit: int = 100,
+) -> list[str]:
+    rows = (
+        db.query(WorkspaceSearchEvent)
+        .filter(
+            WorkspaceSearchEvent.workspace_id == workspace_id,
+            WorkspaceSearchEvent.run_id == run_id,
+            WorkspaceSearchEvent.event_type == "progress",
+        )
+        .order_by(WorkspaceSearchEvent.id.desc())
+        .limit(limit)
+        .all()
+    )
+    return [row.payload for row in reversed(rows)]
 
 
 def update_search_run_status(
@@ -819,6 +1324,7 @@ def update_search_run_status(
     jobs_scored: int = 0,
     strong_matches: int = 0,
     error: str = "",
+    started_at: datetime | None = None,
     completed_at: datetime | None = None,
 ) -> None:
     record = db.query(WorkspaceSearchRun).filter(WorkspaceSearchRun.run_id == run_id).first()
@@ -829,28 +1335,246 @@ def update_search_run_status(
     record.jobs_scored = jobs_scored
     record.strong_matches = strong_matches
     record.error = error
+    if started_at:
+        record.started_at = started_at
     if completed_at:
         record.completed_at = completed_at
+        record.lease_expires_at = None
+        record.claimed_by = ""
     db.commit()
 
 
+def touch_search_run_heartbeat(db: Session, run_id: str, *, worker_id: str = "") -> None:
+    record = db.query(WorkspaceSearchRun).filter(WorkspaceSearchRun.run_id == run_id).first()
+    if not record:
+        return
+    now = _utcnow()
+    record.heartbeat_at = now
+    if worker_id:
+        record.claimed_by = worker_id
+        record.lease_expires_at = now + timedelta(seconds=get_settings().worker_lease_seconds)
+    db.flush()
+
+
+def get_search_request_payload(run: WorkspaceSearchRun) -> dict[str, Any]:
+    if not run.request_json:
+        return {}
+    try:
+        payload = json.loads(run.request_json)
+    except json.JSONDecodeError:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _claim_search_run_record(record: WorkspaceSearchRun, worker_id: str) -> None:
+    now = _utcnow()
+    record.status = "running"
+    record.attempt_count = int(record.attempt_count or 0) + 1
+    record.claimed_by = worker_id
+    record.claimed_at = now
+    record.heartbeat_at = now
+    record.lease_expires_at = now + timedelta(seconds=get_settings().worker_lease_seconds)
+    if not record.started_at:
+        record.started_at = now
+
+
+def claim_search_run(db: Session, run_id: str, worker_id: str) -> WorkspaceSearchRun | None:
+    now = _utcnow()
+    record = db.query(WorkspaceSearchRun).filter(WorkspaceSearchRun.run_id == run_id).first()
+    if not record:
+        return None
+    available_at = _coerce_utc(record.available_at)
+    if available_at and available_at > now:
+        return None
+
+    lease_expires_at = _coerce_utc(record.lease_expires_at)
+    lease_expired = bool(lease_expires_at and lease_expires_at < now)
+    claimable = record.status == "pending" or (
+        record.status == "running" and (record.claimed_by == worker_id or lease_expired)
+    )
+    if not claimable:
+        return None
+
+    _claim_search_run_record(record, worker_id)
+    db.commit()
+    db.refresh(record)
+    return record
+
+
+def claim_next_search_run(db: Session, worker_id: str) -> WorkspaceSearchRun | None:
+    now = _utcnow()
+    query = (
+        db.query(WorkspaceSearchRun)
+        .filter(
+            (WorkspaceSearchRun.status == "pending")
+            | (
+                (WorkspaceSearchRun.status == "running")
+                & (WorkspaceSearchRun.lease_expires_at.is_not(None))
+                & (WorkspaceSearchRun.lease_expires_at < now)
+            )
+        )
+        .filter(WorkspaceSearchRun.available_at <= now)
+        .order_by(WorkspaceSearchRun.available_at.asc(), WorkspaceSearchRun.created_at.asc())
+    )
+
+    dialect_name = db.bind.dialect.name if db.bind is not None else ""
+    if dialect_name == "postgresql":
+        query = query.with_for_update(skip_locked=True)
+
+    record = query.first()
+    if not record:
+        return None
+
+    _claim_search_run_record(record, worker_id)
+    db.commit()
+    db.refresh(record)
+    return record
+
+
+def release_search_run_for_retry(
+    db: Session,
+    run_id: str,
+    *,
+    error: str,
+    retry_seconds: int,
+) -> None:
+    record = db.query(WorkspaceSearchRun).filter(WorkspaceSearchRun.run_id == run_id).first()
+    if not record:
+        return
+    record.status = "pending"
+    record.error = error
+    record.available_at = _utcnow() + timedelta(seconds=retry_seconds)
+    record.claimed_by = ""
+    record.lease_expires_at = None
+    record.heartbeat_at = None
+    db.commit()
+
+
+def increment_usage_counter(
+    db: Session,
+    workspace_id: str,
+    *,
+    metric: str,
+    amount: int = 1,
+    limit_count: int | None = None,
+    period_key: str | None = None,
+) -> UsageCounter:
+    key = period_key or _utcnow().strftime("%Y-%m")
+    record = (
+        db.query(UsageCounter)
+        .filter(
+            UsageCounter.workspace_id == workspace_id,
+            UsageCounter.metric == metric,
+            UsageCounter.period_key == key,
+        )
+        .first()
+    )
+    if not record:
+        record = UsageCounter(
+            workspace_id=workspace_id,
+            metric=metric,
+            period_key=key,
+        )
+        db.add(record)
+    record.used_count = int(record.used_count or 0) + amount
+    if limit_count is not None:
+        record.limit_count = limit_count
+    db.commit()
+    db.refresh(record)
+    return record
+
+
+def update_worker_heartbeat(
+    db: Session,
+    worker_id: str,
+    *,
+    worker_type: str = "search",
+    status: str = "idle",
+    metadata: dict[str, Any] | None = None,
+) -> WorkerHeartbeat:
+    record = db.query(WorkerHeartbeat).filter(WorkerHeartbeat.worker_id == worker_id).first()
+    if not record:
+        record = WorkerHeartbeat(worker_id=worker_id)
+        db.add(record)
+    record.worker_type = worker_type
+    record.status = status
+    record.last_seen_at = _utcnow()
+    record.metadata_json = json.dumps(metadata or {})
+    db.commit()
+    db.refresh(record)
+    return record
+
+
+def worker_heartbeat_release(record: WorkerHeartbeat) -> str:
+    try:
+        metadata = json.loads(record.metadata_json or "{}")
+    except Exception:
+        return ""
+    return str(metadata.get("release", "") or "").strip()
+
+
+def list_recent_worker_heartbeats(
+    db: Session,
+    *,
+    worker_type: str = "search",
+    max_age_seconds: int = 180,
+    expected_release: str | None = None,
+) -> list[WorkerHeartbeat]:
+    cutoff = _utcnow() - timedelta(seconds=max_age_seconds)
+    records = (
+        db.query(WorkerHeartbeat)
+        .filter(
+            WorkerHeartbeat.worker_type == worker_type,
+            WorkerHeartbeat.last_seen_at >= cutoff,
+        )
+        .order_by(WorkerHeartbeat.last_seen_at.desc())
+        .all()
+    )
+    if not expected_release:
+        return records
+    return [record for record in records if worker_heartbeat_release(record) == expected_release]
+
+
 def build_pipeline_config_override(preferences: WorkspacePreferencesSchema, workspace_id: str) -> dict[str, Any]:
+    from app.services.watchlist_service import build_watchlist_entries
+    from job_finder.company_classifier import parse_location
+
     preferred_places = [place.model_dump() for place in preferences.preferred_places]
     labels = place_labels(preferences.preferred_places)
-    include_remote = preferences.workplace_preference != "location_only"
-    remote_only = preferences.workplace_preference == "remote_only"
+    preferred_states: list[str] = []
+    preferred_cities: list[str] = []
+    for label in labels:
+        parsed = parse_location(label)
+        if parsed["state"] and parsed["state"] not in preferred_states:
+            preferred_states.append(parsed["state"])
+        if parsed["city"] and parsed["city"] not in preferred_cities:
+            preferred_cities.append(parsed["city"])
+    effective_preference = effective_workplace_preference(
+        preferences.workplace_preference,
+        preferences.preferred_places,
+    )
+    include_remote = effective_preference != "location_only"
+    remote_only = effective_preference == "remote_only"
+    watchlist = build_watchlist_entries(_clean_string_list(preferences.companies, 60))
+    job_boards = list(_DEFAULT_JOBSPY_BOARDS)
+    if preferences.include_linkedin_jobs:
+        job_boards.insert(1, _LINKEDIN_JOBSPY_BOARD)
 
     return {
         "target_roles": preferences.roles,
         "keyword_searches": preferences.keywords,
+        "watchlist": watchlist,
+        "job_boards": job_boards,
         "locations": labels + (["Remote"] if include_remote and not remote_only else []),
         "location_preferences": {
             "filter_enabled": bool(labels) or remote_only or not include_remote,
             "preferred_locations": labels,
+            "preferred_states": preferred_states,
+            "preferred_cities": preferred_cities,
             "preferred_places": preferred_places,
             "remote_only": remote_only,
             "include_remote": include_remote,
-            "workplace_preference": preferences.workplace_preference,
+            "workplace_preference": effective_preference,
         },
         "career_baseline": {
             "current_title": preferences.current_title,

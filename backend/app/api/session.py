@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.models.database import get_db
 from app.schemas.workspace import WorkspaceSessionResponse
 from app.services import workspace_service
@@ -18,4 +19,6 @@ def bootstrap_session(
     response: Response,
     db: Session = Depends(get_db),
 ):
+    if get_settings().hosted_mode:
+        raise HTTPException(status_code=410, detail="Anonymous hosted bootstrap is disabled")
     return workspace_service.bootstrap_workspace_session(db, request, response)

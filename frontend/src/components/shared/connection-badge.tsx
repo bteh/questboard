@@ -7,8 +7,8 @@ interface ConnectionBadgeProps {
 }
 
 export function ConnectionBadge({ llm }: ConnectionBadgeProps) {
-  if (!llm) return null;
   const { resolved } = useTheme();
+  if (!llm) return null;
   const isDark = resolved === 'dark';
 
   let bg: string, text: string, dotColor: string, label: string;
@@ -26,7 +26,7 @@ export function ConnectionBadge({ llm }: ConnectionBadgeProps) {
     bg = isDark ? '#27272A' : '#F1F5F9';
     text = isDark ? '#A1A1AA' : '#64748B';
     dotColor = isDark ? '#71717A' : '#94A3B8';
-    label = 'Not configured';
+    label = 'AI optional';
   }
 
   return (

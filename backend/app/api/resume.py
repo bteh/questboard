@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 
 from app.schemas.resume import ResumeStatus, ResumeUploadResponse
 from app.services import resume_service
-from app.dependencies import sanitize_profile
+from app.dependencies import reject_legacy_route_in_hosted_mode, sanitize_profile
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +46,7 @@ def _analyze_and_update_profile(profile: str) -> None:
 @router.get("/{profile}", response_model=ResumeStatus)
 async def get_resume_status(profile: str):
     """Check if a resume exists for the given profile."""
+    reject_legacy_route_in_hosted_mode("Resume profile routes are disabled in hosted mode")
     profile = sanitize_profile(profile)
     return resume_service.get_resume_status(profile)
 
@@ -61,6 +62,7 @@ async def upload_resume(
     auto-extracts skills, seniority, and industry from the resume and
     populates the profile's target roles, keywords, and career baseline.
     """
+    reject_legacy_route_in_hosted_mode("Resume profile routes are disabled in hosted mode")
     profile = sanitize_profile(profile)
     if not file.filename or not file.filename.lower().endswith(".pdf"):
         raise HTTPException(400, "Only PDF files are accepted")
@@ -79,6 +81,7 @@ async def upload_resume(
 @router.get("/{profile}/download")
 async def download_resume(profile: str):
     """Download the resume PDF for the given profile."""
+    reject_legacy_route_in_hosted_mode("Resume profile routes are disabled in hosted mode")
     profile = sanitize_profile(profile)
     path = resume_service.get_resume_path(profile)
     if not path:
@@ -89,6 +92,7 @@ async def download_resume(profile: str):
 @router.get("/{profile}/text")
 async def get_resume_text(profile: str):
     """Get parsed text content of the resume."""
+    reject_legacy_route_in_hosted_mode("Resume profile routes are disabled in hosted mode")
     profile = sanitize_profile(profile)
     text = resume_service.get_resume_text(profile)
     if text.startswith("ERROR"):
@@ -103,6 +107,7 @@ async def analyze_resume_endpoint(profile: str):
     Useful for re-analyzing after the user updates their resume or
     when they want to refresh the extracted data.
     """
+    reject_legacy_route_in_hosted_mode("Resume profile routes are disabled in hosted mode")
     profile = sanitize_profile(profile)
     resume_text = resume_service.get_resume_text(profile)
     if resume_text.startswith("ERROR"):

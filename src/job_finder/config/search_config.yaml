@@ -46,7 +46,6 @@ locations:
 # Job boards to scrape via JobSpy
 job_boards:
   - "indeed"
-  - "linkedin"
   - "glassdoor"
   - "zip_recruiter"
   - "google"
@@ -115,6 +114,7 @@ search_settings:
   max_parallel_searches: 6  # Concurrent JobSpy workers (each hits 5 boards, so 6 = 30 requests)
   max_unique_jobs: 500      # Stop early once this many unique jobs found
   max_search_tasks: 30      # Hard cap on total JobSpy queries (term × location combos)
+  ai_score_top_n: 60        # Keyword-score all jobs, then AI-score only the top N for speed (<=0 = AI-score all)
 
 # Applicant information (used for auto-apply)
 applicant_info:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
@@ -25,7 +26,7 @@ from app.schemas.settings import (
     ProviderPreset,
 )
 from app.services import settings_service
-from app.dependencies import sanitize_profile
+from app.dependencies import reject_legacy_route_in_hosted_mode, sanitize_profile
 from app.models.database import get_db
 from app.services import workspace_service
 from app.config import get_settings
@@ -36,6 +37,20 @@ router = APIRouter(tags=["settings"])
 # --- LLM Configuration ---
 
 
+def _invalid_base_url_detail(*, hosted_mode: bool) -> str:
+    if hosted_mode:
+        return "Invalid base_url: hosted mode only allows https:// provider endpoints"
+    return "Invalid base_url: must use https:// or http://localhost / http://127.0.0.1"
+
+
+def _workspace_scoped_llm_mode() -> bool:
+    settings = get_settings()
+    return bool(
+        settings.hosted_mode
+        or os.environ.get("LAUNCHBOARD_DESKTOP_MODE", "").strip().lower() == "true"
+    )
+
+
 @router.get("/settings/llm", response_model=LLMStatus)
 async def get_llm_config(
     request: Request,
@@ -44,9 +59,22 @@ async def get_llm_config(
     """Get current LLM configuration and connection status."""
     import asyncio
 
-    workspace = workspace_service.get_workspace_context_optional(db, request)
-    if workspace and get_settings().hosted_mode:
-        return workspace_service.get_workspace_llm_status(db, workspace.workspace.id)
+    if _workspace_scoped_llm_mode():
+        if not get_settings().hosted_mode:
+            context = workspace_service.get_workspace_context_optional(db, request)
+            if not context:
+                settings = get_settings()
+                return {
+                    "configured": False,
+                    "available": False,
+                    "provider": "",
+                    "model": "",
+                    "label": "",
+                    "runtime_configurable": bool(settings.allow_workspace_llm_config),
+                }
+        else:
+            context = workspace_service.require_workspace_context(db, request, validate_csrf=False)
+        return workspace_service.get_workspace_llm_status(db, context.workspace.id)
     return await asyncio.to_thread(settings_service.get_llm_status)
 
 
@@ -58,13 +86,13 @@ async def update_llm_config(
 ):
     """Update LLM provider configuration."""
     base = config.base_url.rstrip("/")
-    if base and not _is_safe_url(base):
+    hosted_mode = get_settings().hosted_mode
+    if base and not _is_safe_url(base, allow_local_http=not hosted_mode):
         raise HTTPException(
             400,
-            "Invalid base_url: must use https:// or http://localhost / http://127.0.0.1",
+            _invalid_base_url_detail(hosted_mode=hosted_mode),
         )
-    workspace = workspace_service.get_workspace_context_optional(db, request)
-    if workspace and get_settings().hosted_mode:
+    if _workspace_scoped_llm_mode():
         workspace = workspace_service.require_workspace_context(db, request, validate_csrf=True)
         return workspace_service.save_workspace_llm_config(
             db,
@@ -91,6 +119,7 @@ async def update_llm_config(
 @router.get("/settings/llm/detect-ollama", response_model=OllamaDetectResult)
 async def detect_ollama():
     """Probe localhost for Ollama and return available models."""
+    reject_legacy_route_in_hosted_mode("Local AI discovery is disabled in hosted mode")
     import asyncio
 
     return await asyncio.to_thread(settings_service.detect_ollama)
@@ -99,6 +128,7 @@ async def detect_ollama():
 @router.get("/settings/llm/detect-local", response_model=LocalAIDetectResult)
 async def detect_local_ai():
     """Scan common localhost ports for OpenAI-compatible AI servers."""
+    reject_legacy_route_in_hosted_mode("Local AI discovery is disabled in hosted mode")
     import asyncio
 
     return await asyncio.to_thread(settings_service.detect_local_ai)
@@ -110,41 +140,56 @@ async def test_llm_connection(
     db: Session = Depends(get_db),
 ):
     """Test the current LLM connection."""
-    workspace = workspace_service.get_workspace_context_optional(db, request)
-    if workspace and get_settings().hosted_mode:
+    if _workspace_scoped_llm_mode():
+        workspace = workspace_service.require_workspace_context(db, request, validate_csrf=True)
         return workspace_service.test_workspace_llm_connection(db, workspace.workspace.id)
     return settings_service.test_llm_connection()
 
 
-def _is_safe_url(url: str) -> bool:
+def _is_safe_url(url: str, *, allow_local_http: bool) -> bool:
     """Validate that a URL is safe to proxy requests to.
 
     Allows https:// URLs and localhost/127.0.0.1 over http://.
     Rejects all other http:// targets to prevent SSRF against internal services.
     """
-    from urllib.parse import urlparse
     import ipaddress
+    import socket
+    from urllib.parse import urlparse
 
     try:
         parsed = urlparse(url)
     except Exception:
         return False
 
-    if parsed.scheme == "https":
-        # Reject if the hostname resolves to a private/internal IP
-        hostname = parsed.hostname or ""
+    def _is_public_host(hostname: str) -> bool:
         try:
             addr = ipaddress.ip_address(hostname)
+            return not (addr.is_private or addr.is_loopback or addr.is_reserved or addr.is_link_local)
+        except ValueError:
+            pass
+
+        try:
+            infos = socket.getaddrinfo(hostname, None)
+        except OSError:
+            return False
+
+        for info in infos:
+            candidate = info[4][0]
+            try:
+                addr = ipaddress.ip_address(candidate)
+            except ValueError:
+                return False
             if addr.is_private or addr.is_loopback or addr.is_reserved or addr.is_link_local:
                 return False
-        except ValueError:
-            # Not a raw IP — it's a hostname, which is fine for https
-            pass
         return True
+
+    if parsed.scheme == "https":
+        hostname = parsed.hostname or ""
+        return bool(hostname) and _is_public_host(hostname)
 
     if parsed.scheme == "http":
         hostname = parsed.hostname or ""
-        if hostname in ("localhost", "127.0.0.1", "::1"):
+        if allow_local_http and hostname in ("localhost", "127.0.0.1", "::1"):
             return True
         return False
 
@@ -152,23 +197,33 @@ def _is_safe_url(url: str) -> bool:
 
 
 @router.post("/settings/llm/models", response_model=list[ProviderModel])
-async def fetch_provider_models(req: FetchModelsRequest):
+async def fetch_provider_models(
+    req: FetchModelsRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
     """Fetch available models from a provider's /models endpoint.
 
     Proxies the request so the frontend doesn't need CORS access to
     arbitrary provider URLs.
     """
     import requests as http_requests
+    hosted_mode = get_settings().hosted_mode
+    workspace_scoped = _workspace_scoped_llm_mode()
 
-    if not settings_service.runtime_llm_config_allowed() and not get_settings().hosted_mode:
+    if workspace_scoped:
+        workspace_service.require_workspace_context(db, request, validate_csrf=True)
+        if hosted_mode and not get_settings().allow_workspace_llm_config:
+            raise HTTPException(403, detail="Hosted AI is platform-managed")
+    elif not settings_service.runtime_llm_config_allowed():
         raise HTTPException(403, detail="Runtime LLM configuration is disabled")
 
     base = req.base_url.rstrip("/")
 
-    if not _is_safe_url(base):
+    if not _is_safe_url(base, allow_local_http=not hosted_mode):
         raise HTTPException(
             400,
-            "Invalid base_url: must use https:// or http://localhost / http://127.0.0.1",
+            _invalid_base_url_detail(hosted_mode=hosted_mode),
         )
 
     headers: dict[str, str] = {}
@@ -219,6 +274,7 @@ async def get_llm_presets(include_internal: bool = False):
 @router.get("/settings/database", response_model=DatabaseInfo)
 async def get_database_info():
     """Get database path, size, and record count."""
+    reject_legacy_route_in_hosted_mode("Database inspection is disabled in hosted mode")
     return settings_service.get_database_info()
 
 
@@ -228,12 +284,14 @@ async def get_database_info():
 @router.get("/profiles", response_model=list[ProfileSummary])
 async def list_profiles():
     """List available search profiles."""
+    reject_legacy_route_in_hosted_mode("Profile routes are disabled in hosted mode")
     return settings_service.list_profiles()
 
 
 @router.get("/profiles/{name}", response_model=ProfileDetail)
 async def get_profile(name: str):
     """Get full config for a profile."""
+    reject_legacy_route_in_hosted_mode("Profile routes are disabled in hosted mode")
     detail = settings_service.get_profile_detail(name)
     if not detail:
         raise HTTPException(404, f"Profile '{name}' not found")
@@ -243,6 +301,7 @@ async def get_profile(name: str):
 @router.get("/profiles/{name}/preferences", response_model=ProfilePreferencesResponse)
 async def get_profile_preferences(name: str):
     """Get user-editable preferences for a profile."""
+    reject_legacy_route_in_hosted_mode("Profile routes are disabled in hosted mode")
     name = sanitize_profile(name)
     return settings_service.get_profile_preferences(name)
 
@@ -250,6 +309,7 @@ async def get_profile_preferences(name: str):
 @router.put("/profiles/{name}/preferences", response_model=ProfilePreferencesResponse)
 async def update_profile_preferences(name: str, prefs: ProfilePreferences):
     """Update user-editable preferences for a profile."""
+    reject_legacy_route_in_hosted_mode("Profile routes are disabled in hosted mode")
     name = sanitize_profile(name)
     try:
         return settings_service.update_profile_preferences(

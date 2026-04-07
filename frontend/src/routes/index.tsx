@@ -10,6 +10,7 @@ import { JobCard } from '@/components/jobs/job-card';
 import { ActivityItem } from '@/components/shared/activity-item';
 import { useDashboardStats } from '@/hooks/use-analytics';
 import { useApplications } from '@/hooks/use-applications';
+import { pickLatestCompletedRun, useSearchRuns } from '@/hooks/use-search';
 import { useProfile } from '@/contexts/profile-context';
 import { useSearchContext } from '@/contexts/search-context';
 import { useSourceLabels } from '@/hooks/use-scrapers';
@@ -25,12 +26,16 @@ function DashboardPage() {
   const { profile } = useProfile();
   const { state: searchState } = useSearchContext();
   const sourceLabels = useSourceLabels();
-  const { data: stats, isLoading: statsLoading } = useDashboardStats();
+  const { data: runs } = useSearchRuns(10);
+  const latestCompletedRun = useMemo(() => pickLatestCompletedRun(runs), [runs]);
+  const latestRunId = latestCompletedRun?.run_id;
+  const { data: stats, isLoading: statsLoading } = useDashboardStats(latestRunId);
   const { data: appData, isLoading: appsLoading } = useApplications({
     sort_by: 'overall_score',
     sort_order: 'desc',
     page_size: 5,
     profile,
+    search_run_id: latestRunId,
   });
 
   const { data: recentData, isLoading: recentLoading } = useApplications({
@@ -38,6 +43,7 @@ function DashboardPage() {
     sort_order: 'desc',
     page_size: 5,
     profile,
+    search_run_id: latestRunId,
   });
 
   const topJobs = appData?.items || [];
@@ -88,20 +94,29 @@ function DashboardPage() {
         ))}
       </div>
 
-      {topJobs.length > 0 && (
-        <p className="text-xs text-text-muted mb-4">
-          Showing top opportunities from {stats?.total_jobs ?? 0} tracked jobs
+      <div className="mb-4 flex items-center justify-between gap-4">
+        <p className="text-xs text-text-muted">
+          {latestRunId
+            ? `Showing your latest completed search${stats?.total_jobs != null ? ` · ${stats.total_jobs} jobs in scope` : ''}`
+            : (topJobs.length > 0 ? `Showing top opportunities from ${stats?.total_jobs ?? 0} tracked jobs` : 'No completed search yet. Your dashboard will populate after the first run.')}
         </p>
-      )}
+        {latestRunId ? (
+          <Link to="/applications" search={{ scope: 'all', run: undefined }} className="text-xs text-brand hover:text-brand-hover transition-colors inline-flex items-center gap-1">
+            Browse all tracked jobs <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        ) : null}
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Top Opportunities */}
         <div className="lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-text-primary">Top Opportunities</h2>
+            <h2 className="text-lg font-semibold text-text-primary">
+              {latestRunId ? 'Top Matches From Your Latest Search' : 'Top Opportunities'}
+            </h2>
             {topJobs.length > 0 && (
-              <Link to="/applications" className="text-sm text-brand hover:text-brand-hover transition-colors inline-flex items-center gap-1">
-                View all <ArrowRight className="h-3.5 w-3.5" />
+              <Link to="/applications" search={{ run: latestRunId ?? undefined, scope: latestRunId ? undefined : 'all' }} className="text-sm text-brand hover:text-brand-hover transition-colors inline-flex items-center gap-1">
+                {latestRunId ? 'View latest search' : 'View all'} <ArrowRight className="h-3.5 w-3.5" />
               </Link>
             )}
           </div>
@@ -116,13 +131,32 @@ function DashboardPage() {
               <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-light mb-5">
                 <Inbox className="h-7 w-7 text-brand" />
               </div>
-              <h3 className="text-base font-semibold text-text-primary mb-1.5">Welcome to Launchboard</h3>
-              <p className="text-sm text-text-tertiary mb-5 max-w-sm leading-relaxed">
-                Search multiple job boards at once, see which jobs match your skills and experience, and track your applications — all in one place.
-              </p>
-              <Button onClick={() => navigate({ to: '/search' })} size="sm">
-                <Search className="h-4 w-4 mr-2" /> Start Your First Search
-              </Button>
+              {latestRunId ? (
+                <>
+                  <h3 className="text-base font-semibold text-text-primary mb-1.5">No matches in your latest search</h3>
+                  <p className="text-sm text-text-tertiary mb-5 max-w-sm leading-relaxed">
+                    Your most recent run did not keep any jobs after filtering. You can adjust your search criteria or browse older tracked jobs.
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <Button onClick={() => navigate({ to: '/search' })} size="sm">
+                      <Search className="h-4 w-4 mr-2" /> Refine Search
+                    </Button>
+                    <Button onClick={() => navigate({ to: '/applications', search: { scope: 'all', run: undefined } })} variant="outline" size="sm">
+                      Browse History
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h3 className="text-base font-semibold text-text-primary mb-1.5">Welcome to Launchboard</h3>
+                  <p className="text-sm text-text-tertiary mb-5 max-w-sm leading-relaxed">
+                    Search multiple job boards at once, see which jobs match your skills and experience, and track your applications — all in one place.
+                  </p>
+                  <Button onClick={() => navigate({ to: '/search' })} size="sm">
+                    <Search className="h-4 w-4 mr-2" /> Start Your First Search
+                  </Button>
+                </>
+              )}
             </div>
           ) : (
             <div className="space-y-4">
@@ -135,7 +169,9 @@ function DashboardPage() {
 
         {/* Recent Activity */}
         <div>
-          <h2 className="text-lg font-semibold text-text-primary mb-4">Recent Activity</h2>
+          <h2 className="text-lg font-semibold text-text-primary mb-4">
+            {latestRunId ? 'Recent Matches' : 'Recent Activity'}
+          </h2>
           <Card>
             <CardContent className="p-4">
               {recentLoading ? (

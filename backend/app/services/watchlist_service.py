@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import os
 import re
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
 import yaml
@@ -155,6 +155,47 @@ def discover_company(name: str) -> dict:
                 return {"name": name, **result}
 
     return {"name": name, "slug": slugs[0], "ats": "unknown", "job_count": 0, "careers_url": ""}
+
+
+def build_watchlist_entries(company_names: list[str]) -> list[dict]:
+    """Discover ATS-backed watchlist entries for a list of company names.
+
+    Only confirmed ATS boards are returned. Unknown/unconfirmed companies are
+    skipped so the scraper layer does not spray guessed slugs across every ATS.
+    """
+    cleaned_names: list[str] = []
+    seen: set[str] = set()
+    for name in company_names:
+        normalized = name.strip()
+        if not normalized:
+            continue
+        key = normalized.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        cleaned_names.append(normalized)
+
+    if not cleaned_names:
+        return []
+
+    results_by_name: dict[str, dict] = {}
+    workers = min(len(cleaned_names), 6)
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {pool.submit(discover_company, name): name for name in cleaned_names}
+        for future in as_completed(futures):
+            name = futures[future]
+            try:
+                result = future.result()
+            except Exception:
+                logger.debug("ATS discovery failed for %s", name, exc_info=True)
+                continue
+            if not result:
+                continue
+            if result.get("ats") == "unknown" or not result.get("slug"):
+                continue
+            results_by_name[name.lower()] = result
+
+    return [results_by_name[name.lower()] for name in cleaned_names if name.lower() in results_by_name]
 
 
 def _get_profile_path(profile: str) -> str:

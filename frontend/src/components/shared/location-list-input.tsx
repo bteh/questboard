@@ -3,11 +3,14 @@ import { X } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useLocationSuggestions } from '@/hooks/use-workspace';
 import type { PlaceSelection } from '@/types/workspace';
 import { cn } from '@/lib/utils';
 import {
   createManualPlace,
+  getPlaceScopeLabel,
+  getPlaceScopeOptions,
   getLocationSuggestions,
   normalizeLocationInput,
   normalizePlaceList,
@@ -60,6 +63,12 @@ export function LocationListInput({
 
   const removeLocation = (target: string) => {
     onChange(value.filter((item) => item.label !== target));
+  };
+
+  const updateScope = (target: string, match_scope: PlaceSelection['match_scope']) => {
+    onChange(value.map((item) => (
+      item.label === target ? { ...item, match_scope } : item
+    )));
   };
 
   return (
@@ -132,17 +141,39 @@ export function LocationListInput({
       )}
 
       {value.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
+        <div className="space-y-2">
           {value.map((item) => (
-            <button
+            <div
               key={item.label}
-              type="button"
-              onClick={() => removeLocation(item.label)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-border-default bg-bg-card px-3 py-1 text-xs text-text-secondary transition-colors hover:border-border-hover hover:bg-bg-subtle"
+              className="flex items-center justify-between gap-3 rounded-xl border border-border-default bg-bg-card px-3 py-2"
             >
-              {placeLabel(item)}
-              <X className="h-3 w-3" />
-            </button>
+              <div className="min-w-0">
+                <p className="truncate text-sm text-text-secondary">{placeLabel(item)}</p>
+                <p className="text-[11px] text-text-muted">{getPlaceScopeLabel(item.match_scope)}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Select value={item.match_scope} onValueChange={(next) => updateScope(item.label, next as PlaceSelection['match_scope'])}>
+                  <SelectTrigger size="sm" className="min-w-[124px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent align="end">
+                    {getPlaceScopeOptions(item).map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <button
+                  type="button"
+                  onClick={() => removeLocation(item.label)}
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-border-default text-text-muted transition-colors hover:border-border-hover hover:bg-bg-subtle hover:text-text-secondary"
+                  aria-label={`Remove ${item.label}`}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
           ))}
         </div>
       ) : (

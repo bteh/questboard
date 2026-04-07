@@ -12,6 +12,7 @@ from job_finder.tools.scrapers._registry import register_scraper
 from job_finder.tools.scrapers._utils import _HEADERS, _TIMEOUT, _match_roles, _strip_html
 
 logger = logging.getLogger(__name__)
+_SEEN_PARSE_FAILURES: set[str] = set()
 
 _WWR_CATEGORIES = {
     "programming": "remote-programming-jobs",
@@ -57,7 +58,11 @@ def search_weworkremotely(
         try:
             root = ET.fromstring(resp.content)
         except ET.ParseError as e:
-            logger.warning("WWR RSS parse failed for %s: %s", cat, e)
+            if cat not in _SEEN_PARSE_FAILURES:
+                _SEEN_PARSE_FAILURES.add(cat)
+                logger.warning("WWR RSS parse failed for %s: %s", cat, e)
+            else:
+                logger.debug("WWR RSS parse failed for %s: %s", cat, e)
             continue
 
         for item in root.iter("item"):

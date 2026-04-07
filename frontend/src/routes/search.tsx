@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createRoute, useNavigate } from '@tanstack/react-router';
 import { Route as rootRoute } from './__root';
-import { Search as SearchIcon, Play, CheckCircle2, XCircle, FileText, Loader2, Sparkles, ArrowRight, Circle, Clock, RefreshCw, SlidersHorizontal, ChevronDown, ChevronRight, BarChart3, Bot, Zap, Globe } from 'lucide-react';
+import { Search as SearchIcon, CheckCircle2, XCircle, FileText, Loader2, Sparkles, ArrowRight, Circle, Clock, RefreshCw, SlidersHorizontal, ChevronDown, ChevronRight, BarChart3, Bot, Zap, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { LocationListInput } from '@/components/shared/location-list-input';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
+import { SearchAreaSection } from '@/components/shared/search-area-section';
+import { JobBoardOptionsSection } from '@/components/shared/job-board-options-section';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -18,7 +19,7 @@ import { PipelineSteps } from '@/components/shared/pipeline-steps';
 import { useStartSearch, useSearchDefaults, useSuggestSearch } from '@/hooks/use-search';
 import { toast } from 'sonner';
 import { useLLMStatus } from '@/hooks/use-settings';
-import { useOnboardingState } from '@/hooks/use-workspace';
+import { useOnboardingState, useSaveWorkspacePreferences } from '@/hooks/use-workspace';
 import { useWorkspace } from '@/contexts/workspace-context';
 import { useProfile } from '@/contexts/profile-context';
 import { useSearchContext } from '@/contexts/search-context';
@@ -27,15 +28,27 @@ import type { SearchRequest, SearchRunSnapshot } from '@/types/search';
 import type { PlaceSelection } from '@/types/workspace';
 import { useScraperSources, buildSourceLabels, resolveSourceLabel } from '@/hooks/use-scrapers';
 import { useSchedule, useUpdateSchedule } from '@/hooks/use-schedule';
-import { WorkplacePreferenceSelector } from '@/components/shared/workplace-preference-selector';
 import {
   createManualPlace,
   getWorkplacePreferenceLabel,
-  isRemoteLocation,
   normalizePlaceList,
   placeLabel,
   type WorkplacePreference,
 } from '@/lib/profile-preferences';
+import {
+  deriveWorkplacePreferenceFromPlaces,
+  getSearchReadiness,
+} from '@/lib/search-readiness';
+import { getSearchAreaSummary } from '@/lib/search-area';
+import {
+  buildSearchFormSeed,
+  buildSearchRequestFromForm,
+  buildSearchRunSnapshot,
+  hasSearchAreaOverride,
+  parseMultilineSearchInput,
+  resolveSavedSearchAreaDefaults,
+  resolveSearchSnapshotMetadata,
+} from '@/lib/search-preferences';
 
 export const Route = createRoute({
   getParentRoute: () => rootRoute,
@@ -65,20 +78,6 @@ function compactList(values: string[], limit = 8): { visible: string[]; hidden: 
     visible: values.slice(0, limit),
     hidden: Math.max(values.length - limit, 0),
   };
-}
-
-function parseMultiline(value: string): string[] {
-  return value.split('\n').map((item) => item.trim()).filter(Boolean);
-}
-
-function deriveWorkplacePreference(locations: PlaceSelection[]): WorkplacePreference {
-  const labels = locations.map((item) => item.label);
-  const hasRemote = labels.some(isRemoteLocation);
-  const normalizedLocations = normalizePlaceList(locations);
-
-  if (hasRemote && normalizedLocations.length === 0) return 'remote_only';
-  if (hasRemote) return 'remote_friendly';
-  return 'location_only';
 }
 
 function SnapshotField({ label, value }: { label: string; value: string }) {
@@ -160,12 +159,15 @@ function SuggestLoadingState() {
 }
 
 function SearchPage() {
+  const SUGGEST_TOAST_ID = 'search-suggest';
+  const SEARCH_TOAST_ID = 'search-start';
   const navigate = useNavigate();
   const { profile } = useProfile();
   const { hostedMode } = useWorkspace();
   const { data: searchDefaults, isLoading: configLoading } = useSearchDefaults(profile);
   const { data: llm } = useLLMStatus();
   const { data: onboarding } = useOnboardingState();
+  const savePreferences = useSaveWorkspacePreferences();
   const startSearch = useStartSearch();
   const suggest = useSuggestSearch();
   const { state, runId, messages, result, error, mode, progress, snapshot, activate, reset: resetSearch } = useSearchContext();
@@ -178,51 +180,37 @@ function SearchPage() {
   const [keywords, setKeywords] = useState('');
   const [locations, setLocations] = useState<PlaceSelection[]>([]);
   const [maxDays, setMaxDays] = useState(14);
+  const [includeLinkedInJobs, setIncludeLinkedInJobs] = useState(false);
   const [workplacePreference, setWorkplacePreference] = useState<WorkplacePreference>('remote_friendly');
   const [selectedMode, setSelectedMode] = useState<SearchRequest['mode']>(mode);
   const [showFilters, setShowFilters] = useState(false);
   const [suggestedCompanies, setSuggestedCompanies] = useState<string[]>([]);
 
   const logRef = useRef<HTMLDivElement>(null);
-  const autoSuggestedRef = useRef(false);
+  const formSeed = useMemo(() => buildSearchFormSeed(searchDefaults), [searchDefaults]);
+  const savedSearchAreaDefaults = useMemo(
+    () => resolveSavedSearchAreaDefaults(searchDefaults, onboarding?.preferences),
+    [searchDefaults, onboarding?.preferences],
+  );
+  const snapshotMetadata = useMemo(
+    () => resolveSearchSnapshotMetadata(searchDefaults, onboarding?.preferences),
+    [searchDefaults, onboarding?.preferences],
+  );
 
   // Pre-fill from search defaults when config loads
   useEffect(() => {
-    if (searchDefaults) {
+    if (formSeed) {
       /* eslint-disable react-hooks/set-state-in-effect -- form initialization from async data */
-      if (searchDefaults.roles?.length) setRoles(searchDefaults.roles.join('\n'));
-      if (searchDefaults.keywords?.length) setKeywords(searchDefaults.keywords.join('\n'));
-      setLocations(normalizePlaceList((searchDefaults.locations ?? []).map((item) => createManualPlace(item))));
-      setWorkplacePreference(searchDefaults.workplace_preference ?? (searchDefaults.include_remote ? 'remote_friendly' : 'location_only'));
-      if (searchDefaults.max_days_old) setMaxDays(searchDefaults.max_days_old);
+      setRoles(formSeed.rolesText);
+      setKeywords(formSeed.keywordsText);
+      setSuggestedCompanies(formSeed.companies);
+      setLocations(formSeed.preferredPlaces);
+      setWorkplacePreference(formSeed.workplacePreference);
+      setMaxDays(formSeed.maxDaysOld);
+      setIncludeLinkedInJobs(formSeed.includeLinkedInJobs);
       /* eslint-enable react-hooks/set-state-in-effect */
     }
-  }, [searchDefaults]);
-
-  // Auto-fill from resume on first visit — AI derives roles/keywords from resume
-  useEffect(() => {
-    if (autoSuggestedRef.current) return;
-    if (configLoading) return; // wait for defaults to load first
-    // In hosted mode, respect saved workspace preferences
-    if (hostedMode) {
-      const hasSavedPrefs = searchDefaults?.roles?.length || searchDefaults?.keywords?.length;
-      if (hasSavedPrefs) return;
-    }
-    // Otherwise always auto-suggest from resume (overrides YAML defaults)
-    if (!llm?.available || !onboarding?.resume.exists) return;
-    if (suggest.isPending) return;
-    autoSuggestedRef.current = true;
-    suggest.mutate(profile, {
-      onSuccess: (data) => {
-        setRoles(data.roles.join('\n'));
-        setKeywords(data.keywords.join('\n'));
-        setLocations(normalizePlaceList(data.locations.map((item) => createManualPlace(item))));
-        setWorkplacePreference(deriveWorkplacePreference(data.locations.map((item) => createManualPlace(item))));
-        setSuggestedCompanies(data.companies);
-        toast.success('Search configured from your resume', { description: data.summary });
-      },
-    });
-  }, [configLoading, searchDefaults, llm, onboarding, profile, hostedMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [formSeed]);
 
   // Auto-scroll log
   useEffect(() => {
@@ -232,60 +220,114 @@ function SearchPage() {
   }, [messages]);
 
   const llmAvailable = llm?.available ?? false;
-  const includeRemote = workplacePreference !== 'location_only';
-  const parsedRoles = parseMultiline(roles);
-  const parsedKeywords = parseMultiline(keywords);
-  const isRemoteOnly = workplacePreference === 'remote_only';
-  const missingSearchTerms = parsedRoles.length === 0 && parsedKeywords.length === 0;
-  const missingLocations = !isRemoteOnly && locations.length === 0;
+  const searchAreaSummary = getSearchAreaSummary(workplacePreference, locations, 'search');
+  const effectiveWorkplacePreference = searchAreaSummary.effectiveWorkplacePreference;
+  const includeRemote = effectiveWorkplacePreference !== 'location_only';
+  const parsedRoles = parseMultilineSearchInput(roles);
+  const parsedKeywords = parseMultilineSearchInput(keywords);
+  const canUseResumeFallback = hostedMode && onboarding?.resume.exists === true;
+  const isRemoteOnly = effectiveWorkplacePreference === 'remote_only';
+  const { usesRemoteFallback, missingLocations, missingSearchTerms } = getSearchReadiness({
+    roles: parsedRoles,
+    keywords: parsedKeywords,
+    locations,
+    workplacePreference: effectiveWorkplacePreference,
+    allowResumeFallback: canUseResumeFallback,
+  });
+  const filtersExpanded = showFilters || missingLocations;
   const filterSummary = [
-    locations.length > 0 ? `${locations.length} location${locations.length === 1 ? '' : 's'}` : isRemoteOnly ? 'remote only' : null,
-    workplacePreference !== 'remote_friendly' ? getWorkplacePreferenceLabel(workplacePreference) : null,
+    locations.length > 0
+      ? `${locations.length} location${locations.length === 1 ? '' : 's'}`
+      : isRemoteOnly
+        ? searchAreaSummary.shortLabel
+        : usesRemoteFallback
+          ? searchAreaSummary.shortLabel
+          : null,
     maxDays !== 14 ? `${maxDays} day window` : null,
+    includeLinkedInJobs ? 'LinkedIn enabled' : null,
     suggestedCompanies.length > 0 ? `${suggestedCompanies.length} target companies` : null,
   ].filter(Boolean);
+  const savedDefaultSummary = getSearchAreaSummary(
+    savedSearchAreaDefaults.workplacePreference,
+    savedSearchAreaDefaults.preferredPlaces,
+    'search',
+  );
+  const searchAreaOverridesSavedDefaults = hasSearchAreaOverride(
+    {
+      preferredPlaces: locations,
+      workplacePreference,
+      maxDaysOld: maxDays,
+      includeLinkedInJobs,
+    },
+    savedSearchAreaDefaults,
+  );
+
+  const applySavedSearchArea = () => {
+    setLocations(savedSearchAreaDefaults.preferredPlaces);
+    setWorkplacePreference(savedSearchAreaDefaults.workplacePreference);
+    setMaxDays(savedSearchAreaDefaults.maxDaysOld);
+    setIncludeLinkedInJobs(savedSearchAreaDefaults.includeLinkedInJobs);
+    toast.success('Search reset to your saved defaults');
+  };
+
+  const handleSaveSearchAreaDefaults = () => {
+    if (!onboarding?.preferences) {
+      toast.error('Settings are still loading. Try again in a moment.');
+      return;
+    }
+    savePreferences.mutate(
+      {
+        ...onboarding.preferences,
+        preferred_places: locations,
+        workplace_preference: workplacePreference,
+        max_days_old: maxDays,
+        include_linkedin_jobs: includeLinkedInJobs,
+      },
+      {
+        onSuccess: () => toast.success('Saved this search area as your default'),
+        onError: (error) => toast.error(error instanceof Error ? error.message : 'Failed to save search defaults'),
+      },
+    );
+  };
 
   const handleStart = () => {
-    const locationLabels = locations.map((item) => item.label);
-    const request: SearchRequest = {
-      roles: parsedRoles,
-      locations: locationLabels,
-      keywords: parsedKeywords,
+    const aiEnabledForRun = selectedMode !== 'search_only' && llmAvailable;
+    const request: SearchRequest = buildSearchRequestFromForm({
+      rolesText: roles,
+      keywordsText: keywords,
+      preferredPlaces: locations,
       companies: suggestedCompanies,
-      include_remote: includeRemote,
-      workplace_preference: workplacePreference,
-      max_days_old: maxDays,
-      use_ai: selectedMode !== 'search_only',
+      includeRemote,
+      workplacePreference: effectiveWorkplacePreference,
+      maxDaysOld: maxDays,
+      includeLinkedInJobs,
+      useAi: aiEnabledForRun,
       profile,
       mode: selectedMode,
-    };
-    const runSnapshot: SearchRunSnapshot = {
+    });
+    const runSnapshot: SearchRunSnapshot = buildSearchRunSnapshot({
+      request,
       profile: searchDefaults?.profile ?? profile,
-      mode: selectedMode,
-      roles: request.roles,
-      locations: request.locations,
-      keywords: request.keywords,
-      include_remote: includeRemote,
-      workplace_preference: workplacePreference,
-      max_days_old: maxDays,
-      use_ai: request.use_ai,
-      current_title: searchDefaults?.current_title ?? '',
-      current_level: searchDefaults?.current_level ?? '',
-      current_tc: searchDefaults?.current_tc ?? null,
-      min_base: searchDefaults?.min_base ?? null,
-      target_total_comp: searchDefaults?.target_total_comp ?? null,
-      min_acceptable_tc: searchDefaults?.min_acceptable_tc ?? null,
-      compensation_currency: searchDefaults?.compensation_currency ?? 'USD',
-      compensation_period: searchDefaults?.compensation_period ?? 'annual',
-      include_equity: onboarding?.preferences.compensation.include_equity ?? null,
-      exclude_staffing_agencies: searchDefaults?.exclude_staffing_agencies ?? null,
-    };
+      metadata: snapshotMetadata,
+    });
 
     startSearch.mutate(request, {
       onSuccess: (data) => {
+        toast.dismiss(SUGGEST_TOAST_ID);
         activate(data.run_id, selectedMode, runSnapshot);
       },
-      onError: () => toast.error('Failed to start search'),
+      onError: (error) => {
+        const message = error instanceof Error ? error.message : 'Failed to start search';
+        if (message.includes('At least one role or keyword')) {
+          toast.error('We still need at least one role or keyword. Try Auto-fill from your resume again, or type one manually.', { id: SEARCH_TOAST_ID });
+          return;
+        }
+        if (message.includes('At least one location')) {
+          toast.error('Add a place first, or switch to Remote only.', { id: SEARCH_TOAST_ID });
+          return;
+        }
+        toast.error(message, { id: SEARCH_TOAST_ID });
+      },
     });
   };
 
@@ -300,23 +342,51 @@ function SearchPage() {
     }
     suggest.mutate(profile, {
       onSuccess: (data) => {
-        setRoles(data.roles.join('\n'));
-        setKeywords(data.keywords.join('\n'));
-        setLocations(normalizePlaceList(data.locations.map((item) => createManualPlace(item))));
-        setWorkplacePreference(deriveWorkplacePreference(data.locations.map((item) => createManualPlace(item))));
-        setSuggestedCompanies(data.companies);
-        toast.success('Search configured from your resume', {
-          description: data.summary,
+        const nextRoles = data.roles.filter(Boolean);
+        const nextKeywords = data.keywords.filter(Boolean);
+        const nextPlaces = normalizePlaceList(data.locations.map((item) => createManualPlace(item)));
+        const nextCompanies = data.companies.filter(Boolean);
+
+        if (nextRoles.length > 0) setRoles(nextRoles.join('\n'));
+        if (nextKeywords.length > 0) setKeywords(nextKeywords.join('\n'));
+        if (nextPlaces.length > 0) {
+          setLocations(nextPlaces);
+          setWorkplacePreference(deriveWorkplacePreferenceFromPlaces(nextPlaces));
+        }
+        if (nextCompanies.length > 0) setSuggestedCompanies(nextCompanies);
+
+        const updatedParts = [
+          nextRoles.length > 0 ? `${nextRoles.length} roles` : null,
+          nextKeywords.length > 0 ? `${nextKeywords.length} keywords` : null,
+          nextPlaces.length > 0 ? `${nextPlaces.length} places` : null,
+          nextCompanies.length > 0 ? `${nextCompanies.length} companies` : null,
+        ].filter(Boolean);
+
+        if (updatedParts.length === 0) {
+          toast.error('Resume analysis finished, but it did not return usable search terms. Add a role or keyword manually and continue.', {
+            id: SUGGEST_TOAST_ID,
+          });
+          return;
+        }
+
+        toast.success('Search updated from your resume', {
+          id: SUGGEST_TOAST_ID,
+          description: updatedParts.join(' · '),
         });
       },
       onError: (error) => {
+        const message = error instanceof Error ? error.message : '';
         const msg = error instanceof Error ? error.message : '';
         if (msg.includes('No LLM') || msg.includes('provider')) {
-          toast.error('Connect an AI provider in Settings to analyze your resume.');
+          toast.error('Connect an AI provider in Settings to analyze your resume.', { id: SUGGEST_TOAST_ID });
         } else if (msg.includes('No resume') || msg.includes('Upload')) {
-          toast.error('Upload your resume in Settings first.');
+          toast.error('Upload your resume in Settings first.', { id: SUGGEST_TOAST_ID });
+        } else if (message.includes('too long')) {
+          toast.error('Resume analysis took too long. You can still search now, or try Analyze again later.', { id: SUGGEST_TOAST_ID });
+        } else if (message.includes('unreadable')) {
+          toast.error('Resume analysis came back in an unreadable format. You can still search now, or try again later.', { id: SUGGEST_TOAST_ID });
         } else {
-          toast.error('Resume analysis failed. Try again or fill in the fields manually.');
+          toast.error('Resume analysis failed. Try again or fill in the fields manually.', { id: SUGGEST_TOAST_ID });
         }
       },
     });
@@ -394,8 +464,10 @@ function SearchPage() {
     },
     search_score: {
       label: 'Find & Rank',
-      desc: 'Search + rank by how well you match',
-      detail: `Searches ${boardsLabel}, then ranks each job by how well your skills and experience match the requirements.`,
+      desc: llmAvailable ? 'Search + AI resume-fit ranking' : 'Search + basic ranking for now',
+      detail: llmAvailable
+        ? `Searches ${boardsLabel}, then ranks each job by how well your skills and experience match the requirements.`
+        : `Searches ${boardsLabel}, then ranks results using keywords, filters, and resume context. Connect AI to upgrade this into deeper resume-fit scoring.`,
       icon: BarChart3,
       color: 'text-violet-600 dark:text-violet-400',
       bg: 'bg-violet-50/60 dark:bg-violet-950/30',
@@ -405,8 +477,10 @@ function SearchPage() {
     },
     full_pipeline: {
       label: 'Find, Rank & Prepare',
-      desc: 'Rank + draft cover letters + company notes',
-      detail: `Searches ${boardsLabel}, ranks by resume fit, drafts tailored cover letters, and prepares company background notes. You always review before applying.`,
+      desc: llmAvailable ? 'Rank + draft cover letters + company notes' : 'Requires AI',
+      detail: llmAvailable
+        ? `Searches ${boardsLabel}, ranks by resume fit, drafts tailored cover letters, and prepares company background notes. You always review before applying.`
+        : 'Connect AI to unlock tailored cover letters, company notes, and the full Launchboard workflow. Basic search and ranking still work without it.',
       icon: Bot,
       color: 'text-amber-600 dark:text-amber-400',
       bg: 'bg-amber-50/60 dark:bg-amber-950/30',
@@ -416,8 +490,9 @@ function SearchPage() {
     },
   };
 
-  const startLabel = selectedMode === 'search_only' ? 'Start Search'
-    : selectedMode === 'search_score' ? 'Search & Rank'
+  const resumeDrivenRun = parsedRoles.length === 0 && parsedKeywords.length === 0 && canUseResumeFallback;
+  const startLabel = selectedMode === 'search_only' ? (resumeDrivenRun ? 'Search from Resume' : 'Start Search')
+    : selectedMode === 'search_score' ? (resumeDrivenRun ? (llmAvailable ? 'Rank from Resume' : 'Start Resume Ranking') : (llmAvailable ? 'Search & Rank' : 'Start Basic Ranking'))
     : 'Search & Prepare';
 
   // Progress bar helpers — must be inside the component (uses activeMode)
@@ -449,6 +524,9 @@ function SearchPage() {
   };
 
   const getStagesForMode = (m: string): StageInfo[] => STAGE_MAP[m] || STAGE_MAP.search_score;
+  const stageForDisplay = progress?.stage === 'queued'
+    ? getStagesForMode(activeMode)[0]?.key
+    : progress?.stage;
 
   const isStageComplete = (stageKey: string, currentStage: string | undefined, m: string): boolean => {
     if (!currentStage) return false;
@@ -469,6 +547,23 @@ function SearchPage() {
         </div>
 
         <div className="max-w-3xl mx-auto space-y-5">
+          {!llmAvailable && (
+            <div className="rounded-xl border border-brand/20 bg-brand-light/20 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-medium text-text-primary">Launchboard works best with AI connected.</p>
+                  <p className="mt-1 text-xs text-text-muted">
+                    Start with basic search now. Connect AI when you want resume-fit ranking, search suggestions, target-company autofill, and tailored draft materials.
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => navigate({ to: '/settings' })} className="shrink-0">
+                  <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                  Connect AI
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Source transparency */}
           {sourceCount > 0 && (
             <div className="px-1">
@@ -560,11 +655,13 @@ function SearchPage() {
                     </button>
                   ) : !llmAvailable && (
                     <div className="w-full rounded-xl border border-border-default bg-bg-subtle/50 p-5 text-center">
-                      <p className="text-sm font-medium text-text-primary">Type your target roles and keywords below to get started</p>
+                      <p className="text-sm font-medium text-text-primary">
+                        {canUseResumeFallback ? 'You can start from your uploaded resume, or add roles and keywords below' : 'Type your target roles and keywords below to get started'}
+                      </p>
                       <p className="text-xs text-text-muted mt-1">
                         {onboarding?.resume.exists
-                          ? 'Connect an AI provider in Settings to auto-fill from your resume.'
-                          : 'Or upload a resume and connect an AI provider in Settings to auto-fill.'}
+                          ? 'Launchboard can derive a first search from your resume right away. Connect AI in Settings if you want auto-fill, deeper fit ranking, and drafting.'
+                          : 'This gets you basic search right away. Upload a resume and connect AI later if you want auto-fill and deeper ranking.'}
                       </p>
                     </div>
                   ))}
@@ -587,39 +684,34 @@ function SearchPage() {
                   <div>
                     <button
                       type="button"
-                      onClick={() => setShowFilters(!showFilters)}
+                      onClick={() => setShowFilters(!filtersExpanded)}
                       className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
                     >
                       <SlidersHorizontal className="h-3.5 w-3.5" />
                       <span className="font-medium">Filters</span>
-                      {!showFilters && filterSummary.length > 0 && (
+                      {!filtersExpanded && filterSummary.length > 0 && (
                         <span className="text-[10px] bg-brand-light text-brand font-medium rounded-full px-1.5 py-0.5">
                           {filterSummary.join(', ')}
                         </span>
                       )}
-                      <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', showFilters && 'rotate-180')} />
+                      <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', filtersExpanded && 'rotate-180')} />
                     </button>
-                    {showFilters && (
+                    {filtersExpanded && (
                       <div className="grid grid-cols-1 sm:grid-cols-[1.2fr_0.8fr] gap-5 mt-4 pt-4 border-t border-border-default">
                         <div className="space-y-4">
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium">Preferred locations</Label>
-                            <LocationListInput
-                              value={locations}
-                              onChange={setLocations}
-                              placeholder="Add a city, state, or region"
-                              helperText="These override your saved settings for this run only. Remote is controlled separately below."
-                              emptyText={isRemoteOnly ? 'Remote-only search selected.' : 'No locations added for this run yet.'}
-                            />
-                          </div>
+                          <SearchAreaSection
+                            preferredPlaces={locations}
+                            onPreferredPlacesChange={setLocations}
+                            workplacePreference={workplacePreference}
+                            onWorkplacePreferenceChange={setWorkplacePreference}
+                            context="search"
+                          />
 
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium">Workplace type</Label>
-                            <WorkplacePreferenceSelector
-                              value={workplacePreference}
-                              onChange={setWorkplacePreference}
-                            />
-                          </div>
+                          <JobBoardOptionsSection
+                            includeLinkedInJobs={includeLinkedInJobs}
+                            onIncludeLinkedInJobsChange={setIncludeLinkedInJobs}
+                            context="search"
+                          />
                         </div>
 
                         <div className="space-y-4">
@@ -635,11 +727,6 @@ function SearchPage() {
                             </p>
                           </div>
 
-                          {missingLocations && (
-                            <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-3.5 py-3 text-xs text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
-                              Add at least one preferred location, or switch to Remote only.
-                            </div>
-                          )}
                         </div>
                       </div>
                     )}
@@ -649,11 +736,16 @@ function SearchPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-xs font-medium text-text-secondary">Using for this run:</span>
                       <span className="inline-flex items-center rounded-full bg-bg-card px-2.5 py-1 text-[11px] text-text-secondary ring-1 ring-border-default">
-                        {getWorkplacePreferenceLabel(workplacePreference)}
+                        {getWorkplacePreferenceLabel(effectiveWorkplacePreference)}
                       </span>
                       <span className="inline-flex items-center rounded-full bg-bg-card px-2.5 py-1 text-[11px] text-text-secondary ring-1 ring-border-default">
                         {maxDays} day window
                       </span>
+                      {includeLinkedInJobs && (
+                        <span className="inline-flex items-center rounded-full bg-bg-card px-2.5 py-1 text-[11px] text-text-secondary ring-1 ring-border-default">
+                          LinkedIn enabled
+                        </span>
+                      )}
                       {locations.map((location) => (
                         <span key={location.label} className="inline-flex items-center rounded-full bg-bg-card px-2.5 py-1 text-[11px] text-text-secondary ring-1 ring-border-default">
                           {placeLabel(location)}
@@ -661,9 +753,51 @@ function SearchPage() {
                       ))}
                       {locations.length === 0 && isRemoteOnly && (
                         <span className="inline-flex items-center rounded-full bg-bg-card px-2.5 py-1 text-[11px] text-text-secondary ring-1 ring-border-default">
-                          No physical location filter
+                          {searchAreaSummary.shortLabel}
                         </span>
                       )}
+                      {locations.length === 0 && usesRemoteFallback && (
+                        <span className="inline-flex items-center rounded-full bg-bg-card px-2.5 py-1 text-[11px] text-text-secondary ring-1 ring-border-default">
+                          {searchAreaSummary.shortLabel}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className={cn(
+                    'rounded-xl border px-3.5 py-3',
+                    searchAreaOverridesSavedDefaults
+                      ? 'border-amber-200 bg-amber-50/70 dark:border-amber-900/50 dark:bg-amber-950/20'
+                      : 'border-border-default bg-bg-subtle/40',
+                  )}>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-text-primary">
+                          {searchAreaOverridesSavedDefaults ? 'This run is overriding your saved defaults' : 'Search matches your saved defaults'}
+                        </p>
+                        <p className="mt-1 text-xs text-text-muted leading-relaxed">
+                          Saved area: {savedDefaultSummary.shortLabel}
+                          {savedSearchAreaDefaults.preferredPlaces.length > 0 ? ` · ${savedDefaultSummary.placesSummary}` : ''}
+                          {savedSearchAreaDefaults.maxDaysOld ? ` · ${savedSearchAreaDefaults.maxDaysOld} day window` : ''}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {searchAreaOverridesSavedDefaults && (
+                          <Button type="button" variant="outline" size="sm" onClick={applySavedSearchArea}>
+                            Use saved defaults
+                          </Button>
+                        )}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleSaveSearchAreaDefaults}
+                          disabled={savePreferences.isPending || !searchAreaOverridesSavedDefaults}
+                        >
+                          {savePreferences.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+                          Save this as default
+                        </Button>
+                      </div>
                     </div>
                   </div>
 
@@ -795,13 +929,25 @@ function SearchPage() {
                     <p className="text-xs text-text-tertiary leading-relaxed">
                       {modeLabels[selectedMode].detail}
                     </p>
+                    {!llmAvailable && selectedMode === 'search_score' && (
+                      <p className="text-xs text-text-muted leading-relaxed">
+                        This run will still rank jobs, but it will use keyword and filter matching until you connect AI in Settings.
+                      </p>
+                    )}
+                    {!llmAvailable && selectedMode === 'full_pipeline' && (
+                      <p className="text-xs text-text-muted leading-relaxed">
+                        Full prepare mode is disabled until AI is connected.
+                      </p>
+                    )}
                   </div>
 
                   {/* Start */}
                   <div className="pt-1">
-                    <Button onClick={handleStart} disabled={startSearch.isPending || missingSearchTerms || missingLocations} size="lg" className="w-full text-sm h-12 text-[15px] font-semibold shadow-lg shadow-brand/20 hover:shadow-xl hover:shadow-brand/25 transition-shadow">
+                    <Button onClick={handleStart} disabled={startSearch.isPending || suggest.isPending || missingSearchTerms || missingLocations} size="lg" className="w-full text-sm h-12 text-[15px] font-semibold shadow-lg shadow-brand/20 hover:shadow-xl hover:shadow-brand/25 transition-shadow">
                       {startSearch.isPending ? (
                         <><Loader2 className="h-4.5 w-4.5 mr-2 animate-spin" /> Starting...</>
+                      ) : suggest.isPending ? (
+                        <><Loader2 className="h-4.5 w-4.5 mr-2 animate-spin" /> Analyzing resume...</>
                       ) : (
                         <><Zap className="h-4.5 w-4.5 mr-2" /> {startLabel}</>
                       )}
@@ -810,7 +956,23 @@ function SearchPage() {
                       <p className="text-xs text-text-muted text-center mt-2">Add at least one role or keyword above to start</p>
                     )}
                     {!missingSearchTerms && missingLocations && (
-                      <p className="text-xs text-text-muted text-center mt-2">Add a preferred location or switch the run to Remote only</p>
+                      <div className="mt-2 space-y-2 text-center">
+                        <p className="text-xs text-text-muted">Add a preferred location, or switch this run to a mode that does not require one.</p>
+                        <div className="flex flex-wrap items-center justify-center gap-2">
+                          <Button type="button" variant="outline" size="sm" onClick={() => setWorkplacePreference('remote_friendly')}>
+                            Use Remote + selected places
+                          </Button>
+                          <Button type="button" variant="outline" size="sm" onClick={() => setWorkplacePreference('remote_only')}>
+                            Use Remote only
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                    {!missingSearchTerms && !missingLocations && parsedRoles.length === 0 && parsedKeywords.length === 0 && canUseResumeFallback && (
+                      <p className="text-xs text-text-muted text-center mt-2">No roles or keywords entered. Launchboard will derive them from your uploaded resume for this run.</p>
+                    )}
+                    {!missingSearchTerms && !missingLocations && usesRemoteFallback && (
+                      <p className="text-xs text-text-muted text-center mt-2">No place selected yet, so this run will keep remote jobs everywhere until you add one.</p>
                     )}
                     {suggestedCompanies.length > 0 && !missingSearchTerms && !missingLocations && (
                       <p className="text-xs text-text-muted text-center mt-2">
@@ -882,6 +1044,7 @@ function SearchPage() {
                       <Select
                         value={schedule?.mode ?? 'search_score'}
                         onValueChange={(v) => {
+                          if (!v) return;
                           updateSchedule.mutate({ enabled: schedule?.enabled ?? false, interval_hours: schedule?.interval_hours ?? 6, mode: v });
                         }}
                       >
@@ -959,8 +1122,8 @@ function SearchPage() {
           <Progress value={progress?.percent ?? 0} className="h-2" />
           <div className="flex items-center justify-between px-1">
             {getStagesForMode(activeMode).map((s) => {
-              const isCurrent = progress?.stage === s.key;
-              const isDone = isStageComplete(s.key, progress?.stage, activeMode);
+              const isCurrent = stageForDisplay === s.key;
+              const isDone = isStageComplete(s.key, stageForDisplay, activeMode);
               return (
                 <div
                   key={s.key}
@@ -990,7 +1153,7 @@ function SearchPage() {
             </div>
             <div className="flex items-center gap-2">
               <Button onClick={handleReset} variant="outline" size="sm">New Search</Button>
-              <Button size="sm" onClick={() => navigate({ to: '/applications', search: { run: runId ?? undefined } })}>
+              <Button size="sm" onClick={() => navigate({ to: '/applications', search: { run: runId ?? undefined, scope: undefined } })}>
                 View {result.jobs_found} Jobs <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
               </Button>
             </div>
@@ -1005,6 +1168,20 @@ function SearchPage() {
                     <span className="ml-1 font-semibold tabular-nums">{count}</span>
                   </span>
                 ))}
+            </div>
+          )}
+          {snapshot && !snapshot.use_ai && (
+            <div className="flex flex-col gap-3 rounded-lg border border-brand/20 bg-bg-card/70 p-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-medium text-text-primary">This run used basic ranking only.</p>
+                <p className="mt-1 text-xs text-text-muted">
+                  Connect AI to rerank by resume fit and unlock cover letters, company notes, and application prep.
+                </p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => navigate({ to: '/settings' })} className="shrink-0">
+                <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                Connect AI
+              </Button>
             </div>
           )}
         </div>
@@ -1053,6 +1230,9 @@ function SearchPage() {
                 <span className="inline-flex items-center rounded-full bg-bg-card px-2.5 py-1 text-[11px] text-text-secondary ring-1 ring-border-default">
                   {snapshot.max_days_old} day window
                 </span>
+                <span className="inline-flex items-center rounded-full bg-bg-card px-2.5 py-1 text-[11px] text-text-secondary ring-1 ring-border-default">
+                  LinkedIn {snapshot.include_linkedin_jobs ? 'enabled' : 'disabled'}
+                </span>
               </div>
             </div>
 
@@ -1060,6 +1240,7 @@ function SearchPage() {
               <div className="space-y-3">
                 <SnapshotList label="Roles" values={snapshot.roles} emptyLabel="No roles provided" />
                 <SnapshotList label="Keywords" values={snapshot.keywords} emptyLabel="No keywords provided" />
+                <SnapshotList label="Target Companies" values={snapshot.companies ?? []} emptyLabel="No target companies provided" />
                 <SnapshotList
                   label="Preferred Locations"
                   values={snapshot.locations}

@@ -3,6 +3,8 @@ import { LayoutDashboard, Search, Briefcase, BarChart3, Settings as SettingsIcon
 import { useDashboardStats } from '@/hooks/use-analytics';
 import { useLLMStatus } from '@/hooks/use-settings';
 import { useTheme } from '@/contexts/theme-context';
+import { useWorkspace } from '@/contexts/workspace-context';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
@@ -19,10 +21,19 @@ const THEME_OPTIONS = [
   { value: 'system' as const, icon: Monitor, label: 'System' },
 ];
 
+function getAiLabel(provider: string | undefined, fallback: string | undefined): string {
+  if (provider === 'openai-api') return 'ChatGPT by OpenAI';
+  if (provider === 'anthropic-api') return 'Claude by Anthropic';
+  if (provider === 'gemini') return 'Gemini by Google';
+  if (provider === 'ollama') return 'Local / private';
+  return fallback || 'Connected';
+}
+
 export function Sidebar() {
   const { data: stats } = useDashboardStats();
   const { data: llm } = useLLMStatus();
   const { theme, setTheme } = useTheme();
+  const { hostedMode, currentPersona, signOut } = useWorkspace();
   const matchRoute = useMatchRoute();
 
   return (
@@ -79,6 +90,24 @@ export function Sidebar() {
         </div>
       )}
 
+      {hostedMode && (
+        <div className="mx-3 mb-3 rounded-lg border border-border-default bg-bg-subtle px-4 py-3">
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-text-primary">
+              {currentPersona?.full_name || 'Hosted account'}
+            </p>
+            <p className="text-[11px] text-text-muted">
+              {currentPersona?.headline || 'Signed in to Launchboard hosted mode'}
+            </p>
+          </div>
+          <div className="mt-3 flex gap-2">
+            <Button variant="outline" size="sm" className="flex-1" onClick={() => void signOut()}>
+              {currentPersona ? 'Switch user' : 'Sign out'}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Theme Toggle */}
       <div className="mx-3 mb-3">
         <div className="flex items-center rounded-lg border border-border-default bg-bg-subtle p-0.5" role="radiogroup" aria-label="Theme">
@@ -106,7 +135,7 @@ export function Sidebar() {
 
       {/* LLM Connection */}
       <div className="border-t border-border-default px-4 py-3">
-        <div className="flex items-center gap-2" role="status" aria-label={`LLM: ${llm?.available ? 'connected' : llm?.configured ? 'disconnected' : 'not configured'}`}>
+        <div className="flex items-center gap-2" role="status" aria-label={`LLM: ${llm?.available ? 'connected' : llm?.configured ? 'disconnected' : 'not connected'}`}>
           <div
             className={cn(
               'h-1.5 w-1.5 rounded-full shrink-0',
@@ -116,7 +145,7 @@ export function Sidebar() {
           />
           <Zap className="h-3.5 w-3.5 text-text-muted shrink-0" />
           <span className="text-xs text-text-muted truncate">
-            {llm?.available ? llm.label || 'Connected' : llm?.configured ? 'Disconnected' : 'Not configured'}
+            {llm?.available ? getAiLabel(llm.provider, llm.label) : llm?.configured ? 'Disconnected' : 'Connect AI'}
           </span>
         </div>
       </div>

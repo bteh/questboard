@@ -37,6 +37,7 @@ _UA = (
 # ---------------------------------------------------------------------------
 
 _EMPLOYERS: dict[str, dict] | None = None
+_SEEN_API_ERRORS: set[tuple[str, int | str]] = set()
 
 
 def _load_employers() -> dict[str, dict]:
@@ -299,7 +300,15 @@ def _api_search(employer: dict, query: str, limit: int = 20, offset: int = 0) ->
         resp.raise_for_status()
         return resp.json()
     except requests.RequestException as e:
-        logger.warning("Workday API error for %s: %s", employer.get("name", "?"), e)
+        status = getattr(getattr(e, "response", None), "status_code", "request")
+        key = (str(employer.get("name", "?")), status)
+        noisy_but_expected = {401, 403, 404, 422}
+        log_fn = logger.debug if status in noisy_but_expected else logger.warning
+        if key not in _SEEN_API_ERRORS:
+            _SEEN_API_ERRORS.add(key)
+            log_fn("Workday API error for %s (%s): %s", employer.get("name", "?"), status, e)
+        else:
+            logger.debug("Workday API error for %s (%s): %s", employer.get("name", "?"), status, e)
         return None
 
 

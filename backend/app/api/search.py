@@ -14,7 +14,13 @@ from sqlalchemy.orm import Session
 
 from app.schemas.search import RunResult, RunStatus, SearchDefaults, SearchRequest, SearchSuggestions
 from app.services import pipeline_service, resume_service, workspace_service
-from app.dependencies import get_config, get_llm, sanitize_profile
+from app.dependencies import (
+    get_active_workspace_context,
+    get_active_workspace_context_csrf,
+    get_config,
+    get_llm,
+    sanitize_profile,
+)
 from app.models.database import get_db
 from app.security import enforce_rate_limit, request_identity
 from app.config import get_settings
@@ -69,6 +75,33 @@ def _clean_locations(values: list[str] | None) -> list[str]:
     return cleaned
 
 
+def _place_from_label(label: str) -> PlaceSelection:
+    from job_finder.company_classifier import parse_location
+
+    parsed = parse_location(label)
+    match_scope = "city"
+    kind = "manual"
+    if parsed.get("country") == "non-us" and not parsed.get("city"):
+        match_scope = "country"
+        kind = "country"
+    elif parsed.get("state") and not parsed.get("city"):
+        match_scope = "region"
+        kind = "region"
+    elif parsed.get("country_name") and not parsed.get("city") and not parsed.get("state"):
+        match_scope = "country"
+        kind = "country"
+
+    return PlaceSelection(
+        label=label,
+        kind=kind,
+        match_scope=match_scope,
+        city=parsed.get("city", ""),
+        region=parsed.get("state", ""),
+        country=parsed.get("country_name", ""),
+        country_code=parsed.get("country", ""),
+    )
+
+
 def _derive_workplace_preference(cfg: dict) -> str:
     """Infer the active workplace preference from config."""
     loc_prefs = cfg.get("location_preferences", {})
@@ -84,6 +117,10 @@ def _derive_workplace_preference(cfg: dict) -> str:
     return "remote_friendly" if "remote" in locations else "location_only"
 
 
+def _effective_workplace_preference(value: str, places: list[PlaceSelection]) -> str:
+    return workspace_service.effective_workplace_preference(value, places)
+
+
 def _authorize_run_access(run, workspace) -> None:
     if get_settings().hosted_mode and not workspace:
         raise HTTPException(404, "Run not found")
@@ -95,84 +132,89 @@ def _authorize_run_access(run, workspace) -> None:
 async def start_search_run(
     req: SearchRequest,
     request: Request,
+    workspace = Depends(get_active_workspace_context_csrf),
     db: Session = Depends(get_db),
 ):
     """Start a pipeline run. Returns immediately with a run_id for progress tracking."""
     logger.info("Search request: %d roles, %d keywords, %d companies", len(req.roles), len(req.keywords), len(req.companies))
-    if not req.roles and not req.keywords:
-        raise HTTPException(400, "At least one role or keyword is required")
-    if req.workplace_preference != "remote_only" and not req.locations:
+    effective_roles = list(req.roles)
+    effective_keywords = list(req.keywords)
+    effective_locations = list(req.locations) or [place.label for place in req.preferred_places if place.label.strip()]
+    request_places = req.preferred_places or [PlaceSelection(label=location) for location in effective_locations]
+    effective_workplace_preference = _effective_workplace_preference(
+        req.workplace_preference,
+        request_places,
+    )
+    if effective_workplace_preference == "location_only" and not effective_locations:
         raise HTTPException(400, "At least one location is required")
 
-    workspace = workspace_service.get_workspace_context_optional(db, request)
     if workspace:
         enforce_rate_limit(
             "search-run",
             request_identity(request, workspace.workspace.id),
             limit=get_settings().search_rate_limit_per_minute,
+            db=db,
         )
+        if not effective_roles and not effective_keywords:
+            prefs = workspace_service.get_workspace_preferences(db, workspace.workspace.id)
+            fallback_roles, fallback_keywords = workspace_service.derive_search_terms_from_resume(
+                db,
+                workspace.workspace.id,
+                prefs,
+            )
+            effective_roles = fallback_roles
+            effective_keywords = fallback_keywords
+
+    if not effective_roles and not effective_keywords:
+        raise HTTPException(400, "At least one role or keyword is required")
 
     loop = asyncio.get_running_loop()
     config_override = None
     llm_override = None
+    snapshot = None
     if workspace:
         prefs = workspace_service.get_workspace_preferences(db, workspace.workspace.id)
         merged_prefs = prefs.model_copy(
             update={
-                "roles": req.roles,
-                "keywords": req.keywords,
-                "preferred_places": [PlaceSelection(label=location) for location in req.locations],
-                "workplace_preference": req.workplace_preference,
+                "roles": effective_roles,
+                "keywords": effective_keywords,
+                "preferred_places": request_places,
+                "workplace_preference": effective_workplace_preference,
                 "max_days_old": req.max_days_old,
+                "include_linkedin_jobs": req.include_linkedin_jobs,
             }
         )
         config_override = workspace_service.build_pipeline_config_override(
             merged_prefs,
             workspace.workspace.id,
         )
+        snapshot = workspace_service.build_search_snapshot(merged_prefs)
         llm_override = workspace_service.get_workspace_llm(
             db,
             workspace.workspace.id,
             fallback_to_global=True,
         )
 
-    run = pipeline_service.start_run(
-        roles=req.roles,
-        locations=req.locations,
-        keywords=req.keywords,
-        companies=req.companies,
-        include_remote=req.include_remote,
-        workplace_preference=req.workplace_preference,
-        max_days_old=req.max_days_old,
-        use_ai=req.use_ai,
-        profile="workspace" if workspace else req.profile,
-        mode=req.mode,
-        loop=loop,
-        workspace_id=workspace.workspace.id if workspace else None,
-        config_override=config_override,
-        llm_override=llm_override,
-    )
-    if workspace and config_override:
-        snapshot = workspace_service.build_search_snapshot(
-            workspace_service.get_workspace_preferences(db, workspace.workspace.id).model_copy(
-                update={
-                    "roles": req.roles,
-                    "keywords": req.keywords,
-                    "preferred_places": [PlaceSelection(label=location) for location in req.locations],
-                    "workplace_preference": req.workplace_preference,
-                    "max_days_old": req.max_days_old,
-                }
-            )
+    try:
+        run = pipeline_service.start_run(
+            roles=effective_roles,
+            locations=effective_locations,
+            keywords=effective_keywords,
+            companies=req.companies,
+            include_remote=req.include_remote,
+            workplace_preference=effective_workplace_preference,
+            max_days_old=req.max_days_old,
+            use_ai=req.use_ai,
+            profile="workspace" if workspace else req.profile,
+            mode=req.mode,
+            loop=loop,
+            workspace_id=workspace.workspace.id if workspace else None,
+            config_override=config_override,
+            llm_override=llm_override,
+            snapshot=snapshot,
         )
-        workspace_service.register_search_run(
-            db,
-            workspace.workspace.id,
-            run.run_id,
-            run.status,
-            run.mode,
-            snapshot,
-            run.started_at,
-        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
     return RunStatus(
         run_id=run.run_id,
         status=run.status,
@@ -183,17 +225,23 @@ async def start_search_run(
 @router.get("/runs/{run_id}/progress")
 async def stream_run_progress(
     run_id: str,
-    request: Request,
+    workspace = Depends(get_active_workspace_context),
     db: Session = Depends(get_db),
 ):
     """SSE stream of pipeline progress messages."""
-    run = pipeline_service.get_run(run_id)
-    if not run:
-        raise HTTPException(404, f"Run {run_id} not found")
-    workspace = workspace_service.get_workspace_context_optional(db, request)
-    _authorize_run_access(run, workspace)
+    if get_settings().hosted_mode:
+        run = workspace_service.get_search_run(db, workspace.workspace.id, run_id)
+        if not run:
+            raise HTTPException(404, f"Run {run_id} not found")
+        generator = pipeline_service.stream_persisted_progress(workspace.workspace.id, run_id)
+    else:
+        run = pipeline_service.get_run(run_id)
+        if not run:
+            raise HTTPException(404, f"Run {run_id} not found")
+        _authorize_run_access(run, workspace)
+        generator = pipeline_service.stream_progress(run_id)
     return StreamingResponse(
-        pipeline_service.stream_progress(run_id),
+        generator,
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
@@ -206,14 +254,32 @@ async def stream_run_progress(
 @router.get("/runs/{run_id}/status", response_model=RunStatus)
 async def get_run_status(
     run_id: str,
-    request: Request,
+    workspace = Depends(get_active_workspace_context),
     db: Session = Depends(get_db),
 ):
     """Poll-based fallback for run status."""
+    if get_settings().hosted_mode:
+        run = workspace_service.get_search_run(db, workspace.workspace.id, run_id)
+        if not run:
+            raise HTTPException(404, f"Run {run_id} not found")
+        return RunStatus(
+            run_id=run.run_id,
+            status=run.status,
+            started_at=run.started_at,
+            completed_at=run.completed_at,
+            progress_messages=workspace_service.get_progress_messages(
+                db,
+                workspace.workspace.id,
+                run_id,
+            ),
+            jobs_found=run.jobs_found,
+            jobs_scored=run.jobs_scored,
+            error=run.error or None,
+        )
+
     run = pipeline_service.get_run(run_id)
     if not run:
         raise HTTPException(404, f"Run {run_id} not found")
-    workspace = workspace_service.get_workspace_context_optional(db, request)
     _authorize_run_access(run, workspace)
     return RunStatus(
         run_id=run.run_id,
@@ -229,18 +295,37 @@ async def get_run_status(
 
 @router.get("/runs", response_model=list[RunStatus])
 async def list_runs(
-    request: Request,
     limit: int = 20,
+    workspace = Depends(get_active_workspace_context),
     db: Session = Depends(get_db),
 ):
     """List recent pipeline runs."""
-    workspace = workspace_service.get_workspace_context_optional(db, request)
-    if get_settings().hosted_mode and not workspace:
-        return []
-    runs = pipeline_service.list_runs(
-        limit=limit,
-        workspace_id=workspace.workspace.id if workspace else None,
-    )
+    if get_settings().hosted_mode:
+        runs = workspace_service.list_search_runs(
+            db,
+            workspace.workspace.id,
+            limit=limit,
+        )
+        return [
+            RunStatus(
+                run_id=r.run_id,
+                status=r.status,
+                started_at=r.started_at,
+                completed_at=r.completed_at,
+                progress_messages=workspace_service.get_progress_messages(
+                    db,
+                    workspace.workspace.id,
+                    r.run_id,
+                    limit=20,
+                ),
+                jobs_found=r.jobs_found,
+                jobs_scored=r.jobs_scored,
+                error=r.error or None,
+            )
+            for r in runs
+        ]
+
+    runs = pipeline_service.list_runs(limit=limit, workspace_id=workspace.workspace.id if workspace else None)
     return [
         RunStatus(
             run_id=r.run_id,
@@ -258,21 +343,23 @@ async def list_runs(
 
 @router.get("/defaults", response_model=SearchDefaults)
 async def get_search_defaults(
-    request: Request,
     profile: str = "default",
+    workspace = Depends(get_active_workspace_context),
     db: Session = Depends(get_db),
 ):
     """Return default search parameters from the active profile."""
-    workspace = workspace_service.get_workspace_context_optional(db, request)
     if workspace:
         prefs = workspace_service.get_workspace_preferences(db, workspace.workspace.id)
         return SearchDefaults(
             roles=prefs.roles,
             locations=workspace_service.place_labels(prefs.preferred_places),
+            preferred_places=prefs.preferred_places,
             keywords=prefs.keywords,
+            companies=prefs.companies,
             include_remote=prefs.workplace_preference != "location_only",
             workplace_preference=prefs.workplace_preference,
             max_days_old=prefs.max_days_old,
+            include_linkedin_jobs=prefs.include_linkedin_jobs,
             profile="workspace",
             current_title=prefs.current_title,
             current_level=prefs.current_level,
@@ -291,10 +378,19 @@ async def get_search_defaults(
     return SearchDefaults(
         roles=_clean_search_terms(cfg.get("target_roles")),
         locations=_clean_locations(cfg.get("location_preferences", {}).get("preferred_locations") or cfg.get("locations")),
+        preferred_places=[_place_from_label(location) for location in _clean_locations(cfg.get("location_preferences", {}).get("preferred_locations") or cfg.get("locations"))],
         keywords=_clean_search_terms(cfg.get("keyword_searches")),
+        companies=_clean_search_terms(
+            [entry.get("name") for entry in cfg.get("watchlist", []) if isinstance(entry, dict)]
+        ),
         include_remote=workplace_preference != "location_only",
         workplace_preference=workplace_preference,
         max_days_old=cfg.get("search_settings", {}).get("max_days_old", 14),
+        include_linkedin_jobs="linkedin" in [
+            str(board).strip().lower()
+            for board in cfg.get("job_boards", [])
+            if str(board).strip()
+        ],
         profile=profile,
         current_title=cfg.get("career_baseline", {}).get("current_title", ""),
         current_level=cfg.get("career_baseline", {}).get("current_level", ""),
@@ -310,11 +406,11 @@ async def get_search_defaults(
 
 _SUGGEST_PROMPT = """Analyze the resume and return valid JSON with these keys:
 
-- "roles": 8-12 job titles to search for, matching the resume's seniority level. Include title variations.
-- "keywords": 8-15 domain-specific terms from their experience that appear in relevant job postings. No generic words.
-- "locations": 1-3 locations from the resume plus "Remote".
+- "roles": 6-10 job titles to search for, matching the resume's seniority level. Include title variations.
+- "keywords": 8-12 domain-specific terms from their experience that appear in relevant job postings. No generic words.
+- "locations": up to 3 locations from the resume. Only include locations you are confident about.
 - "summary": one-sentence candidate profile summary.
-- "companies": 30-60 companies this person should target. Mix large employers, growth-stage, and smaller/emerging organizations. Examples by field:
+- "companies": 12-20 companies this person should target. Mix large employers, growth-stage, and smaller/emerging organizations. Examples by field:
   Tech: Stripe, Databricks, RunwayML. Healthcare: Kaiser, One Medical, Cityblock. Finance: JPMorgan, Brex, Ramp. Media: Netflix, A24, Spotify. Education: Khan Academy, Coursera. Adapt to the resume's actual field.
 
 Works for any profession. Be specific and practical — these are used as literal search queries."""
@@ -329,6 +425,77 @@ def _clean_list(raw: list | None, max_items: int = 20, max_len: int = 100) -> li
     if not isinstance(raw, list):
         return []
     return [str(item)[:max_len] for item in raw if isinstance(item, (str, int, float))][:max_items]
+
+
+def _build_suggest_fallback(
+    *,
+    db: Session,
+    workspace,
+    profile: str,
+    failure_reason: str | None,
+) -> SearchSuggestions | None:
+    if workspace:
+        prefs = workspace_service.get_workspace_preferences(db, workspace.workspace.id)
+        roles, keywords = workspace_service.derive_search_terms_from_resume(
+            db,
+            workspace.workspace.id,
+            prefs,
+        )
+        locations = workspace_service.place_labels(prefs.preferred_places)
+        companies = prefs.companies
+    else:
+        profile = sanitize_profile(profile)
+        cfg = get_config(profile if profile != "default" else None)
+        roles = _clean_search_terms(cfg.get("target_roles"))
+        keywords = _clean_search_terms(cfg.get("keyword_searches"))
+        locations = _clean_locations(
+            cfg.get("location_preferences", {}).get("preferred_locations") or cfg.get("locations"),
+        )
+        companies = _clean_search_terms(
+            [entry.get("name") for entry in cfg.get("watchlist", []) if isinstance(entry, dict)]
+        )
+
+    if not (roles or keywords or locations or companies):
+        return None
+
+    if failure_reason == "timeout":
+        summary = "Used quick resume fallback because AI analysis timed out."
+    elif failure_reason == "parse":
+        summary = "Used quick resume fallback because AI returned an unreadable response."
+    else:
+        summary = "Used quick resume fallback."
+
+    return SearchSuggestions(
+        roles=roles[:15],
+        keywords=keywords[:20],
+        locations=locations[:5],
+        companies=companies[:100],
+        summary=summary,
+    )
+
+
+async def _run_suggest_call(llm, system_prompt: str, user_message: str) -> tuple[dict | None, str | None]:
+    settings = get_settings()
+    try:
+        result = await asyncio.wait_for(
+            asyncio.to_thread(
+                llm.chat_json,
+                system_prompt,
+                user_message,
+                max_tokens=2048,
+            ),
+            timeout=max(float(settings.search_suggest_timeout_seconds), 1.0),
+        )
+        if result is None:
+            return None, "parse"
+        return result, None
+    except TimeoutError:
+        logger.warning(
+            "Resume suggestion timed out after %ss for provider '%s'",
+            settings.search_suggest_timeout_seconds,
+            getattr(llm, "provider", "unknown"),
+        )
+        return None, "timeout"
 
 
 def _get_fast_llm(primary_llm) -> tuple:
@@ -367,6 +534,7 @@ def _get_fast_llm(primary_llm) -> tuple:
 async def suggest_search_params(
     request: Request,
     profile: str = "default",
+    workspace = Depends(get_active_workspace_context_csrf),
     db: Session = Depends(get_db),
 ):
     """Use LLM to analyze resume and suggest search parameters.
@@ -375,12 +543,12 @@ async def suggest_search_params(
     (Groq/Cerebras/Gemini) before falling back to the user's model.
     Results are cached per resume hash to avoid redundant calls.
     """
-    workspace = workspace_service.get_workspace_context_optional(db, request)
     settings = get_settings()
     enforce_rate_limit(
         "search-suggest",
         request_identity(request, workspace.workspace.id if workspace else None),
         limit=settings.search_rate_limit_per_minute,
+        db=db,
     )
     primary_llm = (
         workspace_service.get_workspace_llm(db, workspace.workspace.id, fallback_to_global=True)
@@ -412,19 +580,31 @@ async def suggest_search_params(
     llm, _model = _get_fast_llm(primary_llm)
     user_msg = f"Resume:\n\n{resume_text}"
 
-    data = await asyncio.to_thread(
-        llm.chat_json, _SUGGEST_PROMPT, user_msg, max_tokens=2048,
-    )
+    data, failure_reason = await _run_suggest_call(llm, _SUGGEST_PROMPT, user_msg)
 
     if not data:
         # Retry with the primary LLM if the fast provider failed
         if llm is not primary_llm:
             logger.warning("Fast provider failed, retrying with primary LLM")
-            data = await asyncio.to_thread(
-                primary_llm.chat_json, _SUGGEST_PROMPT, user_msg, max_tokens=2048,
-            )
+            data, failure_reason = await _run_suggest_call(primary_llm, _SUGGEST_PROMPT, user_msg)
         if not data:
-            raise HTTPException(502, "LLM failed to generate suggestions. Try again.")
+            fallback = _build_suggest_fallback(
+                db=db,
+                workspace=workspace,
+                profile=profile,
+                failure_reason=failure_reason,
+            )
+            if fallback is not None:
+                return fallback
+            if failure_reason == "timeout":
+                raise HTTPException(
+                    504,
+                    "Resume analysis took too long. You can keep going with your uploaded resume, or try Analyze again later.",
+                )
+            raise HTTPException(
+                502,
+                "Resume analysis returned an unreadable response. You can keep going with your uploaded resume, or try Analyze again later.",
+            )
 
     result = SearchSuggestions(
         roles=_clean_list(data.get("roles"), max_items=15),
@@ -433,6 +613,20 @@ async def suggest_search_params(
         companies=_clean_list(data.get("companies"), max_items=100),
         summary=str(data.get("summary", ""))[:300],
     )
+
+    if workspace and not result.roles and not result.keywords:
+        prefs = workspace_service.get_workspace_preferences(db, workspace.workspace.id)
+        fallback_roles, fallback_keywords = workspace_service.derive_search_terms_from_resume(
+            db,
+            workspace.workspace.id,
+            prefs,
+        )
+        result = result.model_copy(
+            update={
+                "roles": fallback_roles or result.roles,
+                "keywords": fallback_keywords or result.keywords,
+            }
+        )
 
     # Cache result (evict oldest if full)
     if len(_suggest_cache) >= _CACHE_MAX:

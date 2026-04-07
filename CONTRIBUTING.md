@@ -21,9 +21,20 @@ make setup    # creates venv, installs Python + Node deps, copies .env
 
 ```bash
 make dev      # starts backend (localhost:8000) + frontend (localhost:5173)
+make desktop-dev  # starts the Tauri desktop shell against the local runtime
+make desktop-install  # builds and refreshes /Applications/Launchboard.app
+make desktop-smoke  # runs the desktop onboarding/upload/search smoke flow
 make backend  # backend only
 make frontend # frontend only
 ```
+
+Desktop development also requires the Rust toolchain via [rustup](https://rustup.rs). The first desktop scaffold lives in `frontend/src-tauri`, and the desktop runtime entrypoint lives in `backend/app/desktop_runtime.py`.
+`make setup` installs PyInstaller as part of the Python toolchain so `make desktop-build` can package the local runtime sidecar.
+Packaged sidecar artifacts are staged under `.desktop-build/tauri-sidecars`; dev mode still runs directly from your repo `.venv`.
+On macOS, release builds follow the Python architecture in your `.venv` so the Tauri app and bundled sidecar match. If you want a native Apple Silicon app, build from an arm64 Python environment.
+Install the Playwright browser once with `npm --prefix frontend run desktop:smoke:install` before running the desktop smoke flow locally.
+Smoke artifacts are written to `test-results/desktop-smoke/` when the check fails.
+`make desktop-install` backs up the previously installed app into `.desktop-build/install-backups/` before copying the newest build into `/Applications`.
 
 ## Troubleshooting
 
@@ -124,7 +135,19 @@ def new_feature(self, ...) -> dict | None:
 ```bash
 make test       # Python tests
 make typecheck  # TypeScript type checking
+npm --prefix frontend run lint
+npm --prefix frontend run build
 ```
+
+GitHub Actions currently validates:
+
+- fatal Python lint checks via Ruff
+- Python bytecode compilation
+- full Python test suite
+- frontend typecheck, lint, and production build
+- desktop onboarding/upload/search smoke flow on Linux
+- desktop scaffold health on Linux
+- native desktop bundle generation on macOS
 
 ## Pull Requests
 
@@ -140,3 +163,5 @@ Open an issue on GitHub with:
 - What happened instead
 - Steps to reproduce
 - Your OS and Python/Node versions
+
+For security-sensitive issues, do not open a public issue. Follow [SECURITY.md](SECURITY.md) instead.

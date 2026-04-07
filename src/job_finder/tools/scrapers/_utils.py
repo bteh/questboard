@@ -21,14 +21,22 @@ _HEADERS = {
 _TIMEOUT = 15
 
 
-def _get_json(url: str, params: dict | None = None) -> dict | list | None:
+def _get_json(
+    url: str,
+    params: dict | None = None,
+    *,
+    quiet_statuses: set[int] | None = None,
+) -> dict | list | None:
     """GET a JSON endpoint with error handling."""
+    quiet_statuses = quiet_statuses or set()
     try:
         resp = requests.get(url, headers=_HEADERS, params=params, timeout=_TIMEOUT)
         resp.raise_for_status()
         return resp.json()
     except requests.RequestException as e:
-        logger.warning("Failed to fetch %s: %s", url, e)
+        status = getattr(getattr(e, "response", None), "status_code", None)
+        log_fn = logger.debug if status in quiet_statuses else logger.warning
+        log_fn("Failed to fetch %s: %s", url, e)
         return None
     except ValueError as e:
         logger.warning("Invalid JSON from %s: %s", url, e)

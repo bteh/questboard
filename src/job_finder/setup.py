@@ -194,10 +194,10 @@ search_settings:
   max_days_old: 14
   exclude_staffing_agencies: true
   country: "USA"
+  ai_score_top_n: 60
 
 job_boards:
   - "indeed"
-  - "linkedin"
   - "glassdoor"
   - "zip_recruiter"
   - "google"

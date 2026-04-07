@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import re
 import time
 import uuid
@@ -13,6 +14,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
 
+from app.config import get_settings
 from app.dependencies import get_pipeline
 
 logger = logging.getLogger(__name__)
@@ -31,6 +33,7 @@ _MODE_LABELS: dict[str, str] = {
 }
 
 _STAGE_LABELS: dict[str, str] = {
+    "queued": "Queued for worker",
     "searching": "Searching job boards",
     "scoring": "Scoring jobs",
     "ai_scoring": "AI analysis",
@@ -44,6 +47,14 @@ _executor = ThreadPoolExecutor(max_workers=2)
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _coerce_utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
 
 
 @dataclass
@@ -159,6 +170,129 @@ def _cleanup_old_runs() -> None:
             _runs.pop(run.run_id, None)
 
 
+def _with_db(callback) -> None:
+    from app.models.database import get_db
+
+    db_gen = get_db()
+    db = next(db_gen)
+    try:
+        callback(db)
+    finally:
+        try:
+            next(db_gen)
+        except StopIteration:
+            pass
+
+
+def _persist_workspace_run_status(
+    run: PipelineRun,
+    *,
+    error: str = "",
+) -> None:
+    if not run.workspace_id:
+        return
+
+    def _callback(db) -> None:
+        from app.services import workspace_service
+
+        workspace_service.update_search_run_status(
+            db,
+            run.run_id,
+            status=run.status,
+            jobs_found=run.jobs_found,
+            jobs_scored=run.jobs_scored,
+            strong_matches=run.strong_matches,
+            error=error,
+            started_at=run.started_at,
+            completed_at=run.completed_at,
+        )
+
+    try:
+        _with_db(_callback)
+    except Exception:
+        logger.warning("Failed to persist workspace run status", exc_info=True)
+
+
+def _persist_workspace_event(run: PipelineRun, event_type: str, data: str) -> None:
+    if not run.workspace_id:
+        return
+
+    def _callback(db) -> None:
+        from app.services import workspace_service
+
+        workspace_service.append_search_event(
+            db,
+            run.workspace_id,
+            run.run_id,
+            event_type,
+            data,
+        )
+
+    try:
+        _with_db(_callback)
+    except Exception:
+        logger.warning("Failed to persist workspace run event", exc_info=True)
+
+
+def _try_start_inline_dev_hosted_run(run: PipelineRun) -> bool:
+    """Run hosted searches inline in the local sandbox if no worker is alive."""
+    settings = get_settings()
+    if not run.workspace_id or not settings.dev_hosted_auth_enabled:
+        return False
+
+    claimed = False
+
+    def _callback(db) -> None:
+        nonlocal claimed
+        from app.services import workspace_service
+
+        if workspace_service.list_recent_worker_heartbeats(
+            db,
+            expected_release=settings.resolved_app_release,
+        ):
+            return
+
+        record = workspace_service.claim_search_run(db, run.run_id, "sandbox-inline")
+        if not record:
+            return
+
+        run.status = "running"
+        run.started_at = _coerce_utc(record.started_at)
+        claimed = True
+
+    try:
+        _with_db(_callback)
+    except Exception:
+        logger.warning("Failed to check hosted worker availability", exc_info=True)
+        return False
+
+    return claimed
+
+
+def _has_compatible_hosted_worker() -> bool:
+    compatible = False
+    settings = get_settings()
+
+    def _callback(db) -> None:
+        nonlocal compatible
+        from app.services import workspace_service
+
+        compatible = bool(
+            workspace_service.list_recent_worker_heartbeats(
+                db,
+                expected_release=settings.resolved_app_release,
+            )
+        )
+
+    try:
+        _with_db(_callback)
+    except Exception:
+        logger.warning("Failed to inspect worker heartbeats", exc_info=True)
+        return False
+
+    return compatible
+
+
 def start_run(
     *,
     roles: list[str],
@@ -166,7 +300,7 @@ def start_run(
     keywords: list[str],
     companies: list[str] | None = None,
     include_remote: bool,
-    workplace_preference: str,
+    workplace_preference: str = "remote_friendly",
     max_days_old: int,
     use_ai: bool,
     profile: str,
@@ -178,10 +312,8 @@ def start_run(
     snapshot=None,
 ) -> PipelineRun:
     """Launch a pipeline run in a background thread. Returns immediately."""
-    _cleanup_old_runs()
-
     run_id = uuid.uuid4().hex[:12]
-    queue: asyncio.Queue = asyncio.Queue()
+    queue: asyncio.Queue | None = asyncio.Queue() if not get_settings().hosted_mode else None
     run = PipelineRun(
         run_id=run_id,
         profile=profile,
@@ -191,7 +323,52 @@ def start_run(
         queue=queue,
         loop=loop,
     )
-    _runs[run_id] = run
+    if not get_settings().hosted_mode:
+        _cleanup_old_runs()
+        _runs[run_id] = run
+
+    request_payload = {
+        "roles": roles,
+        "locations": locations,
+        "keywords": keywords,
+        "companies": companies or [],
+        "include_remote": include_remote,
+        "workplace_preference": workplace_preference,
+        "max_days_old": max_days_old,
+        "use_ai": use_ai,
+        "profile": profile,
+        "mode": mode,
+    }
+
+    if workspace_id and snapshot is not None:
+        def _callback(db) -> None:
+            from app.services import workspace_service
+
+            workspace_service.register_search_run(
+                db,
+                workspace_id,
+                run.run_id,
+                run.status,
+                run.mode,
+                snapshot,
+                run.started_at,
+                request_payload=request_payload,
+            )
+
+        _with_db(_callback)
+
+    if get_settings().hosted_mode and workspace_id:
+        if _try_start_inline_dev_hosted_run(run):
+            _send_event(run, "progress", "Hosted sandbox worker unavailable - running inline for local development")
+            _emit_stage_event(run, stage="searching", percent=2, label="Starting search")
+        else:
+            if not _has_compatible_hosted_worker():
+                raise RuntimeError(
+                    f"No compatible hosted worker is ready for release {get_settings().resolved_app_release}"
+                )
+            _send_event(run, "progress", "Queued - waiting for an available worker")
+            _emit_stage_event(run, stage="queued", percent=1)
+            return run
 
     # Merge keywords into roles for search (pipeline treats them similarly)
     all_roles = list(roles)
@@ -227,16 +404,18 @@ def _execute_pipeline(
     locations: list[str],
     use_ai: bool,
     mode: str,
-    workplace_preference: str,
+    workplace_preference: str = "remote_friendly",
     max_days_old: int | None = None,
     workspace_id: str | None = None,
     config_override: dict | None = None,
     llm_override: Any | None = None,
     target_companies: list[str] | None = None,
+    emit_error_event: bool = True,
 ) -> None:
     """Run the pipeline in a worker thread."""
     run.status = "running"
-    run.started_at = _utcnow()
+    run.started_at = _coerce_utc(run.started_at) or _utcnow()
+    _persist_workspace_run_status(run)
 
     try:
         from job_finder.tools.scrapers import get_all_metadata
@@ -262,30 +441,30 @@ def _execute_pipeline(
                 else:
                     pipeline.config[key] = value
 
-        # Inject AI-suggested target companies into the pipeline config.
-        # The pipeline's watchlist logic converts these to ATS slugs and
-        # routes them to Greenhouse/Lever/Ashby scrapers automatically.
+        # Inject AI-suggested target companies into the pipeline config, but
+        # only after ATS discovery confirms which board each company actually
+        # uses. This avoids blasting guessed slugs at every ATS API.
         if target_companies:
-            from app.services.watchlist_service import _generate_slugs
+            from app.services.watchlist_service import build_watchlist_entries
             existing = pipeline.config.get("watchlist", [])
-            existing_names = {e.get("name", "").lower() for e in existing}
-            for company_name in target_companies:
-                if company_name.lower() in existing_names:
+            existing_keys = {
+                (str(entry.get("name", "")).lower(), str(entry.get("ats", "")))
+                for entry in existing
+                if isinstance(entry, dict)
+            }
+            discovered = build_watchlist_entries(target_companies)
+            for entry in discovered:
+                key = (str(entry.get("name", "")).lower(), str(entry.get("ats", "")))
+                if key in existing_keys:
                     continue
-                slugs = _generate_slugs(company_name)
-                if slugs:
-                    # Try all ATS types — scrapers handle misses gracefully
-                    for ats in ("greenhouse", "lever", "ashby"):
-                        existing.append({
-                            "name": company_name,
-                            "slug": slugs[0],
-                            "ats": ats,
-                            "job_count": 0,
-                            "careers_url": "",
-                        })
-                    existing_names.add(company_name.lower())
+                existing.append(entry)
+                existing_keys.add(key)
             pipeline.config["watchlist"] = existing
-            logger.info("Injected %d AI-suggested companies into pipeline watchlist (%d ATS entries)", len(target_companies), len(existing))
+            logger.info(
+                "Injected %d confirmed ATS company targets from %d AI-suggested companies",
+                len(discovered),
+                len(target_companies),
+            )
             _send_event(run, "progress", f"Targeting {len(target_companies)} companies from resume analysis")
 
         # Load workspace resume — MUST succeed in workspace mode to prevent
@@ -310,29 +489,34 @@ def _execute_pipeline(
 
         from job_finder.company_classifier import parse_location
 
-        preferred_locations = [
+        existing_loc_prefs = dict(pipeline.config.get("location_preferences", {}))
+
+        preferred_locations = list(existing_loc_prefs.get("preferred_locations", [])) or [
             location for location in locations
             if location.strip().lower() not in {"remote", "anywhere", "united states", "usa", "us"}
         ]
-        preferred_states: list[str] = []
-        preferred_cities: list[str] = []
-        for location in preferred_locations:
-            parsed = parse_location(location)
-            if parsed.get("state") and parsed["state"] not in preferred_states:
-                preferred_states.append(parsed["state"])
-            if parsed.get("city") and parsed["city"] not in preferred_cities:
-                preferred_cities.append(parsed["city"])
+        preferred_states: list[str] = list(existing_loc_prefs.get("preferred_states", []))
+        preferred_cities: list[str] = list(existing_loc_prefs.get("preferred_cities", []))
+        if not preferred_states or not preferred_cities:
+            for location in preferred_locations:
+                parsed = parse_location(location)
+                if parsed.get("state") and parsed["state"] not in preferred_states:
+                    preferred_states.append(parsed["state"])
+                if parsed.get("city") and parsed["city"] not in preferred_cities:
+                    preferred_cities.append(parsed["city"])
 
         pipeline.config["locations"] = list(locations)
-        pipeline.config["location_preferences"] = {
-            "filter_enabled": bool(preferred_locations) or workplace_preference != "remote_friendly",
+        updated_location_preferences = dict(existing_loc_prefs)
+        updated_location_preferences.update({
+            "filter_enabled": bool(preferred_locations or existing_loc_prefs.get("preferred_places")) or workplace_preference != "remote_friendly",
             "preferred_locations": preferred_locations,
             "preferred_states": preferred_states,
             "preferred_cities": preferred_cities,
             "remote_only": workplace_preference == "remote_only",
             "include_remote": workplace_preference != "location_only",
             "workplace_preference": workplace_preference,
-        }
+        })
+        pipeline.config["location_preferences"] = updated_location_preferences
 
         tracker = _ProgressTracker(run, mode)
         progress_cb = tracker
@@ -384,7 +568,7 @@ def _execute_pipeline(
 
         run.status = "completed"
         run.completed_at = _utcnow()
-        duration = (run.completed_at - run.started_at).total_seconds()
+        duration = (run.completed_at - (_coerce_utc(run.started_at) or run.completed_at)).total_seconds()
         _send_event(
             run,
             "complete",
@@ -396,61 +580,15 @@ def _execute_pipeline(
                 "sources": sources,
             }),
         )
-        if workspace_id:
-            try:
-                from app.models.database import get_db
-                from app.services import workspace_service
-
-                db_gen = get_db()
-                db = next(db_gen)
-                try:
-                    workspace_service.update_search_run_status(
-                        db,
-                        run.run_id,
-                        status=run.status,
-                        jobs_found=run.jobs_found,
-                        jobs_scored=run.jobs_scored,
-                        strong_matches=run.strong_matches,
-                        completed_at=run.completed_at,
-                    )
-                finally:
-                    try:
-                        next(db_gen)
-                    except StopIteration:
-                        pass
-            except Exception:
-                logger.warning("Failed to update workspace search run", exc_info=True)
+        _persist_workspace_run_status(run)
     except Exception as e:
         logger.exception("Pipeline run %s failed", run.run_id)
         run.status = "failed"
         run.error = str(e)
         run.completed_at = _utcnow()
-        _send_event(run, "error", str(e))
-        if workspace_id:
-            try:
-                from app.models.database import get_db
-                from app.services import workspace_service
-
-                db_gen = get_db()
-                db = next(db_gen)
-                try:
-                    workspace_service.update_search_run_status(
-                        db,
-                        run.run_id,
-                        status=run.status,
-                        jobs_found=run.jobs_found,
-                        jobs_scored=run.jobs_scored,
-                        strong_matches=run.strong_matches,
-                        error=str(e),
-                        completed_at=run.completed_at,
-                    )
-                finally:
-                    try:
-                        next(db_gen)
-                    except StopIteration:
-                        pass
-            except Exception:
-                logger.warning("Failed to update workspace search run", exc_info=True)
+        if emit_error_event:
+            _send_event(run, "error", str(e))
+        _persist_workspace_run_status(run, error=str(e))
 
 
 def _auto_deduplicate(profile: str | None = None, workspace_id: str | None = None) -> int:
@@ -584,6 +722,7 @@ def _save_search_results(
 
 def _send_event(run: PipelineRun, event_type: str, data: str) -> None:
     """Thread-safe: push an SSE event onto the run's asyncio queue."""
+    _persist_workspace_event(run, event_type, data)
     if run.queue and run.loop:
         try:
             asyncio.run_coroutine_threadsafe(
@@ -592,6 +731,112 @@ def _send_event(run: PipelineRun, event_type: str, data: str) -> None:
             )
         except RuntimeError:
             pass  # loop closed
+
+
+def _emit_stage_event(
+    run: PipelineRun,
+    *,
+    stage: str,
+    percent: int,
+    elapsed: float = 0.0,
+    label: str | None = None,
+) -> None:
+    _send_event(
+        run,
+        "stage",
+        json.dumps({
+            "percent": percent,
+            "stage": stage,
+            "stage_label": label or _STAGE_LABELS.get(stage, stage),
+            "elapsed": round(elapsed, 1),
+        }),
+    )
+
+
+def process_next_hosted_run(worker_id: str | None = None) -> bool:
+    """Claim and execute one hosted search run from durable storage."""
+    if not get_settings().hosted_mode:
+        return False
+
+    from app.models.database import get_db
+    from app.services import workspace_service
+
+    effective_worker_id = worker_id or get_settings().worker_id or f"worker-{os.getpid()}"
+    db_gen = get_db()
+    db = next(db_gen)
+    try:
+        record = workspace_service.claim_next_search_run(db, effective_worker_id)
+        if not record:
+            return False
+
+        payload = workspace_service.get_search_request_payload(record)
+        payload_roles = [str(item) for item in payload.get("roles") or []]
+        payload_keywords = [str(item) for item in payload.get("keywords") or []]
+        run = PipelineRun(
+            run_id=record.run_id,
+            profile=str(payload.get("profile") or "workspace"),
+            mode=record.mode or str(payload.get("mode") or "search_score"),
+            workspace_id=record.workspace_id,
+            status="running",
+            started_at=_coerce_utc(record.started_at),
+        )
+        _send_event(run, "progress", "Worker claimed run - starting search")
+        _emit_stage_event(run, stage="searching", percent=3)
+
+        prefs = workspace_service.get_workspace_preferences(db, record.workspace_id)
+        llm = workspace_service.get_workspace_llm(db, record.workspace_id, fallback_to_global=True)
+        config_override = workspace_service.build_pipeline_config_override(prefs, record.workspace_id)
+
+        _execute_pipeline(
+            run,
+            roles=payload_roles + payload_keywords,
+            locations=[str(item) for item in payload.get("locations") or []],
+            use_ai=bool(payload.get("use_ai")),
+            mode=run.mode,
+            workplace_preference=str(payload.get("workplace_preference") or "remote_friendly"),
+            max_days_old=int(payload.get("max_days_old") or prefs.max_days_old or 14),
+            workspace_id=record.workspace_id,
+            config_override=config_override,
+            llm_override=llm,
+            target_companies=[str(item) for item in payload.get("companies") or []],
+            emit_error_event=False,
+        )
+
+        db.refresh(record)
+        if run.status == "failed" and int(record.attempt_count or 0) < int(record.max_attempts or 1):
+            retry_seconds = min(
+                get_settings().worker_retry_base_seconds * max(int(record.attempt_count or 1), 1),
+                300,
+            )
+            workspace_service.append_search_event(
+                db,
+                record.workspace_id,
+                record.run_id,
+                "progress",
+                f"Run failed, retrying in {retry_seconds} seconds",
+            )
+            workspace_service.release_search_run_for_retry(
+                db,
+                record.run_id,
+                error=run.error or "Retry scheduled",
+                retry_seconds=retry_seconds,
+            )
+            return True
+
+        if run.status == "failed":
+            workspace_service.append_search_event(
+                db,
+                record.workspace_id,
+                record.run_id,
+                "error",
+                run.error or "Search failed",
+            )
+        return True
+    finally:
+        try:
+            next(db_gen)
+        except StopIteration:
+            pass
 
 
 async def stream_progress(run_id: str):
@@ -623,6 +868,42 @@ async def stream_progress(run_id: str):
             yield "event: ping\ndata: keepalive\n\n"
             if run.status in ("completed", "failed"):
                 return
+
+
+async def stream_persisted_progress(workspace_id: str, run_id: str):
+    """Async generator yielding SSE-formatted strings from persisted hosted runs."""
+    from app.models.database import get_db
+    from app.services import workspace_service
+
+    last_event_id = 0
+    while True:
+        db_gen = get_db()
+        db = next(db_gen)
+        try:
+            run = workspace_service.get_search_run(db, workspace_id, run_id)
+            if not run:
+                yield f"event: error\ndata: Run {run_id} not found\n\n"
+                return
+
+            events = workspace_service.list_search_events(
+                db,
+                workspace_id,
+                run_id,
+                after_id=last_event_id,
+            )
+            for event in events:
+                last_event_id = event.id
+                yield f"event: {event.event_type}\ndata: {event.payload}\n\n"
+
+            if run.status in ("completed", "failed") and not events:
+                return
+        finally:
+            try:
+                next(db_gen)
+            except StopIteration:
+                pass
+
+        await asyncio.sleep(0.5)
 
 
 def get_run(run_id: str) -> PipelineRun | None:

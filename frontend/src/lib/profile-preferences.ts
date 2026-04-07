@@ -6,10 +6,12 @@ import {
 import type { PlaceSelection, WorkspacePreferences } from '@/types/workspace';
 
 export type WorkplacePreference = 'remote_friendly' | 'remote_only' | 'location_only';
+export type PlaceMatchScope = 'city' | 'metro' | 'region' | 'country';
 
 export interface LocationSuggestion {
   label: string;
-  kind: LocationKind;
+  kind: LocationKind | 'manual';
+  match_scope?: PlaceMatchScope;
   subtitle: string;
   city?: string;
   region?: string;
@@ -38,8 +40,8 @@ export const LEVEL_OPTIONS = [
 export const WORKPLACE_OPTIONS = [
   {
     value: 'remote_friendly' as const,
-    label: 'Remote + local',
-    description: 'Show remote jobs plus jobs in your preferred locations.',
+    label: 'Remote + selected places',
+    description: 'Remote jobs anywhere, plus hybrid or on-site jobs in the places below.',
   },
   {
     value: 'remote_only' as const,
@@ -48,8 +50,8 @@ export const WORKPLACE_OPTIONS = [
   },
   {
     value: 'location_only' as const,
-    label: 'Local only',
-    description: 'Only show hybrid or on-site jobs in your preferred locations.',
+    label: 'Selected places only',
+    description: 'Only show hybrid or on-site jobs in the places below. Remote jobs are excluded.',
   },
 ] as const;
 
@@ -124,6 +126,7 @@ function normalizeSearchKey(value: string): string {
 function buildLocationSearchTerms(option: LocationOption): string[] {
   return [
     option.label,
+    option.city ?? '',
     option.country ?? '',
     option.region ?? '',
     ...(option.aliases ?? []),
@@ -247,9 +250,81 @@ export function normalizeLocationList(values: string[]): string[] {
 }
 
 export function createManualPlace(label: string): PlaceSelection {
+  const exactOption = findLocationOption(label);
+  if (exactOption) {
+    return {
+      label: exactOption.label,
+      kind: exactOption.kind,
+      match_scope: exactOption.kind === 'city' ? 'city' : exactOption.kind,
+      city: exactOption.city ?? '',
+      region: exactOption.region ?? '',
+      country: exactOption.country ?? '',
+      country_code: exactOption.country_code ?? '',
+      lat: null,
+      lon: null,
+      provider: 'local',
+      provider_id: exactOption.label,
+    };
+  }
+
+  const normalized = normalizeLocationInput(label);
+  const parts = normalized.split(',').map((part) => part.trim()).filter(Boolean);
+  const stateOnly = normalized.toLowerCase().replace(/\s+state$/, '');
+  const countryOption = LOCATION_OPTIONS.find((option) => option.kind === 'country' && option.label === normalized);
+
+  if (countryOption) {
+    return {
+      label: normalized,
+      kind: 'country',
+      match_scope: 'country',
+      city: '',
+      region: '',
+      country: countryOption.country ?? countryOption.label,
+      country_code: countryOption.country_code ?? '',
+      lat: null,
+      lon: null,
+      provider: 'manual',
+      provider_id: '',
+    };
+  }
+
+  if (STATE_NAME_TO_ABBR[stateOnly]) {
+    return {
+      label: normalized,
+      kind: 'region',
+      match_scope: 'region',
+      city: '',
+      region: titleCase(stateOnly),
+      country: 'United States',
+      country_code: 'US',
+      lat: null,
+      lon: null,
+      provider: 'manual',
+      provider_id: '',
+    };
+  }
+
+  if (parts.length === 2) {
+    const [city, region] = parts;
+    return {
+      label: normalized,
+      kind: 'manual',
+      match_scope: 'city',
+      city,
+      region,
+      country: '',
+      country_code: '',
+      lat: null,
+      lon: null,
+      provider: 'manual',
+      provider_id: '',
+    };
+  }
+
   return {
-    label,
+    label: normalized,
     kind: 'manual',
+    match_scope: 'city',
     city: '',
     region: '',
     country: '',
@@ -267,10 +342,21 @@ export function placeLabel(value: Pick<PlaceSelection, 'label'> | string): strin
 
 export function normalizePlaceSelection(value: PlaceSelection | string): PlaceSelection {
   if (typeof value !== 'string') {
+    const normalizedLabel = normalizeLocationInput(value.label);
+    const base = createManualPlace(normalizedLabel);
+    const keepKind = value.kind && !(value.kind === 'manual' && base.kind !== 'manual');
     return {
-      ...createManualPlace(normalizeLocationInput(value.label)),
-      ...value,
-      label: normalizeLocationInput(value.label),
+      label: normalizedLabel,
+      kind: keepKind ? value.kind : base.kind,
+      match_scope: value.match_scope || base.match_scope,
+      city: value.city || base.city,
+      region: value.region || base.region,
+      country: value.country || base.country,
+      country_code: value.country_code || base.country_code,
+      lat: value.lat ?? base.lat,
+      lon: value.lon ?? base.lon,
+      provider: value.provider || base.provider,
+      provider_id: value.provider_id || base.provider_id,
     };
   }
   return createManualPlace(normalizeLocationInput(value));
@@ -296,6 +382,7 @@ export function suggestionToPlace(suggestion: LocationSuggestion): PlaceSelectio
   return {
     label: suggestion.label,
     kind: (suggestion.kind as PlaceSelection['kind']) || 'manual',
+    match_scope: suggestion.match_scope ?? (suggestion.kind === 'city' ? 'city' : suggestion.kind === 'region' ? 'region' : suggestion.kind === 'country' ? 'country' : 'city'),
     city: suggestion.city || '',
     region: suggestion.region || '',
     country: suggestion.country || '',
@@ -307,13 +394,41 @@ export function suggestionToPlace(suggestion: LocationSuggestion): PlaceSelectio
   };
 }
 
+export function getPlaceScopeOptions(place: PlaceSelection): Array<{ value: PlaceMatchScope; label: string }> {
+  if (place.kind === 'country') {
+    return [{ value: 'country', label: 'Country' }];
+  }
+  if (place.kind === 'region') {
+    return [{ value: 'region', label: 'Region / state' }];
+  }
+  return [
+    { value: 'city', label: 'City only' },
+    { value: 'metro', label: 'Metro / nearby' },
+  ];
+}
+
+export function getPlaceScopeLabel(scope: PlaceMatchScope): string {
+  switch (scope) {
+    case 'metro':
+      return 'Metro / nearby';
+    case 'region':
+      return 'Region / state';
+    case 'country':
+      return 'Country';
+    default:
+      return 'City only';
+  }
+}
+
 export function buildDefaultWorkspacePreferences(): WorkspacePreferences {
   return {
     roles: [],
     keywords: [],
+    companies: [],
     preferred_places: [],
     workplace_preference: 'remote_friendly',
     max_days_old: 14,
+    include_linkedin_jobs: false,
     current_title: '',
     current_level: 'mid',
     compensation: {
@@ -353,6 +468,7 @@ export function getLocationSuggestions(query: string, selected: string[] = [], l
     return directMatches.slice(0, limit).map((option) => ({
       label: option.label,
       kind: option.kind,
+      match_scope: option.kind === 'city' ? 'city' : option.kind,
       subtitle: toLocationSubtitle(option),
       city: option.city,
       region: option.region,
@@ -379,6 +495,7 @@ export function getLocationSuggestions(query: string, selected: string[] = [], l
     .map(({ option }) => ({
       label: option.label,
       kind: option.kind,
+      match_scope: option.kind === 'city' ? 'city' : option.kind,
       subtitle: toLocationSubtitle(option),
       city: option.city,
       region: option.region,

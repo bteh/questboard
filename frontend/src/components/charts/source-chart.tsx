@@ -5,6 +5,16 @@ import { getChartTheme, tooltipStyle } from '@/utils/chart-theme';
 import { useSourceLabels, resolveSourceLabel } from '@/hooks/use-scrapers';
 import type { ChartDataPoint } from '@/types/analytics';
 
+function toNumericValue(value: number | string | ReadonlyArray<number | string> | undefined): number {
+  if (Array.isArray(value)) return toNumericValue(value[0]);
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
 const BAR_COLORS = [
   '#6366F1', '#818CF8', '#3B82F6', '#06B6D4', '#10B981',
   '#F59E0B', '#EF4444', '#EC4899', '#8B5CF6', '#14B8A6',
@@ -46,7 +56,7 @@ export function SourceChart({ data }: SourceChartProps) {
         />
         <Tooltip
           contentStyle={tooltipStyle()}
-          formatter={(value: number) => [`${value.toLocaleString()} jobs`, 'Count']}
+          formatter={(value: number | string | ReadonlyArray<number | string> | undefined) => [`${toNumericValue(value).toLocaleString()} jobs`, 'Count']}
         />
         <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={20}>
           {chartData.map((_, index) => (

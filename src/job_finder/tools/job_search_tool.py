@@ -39,7 +39,7 @@ def _safe_bool(value: Any) -> bool:
 
 # -- Main search function --------------------------------------------------
 
-_DEFAULT_BOARDS = ["indeed", "linkedin", "glassdoor", "zip_recruiter", "google"]
+_DEFAULT_BOARDS = ["indeed", "glassdoor", "zip_recruiter", "google"]
 
 
 def search_jobs(
@@ -66,8 +66,8 @@ def search_jobs(
         passes ``False`` during fast search and relies on descriptions from
         other boards.  CLI callers default to ``True`` for richer data.
     boards : list[str] or None
-        JobSpy site names to scrape.  Defaults to Indeed, LinkedIn, Glassdoor,
-        ZipRecruiter, and Google.  Configurable via ``job_boards`` in YAML.
+        JobSpy site names to scrape.  Defaults to Indeed, Glassdoor,
+        ZipRecruiter, and Google. LinkedIn is opt-in via ``job_boards``.
     """
     try:
         from jobspy import scrape_jobs

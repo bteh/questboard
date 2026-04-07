@@ -1,5 +1,6 @@
 import { apiGet, apiPost, apiUpload } from '@/lib/api-client';
 import type {
+  HostedBootstrap,
   LocationSuggestion,
   OnboardingState,
   WorkspacePreferences,
@@ -10,6 +11,10 @@ import type {
 
 export function bootstrapWorkspaceSession(): Promise<WorkspaceSession> {
   return apiPost<WorkspaceSession>('/session/bootstrap');
+}
+
+export function getHostedBootstrap(): Promise<HostedBootstrap> {
+  return apiGet<HostedBootstrap>('/me');
 }
 
 export function getOnboardingState(): Promise<OnboardingState> {

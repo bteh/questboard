@@ -20,6 +20,36 @@ def health():
     return {"status": "ok"}
 
 
+@router.get("/health/worker")
+def health_worker(db: Session = Depends(get_db)):
+    settings = get_settings()
+    if not settings.hosted_mode:
+        return {"status": "disabled", "workers": []}
+
+    from app.services import workspace_service
+
+    workers = workspace_service.list_recent_worker_heartbeats(db)
+    compatible_workers = workspace_service.list_recent_worker_heartbeats(
+        db,
+        expected_release=settings.resolved_app_release,
+    )
+    return {
+        "status": "ok" if compatible_workers else "degraded",
+        "release": settings.resolved_app_release,
+        "compatible_workers": len(compatible_workers),
+        "workers": [
+            {
+                "worker_id": worker.worker_id,
+                "status": worker.status,
+                "last_seen_at": worker.last_seen_at.isoformat(),
+                "release": workspace_service.worker_heartbeat_release(worker),
+                "compatible": workspace_service.worker_heartbeat_release(worker) == settings.resolved_app_release,
+            }
+            for worker in workers
+        ],
+    }
+
+
 @router.get("/health/ready")
 def health_ready(db: Session = Depends(get_db)):
     settings = get_settings()
@@ -58,7 +88,7 @@ def health_ready(db: Session = Depends(get_db)):
     except Exception:
         pass
 
-    return {
+    payload = {
         "status": "ready",
         "database": "connected",
         "llm": llm_status,
@@ -70,6 +100,16 @@ def health_ready(db: Session = Depends(get_db)):
         "setup_complete": bool(llm_provider or resume_found or profiles),
         "tips": _get_tips(llm_provider, llm_available, resume_found, profiles),
     }
+    if settings.hosted_mode:
+        from app.services import workspace_service
+
+        payload["workers"] = len(workspace_service.list_recent_worker_heartbeats(db))
+        payload["dev_hosted_auth"] = bool(settings.dev_hosted_auth_enabled)
+        if settings.dev_hosted_auth_enabled:
+            from app.services import dev_auth_service
+
+            payload["dev_personas"] = len(dev_auth_service.list_personas())
+    return payload
 
 
 def _get_tips(

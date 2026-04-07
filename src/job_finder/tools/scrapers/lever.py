@@ -20,7 +20,10 @@ _LEVER_COMPANIES: list[str] = []  # Populated at runtime via watchlist + config
 
 def _fetch_company_postings(slug: str, roles: list[str] | None) -> list[dict]:
     """Fetch matching postings for a single Lever company."""
-    data = _get_json(f"https://api.lever.co/v0/postings/{slug}")
+    data = _get_json(
+        f"https://api.lever.co/v0/postings/{slug}",
+        quiet_statuses={404},
+    )
     if not data or not isinstance(data, list):
         return []
 

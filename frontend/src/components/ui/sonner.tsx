@@ -2,7 +2,6 @@ import { useTheme } from "@/contexts/theme-context"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon, Loader2Icon } from "lucide-react"
 
-// eslint-disable-next-line react-refresh/only-export-components
 const Toaster = ({ ...props }: ToasterProps) => {
   const { resolved } = useTheme()
 

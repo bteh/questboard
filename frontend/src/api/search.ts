@@ -9,6 +9,10 @@ export function getRunStatus(runId: string): Promise<RunStatus> {
   return apiGet<RunStatus>(`/search/runs/${runId}/status`);
 }
 
+export function getSearchRuns(limit = 20): Promise<RunStatus[]> {
+  return apiGet<RunStatus[]>('/search/runs', { limit });
+}
+
 export function getSearchDefaults(profile: string = 'default'): Promise<SearchDefaults> {
   return apiGet<SearchDefaults>('/search/defaults', { profile });
 }

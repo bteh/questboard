@@ -1,13 +1,16 @@
 import type { WorkplacePreference } from '@/lib/profile-preferences';
+import type { PlaceSelection } from '@/types/workspace';
 
 export interface SearchRequest {
   roles: string[];
   locations: string[];
+  preferred_places: PlaceSelection[];
   keywords: string[];
   companies: string[];
   include_remote: boolean;
   workplace_preference: WorkplacePreference;
   max_days_old: number;
+  include_linkedin_jobs: boolean;
   use_ai: boolean;
   profile: string;
   mode: 'search_only' | 'search_score' | 'full_pipeline';
@@ -19,9 +22,11 @@ export interface SearchRunSnapshot {
   roles: string[];
   locations: string[];
   keywords: string[];
+  companies?: string[];
   include_remote: boolean;
   workplace_preference: WorkplacePreference;
   max_days_old: number;
+  include_linkedin_jobs: boolean;
   use_ai: boolean;
   current_title: string;
   current_level: string;
@@ -38,10 +43,13 @@ export interface SearchRunSnapshot {
 export interface SearchDefaults {
   roles: string[];
   locations: string[];
+  preferred_places: PlaceSelection[];
   keywords: string[];
+  companies: string[];
   include_remote: boolean;
   workplace_preference: WorkplacePreference;
   max_days_old: number;
+  include_linkedin_jobs: boolean;
   profile: string;
   current_title: string;
   current_level: string;

@@ -1,0 +1,27 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1024" height="1024" rx="224" fill="#12121A"/>
+  <rect x="168" y="168" width="688" height="688" rx="176" fill="url(#launchboardGradient)"/>
+  <path
+    d="M512 292L682 380V626L512 732L342 626V380L512 292Z"
+    fill="white"
+    fill-opacity="0.96"
+  />
+  <path
+    d="M512 364L610 414V566L512 620L414 566V414L512 364Z"
+    fill="#7A6BFF"
+  />
+  <path
+    d="M342 380L512 468L682 380"
+    stroke="#12121A"
+    stroke-width="28"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    opacity="0.18"
+  />
+  <defs>
+    <linearGradient id="launchboardGradient" x1="220" y1="204" x2="820" y2="828" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8A84FF"/>
+      <stop offset="1" stop-color="#5D6BFF"/>
+    </linearGradient>
+  </defs>
+</svg>

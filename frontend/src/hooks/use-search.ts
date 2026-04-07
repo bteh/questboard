@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { startSearchRun, getRunStatus, getSearchDefaults, suggestSearchParams } from '@/api/search';
+import { startSearchRun, getRunStatus, getSearchDefaults, getSearchRuns, suggestSearchParams } from '@/api/search';
 import type { SearchSuggestions } from '@/api/search';
-import type { SearchRequest } from '@/types/search';
+import type { SearchRequest, RunStatus } from '@/types/search';
 
 export function useSearchDefaults(profile: string) {
   return useQuery({
@@ -40,4 +40,17 @@ export function useRunStatus(runId: string | null) {
       return 2000;
     },
   });
+}
+
+export function useSearchRuns(limit = 20) {
+  return useQuery({
+    queryKey: ['search', 'runs', limit],
+    queryFn: () => getSearchRuns(limit),
+    staleTime: 30_000,
+  });
+}
+
+export function pickLatestCompletedRun(runs: RunStatus[] | undefined): RunStatus | null {
+  if (!runs || runs.length === 0) return null;
+  return runs.find((run) => run.status === 'completed') ?? null;
 }

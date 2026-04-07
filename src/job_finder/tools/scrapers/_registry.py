@@ -89,10 +89,26 @@ def run_scrapers(
     if not active:
         return []
 
-    if progress:
-        progress(f"Searching {len(active)} additional sources in parallel...")
-
     _ats_scrapers = {"greenhouse", "lever", "ashby"}
+    ats_watchlist = watchlist_by_ats or {}
+    skipped_ats: list[str] = []
+    runnable: list[str] = []
+
+    for name in active:
+        if name in _ats_scrapers and not ats_watchlist.get(name):
+            skipped_ats.append(name)
+            continue
+        runnable.append(name)
+
+    if progress:
+        progress(f"Searching {len(runnable)} additional sources in parallel...")
+        for name in skipped_ats:
+            meta = _REGISTRY.get(name)
+            display = meta.display_name if meta else name
+            progress(f"  {display}: skipped — no companies configured")
+
+    if not runnable:
+        return []
 
     def _run_one(name: str) -> tuple[str, list[dict]]:
         meta = _REGISTRY.get(name)
@@ -101,8 +117,8 @@ def run_scrapers(
             return name, []
         try:
             kwargs: dict[str, Any] = {}
-            if watchlist_by_ats and name in _ats_scrapers:
-                extra = watchlist_by_ats.get(name, [])
+            if name in _ats_scrapers:
+                extra = ats_watchlist.get(name, [])
                 if extra:
                     kwargs["watchlist_companies"] = extra
             return name, meta.search_fn(
@@ -117,13 +133,13 @@ def run_scrapers(
             return name, []
 
     all_jobs: list[dict] = []
-    workers = min(len(active), 8)
+    workers = min(len(runnable), 8)
     # Per-scraper timeout prevents a single slow/hung scraper from blocking
     # the entire pipeline.  Scrapers that exceed this are logged and skipped.
     scraper_timeout = 60  # seconds
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {pool.submit(_run_one, n): n for n in active}
+        futures = {pool.submit(_run_one, n): n for n in runnable}
         try:
             for future in as_completed(futures, timeout=scraper_timeout * 2):
                 try:

@@ -17,7 +17,8 @@ _ASHBY_COMPANIES: list[str] = []
 def _fetch_company_jobs(slug: str, roles: list[str] | None) -> list[dict]:
     """Fetch matching jobs for a single Ashby company board."""
     data = _get_json(
-        f"https://api.ashbyhq.com/posting-api/job-board/{slug}?includeCompensation=true"
+        f"https://api.ashbyhq.com/posting-api/job-board/{slug}?includeCompensation=true",
+        quiet_statuses={404},
     )
     if not data or "jobs" not in data:
         return []

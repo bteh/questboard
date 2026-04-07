@@ -11,47 +11,47 @@ function useEffectiveProfile(): string | undefined {
   return hostedMode ? undefined : profile;
 }
 
-export function useDashboardStats() {
+export function useDashboardStats(searchRunId?: string) {
   const profile = useEffectiveProfile();
   return useQuery({
-    queryKey: ['analytics', 'stats', profile],
-    queryFn: () => getDashboardStats(profile),
+    queryKey: ['analytics', 'stats', profile, searchRunId],
+    queryFn: () => getDashboardStats(profile, searchRunId),
     staleTime: 5 * 60 * 1000,
   });
 }
 
-export function useScoreDistribution() {
+export function useScoreDistribution(searchRunId?: string) {
   const profile = useEffectiveProfile();
   return useQuery({
-    queryKey: ['analytics', 'score-distribution', profile],
-    queryFn: () => getScoreDistribution(profile),
+    queryKey: ['analytics', 'score-distribution', profile, searchRunId],
+    queryFn: () => getScoreDistribution(profile, searchRunId),
     staleTime: 5 * 60 * 1000,
   });
 }
 
-export function useRecommendations() {
+export function useRecommendations(searchRunId?: string) {
   const profile = useEffectiveProfile();
   return useQuery({
-    queryKey: ['analytics', 'recommendations', profile],
-    queryFn: () => getRecommendations(profile),
+    queryKey: ['analytics', 'recommendations', profile, searchRunId],
+    queryFn: () => getRecommendations(profile, searchRunId),
     staleTime: 5 * 60 * 1000,
   });
 }
 
-export function useSources() {
+export function useSources(searchRunId?: string) {
   const profile = useEffectiveProfile();
   return useQuery({
-    queryKey: ['analytics', 'sources', profile],
-    queryFn: () => getSources(profile),
+    queryKey: ['analytics', 'sources', profile, searchRunId],
+    queryFn: () => getSources(profile, searchRunId),
     staleTime: 5 * 60 * 1000,
   });
 }
 
-export function useFunnel() {
+export function useFunnel(searchRunId?: string) {
   const profile = useEffectiveProfile();
   return useQuery({
-    queryKey: ['analytics', 'funnel', profile],
-    queryFn: () => getFunnel(profile),
+    queryKey: ['analytics', 'funnel', profile, searchRunId],
+    queryFn: () => getFunnel(profile, searchRunId),
     staleTime: 5 * 60 * 1000,
   });
 }

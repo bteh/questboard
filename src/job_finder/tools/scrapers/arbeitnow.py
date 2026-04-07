@@ -34,6 +34,7 @@ def search_arbeitnow(
         data = _get_json(
             "https://www.arbeitnow.com/api/job-board-api",
             params=params,
+            quiet_statuses={403, 404},
         )
         if not data or "data" not in data:
             break

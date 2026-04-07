@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from typing import Any
 
 # =========================================================================
 # Known-company lists (lowercase, normalized)
@@ -250,7 +251,8 @@ def classify_company(
 # =========================================================================
 
 METRO_AREAS: dict[str, set[str]] = {
-    "Los Angeles": {"los angeles", "santa monica", "culver city", "burbank", "pasadena", "glendale", "long beach", "torrance", "el segundo", "playa vista", "marina del rey", "venice", "west hollywood", "beverly hills", "inglewood", "hawthorne", "manhattan beach", "hermosa beach", "redondo beach", "irvine", "costa mesa", "anaheim", "santa ana", "huntington beach", "newport beach", "woodland hills", "encino", "sherman oaks"},
+    "Los Angeles": {"los angeles", "santa monica", "culver city", "burbank", "pasadena", "glendale", "long beach", "torrance", "el segundo", "playa vista", "marina del rey", "venice", "west hollywood", "beverly hills", "inglewood", "hawthorne", "manhattan beach", "hermosa beach", "redondo beach", "woodland hills", "encino", "sherman oaks"},
+    "Orange County": {"irvine", "costa mesa", "anaheim", "santa ana", "huntington beach", "newport beach"},
     "San Francisco": {"san francisco", "san jose", "oakland", "palo alto", "mountain view", "sunnyvale", "santa clara", "cupertino", "menlo park", "redwood city", "san mateo", "fremont", "berkeley", "emeryville", "south san francisco", "foster city", "milpitas", "campbell", "los gatos", "saratoga"},
     "New York": {"new york", "brooklyn", "manhattan", "queens", "bronx", "staten island", "jersey city", "hoboken", "newark", "white plains", "stamford", "yonkers"},
     "Seattle": {"seattle", "bellevue", "redmond", "kirkland", "tacoma", "bothell", "renton", "kent", "everett"},
@@ -369,6 +371,11 @@ def parse_location(raw_location: str, is_remote: bool = False) -> dict:
 
     loc = raw_location.strip()
     loc_lower = loc.lower()
+
+    if re.fullmatch(r"(united states of america|united states|usa|us|u\.s\.)", loc_lower):
+        result["country"] = "US"
+        result["country_name"] = "united states"
+        return result
 
     # Detect remote
     for kw in _REMOTE_KEYWORDS:
@@ -522,6 +529,182 @@ def _matches_preferred_location_strings(
     return False
 
 
+def _has_explicit_statewide_preference(
+    job_state: str,
+    preferred_locations: list[str] | None,
+) -> bool:
+    """Return True when the user explicitly selected a state-wide preference.
+
+    Examples:
+    - "California" -> explicit state-wide preference for CA
+    - "Los Angeles, CA" -> not state-wide; city-specific preference
+    """
+    if not job_state or not preferred_locations:
+        return False
+
+    for preferred in preferred_locations:
+        if not preferred:
+            continue
+        parsed_pref = parse_location(preferred)
+        if (
+            parsed_pref.get("state", "").upper() == job_state.upper()
+            and not parsed_pref.get("city", "")
+            and parsed_pref.get("country", "") == "US"
+        ):
+            return True
+    return False
+
+
+def _split_location_candidates(job_location: str) -> list[str]:
+    """Split a raw location field into candidate segments.
+
+    Many boards emit multi-location strings like
+    "Denver, CO; Los Angeles, CA; Remote". We should accept a job if any
+    listed location matches the user's preference.
+    """
+    if not job_location:
+        return [""]
+    parts = [
+        part.strip(" ,")
+        for part in re.split(r"\s*;\s*|\s*\|\s*", job_location)
+        if part.strip(" ,")
+    ]
+    if not parts:
+        return [job_location]
+    return parts
+
+
+def _coerce_place_scope(place: dict[str, Any]) -> str:
+    scope = str(place.get("match_scope", "") or "").strip().lower()
+    if scope in {"city", "metro", "region", "country"}:
+        return scope
+    kind = str(place.get("kind", "") or "").strip().lower()
+    if kind in {"region", "country"}:
+        return kind
+    return "city"
+
+
+def _normalize_state_code(value: str) -> str:
+    normalized = str(value or "").strip()
+    if not normalized:
+        return ""
+    if normalized.upper() in _US_STATES:
+        return normalized.upper()
+    state_key = normalized.lower().replace(".", "").removesuffix(" state").strip()
+    return _STATE_NAME_TO_ABBR.get(state_key, normalized)
+
+
+def _normalize_preferred_place(place: Any) -> dict[str, str]:
+    if isinstance(place, str):
+        place = {"label": place}
+    if not isinstance(place, dict):
+        return {"label": "", "scope": "city", "city": "", "state": "", "country": ""}
+
+    label = str(place.get("label", "") or "").strip()
+    parsed = parse_location(label)
+    state = str(parsed.get("state", "") or "").strip() or _normalize_state_code(
+        str(place.get("region", "") or "").strip()
+    )
+    country = str(place.get("country", "") or "").strip().lower()
+    if not country:
+        if parsed.get("country") == "US":
+            country = "united states"
+        else:
+            country = str(parsed.get("country_name", "") or "").strip().lower()
+    return {
+        "label": label,
+        "scope": _coerce_place_scope(place),
+        "city": str(place.get("city", "") or parsed.get("city", "") or "").strip(),
+        "state": state,
+        "country": country,
+    }
+
+
+def _country_matches_place(parsed_job_location: dict, place: dict[str, str]) -> bool:
+    job_country = str(parsed_job_location.get("country_name", "") or "").strip().lower()
+    place_country = place.get("country", "").strip().lower()
+    if place_country and job_country:
+        return place_country == job_country
+    if place_country == "united states":
+        return parsed_job_location.get("country") == "US"
+    return False
+
+
+def _region_matches_place(job_location: str, parsed_job_location: dict, place: dict[str, str]) -> bool:
+    place_state = place.get("state", "").strip()
+    if place_state and parsed_job_location.get("state"):
+        if place_state.upper() == str(parsed_job_location.get("state", "")).upper():
+            return True
+
+    region_norm = _normalize_location_text(place.get("state", ""))
+    job_norm = _normalize_location_text(job_location)
+    if region_norm and region_norm in job_norm:
+        if not place.get("country") or _country_matches_place(parsed_job_location, place):
+            return True
+    return False
+
+
+def _city_matches_place(job_location: str, parsed_job_location: dict, place: dict[str, str]) -> bool:
+    place_city = _normalize_location_text(place.get("city", ""))
+    if not place_city:
+        return False
+
+    job_city = _normalize_location_text(str(parsed_job_location.get("city", "") or ""))
+    if not job_city:
+        return place_city in _normalize_location_text(job_location)
+
+    if place_city != job_city:
+        return False
+
+    place_state = place.get("state", "").strip()
+    job_state = str(parsed_job_location.get("state", "") or "").strip()
+    if place_state and job_state and place_state.upper() != job_state.upper():
+        return False
+
+    if place.get("country") and parsed_job_location.get("country_name"):
+        if not _country_matches_place(parsed_job_location, place):
+            return False
+
+    return True
+
+
+def _metro_matches_place(job_location: str, parsed_job_location: dict, place: dict[str, str]) -> bool:
+    if _city_matches_place(job_location, parsed_job_location, place):
+        return True
+
+    place_city = place.get("city", "").strip()
+    job_city = str(parsed_job_location.get("city", "") or "").strip()
+    if not place_city or not job_city:
+        return False
+
+    place_metro = _find_metro(place_city)
+    job_metro = _find_metro(job_city)
+    return bool(place_metro and job_metro and place_metro == job_metro)
+
+
+def _matches_preferred_places(
+    job_location: str,
+    preferred_places: list[dict[str, Any]] | None,
+) -> bool:
+    if not preferred_places:
+        return False
+
+    for candidate in _split_location_candidates(job_location):
+        parsed_candidate = parse_location(candidate)
+        for raw_place in preferred_places:
+            place = _normalize_preferred_place(raw_place)
+            scope = place.get("scope", "city")
+            if scope == "country" and _country_matches_place(parsed_candidate, place):
+                return True
+            if scope == "region" and _region_matches_place(candidate, parsed_candidate, place):
+                return True
+            if scope == "metro" and _metro_matches_place(candidate, parsed_candidate, place):
+                return True
+            if scope == "city" and _city_matches_place(candidate, parsed_candidate, place):
+                return True
+    return False
+
+
 def _has_physical_location(location: str) -> bool:
     """Check if the location string contains a real city/state (not just 'Remote')."""
     if not location:
@@ -623,6 +806,7 @@ def location_matches_preferences(
     remote_only: bool = False,
     include_remote: bool = True,
     work_type: str = "",
+    preferred_places: list[dict[str, Any]] | None = None,
 ) -> bool:
     """Check if a job location matches user preferences.
 
@@ -634,7 +818,7 @@ def location_matches_preferences(
     4. If no preferences configured -> pass (no filtering).
     """
     # No preferences = no filtering
-    if not preferred_states and not preferred_cities and not preferred_locations and not remote_only and include_remote:
+    if not preferred_states and not preferred_cities and not preferred_locations and not preferred_places and not remote_only and include_remote:
         return True
 
     # Use work_type if provided, otherwise fall back to basic detection
@@ -651,6 +835,9 @@ def location_matches_preferences(
     # Rule 3: Fully remote passes (but NOT hybrid)
     if wt == "remote":
         return True
+
+    if preferred_places:
+        return _matches_preferred_places(job_location, preferred_places)
 
     # Rule 4: Hybrid and onsite must match state/city
     parsed = parse_location(job_location, is_remote)
@@ -691,11 +878,16 @@ def location_matches_preferences(
             if pref_metro and pref_metro == job_metro:
                 return True
 
-    # State-level match — only when user specified states without cities.
-    # If the user picked specific cities (e.g. "Los Angeles"), don't let
-    # every job in that state (e.g. San Francisco) slip through.
-    if preferred_states and parsed["state"] and not preferred_cities:
-        if parsed["state"].upper() in [s.upper() for s in preferred_states]:
+    # State-level fallback only applies when the preference is truly state-wide.
+    # A city preference like "Los Angeles, CA" should not expand to all of
+    # California just because we also derived "CA" while parsing it.
+    if preferred_states and parsed["state"]:
+        normalized_states = [s.upper() for s in preferred_states]
+        job_state = parsed["state"].upper()
+        if job_state in normalized_states and (
+            (not preferred_cities and not preferred_locations)
+            or _has_explicit_statewide_preference(job_state, preferred_locations)
+        ):
             return True
 
     # No match

@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from app.dependencies import reject_legacy_route_in_hosted_mode
 from app.models.database import get_db
 from app.models.schedule import Schedule
 from app.schemas.schedule import ScheduleResponse, ScheduleUpdate
@@ -23,6 +24,7 @@ def get_schedule(
     profile: str = "default", db: Session = Depends(get_db)
 ) -> ScheduleResponse:
     """Get the schedule for a profile (returns defaults if none exists)."""
+    reject_legacy_route_in_hosted_mode("Profile schedules are disabled in hosted mode")
     sched = db.query(Schedule).filter(Schedule.profile == profile).first()
     if not sched:
         return ScheduleResponse(profile=profile)
@@ -36,6 +38,7 @@ def update_schedule(
     db: Session = Depends(get_db),
 ) -> ScheduleResponse:
     """Create or update the schedule for a profile."""
+    reject_legacy_route_in_hosted_mode("Profile schedules are disabled in hosted mode")
     sched = db.query(Schedule).filter(Schedule.profile == profile).first()
     if not sched:
         sched = Schedule(profile=profile)

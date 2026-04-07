@@ -9,12 +9,177 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from typing import Any
 
 import requests
 from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
+
+
+def _strip_markdown_fences(text: str) -> str:
+    value = text.strip()
+    if value.startswith("```"):
+        first_newline = value.index("\n") if "\n" in value else 3
+        value = value[first_newline + 1 :]
+    if value.endswith("```"):
+        value = value[:-3]
+    return value.strip()
+
+
+def _extract_json_candidate(text: str) -> str:
+    start = text.find("{")
+    if start == -1:
+        return text.strip()
+    end = text.rfind("}")
+    if end == -1 or end < start:
+        return text[start:].strip()
+    return text[start : end + 1].strip()
+
+
+def _close_truncated_json(text: str) -> str:
+    stack: list[str] = []
+    in_string = False
+    escape = False
+    result: list[str] = []
+
+    for char in text:
+        result.append(char)
+        if in_string:
+            if escape:
+                escape = False
+            elif char == "\\":
+                escape = True
+            elif char == '"':
+                in_string = False
+            continue
+
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            stack.append("}")
+        elif char == "[":
+            stack.append("]")
+        elif char in "}]":
+            if stack and stack[-1] == char:
+                stack.pop()
+
+    repaired = "".join(result)
+    if in_string:
+        repaired += '"'
+    if stack:
+        repaired += "".join(reversed(stack))
+    return repaired
+
+
+def _parse_loose_json(text: str) -> dict | None:
+    candidate = _extract_json_candidate(_strip_markdown_fences(text))
+    if not candidate:
+        return None
+
+    attempts = [
+        candidate,
+        re.sub(r",\s*([}\]])", r"\1", candidate),
+    ]
+
+    repaired = _close_truncated_json(candidate)
+    attempts.extend([
+        repaired,
+        re.sub(r",\s*([}\]])", r"\1", repaired),
+    ])
+
+    seen: set[str] = set()
+    for attempt in attempts:
+        normalized = attempt.strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        try:
+            value = json.loads(normalized)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, dict):
+            return value
+    partial = _extract_partial_fields(candidate)
+    if partial:
+        return partial
+    return None
+
+
+def _extract_array_values(segment: str) -> list[str]:
+    values: list[str] = []
+    for match in re.finditer(r'"((?:\\.|[^"\\])*)"', segment, re.DOTALL):
+        try:
+            values.append(json.loads(f'"{match.group(1)}"'))
+        except json.JSONDecodeError:
+            continue
+    return values
+
+
+def _extract_array_segment(text: str, key: str) -> str | None:
+    match = re.search(rf'"{re.escape(key)}"\s*:\s*\[', text)
+    if not match:
+        return None
+
+    start = match.end() - 1
+    depth = 0
+    in_string = False
+    escape = False
+    chars: list[str] = []
+
+    for char in text[start:]:
+        chars.append(char)
+        if in_string:
+            if escape:
+                escape = False
+            elif char == "\\":
+                escape = True
+            elif char == '"':
+                in_string = False
+            continue
+
+        if char == '"':
+            in_string = True
+        elif char == "[":
+            depth += 1
+        elif char == "]":
+            depth -= 1
+            if depth == 0:
+                break
+
+    segment = "".join(chars).strip()
+    return segment or None
+
+
+def _extract_string_value(text: str, key: str) -> str:
+    match = re.search(rf'"{re.escape(key)}"\s*:\s*"((?:\\.|[^"\\])*)', text, re.DOTALL)
+    if not match:
+        return ""
+    raw = match.group(1)
+    if not raw.endswith('"'):
+        raw = raw.rstrip()
+    try:
+        return json.loads(f'"{raw}"')
+    except json.JSONDecodeError:
+        return raw.replace('\\"', '"').strip()
+
+
+def _extract_partial_fields(text: str) -> dict[str, Any] | None:
+    extracted: dict[str, Any] = {}
+    for key in ("roles", "keywords", "locations", "companies"):
+        segment = _extract_array_segment(text, key)
+        if not segment:
+            continue
+        values = _extract_array_values(segment)
+        if values:
+            extracted[key] = values
+
+    summary = _extract_string_value(text, "summary")
+    if summary:
+        extracted["summary"] = summary
+
+    return extracted or None
 
 
 def _get_keychain_key() -> str:
@@ -253,20 +418,11 @@ class LLMClient:
         )
         if raw is None:
             return None
-        # Strip markdown code fences if the model wraps its answer
-        text = raw.strip()
-        if text.startswith("```"):
-            # Remove opening fence (```json or ```)
-            first_newline = text.index("\n") if "\n" in text else 3
-            text = text[first_newline + 1 :]
-        if text.endswith("```"):
-            text = text[:-3]
-        text = text.strip()
-        try:
-            return json.loads(text)
-        except json.JSONDecodeError:
-            logger.error("Failed to parse LLM JSON response: %s…", text[:200])
-            return None
+        parsed = _parse_loose_json(raw)
+        if parsed is not None:
+            return parsed
+        logger.error("Failed to parse LLM JSON response: %s…", _strip_markdown_fences(raw)[:200])
+        return None
 
     def get_provider_info(self) -> dict[str, str]:
         """Return human-readable config for the Settings UI."""

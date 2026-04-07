@@ -170,7 +170,6 @@ const KNOWN_DOMAINS: Record<string, string> = {
   niantic: 'nianticlabs.com',
   zynga: 'zynga.com',
   // Defense / Aerospace
-  'shield ai': 'shield.ai',
   'northrop grumman': 'northropgrumman.com',
   lockheed: 'lockheedmartin.com',
   'lockheed martin': 'lockheedmartin.com',
@@ -183,7 +182,6 @@ const KNOWN_DOMAINS: Record<string, string> = {
   wish: 'wish.com',
   poshmark: 'poshmark.com',
   // SaaS / Cloud
-  twilio: 'twilio.com',
   segment: 'segment.com',
   amplitude: 'amplitude.com',
   mixpanel: 'mixpanel.com',
@@ -192,7 +190,6 @@ const KNOWN_DOMAINS: Record<string, string> = {
   'new relic': 'newrelic.com',
   grafana: 'grafana.com',
   sentry: 'sentry.io',
-  vercel: 'vercel.com',
   // Ad tech / Marketing
   'the trade desk': 'thetradedesk.com',
   trade: 'thetradedesk.com',

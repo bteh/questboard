@@ -5,15 +5,19 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.schemas.workspace import PlaceSelection
+
 
 class SearchRequest(BaseModel):
     roles: list[str] = Field(default_factory=list)
     locations: list[str] = Field(default_factory=list)
+    preferred_places: list[PlaceSelection] = Field(default_factory=list)
     keywords: list[str] = Field(default_factory=list)
     companies: list[str] = Field(default_factory=list)
     include_remote: bool = True
     workplace_preference: Literal["remote_friendly", "remote_only", "location_only"] = "remote_friendly"
     max_days_old: int = 14
+    include_linkedin_jobs: bool = False
     use_ai: bool = False
     profile: str = "default"
     mode: Literal["search_only", "search_score", "full_pipeline"] = Field(
@@ -57,10 +61,13 @@ class RunResult(BaseModel):
 class SearchDefaults(BaseModel):
     roles: list[str] = Field(default_factory=list)
     locations: list[str] = Field(default_factory=list)
+    preferred_places: list[PlaceSelection] = Field(default_factory=list)
     keywords: list[str] = Field(default_factory=list)
+    companies: list[str] = Field(default_factory=list)
     include_remote: bool = True
     workplace_preference: Literal["remote_friendly", "remote_only", "location_only"] = "remote_friendly"
     max_days_old: int = 14
+    include_linkedin_jobs: bool = False
     profile: str = "default"
     current_title: str = ""
     current_level: str = ""

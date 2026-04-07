@@ -14,7 +14,6 @@ from sqlalchemy import (
     Column,
     DateTime,
     Float,
-    ForeignKey,
     Integer,
     String,
     Text,
@@ -88,7 +87,7 @@ class ApplicationRecord(Base):
     application_method = Column(String(100), default="")  # manual, greenhouse, lever
     profile = Column(String(100), default="default")  # which profile found this job
     search_run_id = Column(String(12), nullable=True)  # links to the pipeline run that found this job
-    workspace_id = Column(String(64), ForeignKey("workspaces.id"), nullable=True, index=True)
+    workspace_id = Column(String(64), nullable=True, index=True)
 
     # Status tracking
     status = Column(String(50), default="found")
@@ -141,6 +140,26 @@ DB_PATH = os.path.join(
     os.getenv("JOB_FINDER_DATA_DIR", os.path.join(os.getcwd(), "data")),
     "job_tracker.db",
 )
+
+
+def _resolved_database_url(db_path: str | None = None) -> str:
+    if db_path and "://" in db_path:
+        return db_path
+    if db_path:
+        return f"sqlite:///{db_path}"
+    env_url = os.getenv("JOB_FINDER_DATABASE_URL") or os.getenv("DATABASE_URL")
+    if env_url:
+        return env_url
+    return f"sqlite:///{DB_PATH}"
+
+
+def _should_manage_schema(database_url: str) -> bool:
+    env_value = os.getenv("JOB_FINDER_MANAGE_SCHEMA", "").strip().lower()
+    if env_value in {"1", "true", "yes", "on"}:
+        return True
+    if env_value in {"0", "false", "no", "off"}:
+        return False
+    return database_url.startswith("sqlite:///")
 
 
 def _migrate_db(engine) -> None:
@@ -205,16 +224,26 @@ def init_db(db_path: str | None = None) -> None:
     """Initialize the database and create tables."""
     global _engine, _SessionLocal
 
-    path = db_path or DB_PATH
-    os.makedirs(os.path.dirname(path), exist_ok=True)
+    database_url = _resolved_database_url(db_path)
+    using_sqlite = database_url.startswith("sqlite:///")
+    if using_sqlite:
+        path = database_url.removeprefix("sqlite:///")
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        engine_kwargs = {
+            "echo": False,
+            "connect_args": {"check_same_thread": False},
+        }
+    else:
+        engine_kwargs = {
+            "echo": False,
+            "pool_pre_ping": True,
+        }
 
-    _engine = create_engine(
-        f"sqlite:///{path}",
-        echo=False,
-        connect_args={"check_same_thread": False},
-    )
-    _migrate_db(_engine)
-    Base.metadata.create_all(_engine)
+    _engine = create_engine(database_url, **engine_kwargs)
+    if _should_manage_schema(database_url):
+        if using_sqlite:
+            _migrate_db(_engine)
+        Base.metadata.create_all(_engine)
     _SessionLocal = scoped_session(sessionmaker(bind=_engine))
 
 
@@ -278,9 +307,16 @@ def save_application(
 
     session = get_session()
     try:
+        def _scope_query(query):
+            if workspace_id:
+                return query.filter(ApplicationRecord.workspace_id == workspace_id)
+            return query.filter(ApplicationRecord.workspace_id.is_(None), ApplicationRecord.profile == profile)
+
         # Skip duplicates by URL — but stamp the current run_id
         if job_url:
-            existing = session.query(ApplicationRecord).filter_by(job_url=job_url).first()
+            existing = _scope_query(
+                session.query(ApplicationRecord).filter(ApplicationRecord.job_url == job_url)
+            ).first()
             if existing:
                 if search_run_id and existing.search_run_id != search_run_id:
                     existing.search_run_id = search_run_id
@@ -302,7 +338,7 @@ def save_application(
                 # Use the longest word in the company name for SQL LIKE filter
                 longest_word = max(co_words, key=len) if co_words else norm_co
                 candidates = (
-                    session.query(ApplicationRecord)
+                    _scope_query(session.query(ApplicationRecord))
                     .filter(
                         func.lower(ApplicationRecord.company).contains(longest_word),
                         ApplicationRecord.job_title.isnot(None),
@@ -509,6 +545,7 @@ def purge_non_matching_locations(
     preferred_states: list[str] | None = None,
     preferred_cities: list[str] | None = None,
     preferred_locations: list[str] | None = None,
+    preferred_places: list[dict] | None = None,
     include_remote: bool = True,
     remote_only: bool = False,
     profile: str | None = None,
@@ -519,7 +556,7 @@ def purge_non_matching_locations(
     Remote jobs are always kept. When ``profile`` is provided, only records
     for that profile are considered. Returns the number of deleted records.
     """
-    if not preferred_states and not preferred_cities and not preferred_locations and include_remote and not remote_only:
+    if not preferred_states and not preferred_cities and not preferred_locations and not preferred_places and include_remote and not remote_only:
         return 0
 
     from job_finder.company_classifier import (
@@ -553,6 +590,7 @@ def purge_non_matching_locations(
                 remote_only=remote_only,
                 include_remote=include_remote,
                 work_type=wt,
+                preferred_places=preferred_places,
             ):
                 session.delete(rec)
                 deleted += 1

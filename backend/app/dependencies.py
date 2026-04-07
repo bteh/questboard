@@ -25,6 +25,7 @@ load_dotenv(_ENV_PATH, override=False)
 
 from job_finder.llm_client import LLMClient, PRESETS
 from job_finder.pipeline import JobFinderPipeline, _load_search_config
+from app.config import get_settings
 from app.models.database import get_db
 
 _PROFILE_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
@@ -88,3 +89,33 @@ def get_workspace_context_csrf(
     from app.services import workspace_service
 
     return workspace_service.require_workspace_context(db, request, validate_csrf=True)
+
+
+def get_active_workspace_context(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Return the hosted workspace when required, otherwise best-effort context."""
+    from app.services import workspace_service
+
+    if get_settings().hosted_mode:
+        return workspace_service.require_workspace_context(db, request, validate_csrf=False)
+    return workspace_service.get_workspace_context_optional(db, request)
+
+
+def get_active_workspace_context_csrf(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Return the hosted workspace when required and validate CSRF for mutations."""
+    from app.services import workspace_service
+
+    if get_settings().hosted_mode:
+        return workspace_service.require_workspace_context(db, request, validate_csrf=True)
+    return workspace_service.get_workspace_context_optional(db, request)
+
+
+def reject_legacy_route_in_hosted_mode(detail: str = "Route not available in hosted mode") -> None:
+    """Block legacy single-user routes when hosted mode is enabled."""
+    if get_settings().hosted_mode:
+        raise HTTPException(status_code=404, detail=detail)

@@ -1,0 +1,48 @@
+[
+  {
+    "id": "casey-martin",
+    "email": "casey.martin@launchboard.dev",
+    "full_name": "Casey Martin",
+    "headline": "Growth marketer moving into lifecycle and AI-driven CRM work",
+    "background": "Five years across B2B SaaS growth, paid acquisition, and marketing operations.",
+    "job_search_focus": "Looking for lifecycle marketing and growth ops roles with strong automation and experimentation ownership.",
+    "current_title": "Senior Growth Marketing Manager",
+    "current_level": "senior",
+    "target_roles": [
+      "Lifecycle Marketing Manager",
+      "Growth Operations Manager"
+    ],
+    "keywords": [
+      "CRM automation",
+      "retention",
+      "experimentation",
+      "B2B SaaS"
+    ],
+    "preferred_places": [
+      {
+        "label": "Remote",
+        "kind": "manual",
+        "city": "",
+        "region": "",
+        "country": "",
+        "country_code": "",
+        "lat": null,
+        "lon": null,
+        "provider": "dev-sandbox",
+        "provider_id": "Remote"
+      }
+    ],
+    "workplace_preference": "remote_only",
+    "compensation": {
+      "currency": "USD",
+      "pay_period": "annual",
+      "current_comp": 168000,
+      "min_base": 150000,
+      "target_total_comp": 185000,
+      "min_acceptable_tc": 155000,
+      "include_equity": true
+    },
+    "resume_filename": "casey-martin-resume.pdf",
+    "resume_text": "Casey Martin\nSenior Growth Marketing Manager\n\nSummary\nGrowth marketer with 5 years in lifecycle, CRM, and experimentation.\n\nExperience\nSenior Growth Marketing Manager, North Peak Software, 2023 to present\n- Built CRM automation and lifecycle programs that increased expansion pipeline by 17 percent.\n- Ran experimentation across onboarding, product education, and retention campaigns.\n\nGrowth Marketing Manager, Clearline, 2020 to 2023\n- Owned paid acquisition reporting, lead scoring, and funnel analysis.\n\nSkills\nLifecycle marketing, CRM automation, experimentation, retention, B2B SaaS"
+  }
+]

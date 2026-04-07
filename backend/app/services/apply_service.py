@@ -18,6 +18,19 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _get_scoped_application(
+    db: Session,
+    app_id: int,
+    workspace_id: str | None,
+) -> ApplicationRecord | None:
+    query = db.query(ApplicationRecord).filter(ApplicationRecord.id == app_id)
+    if workspace_id:
+        query = query.filter(ApplicationRecord.workspace_id == workspace_id)
+    else:
+        query = query.filter(ApplicationRecord.workspace_id.is_(None))
+    return query.first()
+
+
 def prepare_application(
     db: Session,
     app_id: int,
@@ -37,11 +50,11 @@ def prepare_application(
     from job_finder.tools.resume_parser_tool import parse_resume
     from job_finder.pipeline import JobFinderPipeline
 
-    record = db.query(ApplicationRecord).filter(ApplicationRecord.id == app_id).first()
+    record = _get_scoped_application(db, app_id, workspace_id)
     if not record:
         return None
 
-    config = get_config(profile)
+    config = {} if workspace_id else get_config(profile)
     job_url = record.job_url or ""
 
     # ATS detection
@@ -71,6 +84,12 @@ def prepare_application(
 
     # LLM-powered generation (gracefully degrades when LLM is unavailable)
     llm = get_llm()
+    if workspace_id:
+        from app.services import workspace_service
+
+        workspace_llm = workspace_service.get_workspace_llm(db, workspace_id, fallback_to_global=True)
+        if workspace_llm:
+            llm = workspace_llm
     pipeline = JobFinderPipeline(
         llm=llm if llm.is_configured else None,
         profile=profile,
@@ -153,11 +172,11 @@ def submit_application(
     from job_finder.tools.auto_apply_tool import auto_apply, detect_ats_type
     from job_finder.tools.resume_parser_tool import find_resume
 
-    record = db.query(ApplicationRecord).filter(ApplicationRecord.id == app_id).first()
+    record = _get_scoped_application(db, app_id, workspace_id)
     if not record:
         return None
 
-    config = get_config(profile)
+    config = {} if workspace_id else get_config(profile)
     job_url = record.job_url or ""
 
     # ATS detection
@@ -177,12 +196,10 @@ def submit_application(
     resume_path = ""
     if workspace_id:
         from app.services import workspace_service
-        resume_record = workspace_service.get_workspace_resume(db, workspace_id)
-        if resume_record and resume_record.file_path:
-            resume_path = resume_record.file_path
-    if not resume_path:
+        resume_path = workspace_service.materialize_workspace_resume_pdf(db, workspace_id)
+    if not resume_path and not workspace_id:
         resume_path = config.get("profile", {}).get("resume_path", "")
-    if not resume_path:
+    if not resume_path and not workspace_id:
         resume_path = find_resume(profile=profile) or ""
 
     # Build the job dict expected by auto_apply

@@ -1,6 +1,7 @@
 import { createContext, useContext, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { sseUrl } from '@/lib/api-client';
+import { sseUrl, streamSse } from '@/lib/api-client';
+import { useWorkspace } from '@/contexts/workspace-context';
 import type { RunResult, SearchRequest, ProgressUpdate, SearchRunSnapshot } from '@/types/search';
 
 type SearchState = 'idle' | 'running' | 'completed' | 'failed';
@@ -33,6 +34,7 @@ const SearchContext = createContext<SearchContextValue>({
 });
 
 export function SearchProvider({ children }: { children: ReactNode }) {
+  const { hostedMode } = useWorkspace();
   const queryClient = useQueryClient();
   const [state, setState] = useState<SearchState>('idle');
   const [runId, setRunId] = useState<string | null>(null);
@@ -43,8 +45,13 @@ export function SearchProvider({ children }: { children: ReactNode }) {
   const [progress, setProgress] = useState<ProgressUpdate | null>(null);
   const [snapshot, setSnapshot] = useState<SearchRunSnapshot | null>(null);
   const esRef = useRef<EventSource | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const cleanup = useCallback(() => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
     if (esRef.current) {
       esRef.current.close();
       esRef.current = null;
@@ -77,6 +84,72 @@ export function SearchProvider({ children }: { children: ReactNode }) {
   // SSE connection — runs whenever runId changes, independent of which page is mounted
   useEffect(() => {
     if (!runId || state !== 'running') return;
+
+    if (hostedMode) {
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      void streamSse(
+        `/search/runs/${runId}/progress`,
+        {
+          onEvent: (event, data) => {
+            if (event === 'progress') {
+              setMessages((prev) => [...prev, data]);
+              return;
+            }
+
+            if (event === 'stage') {
+              try {
+                setProgress(JSON.parse(data) as ProgressUpdate);
+              } catch {
+                // ignore malformed stage payloads
+              }
+              return;
+            }
+
+            if (event === 'complete') {
+              try {
+                const r = JSON.parse(data) as RunResult;
+                setResult(r);
+              } catch {
+                setResult({
+                  run_id: runId,
+                  status: 'completed',
+                  jobs_found: 0,
+                  jobs_scored: 0,
+                  strong_matches: 0,
+                  duration_seconds: 0,
+                  error: null,
+                });
+              }
+              setState('completed');
+              abortRef.current = null;
+              queryClient.invalidateQueries({ queryKey: ['applications'] });
+              queryClient.invalidateQueries({ queryKey: ['analytics'] });
+              return;
+            }
+
+            if (event === 'error') {
+              setError(data || 'Connection lost');
+              setState('failed');
+              abortRef.current = null;
+              queryClient.invalidateQueries({ queryKey: ['applications'] });
+            }
+          },
+        },
+        controller.signal,
+      ).catch((err) => {
+        if (controller.signal.aborted) return;
+        setError(err instanceof Error ? err.message : 'Connection lost');
+        setState('failed');
+        abortRef.current = null;
+      });
+
+      return () => {
+        controller.abort();
+        abortRef.current = null;
+      };
+    }
 
     const es = new EventSource(sseUrl(`/search/runs/${runId}/progress`));
     esRef.current = es;
@@ -135,7 +208,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
       es.close();
       esRef.current = null;
     };
-  }, [runId, state, queryClient]);
+  }, [hostedMode, runId, state, queryClient]);
 
   return (
     <SearchContext.Provider value={{ state, runId, messages, result, error, mode, progress, snapshot, activate, reset }}>

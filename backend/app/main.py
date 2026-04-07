@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.config import get_settings
 from app.dependencies import _src_dir  # noqa: F401 — ensures src/ is on sys.path
 from app.api.router import api_router
 from app.models.database import get_db, init_db
@@ -23,6 +24,11 @@ def _get_cors_origins() -> list[str]:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    settings = get_settings()
+    os.environ["DATABASE_URL"] = settings.resolved_database_url
+    os.environ["JOB_FINDER_DATABASE_URL"] = settings.resolved_database_url
+    os.environ["JOB_FINDER_DATA_DIR"] = settings.data_dir
+    os.environ["JOB_FINDER_MANAGE_SCHEMA"] = "true" if settings.should_manage_schema_on_startup else "false"
     init_db()
     db_gen = get_db()
     try:
@@ -33,9 +39,11 @@ async def lifespan(app: FastAPI):
             next(db_gen)
         except StopIteration:
             pass
-    start_scheduler()
+    if settings.use_embedded_scheduler:
+        start_scheduler()
     yield
-    stop_scheduler()
+    if settings.use_embedded_scheduler:
+        stop_scheduler()
 
 
 app = FastAPI(

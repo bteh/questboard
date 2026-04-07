@@ -4,7 +4,7 @@ import csv
 import io
 import json
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -17,9 +17,14 @@ from app.schemas.application import (
     StatusUpdate,
 )
 from app.schemas.apply import PrepareResponse, SubmitRequest, SubmitResponse
-from app.services import application_service, workspace_service
+from app.services import application_service
 from app.services import apply_service
-from app.dependencies import sanitize_profile
+from app.dependencies import (
+    get_active_workspace_context,
+    get_active_workspace_context_csrf,
+    reject_legacy_route_in_hosted_mode,
+    sanitize_profile,
+)
 
 router = APIRouter(prefix="/applications", tags=["applications"])
 
@@ -95,7 +100,6 @@ def _to_response(record) -> ApplicationResponse:
 
 @router.get("", response_model=ApplicationListResponse)
 def list_applications(
-    request: Request,
     status: str | None = None,
     min_score: float | None = None,
     recommendation: str | None = None,
@@ -110,9 +114,9 @@ def list_applications(
     sort_dir: str = "desc",
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
+    workspace = Depends(get_active_workspace_context),
     db: Session = Depends(get_db),
 ):
-    workspace = workspace_service.get_workspace_context_optional(db, request)
     items, total = application_service.get_applications(
         db,
         status=status,
@@ -141,12 +145,11 @@ def list_applications(
 
 @router.post("", response_model=ApplicationResponse, status_code=201)
 def create_application(
-    request: Request,
     body: ApplicationCreate,
+    workspace = Depends(get_active_workspace_context_csrf),
     db: Session = Depends(get_db),
 ):
     """Manually add a job application."""
-    workspace = workspace_service.get_workspace_context_optional(db, request)
     record = application_service.create_application(
         db,
         body,
@@ -157,7 +160,6 @@ def create_application(
 
 @router.get("/export/csv")
 def export_csv(
-    request: Request,
     status: str | None = None,
     min_score: float | None = None,
     recommendation: str | None = None,
@@ -169,10 +171,10 @@ def export_csv(
     profile: str | None = None,
     sort_by: str = "overall_score",
     sort_dir: str = "desc",
+    workspace = Depends(get_active_workspace_context),
     db: Session = Depends(get_db),
 ):
     """Export filtered applications as CSV."""
-    workspace = workspace_service.get_workspace_context_optional(db, request)
     items, _ = application_service.get_applications(
         db,
         status=status,
@@ -213,8 +215,11 @@ def export_csv(
 
 
 @router.get("/{app_id}", response_model=ApplicationResponse)
-def get_application(app_id: int, request: Request, db: Session = Depends(get_db)):
-    workspace = workspace_service.get_workspace_context_optional(db, request)
+def get_application(
+    app_id: int,
+    workspace = Depends(get_active_workspace_context),
+    db: Session = Depends(get_db),
+):
     record = application_service.get_application(
         db,
         app_id,
@@ -229,10 +234,9 @@ def get_application(app_id: int, request: Request, db: Session = Depends(get_db)
 def update_application(
     app_id: int,
     update: ApplicationUpdate,
-    request: Request,
+    workspace = Depends(get_active_workspace_context_csrf),
     db: Session = Depends(get_db),
 ):
-    workspace = workspace_service.get_workspace_context_optional(db, request)
     record = application_service.update_application(
         db,
         app_id,
@@ -248,10 +252,9 @@ def update_application(
 def update_status(
     app_id: int,
     body: StatusUpdate,
-    request: Request,
+    workspace = Depends(get_active_workspace_context_csrf),
     db: Session = Depends(get_db),
 ):
-    workspace = workspace_service.get_workspace_context_optional(db, request)
     kwargs = {"status": body.status}
     if body.notes:
         kwargs["notes"] = body.notes
@@ -267,8 +270,11 @@ def update_status(
 
 
 @router.delete("/{app_id}")
-def delete_application(app_id: int, request: Request, db: Session = Depends(get_db)):
-    workspace = workspace_service.get_workspace_context_optional(db, request)
+def delete_application(
+    app_id: int,
+    workspace = Depends(get_active_workspace_context_csrf),
+    db: Session = Depends(get_db),
+):
     deleted = application_service.delete_application(
         db,
         app_id,
@@ -281,13 +287,12 @@ def delete_application(app_id: int, request: Request, db: Session = Depends(get_
 
 @router.post("/check-urls")
 def check_urls(
-    request: Request,
     ids: list[int] | None = None,
     limit: int = Query(100, ge=1, le=500),
+    workspace = Depends(get_active_workspace_context_csrf),
     db: Session = Depends(get_db),
 ):
     """Check if job posting URLs are still live. Updates url_status in DB."""
-    workspace = workspace_service.get_workspace_context_optional(db, request)
     return application_service.check_urls(
         db,
         ids=ids,
@@ -298,8 +303,8 @@ def check_urls(
 
 @router.post("/deduplicate")
 def deduplicate_applications(
-    request: Request,
     profile: str | None = None,
+    workspace = Depends(get_active_workspace_context_csrf),
     db: Session = Depends(get_db),
 ):
     """Merge cross-source duplicate applications in the database.
@@ -318,7 +323,6 @@ def deduplicate_applications(
     profile = _sanitize_optional_profile(profile)
     from app.models.application import ApplicationRecord
 
-    workspace = workspace_service.get_workspace_context_optional(db, request)
     query = db.query(ApplicationRecord)
     if workspace:
         query = query.filter(ApplicationRecord.workspace_id == workspace.workspace.id)
@@ -418,6 +422,7 @@ def purge_non_matching_locations(
     states/cities are removed. Auto-derives from search locations if no
     explicit location_preferences section is configured.
     """
+    reject_legacy_route_in_hosted_mode("Legacy profile cleanup routes are disabled in hosted mode")
     profile = _sanitize_optional_profile(profile)
     from job_finder.pipeline import _load_search_config
     from job_finder.models.database import (
@@ -474,9 +479,9 @@ def purge_non_matching_locations(
 
 @router.post("/purge-all")
 def purge_all_applications(
-    request: Request,
     profile: str | None = None,
     confirm: bool = Query(False, description="Must be true to confirm purge"),
+    workspace = Depends(get_active_workspace_context_csrf),
     db: Session = Depends(get_db),
 ):
     """Delete all saved applications. Requires confirm=true as a safety check."""
@@ -486,7 +491,6 @@ def purge_all_applications(
 
     from app.models.application import ApplicationRecord
 
-    workspace = workspace_service.get_workspace_context_optional(db, request)
     query = db.query(ApplicationRecord)
     if workspace:
         query = query.filter(ApplicationRecord.workspace_id == workspace.workspace.id)
@@ -507,6 +511,7 @@ def backfill_scores(
     Scores all DB records that have NULL overall_score using keyword-based
     scoring (no LLM required). Returns the number of records scored.
     """
+    reject_legacy_route_in_hosted_mode("Legacy profile scoring routes are disabled in hosted mode")
     profile = sanitize_profile(profile)
     from job_finder.models.database import (
         init_db,
@@ -521,8 +526,8 @@ def backfill_scores(
 @router.post("/{app_id}/prepare", response_model=PrepareResponse)
 def prepare_application(
     app_id: int,
-    request: Request,
     profile: str = "default",
+    workspace = Depends(get_active_workspace_context_csrf),
     db: Session = Depends(get_db),
 ):
     """Prepare application materials (cover letter, resume tweaks) and detect ATS.
@@ -530,7 +535,6 @@ def prepare_application(
     Generates missing materials via LLM when available and saves them to the DB.
     """
     profile = sanitize_profile(profile)
-    workspace = workspace_service.get_workspace_context_optional(db, request)
     result = apply_service.prepare_application(
         db, app_id, profile=profile,
         workspace_id=workspace.workspace.id if workspace else None,
@@ -543,9 +547,9 @@ def prepare_application(
 @router.post("/{app_id}/apply", response_model=SubmitResponse)
 def submit_application(
     app_id: int,
-    request: Request,
     body: SubmitRequest,
     profile: str = "default",
+    workspace = Depends(get_active_workspace_context_csrf),
     db: Session = Depends(get_db),
 ):
     """Submit an application via detected ATS (Greenhouse/Lever).
@@ -553,7 +557,6 @@ def submit_application(
     Defaults to dry_run=True for safety. Set dry_run=False for live submission.
     """
     profile = sanitize_profile(profile)
-    workspace = workspace_service.get_workspace_context_optional(db, request)
     result = apply_service.submit_application(
         db,
         app_id,

@@ -42,6 +42,7 @@ async def upload_workspace_resume(
         "resume-upload",
         request_identity(request, context.workspace.id),
         limit=settings.upload_rate_limit_per_minute,
+        db=db,
     )
     content = await file.read()
     if not content:
@@ -67,6 +68,7 @@ def save_preferences(
         "workspace-prefs",
         request_identity(request, context.workspace.id),
         limit=settings.search_rate_limit_per_minute,
+        db=db,
     )
     return workspace_service.save_workspace_preferences(db, context.workspace.id, body)
 
@@ -83,13 +85,19 @@ async def start_onboarding_search(
         "onboarding-search",
         request_identity(request, context.workspace.id),
         limit=settings.search_rate_limit_per_minute,
+        db=db,
     )
     prefs = workspace_service.save_workspace_preferences(db, context.workspace.id, body)
     labels = workspace_service.place_labels(prefs.preferred_places)
-
-    # When no locations specified, default to remote-only so the user can still search
-    if not labels and prefs.workplace_preference != "remote_only":
-        prefs = prefs.model_copy(update={"workplace_preference": "remote_only"})
+    effective_workplace_preference = workspace_service.effective_workplace_preference(
+        prefs.workplace_preference,
+        prefs.preferred_places,
+    )
+    if not workspace_service.workspace_locations_are_runnable(prefs):
+        raise HTTPException(
+            status_code=400,
+            detail="Add at least one preferred location, or switch to Remote + selected places / Remote only.",
+        )
 
     # When no roles/keywords, try to derive from the uploaded resume
     if not prefs.roles and not prefs.keywords:
@@ -113,8 +121,9 @@ async def start_onboarding_search(
         roles=prefs.roles or prefs.keywords,
         locations=labels,
         keywords=prefs.keywords,
-        include_remote=prefs.workplace_preference != "location_only",
-        workplace_preference=prefs.workplace_preference,
+        companies=prefs.companies,
+        include_remote=effective_workplace_preference != "location_only",
+        workplace_preference=effective_workplace_preference,
         max_days_old=prefs.max_days_old,
         use_ai=bool(llm and llm.is_configured),
         profile="workspace",
@@ -124,15 +133,6 @@ async def start_onboarding_search(
         config_override=workspace_service.build_pipeline_config_override(prefs, context.workspace.id),
         llm_override=llm,
         snapshot=snapshot,
-    )
-    workspace_service.register_search_run(
-        db,
-        context.workspace.id,
-        run.run_id,
-        run.status,
-        run.mode,
-        snapshot,
-        run.started_at,
     )
     return WorkspaceSearchRunResponse(
         run_id=run.run_id,

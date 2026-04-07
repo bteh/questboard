@@ -4,11 +4,88 @@ export interface WorkspaceSession {
   hosted_mode: boolean;
   csrf_required: boolean;
   llm_optional: boolean;
+  session_token?: string | null;
+  csrf_token?: string | null;
+}
+
+export interface HostedUserProfile {
+  id: string;
+  email: string;
+  full_name: string;
+  avatar_url: string;
+  auth_provider: string;
+  email_verified: boolean;
+}
+
+export interface HostedWorkspaceSummary {
+  id: string;
+  name: string;
+  slug: string;
+  role: string;
+  plan: string;
+  subscription_status: string;
+}
+
+export interface HostedFeatureFlags {
+  platform_managed_ai: boolean;
+  runtime_llm_configurable: boolean;
+  billing_enabled: boolean;
+}
+
+export interface DevHostedPersona {
+  id: string;
+  email: string;
+  full_name: string;
+  avatar_url: string;
+  headline: string;
+  background: string;
+  job_search_focus: string;
+  current_title: string;
+  current_level: string;
+  target_roles: string[];
+  keywords: string[];
+  preferred_places: string[];
+  workplace_preference: 'remote_friendly' | 'remote_only' | 'location_only';
+  resume_filename: string;
+}
+
+export interface DevHostedLoginResponse {
+  access_token: string;
+  token_type: 'bearer';
+  expires_at: string;
+  persona: DevHostedPersona;
+}
+
+export interface DevHostedUser {
+  id: string;
+  email: string;
+  full_name: string;
+  avatar_url: string;
+  auth_provider: string;
+  seeded: boolean;
+}
+
+export interface DevHostedRegisterResponse {
+  access_token: string;
+  token_type: 'bearer';
+  expires_at: string;
+  user: DevHostedUser;
+}
+
+export interface HostedBootstrap {
+  hosted_mode: true;
+  auth_required: true;
+  csrf_required: false;
+  llm_optional: boolean;
+  user: HostedUserProfile;
+  workspace: HostedWorkspaceSummary;
+  features: HostedFeatureFlags;
 }
 
 export interface PlaceSelection {
   label: string;
   kind: 'city' | 'region' | 'country' | 'manual';
+  match_scope: 'city' | 'metro' | 'region' | 'country';
   city: string;
   region: string;
   country: string;
@@ -32,9 +109,11 @@ export interface CompensationPreference {
 export interface WorkspacePreferences {
   roles: string[];
   keywords: string[];
+  companies: string[];
   preferred_places: PlaceSelection[];
   workplace_preference: 'remote_friendly' | 'remote_only' | 'location_only';
   max_days_old: number;
+  include_linkedin_jobs: boolean;
   current_title: string;
   current_level: string;
   compensation: CompensationPreference;
@@ -51,6 +130,7 @@ export interface WorkspaceResumeStatus {
 
 export interface OnboardingState {
   workspace_id: string;
+  has_started_search: boolean;
   needs_resume: boolean;
   needs_preferences: boolean;
   ready_to_search: boolean;
@@ -77,6 +157,7 @@ export interface WorkspaceSearchRunResponse {
 export interface LocationSuggestion {
   label: string;
   kind: 'city' | 'region' | 'country' | 'manual';
+  match_scope: 'city' | 'metro' | 'region' | 'country';
   subtitle: string;
   city: string;
   region: string;

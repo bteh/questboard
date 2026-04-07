@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { createRoute, useNavigate } from '@tanstack/react-router';
 import { Route as rootRoute } from './__root';
 import {
@@ -17,9 +17,9 @@ import {
 } from 'lucide-react';
 
 import { PageHeader } from '@/components/layout/page-header';
-import { LocationListInput } from '@/components/shared/location-list-input';
+import { JobBoardOptionsSection } from '@/components/shared/job-board-options-section';
+import { SearchAreaSection } from '@/components/shared/search-area-section';
 import { TagListInput } from '@/components/shared/tag-list-input';
-import { WorkplacePreferenceSelector } from '@/components/shared/workplace-preference-selector';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -30,9 +30,11 @@ import { useLLMStatus, useLLMPresets, useProviderModels, useDetectOllama, useDet
 import { useOnboardingState, useSaveWorkspacePreferences, useUploadWorkspaceResume } from '@/hooks/use-workspace';
 import { useWorkspace } from '@/contexts/workspace-context';
 import { buildDefaultWorkspacePreferences, LEVEL_OPTIONS } from '@/lib/profile-preferences';
+import { POPULAR_PROVIDER_CHOICES, getPopularProviderPresets, isPopularProvider } from '@/lib/llm-choice';
+import { getModelDisplayName } from '@/lib/llm-providers';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import type { LLMConfig } from '@/types/settings';
+import type { LLMConfig, LLMStatus } from '@/types/settings';
 import type { WorkspacePreferences } from '@/types/workspace';
 
 export const Route = createRoute({
@@ -44,17 +46,17 @@ export const Route = createRoute({
 // ── Provider metadata for cards ──────────────────────────────────────
 // Maps backend preset names to user-friendly descriptions and key URLs.
 const PROVIDER_INFO: Record<string, { description: string; keyUrl?: string; keyLabel?: string; badge: string; badgeColor: string; recommended?: boolean }> = {
-  gemini:         { description: 'Best free AI — 250 uses/day, no credit card', keyUrl: 'https://aistudio.google.com', keyLabel: 'Get free key from Google', badge: 'Free', badgeColor: 'text-emerald-600 bg-emerald-500/10', recommended: true },
+  gemini:         { description: 'Gemini for Launchboard. Free tier available, but users still need a free Gemini API key.', keyUrl: 'https://aistudio.google.com/apikey', keyLabel: 'Get free Gemini key', badge: 'Free', badgeColor: 'text-emerald-600 bg-emerald-500/10', recommended: true },
   groq:           { description: 'Very fast — 1,000 uses/day', keyUrl: 'https://console.groq.com/keys', keyLabel: 'Get free key', badge: 'Free', badgeColor: 'text-emerald-600 bg-emerald-500/10' },
   cerebras:       { description: 'Ultra-fast — generous free tier', keyUrl: 'https://cloud.cerebras.ai', keyLabel: 'Get free key', badge: 'Free', badgeColor: 'text-emerald-600 bg-emerald-500/10' },
   openrouter:     { description: '29 free AI models through one key — 200 uses/day', keyUrl: 'https://openrouter.ai/keys', keyLabel: 'Get free key', badge: 'Free', badgeColor: 'text-emerald-600 bg-emerald-500/10' },
   mistral:        { description: 'European AI provider — generous free tier', keyUrl: 'https://console.mistral.ai/api-keys', keyLabel: 'Get free key', badge: 'Free', badgeColor: 'text-emerald-600 bg-emerald-500/10' },
   sambanova:      { description: 'Powerful AI — $5 free trial credits', keyUrl: 'https://cloud.sambanova.ai', keyLabel: 'Get free key', badge: 'Trial', badgeColor: 'text-amber-600 bg-amber-500/10' },
   deepseek:       { description: 'Strong AI — free signup bonus, then very cheap', keyUrl: 'https://platform.deepseek.com/api_keys', keyLabel: 'Get key', badge: 'Trial + cheap', badgeColor: 'text-amber-600 bg-amber-500/10' },
-  'openai-api':   { description: 'GPT-4o and other OpenAI models (separate from ChatGPT Plus)', keyUrl: 'https://platform.openai.com/api-keys', keyLabel: 'Get API key', badge: 'Paid', badgeColor: 'text-amber-600 bg-amber-500/10' },
-  'anthropic-api': { description: 'Claude models (separate from Claude Pro subscription)', keyUrl: 'https://console.anthropic.com/settings/keys', keyLabel: 'Get API key', badge: 'Paid', badgeColor: 'text-amber-600 bg-amber-500/10' },
+  'openai-api':   { description: 'Supported today for GPT models in Launchboard. Requires an OpenAI API key.', keyUrl: 'https://platform.openai.com/api-keys', keyLabel: 'Get OpenAI API key', badge: 'Paid', badgeColor: 'text-amber-600 bg-amber-500/10' },
+  'anthropic-api': { description: 'Supported today for Claude models in Launchboard. Requires an Anthropic API key.', keyUrl: 'https://console.anthropic.com/settings/keys', keyLabel: 'Get Anthropic API key', badge: 'Paid', badgeColor: 'text-amber-600 bg-amber-500/10' },
   ollama:         { description: 'Runs on your computer — completely private, no account needed', keyUrl: 'https://ollama.com', keyLabel: 'Install Ollama (free)', badge: 'No account', badgeColor: 'text-blue-600 bg-blue-500/10' },
-  custom:         { description: 'Connect your own AI model or server', badge: 'Custom', badgeColor: 'text-violet-600 bg-violet-500/10' },
+  custom:         { description: 'Connect your own local AI model or OpenAI-compatible server', badge: 'Custom', badgeColor: 'text-violet-600 bg-violet-500/10' },
 };
 
 /** Dev mode shows proxy/internal presets — requires explicit opt-in via localStorage */
@@ -69,6 +71,37 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: '$', EUR: '\u20AC', GBP: '\u00A3', CAD: 'C$', AUD: 'A$', INR: '\u20B9', JPY: '\u00A5', SGD: 'S$',
 };
 
+function formatModelLabel(modelId: string): string {
+  if (!modelId) return '';
+  const known = getModelDisplayName(modelId);
+  if (known !== modelId) return known;
+
+  const withoutDate = modelId.replace(/-\d{8}$/, '');
+  const titleized = withoutDate
+    .replace(/^claude-/, 'Claude ')
+    .replace(/^gpt-/, 'GPT ')
+    .replace(/^gemini-/, 'Gemini ')
+    .replace(/-/g, ' ')
+    .replace(/\b([a-z])/g, (match) => match.toUpperCase());
+
+  return titleized.replace(/\b(\d+)\s+(\d+)\b/g, '$1.$2');
+}
+
+function getConnectedLabel(llm: LLMStatus): string {
+  if (llm.provider !== 'custom') {
+    if (llm.provider === 'openai-api') return 'ChatGPT by OpenAI';
+    if (llm.provider === 'anthropic-api') return 'Claude by Anthropic';
+    if (llm.provider === 'gemini') return 'Gemini by Google';
+    if (llm.provider === 'ollama') return 'Local / private';
+    return llm.label || llm.provider || 'Configured provider';
+  }
+  const model = (llm.model || '').toLowerCase();
+  if (model.startsWith('claude-')) return 'Claude-compatible endpoint';
+  if (model.startsWith('gpt-') || model.startsWith('o3') || model.startsWith('o4')) return 'ChatGPT-compatible endpoint';
+  if (model.startsWith('gemini-')) return 'Gemini-compatible endpoint';
+  return 'Custom endpoint';
+}
+
 function SettingsPage() {
   const navigate = useNavigate();
   const { hostedMode } = useWorkspace();
@@ -81,11 +114,41 @@ function SettingsPage() {
   const uploadResume = useUploadWorkspaceResume();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [llmForm, setLlmForm] = useState<LLMConfig>({ provider: '', base_url: '', api_key: '', model: '' });
-  const [prefsForm, setPrefsForm] = useState<WorkspacePreferences>(buildDefaultWorkspacePreferences());
+  const derivedLlmForm = useMemo<LLMConfig>(() => {
+    if (!llm) {
+      return { provider: '', base_url: '', api_key: '', model: '' };
+    }
+    const preset = presets?.find((item) => item.name === llm.provider);
+    return {
+      provider: llm.provider,
+      base_url: preset?.base_url || '',
+      api_key: '',
+      model: llm.model,
+    };
+  }, [llm, presets]);
+  const [llmDraft, setLlmDraft] = useState<LLMConfig | null>(null);
+  const llmForm = llmDraft ?? derivedLlmForm;
+  const setLlmForm = useCallback((next: LLMConfig | ((prev: LLMConfig) => LLMConfig)) => {
+    setLlmDraft((prev) => {
+      const base = prev ?? derivedLlmForm;
+      return typeof next === 'function' ? next(base) : next;
+    });
+  }, [derivedLlmForm]);
+  const serverPrefs = useMemo(
+    () => onboarding?.preferences ?? buildDefaultWorkspacePreferences(),
+    [onboarding?.preferences],
+  );
+  const [prefsDraft, setPrefsDraft] = useState<WorkspacePreferences | null>(null);
+  const prefsForm = prefsDraft ?? serverPrefs;
+  const setPrefsForm = useCallback((next: WorkspacePreferences | ((prev: WorkspacePreferences) => WorkspacePreferences)) => {
+    setPrefsDraft((prev) => {
+      const base = prev ?? serverPrefs;
+      return typeof next === 'function' ? next(base) : next;
+    });
+  }, [serverPrefs]);
   const [showDevFields, setShowDevFields] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [autoDetectDismissed, setAutoDetectDismissed] = useState(false);
+  const [autoDetectDismissed] = useState(false);
   const [showAllProviders, setShowAllProviders] = useState(false);
   const [geminiKey, setGeminiKey] = useState('');
 
@@ -95,24 +158,6 @@ function SettingsPage() {
   const customSelected = llmForm.provider === 'custom';
   const { data: ollamaDetect } = useDetectOllama(needsAI);
   const { data: localAI } = useDetectLocalAI(needsAI || (!hostedMode && customSelected));
-
-  useEffect(() => {
-    if (llm) {
-      const preset = presets?.find((item) => item.name === llm.provider);
-      setLlmForm({
-        provider: llm.provider,
-        base_url: preset?.base_url || '',
-        api_key: '',
-        model: llm.model,
-      });
-    }
-  }, [llm, presets]);
-
-  useEffect(() => {
-    if (onboarding?.preferences) {
-      setPrefsForm(onboarding.preferences);
-    }
-  }, [onboarding]);
 
   const selectedPreset = presets?.find((item) => item.name === llmForm.provider);
   const providerInfo = llmForm.provider ? PROVIDER_INFO[llmForm.provider] : null;
@@ -143,10 +188,10 @@ function SettingsPage() {
               toast.error(result.message || 'Connection failed');
             }
           },
-          onError: () => toast.error('Connection test failed'),
+          onError: (error) => toast.error(error instanceof Error ? error.message : 'Connection test failed'),
         });
       },
-      onError: () => toast.error('Failed to save provider settings'),
+      onError: (error) => toast.error(error instanceof Error ? error.message : 'Failed to save provider settings'),
     });
   };
 
@@ -175,18 +220,8 @@ function SettingsPage() {
   const userPresets = PROVIDER_ORDER
     .map((name) => presets?.find((p) => p.name === name))
     .filter((p): p is NonNullable<typeof p> => !!p && !p.internal && !!PROVIDER_INFO[p.name]);
-  const freePresets = userPresets.filter((p) => {
-    const info = PROVIDER_INFO[p.name];
-    return info && info.badge === 'Free';
-  });
-  const paidPresets = userPresets.filter((p) => {
-    const info = PROVIDER_INFO[p.name];
-    return info && (info.badge === 'Paid' || info.badge === 'Trial + cheap' || info.badge === 'Trial');
-  });
-  const localPresets = userPresets.filter((p) => {
-    const info = PROVIDER_INFO[p.name];
-    return info && info.badge === 'No account';
-  });
+  const popularPresets = getPopularProviderPresets(userPresets, hostedMode);
+  const advancedPresets = userPresets.filter((p) => !isPopularProvider(p.name, hostedMode));
   const devPresets = presets?.filter((p) => p.internal) || [];
 
   return (
@@ -263,22 +298,30 @@ function SettingsPage() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>Preferred locations</Label>
-              <LocationListInput
-                value={prefsForm.preferred_places}
-                onChange={(preferred_places) => setPrefsForm((prev) => ({ ...prev, preferred_places }))}
-                emptyText={prefsForm.workplace_preference === 'remote_only' ? 'Remote-only — no locations needed.' : 'No preferred locations yet.'}
+            <div className="space-y-1.5">
+              <Label>Target companies</Label>
+              <TagListInput
+                value={prefsForm.companies}
+                onChange={(companies) => setPrefsForm((prev) => ({ ...prev, companies }))}
+                placeholder="e.g. Stripe — press Enter to add"
+                helperText="Launchboard will search these company career pages directly on Greenhouse, Lever, and Ashby when available."
+                emptyText="No target companies added yet."
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>Workplace type</Label>
-              <WorkplacePreferenceSelector
-                value={prefsForm.workplace_preference}
-                onChange={(workplace_preference) => setPrefsForm((prev) => ({ ...prev, workplace_preference }))}
-              />
-            </div>
+            <SearchAreaSection
+              preferredPlaces={prefsForm.preferred_places}
+              onPreferredPlacesChange={(preferred_places) => setPrefsForm((prev) => ({ ...prev, preferred_places }))}
+              workplacePreference={prefsForm.workplace_preference}
+              onWorkplacePreferenceChange={(workplace_preference) => setPrefsForm((prev) => ({ ...prev, workplace_preference }))}
+              context="settings"
+            />
+
+            <JobBoardOptionsSection
+              includeLinkedInJobs={prefsForm.include_linkedin_jobs}
+              onIncludeLinkedInJobsChange={(include_linkedin_jobs) => setPrefsForm((prev) => ({ ...prev, include_linkedin_jobs }))}
+              context="settings"
+            />
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
@@ -362,7 +405,10 @@ function SettingsPage() {
                     </div>
                     <div className="space-y-1.5">
                       <Label>Current level</Label>
-                      <Select value={prefsForm.current_level} onValueChange={(value) => setPrefsForm((prev) => ({ ...prev, current_level: value }))}>
+                      <Select
+                        value={prefsForm.current_level}
+                        onValueChange={(value) => setPrefsForm((prev) => ({ ...prev, current_level: value ?? prev.current_level }))}
+                      >
                         <SelectTrigger className="h-9">
                           <SelectValue />
                         </SelectTrigger>
@@ -382,7 +428,7 @@ function SettingsPage() {
                         value={prefsForm.compensation.currency}
                         onValueChange={(currency) => setPrefsForm((prev) => ({
                           ...prev,
-                          compensation: { ...prev.compensation, currency },
+                          compensation: { ...prev.compensation, currency: currency ?? prev.compensation.currency },
                         }))}
                       >
                         <SelectTrigger className="h-9">
@@ -399,9 +445,12 @@ function SettingsPage() {
                       <Label>Pay period</Label>
                       <Select
                         value={prefsForm.compensation.pay_period}
-                        onValueChange={(pay_period: WorkspacePreferences['compensation']['pay_period']) => setPrefsForm((prev) => ({
+                        onValueChange={(pay_period) => setPrefsForm((prev) => ({
                           ...prev,
-                          compensation: { ...prev.compensation, pay_period },
+                          compensation: {
+                            ...prev.compensation,
+                            pay_period: pay_period ?? prev.compensation.pay_period,
+                          },
                         }))}
                       >
                         <SelectTrigger className="h-9">
@@ -496,42 +545,79 @@ function SettingsPage() {
         {/* ── AI Provider ─────────────────────────────────────── */}
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Sparkles className="h-4 w-4" />
-              AI Provider
-            </CardTitle>
+            <div className="space-y-1">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Sparkles className="h-4 w-4" />
+                AI for Ranking & Drafting
+              </CardTitle>
+              <p className="text-sm text-text-tertiary">
+                Launchboard works best with AI connected. Basic search still works without it, but AI is what unlocks resume-fit ranking, suggestions, and tailored draft materials.
+              </p>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
+            {!hostedMode && (
+              <div className="rounded-xl border border-border-default bg-bg-subtle/40 p-4">
+                <p className="text-sm font-medium text-text-primary">Supported desktop AI paths today</p>
+                <p className="mt-1 text-xs leading-relaxed text-text-muted">
+                  Launchboard officially supports provider API keys, Ollama, and your own local OpenAI-compatible endpoint.
+                  Direct sign-in with your ChatGPT account or Claude account is not available in Launchboard yet.
+                </p>
+              </div>
+            )}
+
             {/* Locked: host configured a provider and disabled runtime editing */}
             {!llm?.runtime_configurable && llm?.configured ? (
               <div className="rounded-xl border border-border-default bg-bg-subtle/50 p-4">
                 <span className="inline-flex items-center gap-1.5 text-sm font-medium text-success">
                   <CheckCircle2 className="h-4 w-4" />
-                  AI scoring is enabled
+                  AI is connected
                 </span>
-                <p className="mt-1 text-xs text-text-muted">
-                  Provider: {llm.provider || 'configured'}{llm.model ? ` · ${llm.model}` : ''}
-                </p>
+                <p className="mt-1 text-sm font-medium text-text-primary">{getConnectedLabel(llm)}</p>
+                {llm.model && (
+                  <p className="text-xs text-text-muted">{formatModelLabel(llm.model)}</p>
+                )}
               </div>
             ) : (
               <>
+                {!llm?.configured && (
+                  <div className="rounded-xl border border-brand/20 bg-brand-light/20 p-4">
+                    <p className="text-sm font-medium text-text-primary">Start searching now, then connect AI for the full experience.</p>
+                    <p className="mt-1 text-xs text-text-muted">
+                      Without AI, Launchboard can still search and apply your filters. With AI, it can understand your resume, rank by fit, and draft application materials.
+                    </p>
+                  </div>
+                )}
+
                 {/* ── Connected status ────────────────────────────── */}
                 {llm?.available && (
-                  <div className="rounded-xl border border-success/20 bg-success/5 p-3">
-                    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-success">
-                      <CheckCircle2 className="h-4 w-4" />
-                      Connected{llm.provider === 'custom' ? '' : ` to ${llm.label || llm.provider}`}{llm.model ? ` · ${llm.model}` : ''}
-                    </span>
+                  <div className="rounded-xl border border-success/20 bg-success/5 p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <span className="inline-flex items-center gap-1.5 text-sm font-medium text-success">
+                          <CheckCircle2 className="h-4 w-4" />
+                          AI connected
+                        </span>
+                        <p className="mt-1 text-sm font-medium text-text-primary">
+                          {getConnectedLabel(llm)}
+                        </p>
+                        {llm.model && (
+                          <p className="text-xs text-text-muted">{formatModelLabel(llm.model)}</p>
+                        )}
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0"
+                        onClick={() => setShowAllProviders(!showAllProviders)}
+                      >
+                        Change AI
+                      </Button>
+                    </div>
                     {llm?.auto_detected === 'ollama' && (
                       <p className="mt-1 text-xs text-text-muted">Auto-detected from your local Ollama installation.</p>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => setShowAllProviders(!showAllProviders)}
-                      className="mt-2 text-xs text-text-muted hover:text-text-secondary underline"
-                    >
-                      Change provider
-                    </button>
                   </div>
                 )}
 
@@ -540,12 +626,11 @@ function SettingsPage() {
                   <div className="space-y-4">
                     {!hostedMode && (ollamaDetect?.detected || (localAI?.servers && localAI.servers.length > 0)) ? (
                       <p className="text-sm text-text-secondary">
-                        We found AI running on your machine. Click to connect — no setup needed.
+                        We found AI running on your machine. Connect it now if you want Launchboard to rank by resume fit and draft materials.
                       </p>
                     ) : (
                       <p className="text-sm text-text-secondary">
-                        Launchboard needs AI to score jobs, write cover letters, and research companies for you.
-                        The fastest way is <strong>Google Gemini</strong> — free, 30 seconds, no credit card.
+                        Recommended: <strong>Gemini</strong>. You can search without AI, but this is what makes Launchboard feel tailored to the user.
                       </p>
                     )}
 
@@ -620,7 +705,46 @@ function SettingsPage() {
                       </button>
                     ))}
 
-                    {/* Option B: Gemini inline setup */}
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">Popular choices</p>
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {popularPresets.map((preset) => {
+                          const info = POPULAR_PROVIDER_CHOICES[preset.name as keyof typeof POPULAR_PROVIDER_CHOICES];
+                          if (!info) return null;
+                          const selected = llmForm.provider === preset.name;
+                          return (
+                            <button
+                              key={preset.name}
+                              type="button"
+                              onClick={() => {
+                                selectProvider(preset.name);
+                                if (preset.name === 'ollama') {
+                                  setShowAllProviders(true);
+                                } else {
+                                  setShowAllProviders(false);
+                                }
+                              }}
+                              className={cn(
+                                'rounded-xl border px-4 py-3 text-left transition-all',
+                                selected
+                                  ? 'border-brand bg-brand-light/40 ring-1 ring-brand/20'
+                                  : 'border-border-default bg-bg-card hover:border-brand/40 hover:bg-bg-subtle',
+                              )}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className={cn('text-sm font-medium', selected ? 'text-brand' : 'text-text-primary')}>{info.title}</span>
+                                <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-medium shrink-0', info.badgeClassName)}>{info.badge}</span>
+                              </div>
+                              <p className="mt-1 text-xs text-text-muted">{info.description}</p>
+                              <p className="mt-1 text-[11px] text-text-tertiary">{info.detail}</p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Recommended default: Gemini inline setup */}
+                    {(llmForm.provider === 'gemini' || !llmForm.provider) && (
                     <div className="rounded-xl border border-border-default bg-bg-card p-4 space-y-3">
                       <div className="flex items-center gap-3">
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-light">
@@ -630,11 +754,9 @@ function SettingsPage() {
                           <div className="flex items-center gap-2">
                             <p className="text-sm font-semibold text-text-primary">Google Gemini</p>
                             <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 uppercase">Free</span>
-                            {(hostedMode || !ollamaDetect?.detected) && (
-                              <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-semibold text-brand uppercase">Recommended</span>
-                            )}
+                            <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-semibold text-brand uppercase">Recommended</span>
                           </div>
-                          <p className="mt-0.5 text-xs text-text-muted">Best free AI available — 250 uses/day, no credit card needed.</p>
+                          <p className="mt-0.5 text-xs text-text-muted">Fastest low-cost setup. Free tier available, but you still need a free Gemini API key.</p>
                         </div>
                       </div>
                       <div className="space-y-2.5 pl-[52px]">
@@ -642,9 +764,9 @@ function SettingsPage() {
                           <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand/10 text-[10px] font-bold text-brand">1</span>
                           <div>
                             <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm text-brand hover:underline">
-                              Get your free key from Google <ExternalLink className="h-3 w-3" />
+                              Create a free Gemini API key <ExternalLink className="h-3 w-3" />
                             </a>
-                            <p className="text-[11px] text-text-muted mt-0.5">Sign in with your Google account, click "Create API key", and copy it.</p>
+                            <p className="text-[11px] text-text-muted mt-0.5">Sign in to Google AI Studio, click "Create API key", then paste it here.</p>
                           </div>
                         </div>
                         <div className="flex items-start gap-2">
@@ -684,50 +806,96 @@ function SettingsPage() {
                       <div className="flex items-start gap-2 pl-[52px]">
                         <Shield className="h-3 w-3 text-emerald-500 shrink-0 mt-0.5" />
                         <p className="text-[10px] text-text-muted leading-relaxed">
-                          Your key stays on your {llm?.key_storage === 'keychain' ? 'OS keychain' : 'computer'} and is only sent to Google. Launchboard never sees it.
+                          {hostedMode
+                            ? 'Your key is sent to Launchboard over HTTPS, stored encrypted for your workspace, and used only to call Google.'
+                            : `Your key stays on your ${llm?.key_storage === 'keychain' ? 'OS keychain' : 'computer'} and is only sent to Google.`}
                         </p>
                       </div>
                     </div>
+                    )}
 
-                    {/* FAQ for non-technical users */}
-                    <div className="rounded-xl border border-border-default bg-bg-subtle/30 p-4 space-y-3">
-                      <div className="flex items-center gap-2">
-                        <HelpCircle className="h-4 w-4 text-text-muted" />
-                        <p className="text-xs font-medium text-text-secondary">Common questions</p>
+                    {!showAllProviders && (llmForm.provider === 'openai-api' || llmForm.provider === 'anthropic-api') && (
+                      <div className="rounded-xl border border-border-default bg-bg-card p-4 space-y-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-light">
+                            <Sparkles className="h-5 w-5 text-brand" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-semibold text-text-primary">
+                                {llmForm.provider === 'openai-api' ? 'ChatGPT by OpenAI' : 'Claude by Anthropic'}
+                              </p>
+                              <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold text-amber-600 uppercase">
+                                API key
+                              </span>
+                            </div>
+                            <p className="mt-0.5 text-xs text-text-muted">
+                              {llmForm.provider === 'openai-api'
+                                ? 'Paste your OpenAI API key to use GPT models in Launchboard.'
+                                : 'Paste your Anthropic API key to use Claude models in Launchboard.'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="space-y-2.5 pl-[52px]">
+                          <div className="flex items-start gap-2">
+                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand/10 text-[10px] font-bold text-brand">1</span>
+                            <div>
+                              <a
+                                href={providerInfo?.keyUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-sm text-brand hover:underline"
+                              >
+                                {providerInfo?.keyLabel || 'Get your API key'} <ExternalLink className="h-3 w-3" />
+                              </a>
+                              <p className="text-[11px] text-text-muted mt-0.5">
+                                Create a key with that provider, then paste it here.
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-2">
+                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand/10 text-[10px] font-bold text-brand">2</span>
+                            <div className="flex-1 flex gap-2">
+                              <Input
+                                type="password"
+                                placeholder={llmForm.provider === 'openai-api' ? 'Paste your OpenAI API key' : 'Paste your Anthropic API key'}
+                                value={llmForm.api_key}
+                                onChange={(event) => setLlmForm((prev) => ({ ...prev, api_key: event.target.value }))}
+                                className="h-8 text-sm"
+                              />
+                              <Button
+                                size="sm"
+                                className="h-8 shrink-0"
+                                onClick={handleSaveLLM}
+                                disabled={!llmForm.api_key.trim() || updateLLM.isPending || testConnection.isPending}
+                              >
+                                {updateLLM.isPending || testConnection.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Connect'}
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-2 pl-[52px]">
+                          <Shield className="h-3 w-3 text-emerald-500 shrink-0 mt-0.5" />
+                          <p className="text-[10px] text-text-muted leading-relaxed">
+                            {hostedMode
+                              ? 'Your key is sent to Launchboard over HTTPS, stored encrypted for your workspace, and used only to call that provider.'
+                              : 'Your key is stored locally and sent only to that provider.'}
+                          </p>
+                        </div>
                       </div>
-                      <details className="group">
-                        <summary className="cursor-pointer text-sm text-text-secondary hover:text-text-primary">
-                          I pay for ChatGPT Plus / Claude Pro — can I use that?
-                        </summary>
-                        <p className="mt-2 text-xs text-text-muted leading-relaxed pl-0.5">
-                          Unfortunately, no. ChatGPT Plus and Claude Pro are <em>chat</em> subscriptions — they let you chat on their website,
-                          but they don't let other apps like Launchboard use their AI. It's like having a Netflix subscription but not being
-                          able to stream Netflix through a different app.
-                          <br /><br />
-                          The good news: <strong>Google Gemini gives you a free key</strong> that works just as well for Launchboard.
-                          It takes 30 seconds and doesn't cost anything.
-                        </p>
-                      </details>
-                      <details className="group">
-                        <summary className="cursor-pointer text-sm text-text-secondary hover:text-text-primary">
-                          What's an API key?
-                        </summary>
-                        <p className="mt-2 text-xs text-text-muted leading-relaxed pl-0.5">
-                          Think of it like a password that lets Launchboard talk to Google's AI on your behalf. You create one on Google's
-                          website (it's free), paste it here, and you're done. It's not shared with anyone else.
-                        </p>
-                      </details>
-                      <details className="group">
-                        <summary className="cursor-pointer text-sm text-text-secondary hover:text-text-primary">
-                          Is this really free? What's the catch?
-                        </summary>
-                        <p className="mt-2 text-xs text-text-muted leading-relaxed pl-0.5">
-                          Google offers Gemini for free to developers (you get 250 requests per day). For most job searches, this is more
-                          than enough. If you search multiple times a day, every day, you might hit the limit — but it resets daily.
-                          There's no credit card required and nothing to cancel.
-                        </p>
-                      </details>
-                    </div>
+                    )}
+
+                    <details className="rounded-xl border border-border-default bg-bg-subtle/30 p-4">
+                      <summary className="flex cursor-pointer items-center gap-2 text-sm text-text-secondary hover:text-text-primary">
+                        <HelpCircle className="h-4 w-4 text-text-muted" />
+                        Why does this need an API key?
+                      </summary>
+                      <p className="mt-3 text-xs text-text-muted leading-relaxed">
+                        ChatGPT Plus and Claude Pro/Max are chat subscriptions, not direct Launchboard access today. For now,
+                        Launchboard officially supports provider API keys, Ollama, and your own local OpenAI-compatible endpoint.
+                        If you want the easiest low-cost path, Gemini is still the simplest starting point.
+                      </p>
+                    </details>
 
                     <button
                       type="button"
@@ -735,7 +903,7 @@ function SettingsPage() {
                       className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-secondary"
                     >
                       <ChevronDown className={cn('h-3 w-3 transition-transform', showAllProviders && 'rotate-180')} />
-                      {showAllProviders ? 'Hide' : 'Show'} other AI providers
+                      {showAllProviders ? 'Hide' : 'Show'} more AI options
                     </button>
                   </div>
                 )}
@@ -800,12 +968,12 @@ function SettingsPage() {
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-light">
                           <Sparkles className="h-5 w-5 text-brand" />
                         </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-semibold text-text-primary">Switch to Google Gemini</p>
-                            <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 uppercase">Free</span>
-                          </div>
-                          <p className="mt-0.5 text-xs text-text-muted">Works instantly — 250 uses/day, no credit card.</p>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-semibold text-text-primary">Switch to Google Gemini</p>
+                              <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 uppercase">Free</span>
+                            </div>
+                          <p className="mt-0.5 text-xs text-text-muted">Fastest way to add AI again without paying for user usage.</p>
                         </div>
                       </div>
                       <div className="space-y-2.5 pl-[52px]">
@@ -859,7 +1027,7 @@ function SettingsPage() {
                       className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-secondary"
                     >
                       <ChevronDown className="h-3 w-3" />
-                      Show other options
+                      Show advanced AI options
                     </button>
                   </div>
                 )}
@@ -873,82 +1041,44 @@ function SettingsPage() {
                       </p>
                     )}
 
-                    {/* Local providers (self-hosted only — backend can't reach user's localhost when hosted) */}
-                    {!hostedMode && localPresets.length > 0 && (
+                    {llm?.configured && (
                       <div className="space-y-2">
-                        <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">Runs on your computer</p>
-                        {localPresets.map((preset) => {
-                          const info = PROVIDER_INFO[preset.name];
-                          if (!info) return null;
-                          const selected = llmForm.provider === preset.name;
-                          return (
-                            <button
-                              key={preset.name}
-                              type="button"
-                              onClick={() => selectProvider(preset.name)}
-                              className={cn(
-                                'w-full rounded-xl border px-4 py-3 text-left transition-all',
-                                selected
-                                  ? 'border-brand bg-brand-light/40 ring-1 ring-brand/20'
-                                  : 'border-border-default bg-bg-card hover:border-brand/40 hover:bg-bg-subtle',
-                              )}
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2">
-                                  <Monitor className="h-4 w-4 text-blue-500" />
-                                  <span className={cn('text-sm font-medium', selected ? 'text-brand' : 'text-text-primary')}>{preset.label}</span>
+                        <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">Popular choices</p>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                          {popularPresets.map((preset) => {
+                            const info = POPULAR_PROVIDER_CHOICES[preset.name as keyof typeof POPULAR_PROVIDER_CHOICES];
+                            if (!info) return null;
+                            const selected = llmForm.provider === preset.name;
+                            return (
+                              <button
+                                key={preset.name}
+                                type="button"
+                                onClick={() => selectProvider(preset.name)}
+                                className={cn(
+                                  'rounded-xl border px-4 py-3 text-left transition-all',
+                                  selected
+                                    ? 'border-brand bg-brand-light/40 ring-1 ring-brand/20'
+                                    : 'border-border-default bg-bg-card hover:border-brand/40 hover:bg-bg-subtle',
+                                )}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className={cn('text-sm font-medium', selected ? 'text-brand' : 'text-text-primary')}>{info.title}</span>
+                                  <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-medium shrink-0', info.badgeClassName)}>{info.badge}</span>
                                 </div>
-                                <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-medium shrink-0', info.badgeColor)}>{info.badge}</span>
-                              </div>
-                              <p className="mt-1 text-xs text-text-muted">{info.description}</p>
-                            </button>
-                          );
-                        })}
+                                <p className="mt-1 text-xs text-text-muted">{info.description}</p>
+                                <p className="mt-1 text-[11px] text-text-tertiary">{info.detail}</p>
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
 
-                    {/* Free cloud providers */}
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">Cloud — free key needed</p>
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        {freePresets.map((preset) => {
-                          const info = PROVIDER_INFO[preset.name];
-                          if (!info) return null;
-                          const selected = llmForm.provider === preset.name;
-                          return (
-                            <button
-                              key={preset.name}
-                              type="button"
-                              onClick={() => selectProvider(preset.name)}
-                              className={cn(
-                                'rounded-xl border px-4 py-3 text-left transition-all',
-                                selected
-                                  ? 'border-brand bg-brand-light/40 ring-1 ring-brand/20'
-                                  : 'border-border-default bg-bg-card hover:border-brand/40 hover:bg-bg-subtle',
-                              )}
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2">
-                                  <span className={cn('text-sm font-medium', selected ? 'text-brand' : 'text-text-primary')}>{preset.label}</span>
-                                  {info.recommended && (
-                                    <span className="rounded-full bg-brand/10 px-1.5 py-0.5 text-[9px] font-semibold text-brand uppercase">Recommended</span>
-                                  )}
-                                </div>
-                                <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-medium shrink-0', info.badgeColor)}>{info.badge}</span>
-                              </div>
-                              <p className="mt-1 text-xs text-text-muted">{info.description}</p>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Paid providers */}
-                    {paidPresets.length > 0 && (
+                    {advancedPresets.length > 0 && (
                       <div className="space-y-2">
-                        <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">Paid (separate from chat subscriptions)</p>
+                        <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">Advanced providers</p>
                         <div className="grid gap-2 sm:grid-cols-2">
-                          {paidPresets.map((preset) => {
+                          {advancedPresets.map((preset) => {
                             const info = PROVIDER_INFO[preset.name];
                             if (!info) return null;
                             const selected = llmForm.provider === preset.name;
@@ -973,6 +1103,9 @@ function SettingsPage() {
                             );
                           })}
                         </div>
+                        <p className="text-[11px] text-text-muted">
+                          Use these only if you already know which provider you want. Most people should stick to Gemini, ChatGPT by OpenAI, Claude by Anthropic, or Local / private.
+                        </p>
                       </div>
                     )}
 
@@ -1037,7 +1170,15 @@ function SettingsPage() {
                     {llmForm.provider && (
                       <div className="space-y-4 rounded-xl border border-brand/20 bg-brand-light/10 p-4">
                         <p className="text-sm font-medium text-text-primary">
-                          {llmForm.provider === 'custom' ? 'Connect to your AI server' : `Set up ${selectedPreset?.label || llmForm.provider}`}
+                          {llmForm.provider === 'custom'
+                            ? 'Connect to your AI server'
+                            : llmForm.provider === 'openai-api'
+                              ? 'Use ChatGPT by OpenAI'
+                              : llmForm.provider === 'anthropic-api'
+                                ? 'Use Claude by Anthropic'
+                                : llmForm.provider === 'gemini'
+                                  ? 'Use Gemini with your Gemini API key'
+                                  : `Set up ${selectedPreset?.label || llmForm.provider}`}
                         </p>
 
                         {llmForm.provider === 'custom' ? (
@@ -1216,7 +1357,11 @@ function SettingsPage() {
                                   <a href={providerInfo.keyUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-sm font-medium text-brand hover:underline">
                                     {providerInfo.keyLabel || 'Get your API key'} <ExternalLink className="h-3.5 w-3.5" />
                                   </a>
-                                  <p className="text-xs text-text-muted mt-0.5">Create an account (free) and generate a key — takes about 30 seconds</p>
+                                  <p className="text-xs text-text-muted mt-0.5">
+                                    {llmForm.provider === 'gemini'
+                                      ? 'Google gives new users a free Gemini key in AI Studio. Create it there, then paste it here.'
+                                      : 'Create an API key with that provider, then paste it here.'}
+                                  </p>
                                 </div>
                               </div>
                             )}
@@ -1226,7 +1371,15 @@ function SettingsPage() {
                                 <Label className="text-sm">Paste your key here</Label>
                                 <Input
                                   type="password"
-                                  placeholder={`Paste the key you copied from ${selectedPreset?.label || 'the provider'}`}
+                                  placeholder={
+                                    llmForm.provider === 'openai-api'
+                                      ? 'Paste your OpenAI API key'
+                                      : llmForm.provider === 'anthropic-api'
+                                        ? 'Paste your Anthropic API key'
+                                        : llmForm.provider === 'gemini'
+                                          ? 'Paste your Gemini API key'
+                                          : `Paste the key you copied from ${selectedPreset?.label || 'the provider'}`
+                                  }
                                   value={llmForm.api_key}
                                   onChange={(event) => setLlmForm((prev) => ({ ...prev, api_key: event.target.value }))}
                                 />
@@ -1235,9 +1388,11 @@ function SettingsPage() {
                             <div className="flex items-start gap-2 rounded-lg bg-bg-subtle/60 px-3 py-2">
                               <Shield className="h-3.5 w-3.5 text-emerald-500 shrink-0 mt-0.5" />
                               <p className="text-[11px] text-text-muted leading-relaxed">
-                                {llm?.key_storage === 'keychain'
-                                  ? `Your key is stored in your OS keychain and sent only to ${selectedPreset?.label || 'the provider'}. It never touches disk as plaintext.`
-                                  : `Your key is stored locally and sent only to ${selectedPreset?.label || 'the provider'}'s API. Launchboard never sends it to any other server.`}
+                                {hostedMode
+                                  ? `Your key is sent to Launchboard over HTTPS, stored encrypted for your workspace, and used only to call ${selectedPreset?.label || 'that provider'}.`
+                                  : llm?.key_storage === 'keychain'
+                                    ? `Your key is stored in your OS keychain and sent only to ${selectedPreset?.label || 'the provider'}. It never touches disk as plaintext.`
+                                    : `Your key is stored locally and sent only to ${selectedPreset?.label || 'the provider'}'s API.`}
                               </p>
                             </div>
                           </div>

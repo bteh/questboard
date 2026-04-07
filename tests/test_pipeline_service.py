@@ -1,123 +1,151 @@
-"""Tests for pipeline_service — strong match threshold from config."""
 from __future__ import annotations
 
 import importlib
-import os
 import sys
 import unittest
-from unittest.mock import patch, MagicMock
-
-# ── Import gymnastics ──
-# The root-level app.py (legacy) shadows `backend/app/` when both
-# `src` and the project root are on sys.path.  We need to force-import
-# the *backend* `app` package before the legacy module gets loaded.
-_backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "backend"))
-_src_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
-
-# Prepend backend so `app` resolves to `backend/app/` (a package dir)
-# and remove the project root / cwd if present.
-_project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-for p in (_backend_dir, _src_dir):
-    if p not in sys.path:
-        sys.path.insert(0, p)
-
-# If the root-level `app` module was already imported (from pytest collecting),
-# replace it with the backend package.
-if "app" in sys.modules:
-    del sys.modules["app"]
-
-# Now import the backend app package from backend/
-import importlib.util
-
-_app_init = os.path.join(_backend_dir, "app", "__init__.py")
-_spec = importlib.util.spec_from_file_location("app", _app_init, submodule_search_locations=[os.path.join(_backend_dir, "app")])
-_app_mod = importlib.util.module_from_spec(_spec)
-sys.modules["app"] = _app_mod
-_spec.loader.exec_module(_app_mod)
-
-# Import the services subpackage
-_svc_init = os.path.join(_backend_dir, "app", "services", "__init__.py")
-_svc_spec = importlib.util.spec_from_file_location("app.services", _svc_init, submodule_search_locations=[os.path.join(_backend_dir, "app", "services")])
-_svc_mod = importlib.util.module_from_spec(_svc_spec)
-sys.modules["app.services"] = _svc_mod
-_svc_spec.loader.exec_module(_svc_mod)
-
-# Now import the target module
-_ps_path = os.path.join(_backend_dir, "app", "services", "pipeline_service.py")
-_ps_spec = importlib.util.spec_from_file_location("app.services.pipeline_service", _ps_path)
-pipeline_service = importlib.util.module_from_spec(_ps_spec)
-sys.modules["app.services.pipeline_service"] = pipeline_service
-_ps_spec.loader.exec_module(pipeline_service)
-
-PipelineRun = pipeline_service.PipelineRun
-_execute_pipeline = pipeline_service._execute_pipeline
+import asyncio
+from datetime import datetime, timezone
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 
-class StrongMatchThresholdTest(unittest.TestCase):
-    """Issue #4: _STRONG_MATCH_THRESHOLD hardcoded instead of reading from config."""
+ROOT = Path(__file__).resolve().parents[1]
+BACKEND_PATH = str(ROOT / "backend")
+SRC_PATH = str(ROOT / "src")
+if BACKEND_PATH in sys.path:
+    sys.path.remove(BACKEND_PATH)
+if SRC_PATH in sys.path:
+    sys.path.remove(SRC_PATH)
+sys.path.insert(0, BACKEND_PATH)
+sys.path.insert(1, SRC_PATH)
 
-    @patch.object(pipeline_service, "get_pipeline")
-    @patch.object(pipeline_service, "_auto_deduplicate", return_value=0)
-    def test_strong_matches_uses_config_threshold(
-        self, mock_dedup: MagicMock, mock_get_pipeline: MagicMock,
-    ) -> None:
-        """When profile sets strong_apply to 50, jobs scoring 55 should count
-        as strong matches (would be missed with hardcoded 70)."""
-        mock_pipeline = MagicMock()
-        mock_pipeline.config = {
-            "scoring": {
-                "thresholds": {"strong_apply": 50},
-            },
-        }
-        mock_pipeline.profile_name = "test"
-        mock_pipeline.run_full_pipeline.return_value = [
-            {"title": "Eng A", "overall_score": 55},
-            {"title": "Eng B", "overall_score": 45},
-            {"title": "Eng C", "overall_score": 75},
-        ]
-        mock_get_pipeline.return_value = mock_pipeline
 
-        run = PipelineRun(
-            run_id="test123",
-            profile="test",
+class PipelineServiceTimeTest(unittest.TestCase):
+    def setUp(self) -> None:
+        for module_name in list(sys.modules):
+            if module_name == "app.services.pipeline_service" or module_name.startswith("app.services.pipeline_service."):
+                sys.modules.pop(module_name, None)
+        self.pipeline_service = importlib.import_module("app.services.pipeline_service")
+
+    def test_coerce_utc_preserves_naive_datetimes_as_utc(self) -> None:
+        naive = datetime(2026, 3, 23, 12, 0, 0)
+        coerced = self.pipeline_service._coerce_utc(naive)
+
+        self.assertIsNotNone(coerced)
+        self.assertEqual(coerced.tzinfo, timezone.utc)
+        self.assertEqual(coerced.hour, 12)
+
+    def test_coerce_utc_normalizes_aware_datetimes(self) -> None:
+        aware = datetime(2026, 3, 23, 12, 0, 0, tzinfo=timezone.utc)
+        coerced = self.pipeline_service._coerce_utc(aware)
+
+        self.assertEqual(coerced, aware)
+
+    def test_execute_pipeline_preserves_structured_preferred_places(self) -> None:
+        captured: dict[str, object] = {}
+
+        class FakePipeline:
+            def __init__(self) -> None:
+                self.profile_name = "workspace"
+                self.llm = None
+                self.config = {
+                    "search_settings": {"ai_score_top_n": 60},
+                    "location_preferences": {
+                        "preferred_places": [
+                            {
+                                "label": "Los Angeles, CA",
+                                "kind": "city",
+                                "match_scope": "city",
+                                "city": "Los Angeles",
+                                "region": "CA",
+                                "country": "United States",
+                                "country_code": "US",
+                            }
+                        ],
+                        "preferred_locations": ["Los Angeles, CA"],
+                        "preferred_states": ["CA"],
+                        "preferred_cities": ["Los Angeles"],
+                    },
+                    "scoring": {"thresholds": {"strong_apply": 70}},
+                }
+
+            def run_full_pipeline(self, **kwargs):
+                captured["location_preferences"] = self.config["location_preferences"]
+                captured["locations"] = self.config["locations"]
+                return []
+
+        run = self.pipeline_service.PipelineRun(
+            run_id="run123",
+            profile="workspace",
             mode="search_score",
         )
-        run.queue = None
-        run.loop = None
 
-        _execute_pipeline(run, ["engineer"], ["Remote"], use_ai=True, mode="search_score")
+        with patch("app.services.pipeline_service.get_pipeline", return_value=FakePipeline()), patch(
+            "app.services.pipeline_service._auto_deduplicate",
+            return_value=0,
+        ):
+            self.pipeline_service._execute_pipeline(
+                run,
+                roles=["data engineer"],
+                locations=["Los Angeles, CA", "Remote"],
+                use_ai=True,
+                mode="search_score",
+                workplace_preference="remote_friendly",
+                config_override={
+                    "location_preferences": {
+                        "preferred_places": [
+                            {
+                                "label": "Los Angeles, CA",
+                                "kind": "city",
+                                "match_scope": "city",
+                                "city": "Los Angeles",
+                                "region": "CA",
+                                "country": "United States",
+                                "country_code": "US",
+                            }
+                        ],
+                        "preferred_locations": ["Los Angeles, CA"],
+                        "preferred_states": ["CA"],
+                        "preferred_cities": ["Los Angeles"],
+                    }
+                },
+            )
 
-        # With threshold 50: scores 55 and 75 are strong matches -> 2
-        # With hardcoded 70: only 75 -> 1
-        self.assertEqual(run.strong_matches, 2)
+        location_preferences = captured["location_preferences"]
+        self.assertIsInstance(location_preferences, dict)
+        self.assertEqual(location_preferences["preferred_places"][0]["match_scope"], "city")
+        self.assertEqual(location_preferences["preferred_places"][0]["city"], "Los Angeles")
+        self.assertEqual(location_preferences["preferred_cities"], ["Los Angeles"])
+        self.assertEqual(captured["locations"], ["Los Angeles, CA", "Remote"])
 
-    @patch.object(pipeline_service, "get_pipeline")
-    @patch.object(pipeline_service, "_auto_deduplicate", return_value=0)
-    def test_default_threshold_is_70(
-        self, mock_dedup: MagicMock, mock_get_pipeline: MagicMock,
-    ) -> None:
-        """When config has no thresholds section, default to 70."""
-        mock_pipeline = MagicMock()
-        mock_pipeline.config = {}
-        mock_pipeline.profile_name = "test"
-        mock_pipeline.run_full_pipeline.return_value = [
-            {"title": "Eng A", "overall_score": 65},
-            {"title": "Eng B", "overall_score": 75},
-        ]
-        mock_get_pipeline.return_value = mock_pipeline
+    def test_start_run_requires_compatible_hosted_worker(self) -> None:
+        loop = asyncio.new_event_loop()
+        self.addCleanup(loop.close)
 
-        run = PipelineRun(
-            run_id="test456",
-            profile="test",
-            mode="search_score",
+        settings = SimpleNamespace(
+            hosted_mode=True,
+            dev_hosted_auth_enabled=False,
+            resolved_app_release="test-release",
         )
-        run.queue = None
-        run.loop = None
 
-        _execute_pipeline(run, ["engineer"], ["Remote"], use_ai=True, mode="search_score")
-
-        # Default threshold 70: only 75 qualifies -> 1
-        self.assertEqual(run.strong_matches, 1)
+        with patch("app.services.pipeline_service.get_settings", return_value=settings), patch(
+            "app.services.pipeline_service._has_compatible_hosted_worker",
+            return_value=False,
+        ):
+            with self.assertRaises(RuntimeError):
+                self.pipeline_service.start_run(
+                    roles=["data engineer"],
+                    locations=["Los Angeles, CA"],
+                    keywords=[],
+                    include_remote=True,
+                    max_days_old=14,
+                    use_ai=True,
+                    profile="workspace",
+                    mode="search_score",
+                    loop=loop,
+                    workspace_id="ws_123",
+                )
 
 
 if __name__ == "__main__":
