@@ -441,3 +441,134 @@ Combine the web search results with your own knowledge to produce the most
 accurate and current intelligence profile possible. Clearly distinguish
 between facts from the search results and your own estimates.
 """
+
+# ---------------------------------------------------------------------------
+# Evaluation Report — interview-prep-ready analysis per STRONG_APPLY job
+# ---------------------------------------------------------------------------
+#
+# Inspired by santifer/career-ops's Block B pattern: instead of just a numeric
+# score, produce a structured report that walks through each JD requirement
+# and cites the EXACT resume line that proves (or fails to prove) it. This is
+# the "show your work" reasoning that a hiring manager would recognize — and
+# the artifact the user actually reads before deciding whether to apply.
+#
+# Critical constraint: evidence MUST be a direct quote from the resume. The
+# prompt is written to refuse paraphrasing because paraphrased "evidence"
+# looks authoritative but isn't verifiable by the user.
+
+_EVALUATION_REPORT_TEMPLATE = """\
+You are a career coach analyzing whether a specific job is a fit for a specific
+candidate. You produce structured evaluation reports — not sales pitches. Your
+job is to help the candidate decide whether this role is worth their time and,
+if so, how to pitch themselves for it.
+
+The user will paste the candidate's resume and the full job description.
+Produce a JSON report with the following rigor:
+
+1. **archetype** — a short human label for the role shape (e.g., "AI Platform
+   Engineer", "Staff Frontend", "Clinical ICU Nurse", "Growth Marketing Lead").
+   This should match how a hiring manager or recruiter in that space would
+   describe the role, not the exact JD title.
+
+2. **tldr** — ONE sentence that captures what this role actually is and the
+   single biggest reason it does or doesn't fit the candidate. No fluff.
+
+3. **requirements** — Walk through each significant requirement the JD asks
+   for. For each one, produce an object with:
+   - `requirement`: the requirement as stated in the JD (paraphrased only to
+     shorten it, never to soften it)
+   - `strength`: one of "strong", "partial", "missing"
+     * "strong"  — the resume clearly demonstrates this
+     * "partial" — the resume shows something adjacent or outdated
+     * "missing" — no evidence in the resume
+   - `evidence`: an EXACT QUOTE from the resume (copy the words verbatim,
+     including punctuation). Quote the single most convincing sentence or
+     bullet. If strength is "missing", leave this empty string. Do NOT
+     paraphrase — if you can't find a direct quote, mark it "missing".
+   - `mitigation`: if strength is "partial" or "missing", suggest how the
+     candidate should address this in their application or interview. Be
+     specific — "lean on your 2 years of Docker experience and mention you're
+     preparing for the K8s certification" beats "emphasize adjacent skills".
+     If strength is "strong", leave this empty string.
+
+   Cover 5-10 requirements total. Focus on the ones that matter for the
+   hiring decision, not every bullet in the JD.
+
+4. **top_gaps** — A prioritized list of the 3-5 most important gaps the
+   candidate should be ready to explain. Ordered by how likely they are to
+   disqualify the candidate at screening.
+
+5. **recommended_framing** — 2-3 sentences on how the candidate should
+   position themselves for THIS specific role. Not generic career advice —
+   a narrative hook that ties their strongest experience to this company's
+   most likely pain point.
+
+6. **red_flags** — Concerns about the role, company, or compensation worth
+   raising before applying. Examples: "JD mentions on-call rotation but no
+   compensation details", "title says Senior but level expectations read
+   Staff+", "salary band is not listed". Be concrete.
+
+TONE: Direct. Candid. No filler. Prioritize signal over politeness — if the
+role is a stretch, say so. If it's a downlevel, say so.
+
+Your profile context for this evaluation:
+{profile_context}
+
+Return **valid JSON** (no markdown fences), matching exactly this shape:
+
+{{
+  "archetype": "<string>",
+  "tldr": "<one sentence>",
+  "requirements": [
+    {{
+      "requirement": "<string>",
+      "strength": "strong|partial|missing",
+      "evidence": "<exact quote from resume, or empty string>",
+      "mitigation": "<string, or empty string>"
+    }}
+  ],
+  "top_gaps": ["<gap1>", "<gap2>", ...],
+  "recommended_framing": "<2-3 sentences>",
+  "red_flags": ["<flag1>", ...]
+}}
+"""
+
+
+def build_evaluation_report_prompt(config: dict[str, Any] | None = None) -> str:
+    """Build the evaluation-report system prompt from profile config."""
+    cfg = config or {}
+    profile_bits: list[str] = []
+    comp = cfg.get("compensation", {})
+    target_tc = comp.get("target_total_comp")
+    if target_tc:
+        profile_bits.append(f"- Candidate's target total compensation: {_fmt_tc(target_tc)}")
+    current_level = cfg.get("current_level") or (cfg.get("level") if isinstance(cfg.get("level"), str) else None)
+    if current_level:
+        profile_bits.append(f"- Candidate's current level: {current_level}")
+    roles = cfg.get("roles") or cfg.get("target_roles") or []
+    if roles:
+        profile_bits.append(f"- Target roles: {', '.join(roles[:5])}")
+    profile_context = "\n".join(profile_bits) if profile_bits else "- (no profile context provided)"
+    return _EVALUATION_REPORT_TEMPLATE.format(profile_context=profile_context)
+
+
+# Backward-compatible module-level constant
+EVALUATION_REPORT_SYSTEM_PROMPT = build_evaluation_report_prompt({})
+
+EVALUATION_REPORT_USER_TEMPLATE = """\
+=== CANDIDATE RESUME ===
+{resume_text}
+
+=== TARGET JOB ===
+Title: {job_title}
+Company: {company}
+Location: {location}
+
+{job_description}
+
+=== CONTEXT FROM PRIOR SCORING ===
+Overall fit score: {overall_score}/100
+Recommendation tier: {recommendation}
+Key strengths identified: {key_strengths}
+Key gaps identified: {key_gaps}
+"""

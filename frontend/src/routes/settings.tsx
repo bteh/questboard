@@ -6,13 +6,16 @@ import {
   ChevronDown,
   ExternalLink,
   FileText,
+  Filter,
   HelpCircle,
   Loader2,
+  MapPin,
   Monitor,
   Rocket,
   Search,
   Shield,
   Sparkles,
+  Tag,
   Upload,
 } from 'lucide-react';
 
@@ -37,10 +40,21 @@ import { cn } from '@/lib/utils';
 import type { LLMConfig, LLMStatus } from '@/types/settings';
 import type { WorkspacePreferences } from '@/types/workspace';
 
+type SettingsTab = 'resume' | 'search' | 'ai' | 'auto-apply';
+
+const SETTINGS_TABS: SettingsTab[] = ['resume', 'search', 'ai', 'auto-apply'];
+
+function isSettingsTab(value: unknown): value is SettingsTab {
+  return typeof value === 'string' && (SETTINGS_TABS as string[]).includes(value);
+}
+
 export const Route = createRoute({
   getParentRoute: () => rootRoute,
   path: '/settings',
   component: SettingsPage,
+  validateSearch: (search: Record<string, unknown>) => ({
+    tab: isSettingsTab(search.tab) ? search.tab : undefined,
+  }),
 });
 
 // ── Provider metadata for cards ──────────────────────────────────────
@@ -102,8 +116,82 @@ function getConnectedLabel(llm: LLMStatus): string {
   return 'Custom endpoint';
 }
 
+/**
+ * True if a model ID looks like a flagship vendor model (Claude/GPT/Gemini/o-series).
+ *
+ * We use this to detect when a localhost "AI server" is actually a third-party
+ * proxy (cliproxyapi, vibeproxy, Quotio, etc.) re-exporting a Claude Code or
+ * Codex CLI OAuth subscription as if it were a local runtime. Real local
+ * runtimes (Ollama, LM Studio, vLLM, llama.cpp) report model IDs like
+ * "llama3.2:3b", "mistral", "qwen2.5-coder", etc. — not "claude-sonnet-4-5".
+ *
+ * When we see flagship IDs we surface a warning so the user understands
+ * that connecting will burn their consumer subscription quota and may
+ * violate the vendor's terms of service.
+ */
+function looksLikeFlagshipModel(modelId: string): boolean {
+  const m = modelId.toLowerCase();
+  return (
+    m.startsWith('claude-') ||
+    m.startsWith('gpt-') ||
+    m.startsWith('o1-') ||
+    m.startsWith('o3-') ||
+    m.startsWith('o4-') ||
+    m.startsWith('gemini-')
+  );
+}
+
+interface DetectedServerLike {
+  models: string[];
+}
+
+function serversIncludeFlagshipModels(servers: DetectedServerLike[] | undefined): boolean {
+  if (!servers || servers.length === 0) return false;
+  return servers.some((server) => server.models?.some(looksLikeFlagshipModel));
+}
+
+interface FlagshipDetectionWarningProps {
+  className?: string;
+}
+
+/**
+ * Disclosure shown above any "detected on your machine" card whose server
+ * advertises flagship Claude / GPT / Gemini model IDs. We don't block the
+ * user — they may know exactly what they're doing — but we make sure they
+ * can't click "connect" without understanding what they're wiring up.
+ */
+function FlagshipDetectionWarning({ className }: FlagshipDetectionWarningProps) {
+  return (
+    <div
+      className={cn(
+        'rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900',
+        'dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200',
+        className,
+      )}
+      role="alert"
+    >
+      <p className="font-semibold">This local server is exposing vendor flagship models.</p>
+      <p className="mt-1">
+        It looks like a third-party proxy (e.g. <code className="rounded bg-amber-100/60 px-1 py-0.5 text-[11px] dark:bg-amber-900/40">cliproxyapi</code>,
+        <code className="ml-0.5 rounded bg-amber-100/60 px-1 py-0.5 text-[11px] dark:bg-amber-900/40">vibeproxy</code>) wrapping your
+        Claude Code, Codex CLI, or Gemini CLI OAuth subscription. Connecting Launchboard to it will charge each
+        request against your consumer subscription quota and may violate Anthropic / OpenAI / Google's terms of service —
+        Launchboard runs many calls per search and you can be rate-limited or have the upstream account suspended.
+      </p>
+      <p className="mt-1.5 text-amber-800/80 dark:text-amber-200/80">
+        If you have a real API key, use the Gemini / ChatGPT / Claude tabs above instead.
+      </p>
+    </div>
+  );
+}
+
 function SettingsPage() {
   const navigate = useNavigate();
+  const { tab: tabFromUrl } = Route.useSearch();
+  const activeTab: SettingsTab = tabFromUrl ?? 'resume';
+  const setActiveTab = (next: SettingsTab) => {
+    navigate({ to: '/settings', search: { tab: next === 'resume' ? undefined : next } });
+  };
   const { hostedMode } = useWorkspace();
   const { data: llm } = useLLMStatus();
   const { data: presets } = useLLMPresets();
@@ -151,6 +239,10 @@ function SettingsPage() {
   const [autoDetectDismissed] = useState(false);
   const [showAllProviders, setShowAllProviders] = useState(false);
   const [geminiKey, setGeminiKey] = useState('');
+  // AI tab — controls the simplified primary connect card.
+  const [quickProvider, setQuickProvider] = useState<'gemini' | 'openai-api' | 'anthropic-api' | 'ollama'>('gemini');
+  const [quickKey, setQuickKey] = useState('');
+  const [showAdvancedAi, setShowAdvancedAi] = useState(false);
 
   // Detect Ollama and local AI servers when no LLM is configured, AI is offline, or custom provider is selected
   // Only scan localhost in self-hosted mode — hosted backend can't reach user's localhost anyway
@@ -195,6 +287,57 @@ function SettingsPage() {
     });
   };
 
+  /**
+   * AI tab — quick connect for the primary "happy path" providers.
+   *
+   * Mirrors the ConnectAiPopover logic exactly so the user gets the same
+   * behavior whether they click the sidebar pill or open the AI tab in
+   * Settings. The advanced section below this card still exposes every
+   * preset, custom endpoints, and the model picker for power users.
+   */
+  const handleQuickConnect = () => {
+    const isOllama = quickProvider === 'ollama';
+    const trimmed = quickKey.trim();
+    if (!isOllama && !trimmed) {
+      toast.error('Paste an API key first.');
+      return;
+    }
+
+    const preset = presets?.find((item) => item.name === quickProvider);
+    if (!preset) {
+      toast.error('Provider preset is unavailable.');
+      return;
+    }
+
+    const config = isOllama
+      ? {
+          provider: quickProvider,
+          base_url: 'http://localhost:11434/v1',
+          api_key: 'ollama',
+          model: ollamaDetect?.recommended_model || 'llama3.1',
+        }
+      : { provider: quickProvider, base_url: preset.base_url, api_key: trimmed, model: preset.model };
+
+    updateLLM.mutate(config, {
+      onSuccess: () => {
+        testConnection.mutate(undefined, {
+          onSuccess: (result) => {
+            if (result.success) {
+              toast.success(`Connected to ${result.provider || quickProvider}`);
+              setQuickKey('');
+            } else {
+              toast.error(result.message || 'Connection failed — check your key');
+            }
+          },
+          onError: (error) =>
+            toast.error(error instanceof Error ? error.message : 'Connection test failed'),
+        });
+      },
+      onError: (error) =>
+        toast.error(error instanceof Error ? error.message : 'Failed to save provider settings'),
+    });
+  };
+
   const handleUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -224,12 +367,49 @@ function SettingsPage() {
   const advancedPresets = userPresets.filter((p) => !isPopularProvider(p.name, hostedMode));
   const devPresets = presets?.filter((p) => p.internal) || [];
 
+  const TAB_DEFS: Array<{ id: SettingsTab; label: string; icon: typeof FileText }> = [
+    { id: 'resume', label: 'Resume', icon: FileText },
+    { id: 'search', label: 'Search', icon: Search },
+    { id: 'ai', label: 'AI provider', icon: Sparkles },
+    { id: 'auto-apply', label: 'Auto-apply', icon: Rocket },
+  ];
+
   return (
     <div>
       <PageHeader title="Settings" description="Configure what you're looking for and how Launchboard finds it" />
 
+      {/* Real top-level tabs — only the active tab's cards render below.
+          The user only sees one focused page at a time instead of one
+          1500-line scroll. */}
+      <div className="mb-6 border-b border-border-default">
+        <nav className="flex gap-1 overflow-x-auto" role="tablist" aria-label="Settings sections">
+          {TAB_DEFS.map(({ id, label, icon: Icon }) => {
+            const isActive = activeTab === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => setActiveTab(id)}
+                className={cn(
+                  'group inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors -mb-px',
+                  isActive
+                    ? 'border-brand text-text-primary'
+                    : 'border-transparent text-text-tertiary hover:text-text-primary',
+                )}
+              >
+                <Icon className={cn('h-4 w-4 transition-colors', isActive ? 'text-brand' : 'text-text-muted group-hover:text-text-secondary')} />
+                {label}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+
       <div className="max-w-3xl space-y-6">
         {/* ── Resume ──────────────────────────────────────────── */}
+        {activeTab === 'resume' && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
@@ -261,18 +441,22 @@ function SettingsPage() {
 
             <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploadResume.isPending}>
               {uploadResume.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-              {onboarding?.resume.exists ? 'Replace Resume' : 'Upload Resume PDF'}
+              {onboarding?.resume.exists ? 'Replace resume' : 'Upload resume PDF'}
             </Button>
             <input ref={fileInputRef} type="file" accept=".pdf,application/pdf" className="hidden" onChange={handleUpload} />
           </CardContent>
         </Card>
+        )}
 
-        {/* ── Search Preferences ──────────────────────────────── */}
+        {/* ── Search tab — three smaller cards instead of one giant card ───── */}
+        {activeTab === 'search' && (
+        <>
+        {/* What you're looking for */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Search className="h-4 w-4" />
-              Search Preferences
+              <Tag className="h-4 w-4" />
+              What you're looking for
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
@@ -308,7 +492,18 @@ function SettingsPage() {
                 emptyText="No target companies added yet."
               />
             </div>
+          </CardContent>
+        </Card>
 
+        {/* Where */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <MapPin className="h-4 w-4" />
+              Where
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
             <SearchAreaSection
               preferredPlaces={prefsForm.preferred_places}
               onPreferredPlacesChange={(preferred_places) => setPrefsForm((prev) => ({ ...prev, preferred_places }))}
@@ -322,7 +517,18 @@ function SettingsPage() {
               onIncludeLinkedInJobsChange={(include_linkedin_jobs) => setPrefsForm((prev) => ({ ...prev, include_linkedin_jobs }))}
               context="settings"
             />
+          </CardContent>
+        </Card>
 
+        {/* Filters */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Filter className="h-4 w-4" />
+              Filters and salary
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label>Minimum salary</Label>
@@ -537,21 +743,210 @@ function SettingsPage() {
 
             <Button onClick={handleSavePreferences} disabled={savePreferences.isPending}>
               {savePreferences.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Save Preferences
+              Save preferences
             </Button>
           </CardContent>
         </Card>
+        </>
+        )}
 
         {/* ── AI Provider ─────────────────────────────────────── */}
+        {activeTab === 'ai' && (
+        <>
+        {/* Primary card — same simple flow as the sidebar popover. */}
         <Card>
           <CardHeader>
             <div className="space-y-1">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Sparkles className="h-4 w-4" />
-                AI for Ranking & Drafting
+                AI for ranking and drafting
               </CardTitle>
               <p className="text-sm text-text-tertiary">
-                Launchboard works best with AI connected. Basic search still works without it, but AI is what unlocks resume-fit ranking, suggestions, and tailored draft materials.
+                Pick a provider, paste a key, click connect. Launchboard uses it for resume-fit ranking and tailored drafts.
+              </p>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Connected status */}
+            {llm?.available && (
+              <div className="rounded-xl border border-success/20 bg-success/5 p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <span className="inline-flex items-center gap-1.5 text-sm font-medium text-success">
+                      <CheckCircle2 className="h-4 w-4" />
+                      AI is connected
+                    </span>
+                    <p className="mt-1 text-sm font-medium text-text-primary">{getConnectedLabel(llm)}</p>
+                    {llm.model && (
+                      <p className="text-xs text-text-muted">{formatModelLabel(llm.model)}</p>
+                    )}
+                  </div>
+                </div>
+                {llm?.auto_detected === 'ollama' && (
+                  <p className="mt-1 text-xs text-text-muted">Auto-detected from your local Ollama installation.</p>
+                )}
+              </div>
+            )}
+
+            {/* Not connected — quick connect form mirrors the popover */}
+            {!llm?.available && (
+              <div className="space-y-3">
+                {/* Provider tabs */}
+                <div
+                  role="tablist"
+                  aria-label="AI provider"
+                  className="flex gap-1 rounded-lg border border-border-default bg-bg-subtle p-0.5"
+                >
+                  {(['gemini', 'openai-api', 'anthropic-api', 'ollama'] as const)
+                    .filter((name) => !hostedMode || name !== 'ollama')
+                    .map((name) => {
+                      const active = quickProvider === name;
+                      const label =
+                        name === 'gemini'
+                          ? 'Gemini'
+                          : name === 'openai-api'
+                            ? 'ChatGPT'
+                            : name === 'anthropic-api'
+                              ? 'Claude'
+                              : 'Local';
+                      return (
+                        <button
+                          key={name}
+                          type="button"
+                          role="tab"
+                          aria-selected={active}
+                          onClick={() => {
+                            setQuickProvider(name);
+                            setQuickKey('');
+                          }}
+                          className={cn(
+                            'flex-1 rounded-md px-3 py-2 text-xs font-medium transition-colors',
+                            active ? 'bg-bg-card text-text-primary shadow-sm' : 'text-text-muted hover:text-text-secondary',
+                          )}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                </div>
+
+                {/* Get-key link */}
+                <a
+                  href={
+                    quickProvider === 'gemini'
+                      ? 'https://aistudio.google.com/apikey'
+                      : quickProvider === 'openai-api'
+                        ? 'https://platform.openai.com/api-keys'
+                        : quickProvider === 'anthropic-api'
+                          ? 'https://console.anthropic.com/settings/keys'
+                          : 'https://ollama.com/download'
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs font-medium text-brand hover:underline"
+                >
+                  {quickProvider === 'gemini'
+                    ? 'Create a free Gemini API key'
+                    : quickProvider === 'openai-api'
+                      ? 'Get an OpenAI API key'
+                      : quickProvider === 'anthropic-api'
+                        ? 'Get an Anthropic API key'
+                        : 'Install Ollama'}
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+
+                {/* Paste field or Ollama detection */}
+                {quickProvider === 'ollama' ? (
+                  <div className="rounded-lg border border-border-default bg-bg-subtle/40 px-3 py-2.5 text-xs text-text-muted">
+                    {ollamaDetect?.detected ? (
+                      <span className="inline-flex items-center gap-1.5 font-medium text-success">
+                        <Monitor className="h-3.5 w-3.5" />
+                        Detected on localhost ({ollamaDetect.recommended_model})
+                      </span>
+                    ) : (
+                      <>
+                        Install Ollama and run <code className="rounded bg-bg-muted px-1 py-0.5 text-[11px]">ollama pull llama3.2:3b</code>, then click Connect below.
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <Input
+                    type="password"
+                    placeholder={
+                      quickProvider === 'gemini'
+                        ? 'Paste Gemini key'
+                        : quickProvider === 'openai-api'
+                          ? 'Paste OpenAI key'
+                          : 'Paste Anthropic key'
+                    }
+                    value={quickKey}
+                    onChange={(event) => setQuickKey(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' && quickKey.trim() && !updateLLM.isPending) handleQuickConnect();
+                    }}
+                    className="h-9"
+                  />
+                )}
+
+                <Button
+                  onClick={handleQuickConnect}
+                  disabled={
+                    updateLLM.isPending ||
+                    testConnection.isPending ||
+                    (quickProvider !== 'ollama' && !quickKey.trim())
+                  }
+                  className="w-full"
+                >
+                  {updateLLM.isPending || testConnection.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Connecting…
+                    </>
+                  ) : (
+                    'Connect'
+                  )}
+                </Button>
+
+                <div className="flex items-start gap-1.5 text-[11px] leading-relaxed text-text-muted">
+                  <Shield className="h-3 w-3 shrink-0 text-emerald-500 mt-0.5" />
+                  <p>
+                    {hostedMode
+                      ? 'Your key is encrypted on Launchboard and only sent to that provider.'
+                      : 'Your key is stored on this computer and only sent to that provider.'}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Advanced toggle — keeps the existing 940-line form available
+                for power users (custom endpoints, model picker, dev presets,
+                advanced free providers like Groq/Cerebras/OpenRouter, etc.)
+                without putting it on the page by default. */}
+            <div className="border-t border-border-default pt-3">
+              <button
+                type="button"
+                onClick={() => setShowAdvancedAi((v) => !v)}
+                className="flex items-center gap-1.5 text-xs font-medium text-text-muted hover:text-text-primary"
+              >
+                <ChevronDown className={cn('h-3 w-3 transition-transform', showAdvancedAi && 'rotate-180')} />
+                {showAdvancedAi ? 'Hide advanced provider settings' : 'Show advanced provider settings'}
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Advanced legacy AI card — only renders when explicitly expanded.
+            Everything below is the original full-fat provider picker.  */}
+        {showAdvancedAi && (
+        <Card>
+          <CardHeader>
+            <div className="space-y-1">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Sparkles className="h-4 w-4" />
+                Advanced AI settings
+              </CardTitle>
+              <p className="text-sm text-text-tertiary">
+                Custom endpoints, model picker, free provider tier (Groq, Cerebras, OpenRouter), and dev presets.
               </p>
             </div>
           </CardHeader>
@@ -612,7 +1007,7 @@ function SettingsPage() {
                         className="shrink-0"
                         onClick={() => setShowAllProviders(!showAllProviders)}
                       >
-                        Change AI
+                        Change AI provider
                       </Button>
                     </div>
                     {llm?.auto_detected === 'ollama' && (
@@ -666,44 +1061,49 @@ function SettingsPage() {
                     )}
 
                     {/* Option A2: Local AI servers detected on other ports (self-hosted only) */}
-                    {!hostedMode && localAI?.servers && localAI.servers.length > 0 && localAI.servers.map((server) => (
-                      <button
-                        key={server.port}
-                        type="button"
-                        onClick={() => {
-                          updateLLM.mutate(
-                            { provider: 'custom', base_url: server.base_url, api_key: '', model: server.model },
-                            {
-                              onSuccess: () => {
-                                testConnection.mutate(undefined, {
-                                  onSuccess: (r) => r.success
-                                    ? toast.success(`Connected · ${server.model}`)
-                                    : toast.error(r.message || 'Connection failed'),
-                                  onError: () => toast.error('Connection test failed'),
-                                });
-                              },
-                            },
-                          );
-                        }}
-                        disabled={updateLLM.isPending}
-                        className="w-full rounded-xl border-2 border-success/30 bg-success/5 p-4 text-left transition-all hover:border-success/50 hover:bg-success/10"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-success/10">
-                            {updateLLM.isPending ? <Loader2 className="h-5 w-5 animate-spin text-success" /> : <Sparkles className="h-5 w-5 text-success" />}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm font-semibold text-text-primary">{server.model}</p>
-                              <span className="rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success uppercase">Detected</span>
+                    {!hostedMode && localAI?.servers && localAI.servers.length > 0 && (
+                      <>
+                        {serversIncludeFlagshipModels(localAI.servers) && <FlagshipDetectionWarning />}
+                        {localAI.servers.map((server) => (
+                          <button
+                            key={server.port}
+                            type="button"
+                            onClick={() => {
+                              updateLLM.mutate(
+                                { provider: 'custom', base_url: server.base_url, api_key: '', model: server.model },
+                                {
+                                  onSuccess: () => {
+                                    testConnection.mutate(undefined, {
+                                      onSuccess: (r) => r.success
+                                        ? toast.success(`Connected · ${server.model}`)
+                                        : toast.error(r.message || 'Connection failed'),
+                                      onError: () => toast.error('Connection test failed'),
+                                    });
+                                  },
+                                },
+                              );
+                            }}
+                            disabled={updateLLM.isPending}
+                            className="w-full rounded-xl border-2 border-success/30 bg-success/5 p-4 text-left transition-all hover:border-success/50 hover:bg-success/10"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-success/10">
+                                {updateLLM.isPending ? <Loader2 className="h-5 w-5 animate-spin text-success" /> : <Sparkles className="h-5 w-5 text-success" />}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-semibold text-text-primary">{server.model}</p>
+                                  <span className="rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success uppercase">Detected</span>
+                                </div>
+                                <p className="mt-0.5 text-xs text-text-muted">
+                                  Found on port {server.port}. Click to connect.
+                                </p>
+                              </div>
                             </div>
-                            <p className="mt-0.5 text-xs text-text-muted">
-                              Found on port {server.port}. Click to connect.
-                            </p>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
+                          </button>
+                        ))}
+                      </>
+                    )}
 
                     <div className="space-y-2">
                       <p className="text-xs font-medium text-text-secondary uppercase tracking-wide">Popular choices</p>
@@ -923,44 +1323,49 @@ function SettingsPage() {
                     </div>
 
                     {/* Auto-detected local servers (self-hosted only) */}
-                    {!hostedMode && localAI?.servers && localAI.servers.length > 0 && localAI.servers.map((server) => (
-                      <button
-                        key={server.port}
-                        type="button"
-                        onClick={() => {
-                          updateLLM.mutate(
-                            { provider: 'custom', base_url: server.base_url, api_key: '', model: server.model },
-                            {
-                              onSuccess: () => {
-                                testConnection.mutate(undefined, {
-                                  onSuccess: (r) => r.success
-                                    ? toast.success(`Connected · ${server.model}`)
-                                    : toast.error(r.message || 'Connection failed'),
-                                  onError: () => toast.error('Connection test failed'),
-                                });
-                              },
-                            },
-                          );
-                        }}
-                        disabled={updateLLM.isPending}
-                        className="w-full rounded-xl border-2 border-success/30 bg-success/5 p-4 text-left transition-all hover:border-success/50 hover:bg-success/10"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-success/10">
-                            {updateLLM.isPending ? <Loader2 className="h-5 w-5 animate-spin text-success" /> : <Sparkles className="h-5 w-5 text-success" />}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm font-semibold text-text-primary">{server.model}</p>
-                              <span className="rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success uppercase">Detected</span>
+                    {!hostedMode && localAI?.servers && localAI.servers.length > 0 && (
+                      <>
+                        {serversIncludeFlagshipModels(localAI.servers) && <FlagshipDetectionWarning />}
+                        {localAI.servers.map((server) => (
+                          <button
+                            key={server.port}
+                            type="button"
+                            onClick={() => {
+                              updateLLM.mutate(
+                                { provider: 'custom', base_url: server.base_url, api_key: '', model: server.model },
+                                {
+                                  onSuccess: () => {
+                                    testConnection.mutate(undefined, {
+                                      onSuccess: (r) => r.success
+                                        ? toast.success(`Connected · ${server.model}`)
+                                        : toast.error(r.message || 'Connection failed'),
+                                      onError: () => toast.error('Connection test failed'),
+                                    });
+                                  },
+                                },
+                              );
+                            }}
+                            disabled={updateLLM.isPending}
+                            className="w-full rounded-xl border-2 border-success/30 bg-success/5 p-4 text-left transition-all hover:border-success/50 hover:bg-success/10"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-success/10">
+                                {updateLLM.isPending ? <Loader2 className="h-5 w-5 animate-spin text-success" /> : <Sparkles className="h-5 w-5 text-success" />}
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-semibold text-text-primary">{server.model}</p>
+                                  <span className="rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success uppercase">Detected</span>
+                                </div>
+                                <p className="mt-0.5 text-xs text-text-muted">
+                                  Found on port {server.port}. Click to connect.
+                                </p>
+                              </div>
                             </div>
-                            <p className="mt-0.5 text-xs text-text-muted">
-                              Found on port {server.port}. Click to connect.
-                            </p>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
+                          </button>
+                        ))}
+                      </>
+                    )}
 
                     {/* Gemini quick-setup as fallback */}
                     <div className="rounded-xl border border-border-default bg-bg-card p-4 space-y-3">
@@ -1186,6 +1591,7 @@ function SettingsPage() {
                             {/* Auto-detected servers — click to connect */}
                             {localAI?.servers && localAI.servers.length > 0 && (
                               <div className="space-y-2">
+                                {serversIncludeFlagshipModels(localAI.servers) && <FlagshipDetectionWarning />}
                                 <p className="text-xs font-medium text-text-secondary">Detected on your machine:</p>
                                 <div className="grid gap-2">
                                   {localAI.servers.map((server) => {
@@ -1469,7 +1875,7 @@ function SettingsPage() {
                             }
                           >
                             {updateLLM.isPending || testConnection.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                            Save & Test Connection
+                            Save and test connection
                           </Button>
                           {llmForm.provider === 'custom' && (!llmForm.base_url || !llmForm.model) && (
                             <p className="text-xs text-text-muted">Enter a base URL and model</p>
@@ -1486,13 +1892,17 @@ function SettingsPage() {
             )}
           </CardContent>
         </Card>
+        )}
+        </>
+        )}
 
         {/* ── Auto-Apply ─────────────────────────────────────── */}
+        {activeTab === 'auto-apply' && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Rocket className="h-4 w-4" />
-              Auto-Apply
+              Auto-apply
               <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-600 uppercase">Coming soon</span>
             </CardTitle>
           </CardHeader>
@@ -1521,6 +1931,7 @@ function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+        )}
       </div>
     </div>
   );

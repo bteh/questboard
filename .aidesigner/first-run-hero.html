@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<!--
+  AIDesigner artifact: first-run hero
+  run_id: dd9847b6-6d39-4555-9ad2-b3054b7fb104
+  generated: 2026-04-07
+  source_prompt: see git log + chat (P0 first-run UX rework)
+
+  This file is the visual reference for the React implementation at
+  frontend/src/components/onboarding/first-run-hero.tsx. It is NOT shipped
+  to users — it exists so future contributors can compare the implemented
+  React component against the original design intent.
+
+  Differences in the React port:
+  - Tailwind tokens use Launchboard's CSS vars (bg-bg-page, text-text-primary, brand)
+    instead of the shadcn defaults shown here.
+  - Icons use lucide-react, not phosphor.
+  - Animations are CSS-only (no JS animation libs).
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Launchboard - Let's start your job search</title>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'media',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        border: "hsl(var(--border))",
+                        input: "hsl(var(--input))",
+                        ring: "hsl(var(--ring))",
+                        background: "hsl(var(--background))",
+                        foreground: "hsl(var(--foreground))",
+                        brand: { DEFAULT: "hsl(var(--brand))", foreground: "hsl(var(--brand-foreground))" },
+                        muted: { DEFAULT: "hsl(var(--muted))", foreground: "hsl(var(--muted-foreground))" },
+                    },
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --background: 0 0% 100%;
+            --foreground: 240 10% 3.9%;
+            --muted: 240 4.8% 95.9%;
+            --muted-foreground: 240 3.8% 46.1%;
+            --border: 240 5.9% 90%;
+            --input: 240 5.9% 90%;
+            --brand: 239 84% 67%;
+            --brand-foreground: 0 0% 100%;
+            --ring: 239 84% 67%;
+            --radius: 0.5rem;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --background: 240 10% 3.9%;
+                --foreground: 0 0% 98%;
+                --muted: 240 3.7% 15.9%;
+                --muted-foreground: 240 5% 64.9%;
+                --border: 240 3.7% 15.9%;
+                --input: 240 3.7% 15.9%;
+            }
+        }
+        body {
+            background-color: hsl(var(--background));
+            color: hsl(var(--foreground));
+            -webkit-font-smoothing: antialiased;
+            overflow: hidden;
+        }
+        .dropzone-container { position: relative; z-index: 10; }
+        .dropzone-content { transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+        .dropzone-container:hover .dropzone-content {
+            background-color: hsla(var(--brand), 0.04);
+            border-color: hsla(var(--brand), 0.3);
+        }
+        .dropzone-container:hover .upload-icon {
+            color: hsl(var(--brand));
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body class="min-h-screen w-full flex flex-col relative font-sans">
+    <header class="absolute top-0 left-0 w-full p-6 flex items-center gap-2 opacity-70">
+        <div class="w-6 h-6 rounded bg-brand flex items-center justify-center shadow-sm">
+            <i class="ph ph-rocket-launch text-white text-xs"></i>
+        </div>
+        <span class="font-semibold text-sm tracking-tight text-foreground">Launchboard</span>
+    </header>
+    <main class="flex-1 flex flex-col items-center justify-center p-6 sm:p-12 w-full max-w-2xl mx-auto z-10">
+        <div class="text-center space-y-4 mb-10 w-full">
+            <h1 class="text-4xl sm:text-5xl font-semibold tracking-tight text-foreground text-balance">
+                Let's start your job search
+            </h1>
+            <p class="text-[15px] sm:text-base text-muted-foreground w-full max-w-lg mx-auto leading-relaxed flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-balance">
+                <span>Upload your resume</span>
+                <i class="ph ph-arrow-right text-xs opacity-50"></i>
+                <span>we'll suggest roles</span>
+                <i class="ph ph-arrow-right text-xs opacity-50"></i>
+                <span>search 14+ job boards</span>
+                <i class="ph ph-arrow-right text-xs opacity-50"></i>
+                <span class="text-foreground font-medium">see your best matches</span>
+            </p>
+        </div>
+        <div class="w-full dropzone-container cursor-pointer group mb-10" role="button" tabindex="0">
+            <div class="dropzone-content relative rounded-xl border border-dashed border-border bg-background/50 h-[220px] w-full flex flex-col items-center justify-center p-8 overflow-hidden shadow-sm">
+                <div class="h-16 w-16 mb-4 rounded-full bg-muted flex items-center justify-center shadow-sm transition-transform duration-300 group-hover:scale-105 group-hover:shadow-md group-hover:bg-background border border-border/50">
+                    <i class="ph ph-file-arrow-up text-2xl text-muted-foreground upload-icon transition-colors duration-300"></i>
+                </div>
+                <h3 class="text-lg font-medium text-foreground mb-1 group-hover:text-brand transition-colors">Drop or click to upload PDF resume</h3>
+                <p class="text-sm text-muted-foreground">Supported: PDF up to 5MB</p>
+            </div>
+        </div>
+        <div class="w-full max-w-md flex flex-col gap-3">
+            <label for="job-title" class="text-sm font-medium leading-none text-muted-foreground text-center">
+                or skip the resume — type a job title to try Launchboard first
+            </label>
+            <div class="flex items-center gap-2 mt-1">
+                <div class="relative flex-1">
+                    <i class="ph ph-magnifying-glass absolute left-3 text-lg top-1/2 -translate-y-1/2 text-muted-foreground"></i>
+                    <input
+                        type="text"
+                        id="job-title"
+                        placeholder="e.g. Senior Frontend Engineer"
+                        class="flex h-11 w-full rounded-lg border border-input bg-background pl-10 pr-3 py-2 text-sm text-foreground shadow-sm hover:border-muted-foreground/30"
+                    >
+                </div>
+                <button class="inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-medium bg-brand text-brand-foreground hover:bg-brand/90 hover:shadow-md h-11 px-5 shadow-sm">
+                    Search
+                </button>
+            </div>
+        </div>
+        <div class="mt-12 flex items-center justify-center gap-2 text-[13px] text-muted-foreground">
+            <i class="ph ph-shield-check text-base"></i>
+            <span>Your resume and AI keys stay on this computer. No account required.</span>
+        </div>
+    </main>
+    <footer class="absolute bottom-0 left-0 w-full p-8 flex justify-center z-20">
+        <a href="#" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors group">
+            Already have a resume saved? Use it
+            <i class="ph ph-arrow-right group-hover:translate-x-1 transition-transform"></i>
+        </a>
+    </footer>
+</body>
+</html>

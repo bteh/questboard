@@ -178,6 +178,70 @@ class CoverLetter(BaseModel):
     )
 
 
+class RequirementMatch(BaseModel):
+    """A single JD requirement mapped against the candidate's resume.
+
+    This is the "show your work" piece of the evaluation report: instead of
+    giving the user a single numeric score, we walk through each requirement
+    the job description asks for and show exactly how (or whether) the
+    candidate's resume backs it up. The `evidence` field should be a direct
+    quote from the resume — not a paraphrase — so the user can verify the
+    reasoning with their own eyes.
+
+    Inspired by the requirement-to-line mapping in career-ops's Block B.
+    """
+
+    requirement: str = Field(
+        description="The specific requirement pulled from the job description",
+    )
+    strength: str = Field(
+        description="strong (clearly demonstrated), partial (some evidence), missing (no evidence in resume)",
+    )
+    evidence: str = Field(
+        default="",
+        description="Exact quote from the candidate's resume that demonstrates this requirement. Empty if strength is 'missing'.",
+    )
+    mitigation: str = Field(
+        default="",
+        description="How to address this gap if strength is 'missing' or 'partial' (e.g., 'lean on your Docker experience and mention K8s certification in progress')",
+    )
+
+
+class EvaluationReport(BaseModel):
+    """Structured, interview-prep-ready evaluation of a job against the candidate.
+
+    Sibling to the 0-100 numeric JobScore. Where JobScore sorts jobs, this
+    report is the artifact a human actually reads before deciding whether to
+    apply — archetype, TL;DR, requirement-by-requirement match with exact
+    resume-line citations, gaps, recommended positioning, red flags.
+    """
+
+    archetype: str = Field(
+        default="",
+        description="Short human label for the role shape (e.g., 'AI Platform Engineer', 'Staff Frontend', 'ICU Nurse'). Helps the user recognize the role at a glance.",
+    )
+    tldr: str = Field(
+        default="",
+        description="One-sentence summary of what this role actually is and why it does or doesn't fit the candidate.",
+    )
+    requirements: list[RequirementMatch] = Field(
+        default_factory=list,
+        description="Each JD requirement mapped against the candidate's resume with exact-quote evidence.",
+    )
+    top_gaps: list[str] = Field(
+        default_factory=list,
+        description="The 3-5 most important gaps the candidate should be ready to explain or mitigate.",
+    )
+    recommended_framing: str = Field(
+        default="",
+        description="How the candidate should position themselves for this specific role — a 2-3 sentence narrative hook.",
+    )
+    red_flags: list[str] = Field(
+        default_factory=list,
+        description="Concerns about the role, company, or compensation worth raising before applying.",
+    )
+
+
 class CompanyIntel(BaseModel):
     """Intelligence gathered about a company."""
 

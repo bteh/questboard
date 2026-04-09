@@ -153,8 +153,10 @@ export function LocationListInput({
               </div>
               <div className="flex items-center gap-2">
                 <Select value={item.match_scope} onValueChange={(next) => updateScope(item.label, next as PlaceSelection['match_scope'])}>
-                  <SelectTrigger size="sm" className="min-w-[124px]">
-                    <SelectValue />
+                  <SelectTrigger size="sm" className="min-w-[140px]">
+                    <SelectValue>
+                      {(value) => getPlaceScopeLabel((value as PlaceSelection['match_scope']) ?? item.match_scope)}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent align="end">
                     {getPlaceScopeOptions(item).map((option) => (

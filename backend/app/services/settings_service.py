@@ -174,15 +174,31 @@ def detect_ollama() -> dict:
 
 
 def detect_local_ai() -> dict:
-    """Scan common localhost ports for OpenAI-compatible servers."""
+    """Scan common localhost ports for OpenAI-compatible servers.
+
+    We deliberately scan ONLY ports used by real local AI runtimes (LM Studio
+    and a couple of generic local-AI defaults). Ollama has its own dedicated
+    detection in detect_ollama() and is excluded here.
+
+    We previously also scanned 8317, 8741, and 3456 — the default ports for
+    cliproxyapi-style "wrap your Claude Code / Codex CLI / Gemini CLI OAuth
+    subscription as an OpenAI-compatible local server" tools. Those tools
+    re-export vendor flagship model IDs (claude-*, gpt-*, gemini-*) as if
+    they were a local runtime, but in reality they bill against the user's
+    consumer subscription quota — and using those quotas to power a backend
+    job-scoring loop violates Anthropic / OpenAI / Google's terms of service.
+    Auto-discovering them as a "click to connect" provider risked promoting
+    that gray area to mainstream users who couldn't tell what they were
+    actually wiring up.
+
+    Power users running cliproxyapi (or anything else exposing custom model
+    IDs) can still wire it up by hand via the Custom Provider section in the
+    advanced AI settings.
+    """
     import requests as http_requests
 
-    # Common ports for local AI servers (Ollama excluded — has its own detection)
     SCAN_PORTS = [
-        (8317, "AI proxy"),
-        (8741, "AI proxy"),
         (1234, "LM Studio"),
-        (3456, "AI proxy"),
         (5001, "Local AI"),
         (4000, "Local AI"),
     ]

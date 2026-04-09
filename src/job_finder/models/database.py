@@ -82,6 +82,7 @@ class ApplicationRecord(Base):
     # Application materials
     resume_tweaks_json = Column(Text, default="")  # ResumeOptimization as JSON
     cover_letter = Column(Text, default="")
+    evaluation_report_json = Column(Text, default="")  # EvaluationReport as JSON — per-JD requirement mapping, archetype, framing, red flags
 
     # Application method and profile
     application_method = Column(String(100), default="")  # manual, greenhouse, lever
@@ -216,6 +217,10 @@ def _migrate_db(engine) -> None:
             conn.execute(
                 text("ALTER TABLE applications ADD COLUMN salary_max_annualized FLOAT")
             )
+        if "evaluation_report_json" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN evaluation_report_json TEXT DEFAULT ''")
+            )
         # Convert empty job_url strings to NULL (allows multiple NULLs in unique column)
         conn.execute(text("UPDATE applications SET job_url = NULL WHERE job_url = ''"))
 
@@ -292,6 +297,7 @@ def save_application(
     company_intel_json: str | None = None,
     cover_letter: str = "",
     resume_tweaks_json: str = "",
+    evaluation_report_json: str = "",
     application_method: str = "",
     profile: str = "default",
     company_type: str = "Unknown",
@@ -396,6 +402,9 @@ def save_application(
                         if resume_tweaks_json and not cand.resume_tweaks_json:
                             cand.resume_tweaks_json = resume_tweaks_json
                             updated = True
+                        if evaluation_report_json and not cand.evaluation_report_json:
+                            cand.evaluation_report_json = evaluation_report_json
+                            updated = True
                         if search_run_id and cand.search_run_id != search_run_id:
                             cand.search_run_id = search_run_id
                             updated = True
@@ -452,6 +461,7 @@ def save_application(
             company_intel_json=company_intel_json or "",
             cover_letter=cover_letter,
             resume_tweaks_json=resume_tweaks_json,
+            evaluation_report_json=evaluation_report_json or "",
             application_method=application_method,
             profile=profile,
             company_type=company_type,

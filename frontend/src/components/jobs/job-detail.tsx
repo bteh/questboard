@@ -1,16 +1,17 @@
 import { useMemo, useState } from 'react';
-import { FileText, Mail, Pencil, Building2, Copy, Check, ExternalLink } from 'lucide-react';
+import { FileText, Mail, Pencil, Building2, Copy, Check, ExternalLink, Compass } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScoreBars } from '@/components/scores/score-bars';
 import { ScoreCircle } from '@/components/scores/score-circle';
 import { StrengthsGaps } from '@/components/scores/strengths-gaps';
 import { StatusBadge } from '@/components/badges/status-badge';
+import { EvaluationReportView } from '@/components/jobs/evaluation-report';
 import { useUpdateStatus } from '@/hooks/use-applications';
 import { STATUS_OPTIONS, STATUS_LABELS } from '@/utils/constants';
 import { cleanDescription } from '@/utils/format';
 import { toast } from 'sonner';
-import type { ApplicationResponse } from '@/types/application';
+import type { ApplicationResponse, EvaluationReport } from '@/types/application';
 
 interface JobDetailProps {
   app: ApplicationResponse;
@@ -175,6 +176,15 @@ export function JobDetail({ app }: JobDetailProps) {
   const updateStatus = useUpdateStatus();
   const companyIntel = useMemo(() => safeJsonParse(app.company_intel_json), [app.company_intel_json]);
   const resumeTweaks = useMemo(() => safeJsonParse(app.resume_tweaks_json), [app.resume_tweaks_json]);
+  const evaluationReport = useMemo<EvaluationReport | null>(() => {
+    const parsed = safeJsonParse(app.evaluation_report_json);
+    if (!parsed) return null;
+    // Defensive shape check — if the LLM returned an unexpected object we
+    // don't want to render garbage. The required fields are all optional in
+    // the schema, so just confirm it at least looks like an EvaluationReport.
+    if (typeof parsed !== 'object') return null;
+    return parsed as unknown as EvaluationReport;
+  }, [app.evaluation_report_json]);
 
   const handleStatusChange = (newStatus: string | null) => {
     if (!newStatus) return;
@@ -259,8 +269,14 @@ export function JobDetail({ app }: JobDetailProps) {
       )}
 
       {/* ─── Zone 3: Content Tabs ─── */}
-      <Tabs defaultValue="description" className="w-full">
+      <Tabs defaultValue={evaluationReport ? 'evaluation' : 'description'} className="w-full">
         <TabsList variant="line" className="w-full justify-start border-b border-border-default gap-0">
+          {evaluationReport && (
+            <TabsTrigger value="evaluation" className="text-xs gap-1.5">
+              <Compass className="h-3 w-3" />
+              Evaluation
+            </TabsTrigger>
+          )}
           <TabsTrigger value="description" className="text-xs gap-1.5">
             <FileText className="h-3 w-3" />
             Description
@@ -268,22 +284,30 @@ export function JobDetail({ app }: JobDetailProps) {
           {app.cover_letter && (
             <TabsTrigger value="cover-letter" className="text-xs gap-1.5">
               <Mail className="h-3 w-3" />
-              Cover Letter
+              Cover letter
             </TabsTrigger>
           )}
           {resumeTweaks && (
             <TabsTrigger value="resume" className="text-xs gap-1.5">
               <Pencil className="h-3 w-3" />
-              How to Tailor Your Resume
+              Resume tweaks
             </TabsTrigger>
           )}
           {companyIntel && (
             <TabsTrigger value="intel" className="text-xs gap-1.5">
               <Building2 className="h-3 w-3" />
-              Company Background
+              Company background
             </TabsTrigger>
           )}
         </TabsList>
+
+        {evaluationReport && (
+          <TabsContent value="evaluation" className="mt-3">
+            <div className="max-h-[560px] overflow-y-auto rounded-lg border border-border-default bg-bg-card p-4">
+              <EvaluationReportView report={evaluationReport} />
+            </div>
+          </TabsContent>
+        )}
 
         <TabsContent value="description" className="mt-3">
           <div className="relative">

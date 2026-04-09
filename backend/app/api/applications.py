@@ -81,6 +81,7 @@ def _to_response(record) -> ApplicationResponse:
         company_type=getattr(record, "company_type", "") or "",
         company_intel_json=record.company_intel_json or "",
         resume_tweaks_json=record.resume_tweaks_json or "",
+        evaluation_report_json=getattr(record, "evaluation_report_json", "") or "",
         cover_letter=record.cover_letter or "",
         application_method=getattr(record, "application_method", "") or "",
         profile=getattr(record, "profile", "default") or "default",

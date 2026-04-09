@@ -4,6 +4,7 @@ import { Route as rootRoute } from './__root';
 import {
   LayoutGrid, List, Search, X, SlidersHorizontal, Inbox, SearchX,
   ArrowUpDown, ChevronLeft, ChevronRight, Rocket, LinkIcon, Loader2, Trash2,
+  Sparkles, Filter,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -110,11 +111,16 @@ function ApplicationsPage() {
   const [searchInput, setSearchInput] = useState('');
   const [selectedJobId, setSelectedJobId] = useState<number | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Default filter: only Strong Apply (>=70) matches. Career-ops philosophy:
+  // target 5 well-matched roles instead of 50 generic blasts. The user can
+  // one-click "Show all tracked jobs" to drop the filter.
+  const STRONG_MATCH_THRESHOLD = 70;
   const [filters, setFilters] = useState<ApplicationFilters>({
     sort_by: 'overall_score',
     sort_order: 'desc',
     page: 1,
     page_size: 25,
+    min_score: STRONG_MATCH_THRESHOLD,
   });
 
   const { data, isLoading } = useApplications({ ...filters, profile, search_run_id: effectiveRunId });
@@ -142,6 +148,14 @@ function ApplicationsPage() {
       page: 1,
       page_size: 25,
     });
+  }, []);
+
+  const isStrongMatchesOnly = filters.min_score === STRONG_MATCH_THRESHOLD;
+  const showAllTrackedJobs = useCallback(() => {
+    setFilters((prev) => ({ ...prev, min_score: undefined, page: 1 }));
+  }, []);
+  const focusOnStrongMatches = useCallback(() => {
+    setFilters((prev) => ({ ...prev, min_score: STRONG_MATCH_THRESHOLD, page: 1 }));
   }, []);
 
   const items = data?.items || [];
@@ -214,6 +228,48 @@ function ApplicationsPage() {
           )}
         </div>
       </div>
+
+      {/* Strong-matches-only banner — the philosophy: apply to fewer, better jobs. */}
+      {isStrongMatchesOnly ? (
+        <div className="mt-4 flex flex-col gap-3 rounded-xl border border-brand/20 bg-brand-light/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand/10">
+              <Sparkles className="h-4 w-4 text-brand" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-text-primary">Showing your strongest matches</p>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-text-tertiary">
+                Launchboard is designed to help you apply to fewer, better jobs — not more jobs.
+                Every application a human reads costs someone's attention.
+              </p>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={showAllTrackedJobs}
+            className="shrink-0"
+          >
+            Show all tracked jobs
+          </Button>
+        </div>
+      ) : (
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-border-default bg-bg-subtle/50 px-4 py-2.5">
+          <div className="flex items-center gap-2 text-xs text-text-muted">
+            <Filter className="h-3.5 w-3.5" />
+            Showing every tracked job — including ones Launchboard didn't rate as a strong match.
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={focusOnStrongMatches}
+            className="shrink-0 text-brand hover:text-brand-hover"
+          >
+            <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+            Focus on strong matches
+          </Button>
+        </div>
+      )}
 
       {/* Toolbar: Search + Filters toggle + View toggle */}
       <div className="flex items-center gap-3 mt-4 mb-3">

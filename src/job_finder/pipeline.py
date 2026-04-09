@@ -30,10 +30,12 @@ from job_finder.prompts import (
     COMPANY_RESEARCHER_USER_TEMPLATE,
     COMPANY_RESEARCHER_GROUNDED_USER_TEMPLATE,
     COVER_LETTER_USER_TEMPLATE,
+    EVALUATION_REPORT_USER_TEMPLATE,
     JD_SCORER_USER_TEMPLATE,
     RESUME_OPTIMIZER_USER_TEMPLATE,
     build_company_researcher_prompt,
     build_cover_letter_prompt,
+    build_evaluation_report_prompt,
     build_resume_optimizer_prompt,
     build_scorer_prompt,
 )
@@ -1631,6 +1633,38 @@ class JobFinderPipeline:
         cl_prompt = build_cover_letter_prompt(self.config)
         return self.llm.chat_json(cl_prompt, user_msg)
 
+    # -- Stage 5b: Evaluation report (LLM only) ---------------------------
+
+    def generate_evaluation_report(self, job: dict, resume_text: str) -> dict | None:
+        """Produce a structured per-job evaluation report.
+
+        Walks through each JD requirement and maps it to exact quotes from
+        the candidate's resume (Block B in career-ops parlance), plus
+        archetype detection, recommended framing, and red flags. This is the
+        artifact the user reads before deciding to apply — not a sort key.
+
+        Returns None when the LLM is unavailable so the pipeline continues
+        to work without deep evaluation.
+        """
+        if not self.llm or not self.llm.is_configured:
+            return None
+
+        user_msg = EVALUATION_REPORT_USER_TEMPLATE.format(
+            resume_text=resume_text,
+            job_title=job.get("title", ""),
+            company=job.get("company", ""),
+            location=job.get("location", ""),
+            job_description=job.get("description", ""),
+            overall_score=job.get("overall_score", "N/A"),
+            recommendation=job.get("recommendation", "N/A"),
+            key_strengths=json.dumps(job.get("key_strengths", [])),
+            key_gaps=json.dumps(job.get("key_gaps", [])),
+        )
+        eval_prompt = build_evaluation_report_prompt(self.config)
+        # Reports can be long — STAR+R reflections, per-requirement evidence,
+        # recommended framing. Give the model room to produce the full object.
+        return self.llm.chat_json(eval_prompt, user_msg, max_tokens=6144)
+
     # -- Stage 6: Company research (LLM only) -----------------------------
 
     def research_company(
@@ -1825,10 +1859,13 @@ class JobFinderPipeline:
                 if progress:
                     progress(f"  Enhancing {i}/{len(strong)}: {job.get('company', '')}")
 
-                # Run all 3 LLM calls for this job in parallel
+                # Run all 4 LLM calls for this job in parallel. The evaluation
+                # report is the biggest call (walks every JD requirement) but
+                # we only run it for STRONG_APPLY jobs to keep cost bounded.
                 tweaks = None
                 cl = None
                 intel = None
+                report = None
 
                 def _get_tweaks() -> None:
                     nonlocal tweaks
@@ -1846,11 +1883,17 @@ class JobFinderPipeline:
                         job.get("company", ""), job.get("title", ""), fast=True
                     )
 
-                with ThreadPoolExecutor(max_workers=3) as inner_pool:
+                def _get_report() -> None:
+                    nonlocal report
+                    if job.get("recommendation") == "STRONG_APPLY":
+                        report = self.generate_evaluation_report(job, resume_text)
+
+                with ThreadPoolExecutor(max_workers=4) as inner_pool:
                     inner_futures = [
                         inner_pool.submit(_get_tweaks),
                         inner_pool.submit(_get_cover_letter),
                         inner_pool.submit(_get_intel),
+                        inner_pool.submit(_get_report),
                     ]
                     for f in inner_futures:
                         f.result()
@@ -1865,8 +1908,10 @@ class JobFinderPipeline:
                     job["funding_stage"] = intel.get("funding_stage", "")
                     job["total_funding"] = intel.get("total_funding", "")
                     job["employee_count"] = intel.get("employee_count", "")
+                if report:
+                    job["evaluation_report_json"] = json.dumps(report)
 
-                return bool(tweaks or cl or intel)
+                return bool(tweaks or cl or intel or report)
 
             # Parallelize across jobs (cap at 5 for speed vs rate limits)
             with ThreadPoolExecutor(max_workers=5) as pool:
@@ -1925,6 +1970,7 @@ class JobFinderPipeline:
                 employee_count=job.get("employee_count"),
                 company_intel_json=job.get("company_intel_json"),
                 resume_tweaks_json=job.get("resume_tweaks_json"),
+                evaluation_report_json=job.get("evaluation_report_json", ""),
                 cover_letter=job.get("cover_letter"),
                 application_method=job.get("application_method", ""),
                 profile=self.profile_name,

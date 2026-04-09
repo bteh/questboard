@@ -16,6 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { PageHeader } from '@/components/layout/page-header';
 import { PipelineSteps } from '@/components/shared/pipeline-steps';
+import { ConnectAiPopover } from '@/components/onboarding/connect-ai-popover';
 import { useStartSearch, useSearchDefaults, useSuggestSearch } from '@/hooks/use-search';
 import { toast } from 'sonner';
 import { useLLMStatus } from '@/hooks/use-settings';
@@ -218,6 +219,31 @@ function SearchPage() {
       logRef.current.scrollTop = logRef.current.scrollHeight;
     }
   }, [messages]);
+
+  // First-run hand-off: when the brand-new user's very first search completes,
+  // ship them straight to the results so they don't get stranded staring at
+  // the run log. Only fires once — the flag is set in the onboarding wizard
+  // and FirstRunHero quick-search path, then cleared here.
+  useEffect(() => {
+    if (state !== 'completed' || !runId) return;
+    let pending: string | null = null;
+    try {
+      pending = window.localStorage.getItem('launchboard:first-run-pending');
+    } catch {
+      pending = null;
+    }
+    if (pending !== '1') return;
+    try {
+      window.localStorage.removeItem('launchboard:first-run-pending');
+    } catch {
+      // ignore
+    }
+    toast.success('Your first search is ready — opening your top matches.');
+    navigate({
+      to: '/applications',
+      search: { run: runId, scope: undefined },
+    });
+  }, [state, runId, navigate]);
 
   const llmAvailable = llm?.available ?? false;
   const searchAreaSummary = getSearchAreaSummary(workplacePreference, locations, 'search');
@@ -556,10 +582,12 @@ function SearchPage() {
                     Start with basic search now. Connect AI when you want resume-fit ranking, search suggestions, target-company autofill, and tailored draft materials.
                   </p>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => navigate({ to: '/settings' })} className="shrink-0">
-                  <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-                  Connect AI
-                </Button>
+                <ConnectAiPopover side="bottom" align="end">
+                  <Button variant="outline" size="sm" className="shrink-0">
+                    <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                    Connect AI
+                  </Button>
+                </ConnectAiPopover>
               </div>
             </div>
           )}
@@ -616,7 +644,7 @@ function SearchPage() {
                     <SearchIcon className="h-4.5 w-4.5 text-brand" />
                   </div>
                   <div>
-                    <CardTitle className="text-base">Search Configuration</CardTitle>
+                    <CardTitle className="text-base">Search configuration</CardTitle>
                     <p className="text-xs text-text-tertiary mt-0.5">Define what you're looking for</p>
                   </div>
                 </div>
@@ -660,7 +688,7 @@ function SearchPage() {
                       </p>
                       <p className="text-xs text-text-muted mt-1">
                         {onboarding?.resume.exists
-                          ? 'Launchboard can derive a first search from your resume right away. Connect AI in Settings if you want auto-fill, deeper fit ranking, and drafting.'
+                          ? 'Launchboard can derive a first search from your resume right away. Connect AI from the sidebar if you want auto-fill, deeper fit ranking, and drafting.'
                           : 'This gets you basic search right away. Upload a resume and connect AI later if you want auto-fill and deeper ranking.'}
                       </p>
                     </div>
@@ -1091,7 +1119,7 @@ function SearchPage() {
   // ── Running / Completed / Failed: full-width execution view ────────
   return (
     <div className="flex flex-col" style={{ minHeight: 'calc(100vh - 6rem)' }}>
-      <PageHeader title="Run Search" description="Search for jobs across multiple sources" />
+      <PageHeader title="Run search" description="Search for jobs across multiple sources" />
 
       <div className="mb-6">
         <PipelineSteps
@@ -1152,7 +1180,7 @@ function SearchPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Button onClick={handleReset} variant="outline" size="sm">New Search</Button>
+              <Button onClick={handleReset} variant="outline" size="sm">New search</Button>
               <Button size="sm" onClick={() => navigate({ to: '/applications', search: { run: runId ?? undefined, scope: undefined } })}>
                 View {result.jobs_found} Jobs <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
               </Button>
@@ -1178,10 +1206,12 @@ function SearchPage() {
                   Connect AI to rerank by resume fit and unlock cover letters, company notes, and application prep.
                 </p>
               </div>
-              <Button variant="outline" size="sm" onClick={() => navigate({ to: '/settings' })} className="shrink-0">
-                <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-                Connect AI
-              </Button>
+              <ConnectAiPopover side="bottom" align="end">
+                <Button variant="outline" size="sm" className="shrink-0">
+                  <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                  Connect AI
+                </Button>
+              </ConnectAiPopover>
             </div>
           )}
         </div>

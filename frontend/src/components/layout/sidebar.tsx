@@ -5,6 +5,7 @@ import { useLLMStatus } from '@/hooks/use-settings';
 import { useTheme } from '@/contexts/theme-context';
 import { useWorkspace } from '@/contexts/workspace-context';
 import { Button } from '@/components/ui/button';
+import { ConnectAiPopover } from '@/components/onboarding/connect-ai-popover';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
@@ -133,21 +134,31 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* LLM Connection */}
-      <div className="border-t border-border-default px-4 py-3">
-        <div className="flex items-center gap-2" role="status" aria-label={`LLM: ${llm?.available ? 'connected' : llm?.configured ? 'disconnected' : 'not connected'}`}>
-          <div
-            className={cn(
-              'h-1.5 w-1.5 rounded-full shrink-0',
-              llm?.available ? 'bg-success' : llm?.configured ? 'bg-danger' : 'bg-text-faint'
-            )}
-            aria-hidden="true"
-          />
-          <Zap className="h-3.5 w-3.5 text-text-muted shrink-0" />
-          <span className="text-xs text-text-muted truncate">
-            {llm?.available ? getAiLabel(llm.provider, llm.label) : llm?.configured ? 'Disconnected' : 'Connect AI'}
-          </span>
-        </div>
+      {/* LLM connection — clickable to open inline connect popover */}
+      <div className="border-t border-border-default">
+        <ConnectAiPopover side="top" align="start">
+          <button
+            type="button"
+            className="flex w-full items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-bg-subtle"
+            aria-label={`AI: ${llm?.available ? 'connected' : llm?.configured ? 'disconnected' : 'not connected'}. Click to manage.`}
+          >
+            <span
+              className={cn(
+                'h-1.5 w-1.5 rounded-full shrink-0',
+                llm?.available ? 'bg-success' : llm?.configured ? 'bg-danger' : 'bg-text-faint',
+              )}
+              aria-hidden="true"
+            />
+            <Zap className="h-3.5 w-3.5 text-text-muted shrink-0" />
+            <span className="text-xs text-text-muted truncate flex-1">
+              {llm?.available
+                ? getAiLabel(llm.provider, llm.label)
+                : llm?.configured
+                  ? 'Disconnected'
+                  : 'Connect AI'}
+            </span>
+          </button>
+        </ConnectAiPopover>
       </div>
     </aside>
   );

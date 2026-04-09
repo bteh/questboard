@@ -316,21 +316,16 @@ async function clickWhenStable(page, locator, timeoutMs = 30_000) {
 async function completeFirstRun(page) {
   log('Running first-launch onboarding flow');
 
+  // The wizard now opens directly on the resume step (no welcome step) and is
+  // 2 steps total (resume → search). The auto-advance to "What are you looking
+  // for?" happens automatically after the resume upload analysis returns.
   await page.goto(frontendUrl, { waitUntil: 'domcontentloaded' });
-  await page.getByTestId('onboarding-start').waitFor();
-  await clickWhenStable(page, page.getByTestId('onboarding-start'));
-
   await page.getByRole('heading', { name: 'Upload Your Resume' }).waitFor();
   const resumeInput = page.getByTestId('onboarding-resume-input');
   await resumeInput.setInputFiles(process.env.LAUNCHBOARD_SMOKE_RESUME_PATH);
 
-  const aiHeading = page.getByRole('heading', { name: 'Connect AI to unlock Launchboard' });
   const preferencesHeading = page.getByRole('heading', { name: 'What are you looking for?' });
-  const nextStep = await waitForVisible(page, [aiHeading, preferencesHeading], 35_000);
-  if (nextStep === aiHeading) {
-    await clickWhenStable(page, page.getByTestId('onboarding-skip-ai'));
-    await preferencesHeading.waitFor();
-  }
+  await preferencesHeading.waitFor({ timeout: 35_000 });
 
   const rolesInput = page.getByTestId('onboarding-roles-input');
   await rolesInput.fill('Data Platform Engineering Manager');

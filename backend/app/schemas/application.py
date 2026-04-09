@@ -43,6 +43,7 @@ class ApplicationResponse(ApplicationBase):
     company_type: str = ""
     company_intel_json: str = ""
     resume_tweaks_json: str = ""
+    evaluation_report_json: str = ""
     cover_letter: str = ""
     application_method: str = ""
     profile: str = "default"

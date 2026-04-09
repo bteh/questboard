@@ -50,6 +50,8 @@ Thumbs.db
 
 # Claude / Tooling
 .claude/
+.agents/
+.mcp.json
 
 # Stray pip artifacts
 =*
@@ -57,3 +59,6 @@ data/workspaces/
 data/settings_audit.log
 .desktop-build/
 test-results/
+.aidesigner/*
+!.aidesigner/.gitkeep
+!.aidesigner/first-run-hero.html

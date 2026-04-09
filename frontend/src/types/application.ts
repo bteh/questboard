@@ -1,3 +1,19 @@
+export interface RequirementMatch {
+  requirement: string;
+  strength: 'strong' | 'partial' | 'missing';
+  evidence: string;
+  mitigation: string;
+}
+
+export interface EvaluationReport {
+  archetype: string;
+  tldr: string;
+  requirements: RequirementMatch[];
+  top_gaps: string[];
+  recommended_framing: string;
+  red_flags: string[];
+}
+
 export interface ApplicationBase {
   job_title: string;
   company: string;
@@ -31,6 +47,7 @@ export interface ApplicationResponse extends ApplicationBase {
   company_type: string;
   company_intel_json: string;
   resume_tweaks_json: string;
+  evaluation_report_json: string;
   cover_letter: string;
   application_method: string;
   profile: string;

@@ -8,9 +8,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { PageHeader } from '@/components/layout/page-header';
 import { JobCard } from '@/components/jobs/job-card';
 import { ActivityItem } from '@/components/shared/activity-item';
+import { FirstRunHero } from '@/components/onboarding/first-run-hero';
+import { ReadyToLaunchHero } from '@/components/onboarding/ready-to-launch-hero';
 import { useDashboardStats } from '@/hooks/use-analytics';
 import { useApplications } from '@/hooks/use-applications';
 import { pickLatestCompletedRun, useSearchRuns } from '@/hooks/use-search';
+import { useOnboardingState } from '@/hooks/use-workspace';
 import { useProfile } from '@/contexts/profile-context';
 import { useSearchContext } from '@/contexts/search-context';
 import { useSourceLabels } from '@/hooks/use-scrapers';
@@ -26,7 +29,8 @@ function DashboardPage() {
   const { profile } = useProfile();
   const { state: searchState } = useSearchContext();
   const sourceLabels = useSourceLabels();
-  const { data: runs } = useSearchRuns(10);
+  const { data: runs, isLoading: runsLoading } = useSearchRuns(10);
+  const { data: onboarding, isLoading: onboardingLoading } = useOnboardingState();
   const latestCompletedRun = useMemo(() => pickLatestCompletedRun(runs), [runs]);
   const latestRunId = latestCompletedRun?.run_id;
   const { data: stats, isLoading: statsLoading } = useDashboardStats(latestRunId);
@@ -49,9 +53,31 @@ function DashboardPage() {
   const topJobs = appData?.items || [];
   const recentActivity = useMemo(() => recentData?.items?.slice(0, 5) || [], [recentData?.items]);
 
+  // Two pre-search empty states, both ahead of the populated dashboard:
+  //   1. true first run — no resume, no roles, no preferences saved → upload hero
+  //   2. ready to launch — wizard finished, preferences saved, but Start
+  //      hasn't been clicked yet → "you're ready" review hero
+  // Once a search has actually started, fall through to the populated
+  // dashboard layout below. NB: this branch must come AFTER all hooks above
+  // to keep hook ordering stable.
+  const dataReady = !runsLoading && !onboardingLoading && onboarding != null;
+  const noRunStarted = dataReady && !onboarding.has_started_search && (!runs || runs.length === 0);
+  const hasAnyPreferences =
+    dataReady &&
+    (onboarding.resume.exists ||
+      onboarding.preferences.roles.length > 0 ||
+      onboarding.preferences.keywords.length > 0);
+
+  if (noRunStarted && searchState === 'idle') {
+    if (hasAnyPreferences) {
+      return <ReadyToLaunchHero />;
+    }
+    return <FirstRunHero />;
+  }
+
   const metrics = [
-    { label: 'Total Found', value: stats?.total_jobs ?? 0, icon: Briefcase, bg: 'bg-brand-light', fg: 'text-brand' },
-    { label: 'Strong Matches', value: stats?.strong_apply_count ?? 0, icon: Star, bg: 'bg-brand-light', fg: 'text-brand' },
+    { label: 'Total found', value: stats?.total_jobs ?? 0, icon: Briefcase, bg: 'bg-brand-light', fg: 'text-brand' },
+    { label: 'Strong matches', value: stats?.strong_apply_count ?? 0, icon: Star, bg: 'bg-brand-light', fg: 'text-brand' },
     { label: 'Applied', value: stats?.applied_count ?? 0, icon: Send, bg: 'bg-brand-light', fg: 'text-brand' },
     { label: 'Interviewing', value: stats?.interviewing_count ?? 0, icon: Phone, bg: 'bg-brand-light', fg: 'text-brand' },
   ];
@@ -64,9 +90,9 @@ function DashboardPage() {
           size="sm"
         >
           {searchState === 'running' ? (
-            <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Searching...</>
+            <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Searching…</>
           ) : (
-            <><Search className="h-4 w-4 mr-2" /> New Search</>
+            <><Search className="h-4 w-4 mr-2" /> New search</>
           )}
         </Button>
       </PageHeader>
@@ -108,11 +134,11 @@ function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Top Opportunities */}
+        {/* Top opportunities */}
         <div className="lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-text-primary">
-              {latestRunId ? 'Top Matches From Your Latest Search' : 'Top Opportunities'}
+              {latestRunId ? 'Top matches from your latest search' : 'Top opportunities'}
             </h2>
             {topJobs.length > 0 && (
               <Link to="/applications" search={{ run: latestRunId ?? undefined, scope: latestRunId ? undefined : 'all' }} className="text-sm text-brand hover:text-brand-hover transition-colors inline-flex items-center gap-1">
@@ -139,10 +165,10 @@ function DashboardPage() {
                   </p>
                   <div className="flex items-center gap-3">
                     <Button onClick={() => navigate({ to: '/search' })} size="sm">
-                      <Search className="h-4 w-4 mr-2" /> Refine Search
+                      <Search className="h-4 w-4 mr-2" /> Refine search
                     </Button>
                     <Button onClick={() => navigate({ to: '/applications', search: { scope: 'all', run: undefined } })} variant="outline" size="sm">
-                      Browse History
+                      Browse history
                     </Button>
                   </div>
                 </>
@@ -153,7 +179,7 @@ function DashboardPage() {
                     Search multiple job boards at once, see which jobs match your skills and experience, and track your applications — all in one place.
                   </p>
                   <Button onClick={() => navigate({ to: '/search' })} size="sm">
-                    <Search className="h-4 w-4 mr-2" /> Start Your First Search
+                    <Search className="h-4 w-4 mr-2" /> Start your first search
                   </Button>
                 </>
               )}
@@ -167,10 +193,10 @@ function DashboardPage() {
           )}
         </div>
 
-        {/* Recent Activity */}
+        {/* Recent activity */}
         <div>
           <h2 className="text-lg font-semibold text-text-primary mb-4">
-            {latestRunId ? 'Recent Matches' : 'Recent Activity'}
+            {latestRunId ? 'Recent matches' : 'Recent activity'}
           </h2>
           <Card>
             <CardContent className="p-4">
