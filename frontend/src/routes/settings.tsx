@@ -31,6 +31,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useLLMStatus, useLLMPresets, useProviderModels, useDetectOllama, useDetectLocalAI, useTestConnection, useUpdateLLM } from '@/hooks/use-settings';
 import { useOnboardingState, useSaveWorkspacePreferences, useUploadWorkspaceResume } from '@/hooks/use-workspace';
+import { useOnboarding } from '@/hooks/use-onboarding';
 import { useWorkspace } from '@/contexts/workspace-context';
 import { buildDefaultWorkspacePreferences, LEVEL_OPTIONS } from '@/lib/profile-preferences';
 import { POPULAR_PROVIDER_CHOICES, getPopularProviderPresets, isPopularProvider } from '@/lib/llm-choice';
@@ -200,7 +201,15 @@ function SettingsPage() {
   const { data: onboarding } = useOnboardingState();
   const savePreferences = useSaveWorkspacePreferences();
   const uploadResume = useUploadWorkspaceResume();
+  const { markIncomplete: markOnboardingIncomplete } = useOnboarding();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleRestartOnboarding = () => {
+    markOnboardingIncomplete();
+    toast.success('Onboarding will re-open on the next page load.');
+    // Bounce to dashboard so the gate has a chance to re-render the wizard.
+    navigate({ to: '/' });
+  };
 
   const derivedLlmForm = useMemo<LLMConfig>(() => {
     if (!llm) {
@@ -444,6 +453,18 @@ function SettingsPage() {
               {onboarding?.resume.exists ? 'Replace resume' : 'Upload resume PDF'}
             </Button>
             <input ref={fileInputRef} type="file" accept=".pdf,application/pdf" className="hidden" onChange={handleUpload} />
+
+            {/* First-run helpers — small, unobtrusive recovery affordance for
+                users who dismissed the wizard and want to see it again. */}
+            <div className="border-t border-border-default pt-3">
+              <button
+                type="button"
+                onClick={handleRestartOnboarding}
+                className="text-xs text-text-muted transition-colors hover:text-text-secondary"
+              >
+                Restart the first-run walkthrough
+              </button>
+            </div>
           </CardContent>
         </Card>
         )}

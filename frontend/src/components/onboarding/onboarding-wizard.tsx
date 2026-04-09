@@ -8,6 +8,7 @@ import {
   Shield,
   Sparkles,
   Upload,
+  X,
 } from 'lucide-react';
 
 import { SimpleLocationInput } from '@/components/onboarding/simple-location-input';
@@ -33,7 +34,17 @@ const STEPS: Step[] = ['resume', 'search'];
 
 interface OnboardingWizardProps {
   open: boolean;
+  /** Fired when the user finishes the wizard by clicking Save and continue. */
   onComplete: () => void;
+  /**
+   * Fired when the user dismisses the wizard without finishing it — the X
+   * button in the corner, or (if you want to) any of the "Skip" affordances.
+   * This is how we keep non-technical users from getting trapped: closing
+   * the wizard once sticks across reloads via useOnboarding's localStorage
+   * flag. Defaults to onComplete for backwards compatibility with callers
+   * that don't care about the distinction.
+   */
+  onDismiss?: () => void;
 }
 
 /**
@@ -51,7 +62,8 @@ interface OnboardingWizardProps {
  * Test IDs preserved for the Playwright smoke harness:
  *   onboarding-resume-input, onboarding-roles-input, onboarding-save-search.
  */
-export function OnboardingWizard({ open, onComplete }: OnboardingWizardProps) {
+export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWizardProps) {
+  const handleDismiss = onDismiss ?? onComplete;
   const navigate = useNavigate();
   const { data } = useOnboardingState(open);
   const uploadResume = useUploadWorkspaceResume();
@@ -171,8 +183,20 @@ export function OnboardingWizard({ open, onComplete }: OnboardingWizardProps) {
   const isUploading = uploadResume.isPending;
 
   return (
-    <Dialog open={open}>
+    <Dialog open={open} onOpenChange={(next) => { if (!next) handleDismiss(); }}>
       <DialogContent showCloseButton={false} className="sm:max-w-xl p-0 overflow-hidden">
+        {/* Close button — positioned absolutely so it doesn't fight the
+            step indicator for layout space. Dismissing via this button
+            persists to localStorage so the wizard stays closed on reload. */}
+        <button
+          type="button"
+          onClick={handleDismiss}
+          aria-label="Close onboarding"
+          className="absolute right-3 top-3 z-10 flex h-7 w-7 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-bg-subtle hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-bg-card"
+        >
+          <X className="h-4 w-4" />
+        </button>
+
         {/* Step indicator — minimal, two dots */}
         <div className="flex justify-center gap-1.5 pt-5">
           {STEPS.map((value) => (

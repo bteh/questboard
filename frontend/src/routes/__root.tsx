@@ -52,22 +52,16 @@ const PAGE_TITLES: Record<string, string> = {
 function OnboardingGate() {
   const { isLoading, error, isAuthenticated, hostedMode } = useWorkspace();
   const { shouldShow, dismiss } = useOnboarding();
-  const [dismissed, setDismissed] = useState(false);
 
   if (isLoading) return null;
   if (error) return null;
   if (hostedMode && !isAuthenticated) return null;
-  if (!shouldShow || dismissed) return null;
+  if (!shouldShow) return null;
 
-  return (
-    <OnboardingWizard
-      open
-      onComplete={() => {
-        dismiss();
-        setDismissed(true);
-      }}
-    />
-  );
+  // `dismiss` persists to localStorage via useOnboarding, so closing the
+  // wizard once sticks across reloads. Users can still bring it back
+  // explicitly from Settings → Restart onboarding.
+  return <OnboardingWizard open onComplete={dismiss} onDismiss={dismiss} />;
 }
 
 function HostedAuthScreen() {
