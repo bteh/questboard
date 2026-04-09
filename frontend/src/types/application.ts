@@ -14,6 +14,33 @@ export interface EvaluationReport {
   red_flags: string[];
 }
 
+export interface BulletTweak {
+  /** The original bullet as it currently appears on the candidate's resume. */
+  original_bullet: string;
+  /** The rewritten version tailored to the target job. */
+  tweaked_bullet: string;
+  /** Why this change improves the match — shown as helper text. */
+  rationale: string;
+  /** Keywords from the JD this rewrite now addresses. */
+  target_keywords: string[];
+}
+
+/**
+ * The resume-optimizer LLM call returns this shape. Mirrors
+ * src/job_finder/models/schemas.py::ResumeOptimization. Every field is
+ * optional because the LLM may skip sections that don't apply.
+ */
+export interface ResumeOptimization {
+  job_title?: string;
+  company?: string;
+  bullet_tweaks?: BulletTweak[];
+  keywords_to_add?: string[];
+  sections_to_emphasize?: string[];
+  title_suggestion?: string;
+  summary_rewrite?: string;
+  ats_compatibility_notes?: string[];
+}
+
 export interface ApplicationBase {
   job_title: string;
   company: string;

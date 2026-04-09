@@ -7,11 +7,12 @@ import { ScoreCircle } from '@/components/scores/score-circle';
 import { StrengthsGaps } from '@/components/scores/strengths-gaps';
 import { StatusBadge } from '@/components/badges/status-badge';
 import { EvaluationReportView } from '@/components/jobs/evaluation-report';
+import { ResumeTweaksPanel } from '@/components/jobs/resume-tweaks-panel';
 import { useUpdateStatus } from '@/hooks/use-applications';
 import { STATUS_OPTIONS, STATUS_LABELS } from '@/utils/constants';
 import { cleanDescription } from '@/utils/format';
 import { toast } from 'sonner';
-import type { ApplicationResponse, EvaluationReport } from '@/types/application';
+import type { ApplicationResponse, EvaluationReport, ResumeOptimization } from '@/types/application';
 
 interface JobDetailProps {
   app: ApplicationResponse;
@@ -175,7 +176,11 @@ function CopyButton({ text, label }: { text: string; label: string }) {
 export function JobDetail({ app }: JobDetailProps) {
   const updateStatus = useUpdateStatus();
   const companyIntel = useMemo(() => safeJsonParse(app.company_intel_json), [app.company_intel_json]);
-  const resumeTweaks = useMemo(() => safeJsonParse(app.resume_tweaks_json), [app.resume_tweaks_json]);
+  const resumeTweaks = useMemo<ResumeOptimization | null>(() => {
+    const parsed = safeJsonParse(app.resume_tweaks_json);
+    if (!parsed || typeof parsed !== 'object') return null;
+    return parsed as unknown as ResumeOptimization;
+  }, [app.resume_tweaks_json]);
   const evaluationReport = useMemo<EvaluationReport | null>(() => {
     const parsed = safeJsonParse(app.evaluation_report_json);
     if (!parsed) return null;
@@ -333,8 +338,8 @@ export function JobDetail({ app }: JobDetailProps) {
 
         {resumeTweaks && (
           <TabsContent value="resume" className="mt-3">
-            <div className="text-sm text-text-secondary overflow-auto max-h-[400px] bg-bg-card p-4 rounded-lg border border-border-default">
-              <KeyValueDisplay data={resumeTweaks} />
+            <div className="overflow-auto max-h-[560px] rounded-lg border border-border-default bg-bg-card p-4">
+              <ResumeTweaksPanel tweaks={resumeTweaks} />
             </div>
           </TabsContent>
         )}
