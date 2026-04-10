@@ -412,14 +412,22 @@ async def get_search_defaults(
 
 _SUGGEST_PROMPT = """Analyze the resume and return valid JSON with these keys:
 
-- "roles": 6-10 job titles to search for, matching the resume's seniority level. Include title variations.
-- "keywords": 8-12 domain-specific terms from their experience that appear in relevant job postings. No generic words.
+- "roles": 6-15 job titles to search for, matching the resume's seniority level. Include title variations and adjacent roles they'd be qualified for.
+- "keywords": 10-20 domain-specific terms from their experience that appear in relevant job postings. Include tools, frameworks, methodologies, and certifications. No generic words like "leadership" or "teamwork".
 - "locations": up to 3 locations from the resume. Only include locations you are confident about.
 - "summary": one-sentence candidate profile summary.
-- "companies": 12-20 companies this person should target. Mix large employers, growth-stage, and smaller/emerging organizations. Examples by field:
-  Tech: Stripe, Databricks, RunwayML. Healthcare: Kaiser, One Medical, Cityblock. Finance: JPMorgan, Brex, Ramp. Media: Netflix, A24, Spotify. Education: Khan Academy, Coursera. Adapt to the resume's actual field.
+- "companies": 30-50 companies this person should target. This is critical — cast a wide net across ALL of these tiers:
+  1. LARGE/ESTABLISHED (8-12): Major employers in their field that frequently hire for these roles.
+  2. GROWTH-STAGE (8-12): Well-funded startups and scale-ups (Series B-D) in their domain.
+  3. NICHE/EMERGING (8-12): Smaller companies, boutique firms, or early-stage startups doing interesting work in their specific niche. These are the hidden gems most job boards miss.
+  4. ADJACENT-INDUSTRY (5-10): Companies outside their primary industry that hire similar roles (e.g. a data engineer's list should include fintech, healthtech, climate tech, defense tech, not just pure tech companies).
+  Be specific to the resume's actual field and seniority. Include companies the candidate likely hasn't thought of. For example:
+  - Data/ML engineer: include Databricks AND Tecton, Weights & Biases, Anyscale, Modal, Hex, dbt Labs, Fivetran
+  - Nurse: include Kaiser AND Oak Street Health, Devoted Health, Galileo, Dispatch Health, Pair Team
+  - Finance: include JPMorgan AND Brex, Ramp, Mercury, Carta, Anchorage Digital
+  - Creative: include Netflix AND A24, Neon, MUBI, Rooster Teeth, Studio Ghibli US
 
-Works for any profession. Be specific and practical — these are used as literal search queries."""
+Works for any profession. Be specific and practical — these are used as literal search queries on company career pages."""
 
 # In-memory cache keyed by resume hash — avoids re-analyzing the same resume.
 _suggest_cache: dict[str, SearchSuggestions] = {}
