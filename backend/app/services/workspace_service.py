@@ -1147,7 +1147,68 @@ def derive_search_terms_from_resume(
         if candidate:
             roles.append(candidate)
 
+    # 5) If still no keywords, extract technical terms from resume text.
+    #    This is the last resort when the LLM never analyzed the resume.
+    if not keywords and record and record.extracted_text:
+        keywords.extend(_extract_keywords_from_text(record.extracted_text))
+
     return roles[:15], keywords[:20]
+
+
+def _extract_keywords_from_text(text: str) -> list[str]:
+    """Extract technical keywords from resume text without an LLM.
+
+    Scans for known tools, frameworks, platforms, and domain terms by
+    matching multi-word and single-word patterns against a curated set.
+    Returns up to 15 keywords ordered by appearance (earlier = more prominent).
+    """
+    lowered = text.lower()
+    found: list[str] = []
+    seen: set[str] = set()
+
+    # Multi-word terms first (order matters — check longer patterns before shorter)
+    multi_word = [
+        "Apache Kafka", "Apache Flink", "Apache Spark", "Apache Iceberg", "Apache Airflow",
+        "Google Cloud", "Google BigQuery", "Amazon Web Services", "AWS", "Microsoft Azure",
+        "Azure DevOps", "CI/CD", "machine learning", "deep learning", "data engineering",
+        "data platform", "data pipeline", "data warehouse", "data lake", "data lakehouse",
+        "data governance", "data modeling", "data products",
+        "natural language processing", "computer vision", "generative AI", "LLM",
+        "React Native", "Ruby on Rails", "Node.js", "Next.js", "Vue.js",
+        "Spring Boot", "REST API", "GraphQL", "gRPC", "ETL",
+        "Confluent Kafka", "Monte Carlo", "Great Expectations",
+    ]
+    for term in multi_word:
+        if term.lower() in lowered and term.lower() not in seen:
+            found.append(term)
+            seen.add(term.lower())
+
+    # Single-word technical terms
+    single_word = [
+        "Python", "Java", "Scala", "Golang", "Rust", "TypeScript", "JavaScript",
+        "Kubernetes", "Docker", "Terraform", "Ansible",
+        "Snowflake", "Databricks", "Redshift", "BigQuery", "Fivetran", "dbt",
+        "PostgreSQL", "MySQL", "MongoDB", "Redis", "Elasticsearch", "DynamoDB",
+        "Tableau", "Looker", "Power BI", "Superset",
+        "Spark", "Hadoop", "Presto", "Trino", "Starburst",
+        "TensorFlow", "PyTorch", "Scikit-learn", "Pandas", "NumPy",
+        "React", "Angular", "Vue", "Django", "Flask", "FastAPI",
+        "Figma", "Sketch", "Photoshop", "InDesign",
+        "Salesforce", "HubSpot", "Workday", "SAP", "Oracle",
+        "HIPAA", "SOC2", "GDPR", "PCI", "FedRAMP",
+        "Agile", "Scrum", "Kanban", "JIRA", "Confluence",
+        "n8n", "Cube", "Airbyte", "Dagster", "Prefect", "Meltano",
+    ]
+    # Use word boundary matching for single words
+    for term in single_word:
+        if term.lower() in seen:
+            continue
+        # Check case-insensitive but as a whole word
+        if re.search(r'\b' + re.escape(term) + r'\b', text, re.IGNORECASE):
+            found.append(term)
+            seen.add(term.lower())
+
+    return found[:15]
 
 
 def place_labels(places: list[PlaceSelection]) -> list[str]:
