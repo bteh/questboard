@@ -86,3 +86,4 @@ class SearchSuggestions(BaseModel):
     locations: list[str] = Field(default_factory=list)
     companies: list[str] = Field(default_factory=list)
     summary: str = ""
+    ai_failed: bool = False

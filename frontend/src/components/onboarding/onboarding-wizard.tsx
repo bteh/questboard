@@ -95,6 +95,7 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
   const aiAvailable = llm?.available ?? false;
   const resumeUploaded = data?.resume.exists === true;
   const prefilledFromResume = form.roles.length > 0;
+  const [aiFailed, setAiFailed] = useState(false);
 
   // Skip directly to step 2 if a resume is already on disk when the wizard
   // mounts (e.g. after a restart mid-flow). Live transitions after a fresh
@@ -117,6 +118,7 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
       suggestFiredRef.current = true;
       suggestSearch.mutate('workspace', {
         onSuccess: (suggestion) => {
+          if (suggestion.ai_failed) setAiFailed(true);
           setForm((prev) => {
             const suggestedPlaces =
               suggestion.locations.length > 0 && prev.preferred_places.length === 0
@@ -173,6 +175,7 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
         if (llm?.available) {
           suggestSearch.mutate('workspace', {
             onSuccess: (suggestion) => {
+              if (suggestion.ai_failed) setAiFailed(true);
               setForm((prev) => {
                 // Convert location strings from the LLM into PlaceSelection
                 // objects so the location chips render immediately.
@@ -403,6 +406,31 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
                   }
                 />
               </div>
+
+              {aiFailed && aiAvailable && (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3">
+                  <div className="flex items-start gap-2.5">
+                    <Sparkles className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs font-medium text-text-secondary">
+                        AI couldn't analyze your resume
+                      </p>
+                      <p className="mt-0.5 text-[11px] leading-relaxed text-text-muted">
+                        Your AI provider is configured but not responding. Check your API key in{' '}
+                        <button
+                          type="button"
+                          onClick={() => { handleDismiss(); navigate({ to: '/settings', search: { tab: 'ai' } }); }}
+                          className="font-medium text-brand hover:underline"
+                        >
+                          Settings → AI
+                        </button>
+                        . You can still search — results will use basic keyword matching instead of
+                        AI-powered 7-dimension scoring.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {!aiAvailable && (
                 <div className="rounded-xl border border-border-default bg-bg-subtle/50 p-3">

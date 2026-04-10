@@ -23,6 +23,7 @@ export interface SearchSuggestions {
   locations: string[];
   companies: string[];
   summary: string;
+  ai_failed: boolean;
 }
 
 export function suggestSearchParams(profile: string = 'default'): Promise<SearchSuggestions> {

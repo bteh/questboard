@@ -477,6 +477,7 @@ def _build_suggest_fallback(
         locations=locations[:5],
         companies=companies[:100],
         summary=summary,
+        ai_failed=True,
     )
 
 
