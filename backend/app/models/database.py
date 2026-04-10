@@ -160,6 +160,13 @@ def init_db(db_path: str | None = None) -> None:
         }
 
     _engine = create_engine(database_url, **engine_kwargs)
+    if using_sqlite:
+        # WAL mode: crash safety + concurrent reads, mirrors src/job_finder.
+        # See https://www.sqlite.org/wal.html
+        with _engine.connect() as conn:
+            conn.exec_driver_sql("PRAGMA journal_mode = WAL")
+            conn.exec_driver_sql("PRAGMA synchronous = NORMAL")
+            conn.commit()
     # Import models to register them with Base.metadata
     from app.models.application import ApplicationRecord  # noqa: F401
     from app.models.rate_limit import RateLimitEvent  # noqa: F401

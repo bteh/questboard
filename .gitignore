@@ -34,6 +34,10 @@ src/job_finder/config/profiles/*.yaml
 data/*.db
 data/*.sqlite
 **/*.db
+**/*.db-wal
+**/*.db-shm
+**/*.sqlite-wal
+**/*.sqlite-shm
 data/dev-hosted/
 
 # Output

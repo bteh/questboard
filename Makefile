@@ -1,4 +1,4 @@
-.PHONY: help setup dev dev-hosted stop-dev backend frontend search clean docker doctor dev-hosted-reset desktop-dev desktop-build desktop-install desktop-smoke
+.PHONY: help setup dev dev-hosted stop-dev backend frontend search clean docker doctor doctor-env dev-hosted-reset desktop-dev desktop-build desktop-install desktop-smoke
 
 # ── Venv detection ────────────────────────────────────────────────────
 # All Python commands run through the venv. `make setup` creates it.
@@ -67,7 +67,7 @@ dev: .venv ## Start backend + frontend for development
 		exit 1; \
 	fi
 	@trap 'kill 0' EXIT; \
-		cd backend && PYTHONPATH=../src $(CURDIR)/$(PYTHON) -m uvicorn app.main:app --reload --reload-dir . --reload-dir ../src --port 8000 & \
+		cd backend && PYTHONPATH=../src $(CURDIR)/$(PYTHON) -m uvicorn app.main:app --reload --reload-dir . --reload-dir ../src --host 127.0.0.1 --port 8000 & \
 		cd frontend && npm run dev & \
 		wait
 
@@ -103,7 +103,7 @@ dev-hosted: .venv ## Start the hosted-like local sandbox with persona auth + wor
 	fi
 	@mkdir -p data/dev-hosted/workspaces
 	@trap 'kill 0' EXIT; \
-		cd backend && HOSTED_MODE=true DEV_HOSTED_AUTH=true HOSTED_ALLOW_WORKSPACE_LLM_CONFIG=true LAUNCHBOARD_SECRET=launchboard-dev-hosted-workspace-secret MANAGE_SCHEMA_ON_STARTUP=true EMBEDDED_SCHEDULER_ENABLED=false DATA_DIR=$(CURDIR)/data/dev-hosted WORKSPACE_STORAGE_DIR=$(CURDIR)/data/dev-hosted/workspaces PYTHONPATH=../src $(CURDIR)/$(PYTHON) -m uvicorn app.main:app --reload --reload-dir . --reload-dir ../src --port 8000 & \
+		cd backend && HOSTED_MODE=true DEV_HOSTED_AUTH=true HOSTED_ALLOW_WORKSPACE_LLM_CONFIG=true LAUNCHBOARD_SECRET=launchboard-dev-hosted-workspace-secret MANAGE_SCHEMA_ON_STARTUP=true EMBEDDED_SCHEDULER_ENABLED=false DATA_DIR=$(CURDIR)/data/dev-hosted WORKSPACE_STORAGE_DIR=$(CURDIR)/data/dev-hosted/workspaces PYTHONPATH=../src $(CURDIR)/$(PYTHON) -m uvicorn app.main:app --reload --reload-dir . --reload-dir ../src --host 127.0.0.1 --port 8000 & \
 		HOSTED_MODE=true DEV_HOSTED_AUTH=true HOSTED_ALLOW_WORKSPACE_LLM_CONFIG=true LAUNCHBOARD_SECRET=launchboard-dev-hosted-workspace-secret MANAGE_SCHEMA_ON_STARTUP=true EMBEDDED_SCHEDULER_ENABLED=false DATA_DIR=$(CURDIR)/data/dev-hosted WORKSPACE_STORAGE_DIR=$(CURDIR)/data/dev-hosted/workspaces PYTHONPATH=$(CURDIR)/src $(CURDIR)/$(PYTHON) scripts/dev_hosted_worker.py & \
 		cd frontend && VITE_API_URL=http://localhost:8000/api/v1 VITE_HOSTED_MODE=true VITE_DEV_HOSTED_AUTH=true npm run dev -- --port 5173 & \
 		backend_ready=0; \
@@ -175,7 +175,7 @@ stop-dev: ## Stop Launchboard dev servers started from this repo
 	fi
 
 backend: .venv ## Start only the backend (FastAPI)
-	cd backend && PYTHONPATH=../src $(CURDIR)/$(PYTHON) -m uvicorn app.main:app --reload --port 8000
+	cd backend && PYTHONPATH=../src $(CURDIR)/$(PYTHON) -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 frontend: ## Start only the frontend (Vite)
 	cd frontend && npm run dev
@@ -261,8 +261,12 @@ docker-down: ## Stop Docker services
 
 # ── Diagnostics ────────────────────────────────────────────────────────
 
-doctor: ## Check your dev environment for common issues
-	@echo "\n  Launchboard — Doctor\n"
+doctor: doctor-env ## Run full health check (env + runtime app state)
+	@echo ""
+	@.venv/bin/python scripts/doctor.py 2>/dev/null || python3 scripts/doctor.py
+
+doctor-env: ## Check your dev environment for common install/setup issues
+	@echo "\n  Launchboard — Doctor (env)\n"
 	@failed=0; \
 	printf "  Python:         "; \
 	if .venv/bin/python --version 2>/dev/null | sed 's/Python //'; then \

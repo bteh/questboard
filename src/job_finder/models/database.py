@@ -245,6 +245,17 @@ def init_db(db_path: str | None = None) -> None:
         }
 
     _engine = create_engine(database_url, **engine_kwargs)
+    if using_sqlite:
+        # Enable WAL (Write-Ahead Logging) for crash safety + concurrent reads.
+        # Survives power loss mid-write, allows readers and writers to proceed
+        # in parallel — important for a desktop app where the user might close
+        # their laptop lid mid-search. synchronous=NORMAL is the recommended
+        # setting for WAL mode (FULL is overkill, OFF risks corruption).
+        # See https://www.sqlite.org/wal.html
+        with _engine.connect() as conn:
+            conn.exec_driver_sql("PRAGMA journal_mode = WAL")
+            conn.exec_driver_sql("PRAGMA synchronous = NORMAL")
+            conn.commit()
     if _should_manage_schema(database_url):
         if using_sqlite:
             _migrate_db(_engine)

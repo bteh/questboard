@@ -1,11 +1,12 @@
-import { useMemo, useState } from 'react';
-import { FileText, Mail, Pencil, Building2, Copy, Check, ExternalLink, Compass } from 'lucide-react';
+import { useMemo, useState, type ReactNode } from 'react';
+import { AlertTriangle, FileText, Mail, Pencil, Building2, Copy, Check, ExternalLink, Compass } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScoreBars } from '@/components/scores/score-bars';
 import { ScoreCircle } from '@/components/scores/score-circle';
 import { StrengthsGaps } from '@/components/scores/strengths-gaps';
 import { StatusBadge } from '@/components/badges/status-badge';
+import { ErrorBoundary } from '@/components/shared/error-boundary';
 import { EvaluationReportView } from '@/components/jobs/evaluation-report';
 import { ResumeTweaksPanel } from '@/components/jobs/resume-tweaks-panel';
 import { useUpdateStatus } from '@/hooks/use-applications';
@@ -148,6 +149,59 @@ function safeJsonParse(json: string | null | undefined): Record<string, unknown>
   if (!json) return null;
   try { return JSON.parse(json) as Record<string, unknown>; }
   catch { return null; }
+}
+
+/**
+ * Compact in-tab fallback for ErrorBoundary. The full-page ErrorBoundary
+ * default is 400px tall and visually heavy — wrong shape for an inline
+ * job-detail tab. This one just tells the user that ONE tab failed and
+ * (when raw data is provided) lets them peek at the underlying JSON so
+ * they're not totally locked out.
+ *
+ * Wired into JobDetail so a malformed evaluation_report_json or
+ * resume_tweaks_json can't blank the whole row — only the affected tab.
+ */
+function TabErrorFallback({ section, raw }: { section: string; raw?: string }) {
+  const [showRaw, setShowRaw] = useState(false);
+  return (
+    <div className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm dark:border-amber-900/60 dark:bg-amber-950/30">
+      <div className="flex items-start gap-2.5">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />
+        <div className="min-w-0 flex-1">
+          <p className="font-medium text-amber-900 dark:text-amber-100">
+            Couldn't render the {section} section
+          </p>
+          <p className="mt-0.5 text-xs leading-relaxed text-amber-800/90 dark:text-amber-200/90">
+            The data for this tab was malformed. The other tabs still work — this only affects {section}.
+            If this keeps happening on multiple jobs, please open an issue with the raw data below.
+          </p>
+          {raw && (
+            <button
+              type="button"
+              onClick={() => setShowRaw((v) => !v)}
+              className="mt-2 text-[11px] font-medium text-amber-900 underline-offset-2 hover:underline dark:text-amber-200"
+            >
+              {showRaw ? 'Hide' : 'Show'} raw data
+            </button>
+          )}
+          {showRaw && raw && (
+            <pre className="mt-2 max-h-[280px] overflow-auto rounded border border-amber-300 bg-amber-100/60 p-2 text-[10px] leading-relaxed text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100">
+              {raw}
+            </pre>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Convenience wrapper: ErrorBoundary + TabErrorFallback in one. Use around
+ * any tab content that parses or renders user/AI-supplied JSON so a single
+ * bad row can't take down the rest of the panel.
+ */
+function SafeTab({ section, raw, children }: { section: string; raw?: string; children: ReactNode }) {
+  return <ErrorBoundary fallback={<TabErrorFallback section={section} raw={raw} />}>{children}</ErrorBoundary>;
 }
 
 function CopyButton({ text, label }: { text: string; label: string }) {
@@ -308,47 +362,57 @@ export function JobDetail({ app }: JobDetailProps) {
 
         {evaluationReport && (
           <TabsContent value="evaluation" className="mt-3">
-            <div className="max-h-[560px] overflow-y-auto rounded-lg border border-border-default bg-bg-card p-4">
-              <EvaluationReportView report={evaluationReport} />
-            </div>
+            <SafeTab section="Evaluation" raw={app.evaluation_report_json}>
+              <div className="max-h-[560px] overflow-y-auto rounded-lg border border-border-default bg-bg-card p-4">
+                <EvaluationReportView report={evaluationReport} />
+              </div>
+            </SafeTab>
           </TabsContent>
         )}
 
         <TabsContent value="description" className="mt-3">
-          <div className="relative">
-            <div
-              className="prose prose-sm max-w-none text-sm text-text-secondary max-h-[480px] overflow-y-auto leading-relaxed rounded-lg bg-bg-card border border-border-default p-4 [&_h4]:text-sm [&_li]:text-sm [&_li]:leading-relaxed [&_p]:text-sm [&_ol]:list-decimal [&_ol]:pl-5"
-              dangerouslySetInnerHTML={{ __html: descriptionToHtml(app.description) }}
-            />
-          </div>
+          <SafeTab section="Description">
+            <div className="relative">
+              <div
+                className="prose prose-sm max-w-none text-sm text-text-secondary max-h-[480px] overflow-y-auto leading-relaxed rounded-lg bg-bg-card border border-border-default p-4 [&_h4]:text-sm [&_li]:text-sm [&_li]:leading-relaxed [&_p]:text-sm [&_ol]:list-decimal [&_ol]:pl-5"
+                dangerouslySetInnerHTML={{ __html: descriptionToHtml(app.description) }}
+              />
+            </div>
+          </SafeTab>
         </TabsContent>
 
         {app.cover_letter && (
           <TabsContent value="cover-letter" className="mt-3">
-            <div className="relative rounded-lg bg-bg-card border border-border-default">
-              <div className="flex items-center justify-end px-3 py-1.5 border-b border-border-default">
-                <CopyButton text={app.cover_letter} label="Cover letter" />
+            <SafeTab section="Cover letter">
+              <div className="relative rounded-lg bg-bg-card border border-border-default">
+                <div className="flex items-center justify-end px-3 py-1.5 border-b border-border-default">
+                  <CopyButton text={app.cover_letter} label="Cover letter" />
+                </div>
+                <div className="text-sm text-text-secondary whitespace-pre-wrap max-h-[400px] overflow-y-auto p-4 leading-relaxed">
+                  {app.cover_letter}
+                </div>
               </div>
-              <div className="text-sm text-text-secondary whitespace-pre-wrap max-h-[400px] overflow-y-auto p-4 leading-relaxed">
-                {app.cover_letter}
-              </div>
-            </div>
+            </SafeTab>
           </TabsContent>
         )}
 
         {resumeTweaks && (
           <TabsContent value="resume" className="mt-3">
-            <div className="overflow-auto max-h-[560px] rounded-lg border border-border-default bg-bg-card p-4">
-              <ResumeTweaksPanel tweaks={resumeTweaks} />
-            </div>
+            <SafeTab section="Resume tweaks" raw={app.resume_tweaks_json}>
+              <div className="overflow-auto max-h-[560px] rounded-lg border border-border-default bg-bg-card p-4">
+                <ResumeTweaksPanel tweaks={resumeTweaks} />
+              </div>
+            </SafeTab>
           </TabsContent>
         )}
 
         {companyIntel && (
           <TabsContent value="intel" className="mt-3">
-            <div className="text-sm text-text-secondary overflow-auto max-h-[400px] bg-bg-card p-4 rounded-lg border border-border-default">
-              <KeyValueDisplay data={companyIntel} />
-            </div>
+            <SafeTab section="Company background" raw={app.company_intel_json}>
+              <div className="text-sm text-text-secondary overflow-auto max-h-[400px] bg-bg-card p-4 rounded-lg border border-border-default">
+                <KeyValueDisplay data={companyIntel} />
+              </div>
+            </SafeTab>
           </TabsContent>
         )}
       </Tabs>
