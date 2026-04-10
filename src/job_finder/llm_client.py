@@ -336,24 +336,42 @@ class LLMClient:
 
 
     def is_available(self) -> bool:
-        """Health-check: try to reach the endpoint with auth."""
+        """Verify the LLM can actually complete a request.
+
+        Earlier versions just pinged /health or /models, which passes for
+        proxies that are online but reject real inference calls (e.g.
+        consumer-subscription proxies returning auth_unavailable). Now we
+        send a 1-token completion. If the model returns anything, it works.
+        """
         if not self.is_configured:
             return False
         try:
-            url = self.base_url.rstrip("/")
-            headers: dict[str, str] = {}
-            if self.api_key:
-                headers["Authorization"] = f"Bearer {self.api_key}"
-            for path in ["/models", "/../health"]:
-                try:
-                    r = requests.get(f"{url}{path}", headers=headers, timeout=5)
-                    if r.status_code < 400:
-                        return True
-                except requests.ConnectionError:
-                    continue
-            return False
-        except Exception:
-            return False
+            response = self._client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": "hi"}],
+                max_tokens=1,
+                temperature=0,
+            )
+            return bool(response.choices)
+        except Exception as exc:
+            msg = str(exc).lower()
+            # Auth / permission errors → definitively unavailable
+            if any(term in msg for term in [
+                "auth", "401", "403", "permission", "unauthorized",
+                "invalid api key", "api key",
+            ]):
+                return False
+            # Other transient errors (timeout, rate limit, 500) → try
+            # a lighter /models check before giving up
+            try:
+                url = self.base_url.rstrip("/")
+                headers: dict[str, str] = {}
+                if self.api_key:
+                    headers["Authorization"] = f"Bearer {self.api_key}"
+                r = requests.get(f"{url}/models", headers=headers, timeout=5)
+                return r.status_code < 400
+            except Exception:
+                return False
 
     def chat(
         self,
