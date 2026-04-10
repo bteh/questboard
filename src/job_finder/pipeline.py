@@ -31,12 +31,14 @@ from job_finder.prompts import (
     COMPANY_RESEARCHER_GROUNDED_USER_TEMPLATE,
     COVER_LETTER_USER_TEMPLATE,
     EVALUATION_REPORT_USER_TEMPLATE,
+    GENERATE_PROFILE_USER_TEMPLATE,
     JD_SCORER_USER_TEMPLATE,
     RESUME_OPTIMIZER_USER_TEMPLATE,
     _wrap_untrusted,
     build_company_researcher_prompt,
     build_cover_letter_prompt,
     build_evaluation_report_prompt,
+    build_generate_profile_prompt,
     build_resume_optimizer_prompt,
     build_scorer_prompt,
 )
@@ -1633,6 +1635,113 @@ class JobFinderPipeline:
         )
         cl_prompt = build_cover_letter_prompt(self.config)
         return self.llm.chat_json(cl_prompt, user_msg)
+
+    # -- Profile generation (LLM only, called once on resume upload) ------
+
+    def generate_profile_from_resume(
+        self,
+        resume_text: str,
+        available_scrapers: list[str] | None = None,
+        available_templates: list[str] | None = None,
+    ) -> dict | None:
+        """Generate a tailored search profile from a candidate's resume.
+
+        This is the load-bearing piece of "any career, any niche". Instead
+        of forcing the user to pick from the seven hardcoded archetype
+        templates, we ask the LLM to read the resume and produce a profile
+        specifically for them — covering niches we never modeled (climate
+        tech, vet med, MTS at frontier labs, biotech regulatory, etc.).
+
+        The output schema mirrors the YAML archetype shape, so the same
+        ``apply_archetype()`` merge logic in profiles/archetypes.py can
+        consume it. The frontend treats a generated profile as a drop-in
+        replacement for a hardcoded template — the only difference is the
+        confidence + reasoning fields, which expose the LLM's introspection.
+
+        Returns ``None`` when the LLM is unavailable so the caller can
+        gracefully fall back to template-based defaults. The result is
+        validated against the ``GeneratedProfile`` Pydantic schema before
+        being returned — invalid output (wrong shape, weights that don't
+        sum, hallucinated scrapers) is treated as a failure and returns
+        None rather than corrupting the user's profile.
+        """
+        if not self.llm or not self.llm.is_configured:
+            return None
+
+        # Default available_scrapers to the live registry so the LLM can't
+        # hallucinate sources we don't actually run. Imported lazily to
+        # avoid a circular at module load.
+        if available_scrapers is None:
+            try:
+                from job_finder.tools.scrapers._registry import get_registry
+                available_scrapers = sorted(get_registry().keys())
+                # Plus the JobSpy boards which are not registered as plugins
+                # but are first-class search sources.
+                for jobspy in ("indeed", "linkedin", "glassdoor", "zip_recruiter", "google"):
+                    if jobspy not in available_scrapers:
+                        available_scrapers.append(jobspy)
+            except Exception:
+                available_scrapers = []
+
+        if available_templates is None:
+            try:
+                from job_finder.profiles.archetypes import list_archetypes
+                available_templates = [a.slug for a in list_archetypes()]
+            except Exception:
+                available_templates = []
+
+        user_msg = GENERATE_PROFILE_USER_TEMPLATE.format(
+            available_scrapers=", ".join(available_scrapers) or "(none — registry empty)",
+            available_templates=", ".join(available_templates) or "(none)",
+            resume_text=_wrap_untrusted("resume", resume_text),
+        )
+        system_prompt = build_generate_profile_prompt(self.config)
+
+        # Generous max_tokens — the schema has 12+ fields and the keyword
+        # lists alone can be ~150 tokens. Set high enough that the model
+        # never has to truncate the JSON.
+        raw = self.llm.chat_json(system_prompt, user_msg, max_tokens=6144)
+        if raw is None:
+            logger.warning("generate_profile_from_resume: LLM returned None")
+            return None
+
+        # Validate via the Pydantic schema. Any shape mismatch (wrong types,
+        # missing required fields, weights that don't sum) bounces here and
+        # the caller falls back to template-based defaults.
+        try:
+            from job_finder.models.schemas import GeneratedProfile
+            profile = GeneratedProfile.model_validate(raw)
+        except Exception as exc:
+            logger.warning("generate_profile_from_resume: schema validation failed: %s", exc)
+            return None
+
+        # Hard rule: scoring weights must sum to ~1.0. Reject (and log) if
+        # the LLM returned malformed weights so we don't silently corrupt
+        # the user's profile.
+        weights_sum = (
+            profile.scoring.technical_skills
+            + profile.scoring.leadership_signal
+            + profile.scoring.career_progression
+            + profile.scoring.platform_building
+            + profile.scoring.comp_potential
+            + profile.scoring.company_trajectory
+            + profile.scoring.culture_fit
+        )
+        if not 0.98 <= weights_sum <= 1.02:
+            logger.warning(
+                "generate_profile_from_resume: scoring weights sum to %.3f, not 1.0 — rejecting",
+                weights_sum,
+            )
+            return None
+
+        # Hard rule: enabled_scrapers must be a subset of available. Strip
+        # any hallucinated names rather than rejecting the whole profile.
+        if available_scrapers:
+            profile.enabled_scrapers = [
+                s for s in profile.enabled_scrapers if s in available_scrapers
+            ]
+
+        return profile.model_dump()
 
     # -- Stage 5b: Evaluation report (LLM only) ---------------------------
 

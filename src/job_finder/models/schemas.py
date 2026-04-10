@@ -242,6 +242,107 @@ class EvaluationReport(BaseModel):
     )
 
 
+class GeneratedProfileScoring(BaseModel):
+    """The 7 weighted scoring dimensions, must sum to 1.0 (within 0.01)."""
+
+    technical_skills: float = Field(ge=0.0, le=1.0)
+    leadership_signal: float = Field(ge=0.0, le=1.0)
+    career_progression: float = Field(ge=0.0, le=1.0)
+    platform_building: float = Field(ge=0.0, le=1.0)
+    comp_potential: float = Field(ge=0.0, le=1.0)
+    company_trajectory: float = Field(ge=0.0, le=1.0)
+    culture_fit: float = Field(ge=0.0, le=1.0)
+
+
+class GeneratedProfileKeywords(BaseModel):
+    """Three keyword buckets fed into the scoring pipeline."""
+
+    technical: list[str] = Field(
+        default_factory=list,
+        description="5–15 specific technical / domain keywords from the resume.",
+    )
+    leadership: list[str] = Field(
+        default_factory=list,
+        description="3–8 leadership / seniority signals (titles or behaviors).",
+    )
+    signal_terms: list[str] = Field(
+        default_factory=list,
+        description="3–8 phrases that mean 'this is a good fit' for this person specifically.",
+    )
+
+
+class GeneratedProfileCompensation(BaseModel):
+    """Compensation targets inferred from the resume's seniority + domain."""
+
+    currency: str = Field(default="USD")
+    pay_period: str = Field(default="annual")
+    min_base: int = Field(ge=0)
+    target_total_comp: int = Field(ge=0)
+    include_equity: bool = Field(default=False)
+
+
+class GeneratedProfile(BaseModel):
+    """LLM-tailored search profile generated from a candidate's resume.
+
+    The schema deliberately mirrors the YAML archetype shape so the same
+    `apply_archetype()` merge logic in src/job_finder/profiles/archetypes.py
+    can consume either source. The frontend treats this object as
+    interchangeable with a hardcoded template — the only difference is the
+    `archetype.confidence` and `archetype.reasoning` fields, which expose
+    the LLM's introspection.
+
+    The whole point is to make Launchboard work for *any* career, not
+    just the seven hardcoded buckets. A user with an unusual or
+    multi-domain background gets a profile generated specifically for
+    them, rather than being forced into the closest preset.
+    """
+
+    detected_archetype: str = Field(
+        description="Short human-readable label for what kind of role this person wants next, e.g., 'AI Research Engineer at frontier labs', 'Pediatric ICU Nurse, Acute Care', 'Founding Engineer at a Web3 startup'. NOT one of the hardcoded slugs — this is the LLM's specific classification.",
+    )
+    confidence: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="LLM's confidence (0.0–1.0) in the detected archetype. Below 0.5 = the resume was sparse or atypical and the user should manually pick a template.",
+    )
+    reasoning: str = Field(
+        description="2–3 sentences explaining why this archetype was chosen. Surfaced in the UI so the user can sanity-check the LLM.",
+    )
+    closest_template: str | None = Field(
+        default=None,
+        description="If one of our hardcoded archetype slugs is a reasonable fit, surface it here so the UI can offer 'use this template instead'. Null if no template is close.",
+    )
+    career_target: str = Field(
+        description="One sentence: what role this person wants next. Drives the search query language.",
+    )
+    seniority_signal: str = Field(
+        description="Inferred seniority: entry / mid / senior / staff / principal / exec.",
+    )
+    scoring: GeneratedProfileScoring
+    keywords: GeneratedProfileKeywords
+    target_roles: list[str] = Field(
+        default_factory=list,
+        description="3–6 example role titles to seed the wizard's target-role input.",
+    )
+    compensation: GeneratedProfileCompensation
+    enabled_scrapers: list[str] = Field(
+        default_factory=list,
+        description="Subset of available scraper names that make sense for this person. Must be a subset of the available_scrapers list passed in the prompt.",
+    )
+    recommended_external_boards: list[str] = Field(
+        default_factory=list,
+        description="URLs of niche job boards Launchboard does NOT yet scrape but that this candidate should manually check. Lets the system surface domain-specific boards (aijobs.ai for AI, web3.career for crypto, USAJobs.gov for government, etc.) without us needing a scraper for every one.",
+    )
+    primary_strengths: list[str] = Field(
+        default_factory=list,
+        description="3–5 things the LLM identified as this candidate's strongest selling points.",
+    )
+    development_areas: list[str] = Field(
+        default_factory=list,
+        description="2–3 areas where the candidate's resume is thin and should be addressed in cover letters or interview prep.",
+    )
+
+
 class CompanyIntel(BaseModel):
     """Intelligence gathered about a company."""
 
