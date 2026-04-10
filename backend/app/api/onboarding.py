@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import logging
+import time
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from sqlalchemy.orm import Session
@@ -11,6 +14,7 @@ from app.config import get_settings
 from app.dependencies import get_workspace_context, get_workspace_context_csrf
 from app.models.database import get_db
 from app.schemas.workspace import (
+    GeneratedProfileResponse,
     OnboardingState,
     WorkspacePreferences,
     WorkspaceResumeUploadResponse,
@@ -19,7 +23,31 @@ from app.schemas.workspace import (
 from app.security import enforce_rate_limit, request_identity
 from app.services import pipeline_service, workspace_service
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/onboarding", tags=["onboarding"])
+
+# In-memory cache for generated profiles, keyed on (workspace_id, resume_hash).
+# The LLM call is expensive enough that we don't want to re-run it on every
+# tab refresh — but a real user updating their resume MUST get a fresh
+# profile, hence keying on the content hash. 24-hour TTL is a soft cap.
+_GENERATED_PROFILE_CACHE: dict[tuple[str, str], tuple[float, dict]] = {}
+_GENERATED_PROFILE_TTL_SECONDS = 24 * 60 * 60
+
+
+def _cache_get(workspace_id: str, resume_hash: str) -> dict | None:
+    entry = _GENERATED_PROFILE_CACHE.get((workspace_id, resume_hash))
+    if not entry:
+        return None
+    ts, payload = entry
+    if time.time() - ts > _GENERATED_PROFILE_TTL_SECONDS:
+        _GENERATED_PROFILE_CACHE.pop((workspace_id, resume_hash), None)
+        return None
+    return payload
+
+
+def _cache_put(workspace_id: str, resume_hash: str, payload: dict) -> None:
+    _GENERATED_PROFILE_CACHE[(workspace_id, resume_hash)] = (time.time(), payload)
 
 
 @router.get("/state", response_model=OnboardingState)
@@ -140,3 +168,89 @@ async def start_onboarding_search(
         started_at=run.started_at,
         completed_at=run.completed_at,
     )
+
+
+@router.post("/generate-profile", response_model=GeneratedProfileResponse)
+def generate_workspace_profile(
+    request: Request,
+    context = Depends(get_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Generate an LLM-tailored search profile from the workspace's resume.
+
+    The whole point: instead of forcing the user to pick from the seven
+    hardcoded archetype templates, the LLM reads their resume and
+    produces a profile *specifically for them* — covering niches we
+    never modeled (climate tech, vet med, MTS at frontier labs,
+    biotech regulatory, founding engineers at web3 startups, etc.).
+
+    Returns 400 if no resume has been uploaded yet, 503 if the LLM is
+    not configured or returned an unusable result. The frontend handles
+    both as "fall back to template picker".
+
+    Cached per (workspace_id, resume_content_hash) so opening the
+    dashboard repeatedly doesn't burn LLM credits — and changing the
+    resume invalidates automatically.
+    """
+    settings = get_settings()
+    enforce_rate_limit(
+        "generate-profile",
+        request_identity(request, context.workspace.id),
+        limit=settings.search_rate_limit_per_minute,
+        db=db,
+    )
+
+    resume_text = workspace_service.get_resume_text(db, context.workspace.id)
+    if not resume_text or not resume_text.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Upload a resume first — profile generation needs your resume text to work.",
+        )
+
+    # Hash the resume text so we cache by content, not by upload event.
+    # If the user re-uploads the same file, no LLM call. If they edit and
+    # re-upload, we generate a fresh profile.
+    resume_hash = hashlib.sha256(resume_text.encode("utf-8", errors="ignore")).hexdigest()[:16]
+    cached = _cache_get(context.workspace.id, resume_hash)
+    if cached:
+        logger.info("generate_profile: cache hit for workspace=%s", context.workspace.id)
+        return GeneratedProfileResponse(**{**cached, "cached": True})
+
+    llm = workspace_service.get_workspace_llm(db, context.workspace.id, fallback_to_global=True)
+    if not llm or not llm.is_configured:
+        raise HTTPException(
+            status_code=503,
+            detail="No AI provider connected. Connect one in Settings or pick a template manually.",
+        )
+
+    # Build a JobFinderPipeline-like context that just exposes the LLM +
+    # config. We don't need the full pipeline machinery — just the
+    # generate_profile_from_resume method.
+    from job_finder.pipeline import JobFinderPipeline
+
+    pipeline = JobFinderPipeline.__new__(JobFinderPipeline)
+    pipeline.llm = llm
+    pipeline.config = workspace_service.build_pipeline_config_override(
+        workspace_service.get_workspace_preferences(db, context.workspace.id),
+        context.workspace.id,
+    )
+
+    profile = pipeline.generate_profile_from_resume(resume_text)
+    if profile is None:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "AI couldn't generate a profile from your resume. This usually "
+                "means the LLM call failed or the response didn't match the schema. "
+                "Try a template instead, or check your AI provider in Settings."
+            ),
+        )
+
+    _cache_put(context.workspace.id, resume_hash, profile)
+    logger.info(
+        "generate_profile: cache miss, generated for workspace=%s archetype=%r confidence=%.2f",
+        context.workspace.id,
+        profile.get("detected_archetype"),
+        profile.get("confidence", 0.0),
+    )
+    return GeneratedProfileResponse(**{**profile, "cached": False})

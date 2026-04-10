@@ -144,6 +144,38 @@ class SearchSnapshot(BaseModel):
     exclude_staffing_agencies: bool = True
 
 
+class GeneratedProfileResponse(BaseModel):
+    """LLM-tailored search profile generated from a workspace's resume.
+
+    Wire-compat with the GeneratedProfile pydantic model in
+    src/job_finder/models/schemas.py — same field names so the frontend
+    can parse one shape regardless of which layer produced it.
+
+    Returned by POST /onboarding/generate-profile. The frontend uses this
+    to populate the ReadyToLaunchHero with an AI-tailored alternative to
+    the hardcoded archetype templates, so users in niches we never
+    modeled (climate tech, vet med, MTS, web3, etc.) get a custom
+    profile from their resume instead of being forced into a preset.
+    """
+
+    detected_archetype: str
+    confidence: float
+    reasoning: str
+    closest_template: str | None = None
+    career_target: str
+    seniority_signal: str
+    scoring: dict[str, float]
+    keywords: dict[str, list[str]]
+    target_roles: list[str] = Field(default_factory=list)
+    compensation: dict
+    enabled_scrapers: list[str] = Field(default_factory=list)
+    recommended_external_boards: list[str] = Field(default_factory=list)
+    primary_strengths: list[str] = Field(default_factory=list)
+    development_areas: list[str] = Field(default_factory=list)
+    # Set by the API layer when the result was served from cache.
+    cached: bool = False
+
+
 class WorkspaceSearchRunResponse(BaseModel):
     run_id: str
     status: Literal["pending", "running", "completed", "failed"]
