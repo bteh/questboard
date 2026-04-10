@@ -85,7 +85,10 @@ export function useDetectLocalAI(enabled: boolean) {
   return useQuery({
     queryKey: ['settings', 'llm', 'detect-local-browser'],
     queryFn: async () => {
-      const ports = [8317, 8741, 1234, 3456, 5001, 4000];
+      // Scan common local AI server ports. Excludes consumer-subscription
+      // proxies (8317 cliproxyapi, 8741 etc.) — those report as "available"
+      // but fail on real inference, confusing users.
+      const ports = [1234, 3456, 5001, 4000];
       const results = await Promise.allSettled(
         ports.map(async (port) => {
           const base = `http://localhost:${port}/v1`;
