@@ -1,0 +1,90 @@
+archetype:
+  name: "Web3 / Crypto / Blockchain"
+  description: "Solidity engineers, smart contract auditors, DeFi protocols, ZK researchers, cryptography, decentralized infrastructure"
+  emoji: "⛓️"
+
+scoring:
+  technical_skills: 0.30
+  leadership_signal: 0.05
+  career_progression: 0.05
+  platform_building: 0.20
+  comp_potential: 0.25
+  company_trajectory: 0.10
+  culture_fit: 0.05
+  thresholds:
+    strong_apply: 70
+    apply: 55
+    maybe: 40
+
+keywords:
+  technical:
+    - "Solidity"
+    - "Vyper"
+    - "Rust"
+    - "Move"
+    - "Cairo"
+    - "smart contracts"
+    - "EVM"
+    - "DeFi"
+    - "DEX"
+    - "AMM"
+    - "lending protocol"
+    - "yield"
+    - "ZK"
+    - "zero-knowledge"
+    - "SNARK"
+    - "STARK"
+    - "L1"
+    - "L2"
+    - "rollup"
+    - "MEV"
+    - "audit"
+    - "Foundry"
+    - "Hardhat"
+    - "Anchor"
+    - "wagmi"
+    - "viem"
+    - "ethers.js"
+    - "tokenomics"
+    - "DAO"
+    - "validator"
+    - "staking"
+  leadership:
+    - "founding engineer"
+    - "protocol lead"
+    - "head of engineering"
+    - "core contributor"
+  platform_building:
+    - "protocol"
+    - "from scratch"
+    - "novel mechanism"
+    - "L2"
+    - "new chain"
+
+enabled_scrapers:
+  - cryptojobslist
+  - indeed
+  - linkedin
+  - greenhouse
+  - lever
+  - ashby
+  - workatastartup
+  - hackernews
+  - remoteok
+  - google
+
+target_roles:
+  - "Solidity Engineer"
+  - "Smart Contract Engineer"
+  - "Protocol Engineer"
+  - "Smart Contract Auditor"
+  - "Founding Engineer"
+  - "Cryptography Researcher"
+  - "DeFi Engineer"
+
+compensation:
+  currency: "USD"
+  pay_period: "annual"
+  min_base: 180000
+  target_total_comp: 350000
+  include_equity: true

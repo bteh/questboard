@@ -1,0 +1,82 @@
+archetype:
+  name: "AI / ML Research & Engineering"
+  description: "Member of Technical Staff, ML engineers, AI researchers, applied AI, alignment, evals at frontier labs and AI startups"
+  emoji: "🧠"
+
+scoring:
+  technical_skills: 0.30
+  leadership_signal: 0.05
+  career_progression: 0.10
+  platform_building: 0.20
+  comp_potential: 0.20
+  company_trajectory: 0.10
+  culture_fit: 0.05
+  thresholds:
+    strong_apply: 70
+    apply: 55
+    maybe: 40
+
+keywords:
+  technical:
+    - "PyTorch"
+    - "JAX"
+    - "Triton"
+    - "CUDA"
+    - "training infrastructure"
+    - "inference"
+    - "RLHF"
+    - "DPO"
+    - "fine-tuning"
+    - "evals"
+    - "alignment"
+    - "interpretability"
+    - "red-teaming"
+    - "transformers"
+    - "diffusion"
+    - "VLM"
+    - "LLM"
+    - "agent frameworks"
+    - "tool use"
+    - "function calling"
+    - "context engineering"
+    - "RAG"
+    - "vector database"
+  leadership:
+    - "research lead"
+    - "tech lead"
+    - "staff"
+    - "principal"
+    - "founding engineer"
+    - "founding member of technical staff"
+  platform_building:
+    - "0 to 1"
+    - "greenfield"
+    - "novel architecture"
+    - "from research to production"
+    - "training pipeline"
+
+enabled_scrapers:
+  - indeed
+  - linkedin
+  - greenhouse
+  - lever
+  - ashby
+  - workatastartup
+  - hackernews
+  - workday
+  - google
+
+target_roles:
+  - "Member of Technical Staff"
+  - "Research Engineer"
+  - "Machine Learning Engineer"
+  - "Applied AI Engineer"
+  - "Founding ML Engineer"
+  - "AI Alignment Researcher"
+
+compensation:
+  currency: "USD"
+  pay_period: "annual"
+  min_base: 200000
+  target_total_comp: 450000
+  include_equity: true

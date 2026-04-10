@@ -59,6 +59,8 @@ class TestListArchetypes:
         slugs = {a.slug for a in archs}
         expected = {
             "tech",
+            "ai-research",
+            "crypto",
             "healthcare",
             "education",
             "government",
@@ -82,7 +84,7 @@ class TestLoadArchetype:
 
     @pytest.mark.parametrize(
         "slug",
-        ["tech", "healthcare", "education", "government", "trades", "nonprofit", "creative"],
+        ["tech", "ai-research", "crypto", "healthcare", "education", "government", "trades", "nonprofit", "creative"],
     )
     def test_each_archetype_parses_and_scoring_sums_to_one(self, slug: str) -> None:
         data = load_archetype(slug)
@@ -96,7 +98,7 @@ class TestLoadArchetype:
 
     @pytest.mark.parametrize(
         "slug",
-        ["tech", "healthcare", "education", "government", "trades", "nonprofit", "creative"],
+        ["tech", "ai-research", "crypto", "healthcare", "education", "government", "trades", "nonprofit", "creative"],
     )
     def test_enabled_scrapers_reference_real_scrapers(self, slug: str) -> None:
         # Build the set of valid scraper names from the registry + JobSpy
