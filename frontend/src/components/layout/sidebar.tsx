@@ -150,11 +150,14 @@ export function Sidebar() {
               aria-hidden="true"
             />
             <Zap className="h-3.5 w-3.5 text-text-muted shrink-0" />
-            <span className="text-xs text-text-muted truncate flex-1">
+            <span className={cn(
+              'text-xs truncate flex-1',
+              llm?.configured && !llm?.available ? 'text-danger' : 'text-text-muted',
+            )}>
               {llm?.available
                 ? getAiLabel(llm.provider, llm.label)
                 : llm?.configured
-                  ? 'Disconnected'
+                  ? 'AI not responding — click to fix'
                   : 'Connect AI'}
             </span>
           </button>

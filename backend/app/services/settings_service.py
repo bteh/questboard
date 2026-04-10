@@ -356,7 +356,24 @@ def update_llm_config(provider: str, base_url: str, api_key: str, model: str) ->
             _write_env_vars({"LLM_API_KEY": api_key})
             logger.info("API key stored in .env (keychain unavailable)")
 
+    # Clear stale suggest/profile caches so the new provider gets a fresh run
+    _flush_llm_caches()
+
     return get_llm_status()
+
+
+def _flush_llm_caches() -> None:
+    """Clear in-memory LLM result caches when the provider changes."""
+    try:
+        from app.api.search import _suggest_cache
+        _suggest_cache.clear()
+    except Exception:
+        pass
+    try:
+        from app.api.onboarding import _GENERATED_PROFILE_CACHE
+        _GENERATED_PROFILE_CACHE.clear()
+    except Exception:
+        pass
 
 
 def test_llm_connection() -> dict:

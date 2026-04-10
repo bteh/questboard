@@ -643,9 +643,11 @@ async def suggest_search_params(
             }
         )
 
-    # Cache result (evict oldest if full)
-    if len(_suggest_cache) >= _CACHE_MAX:
-        _suggest_cache.pop(next(iter(_suggest_cache)))
-    _suggest_cache[cache_key] = result
+    # Only cache successful AI results — failed fallbacks should be
+    # retried when the user fixes their LLM connection, not served stale.
+    if not result.ai_failed:
+        if len(_suggest_cache) >= _CACHE_MAX:
+            _suggest_cache.pop(next(iter(_suggest_cache)))
+        _suggest_cache[cache_key] = result
 
     return result
