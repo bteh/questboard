@@ -1,6 +1,6 @@
 import type { ProviderPreset } from '@/types/settings';
 
-export type PopularProviderName = 'gemini' | 'openai-api' | 'anthropic-api' | 'ollama';
+export type PopularProviderName = 'gemini' | 'groq' | 'openai-api' | 'anthropic-api' | 'ollama';
 
 export interface PopularProviderChoice {
   name: PopularProviderName;
@@ -14,6 +14,7 @@ export interface PopularProviderChoice {
 
 export const POPULAR_PROVIDER_ORDER: PopularProviderName[] = [
   'gemini',
+  'groq',
   'openai-api',
   'anthropic-api',
   'ollama',
@@ -25,8 +26,17 @@ export const POPULAR_PROVIDER_CHOICES: Record<PopularProviderName, PopularProvid
     title: 'Google Gemini',
     badge: 'Free',
     badgeClassName: 'text-emerald-600 bg-emerald-500/10',
-    description: 'Free, fast, and easy. Get an API key from Google AI Studio in 30 seconds — no credit card needed.',
-    detail: 'Uses Gemini 2.5 Flash. 250 free requests/day, more than enough for job searching.',
+    description: 'Free and easy. Get an API key from Google AI Studio in 30 seconds — no credit card needed.',
+    detail: 'Uses Gemini 2.5 Flash. 500 free requests/day, more than enough for job searching.',
+    hostedSupported: true,
+  },
+  groq: {
+    name: 'groq',
+    title: 'Groq',
+    badge: 'Free',
+    badgeClassName: 'text-emerald-600 bg-emerald-500/10',
+    description: 'Extremely fast inference. Create an account and get a free key — no credit card needed.',
+    detail: 'Uses Llama 3.3 70B. 14,400 free requests/day. Fastest provider available.',
     hostedSupported: true,
   },
   'openai-api': {

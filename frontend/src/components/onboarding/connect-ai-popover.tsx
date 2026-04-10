@@ -39,6 +39,7 @@ interface ConnectAiPopoverProps {
 
 const KEY_URLS: Record<PopularProviderName, string> = {
   gemini: 'https://aistudio.google.com/apikey',
+  groq: 'https://console.groq.com/keys',
   'openai-api': 'https://platform.openai.com/api-keys',
   'anthropic-api': 'https://console.anthropic.com/settings/keys',
   ollama: 'https://ollama.com/download',
@@ -46,6 +47,7 @@ const KEY_URLS: Record<PopularProviderName, string> = {
 
 const KEY_LABELS: Record<PopularProviderName, string> = {
   gemini: 'Get a free Gemini key',
+  groq: 'Get a free Groq key',
   'openai-api': 'Get an OpenAI key',
   'anthropic-api': 'Get an Anthropic key',
   ollama: 'Install Ollama',
@@ -53,6 +55,7 @@ const KEY_LABELS: Record<PopularProviderName, string> = {
 
 const PASTE_PLACEHOLDERS: Record<PopularProviderName, string> = {
   gemini: 'Paste Gemini key',
+  groq: 'Paste Groq key',
   'openai-api': 'Paste OpenAI key',
   'anthropic-api': 'Paste Anthropic key',
   ollama: 'No key needed',
@@ -186,11 +189,13 @@ export function ConnectAiPopover({ children, side = 'top', align = 'start' }: Co
                   >
                     {name === 'gemini'
                       ? 'Gemini ★'
-                      : name === 'openai-api'
-                        ? 'OpenAI'
-                        : name === 'anthropic-api'
-                          ? 'Claude'
-                          : 'Local'}
+                      : name === 'groq'
+                        ? 'Groq'
+                        : name === 'openai-api'
+                          ? 'OpenAI'
+                          : name === 'anthropic-api'
+                            ? 'Claude'
+                            : 'Local'}
                   </button>
                 );
               })}

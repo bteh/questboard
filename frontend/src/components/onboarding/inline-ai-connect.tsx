@@ -274,18 +274,24 @@ export function InlineAiConnect() {
             ) : (
               <div className="mt-3 space-y-2">
                 <a
-                  href={selectedProvider === 'openai-api'
-                    ? 'https://platform.openai.com/api-keys'
-                    : 'https://console.anthropic.com/settings/keys'}
+                  href={
+                    selectedProvider === 'groq' ? 'https://console.groq.com/keys'
+                    : selectedProvider === 'openai-api' ? 'https://platform.openai.com/api-keys'
+                    : 'https://console.anthropic.com/settings/keys'
+                  }
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-xs font-medium text-brand hover:underline"
                 >
-                  Get your API key <ExternalLink className="h-3 w-3" />
+                  Get your {selectedProvider === 'groq' ? 'free ' : ''}API key <ExternalLink className="h-3 w-3" />
                 </a>
                 <Input
                   type="password"
-                  placeholder={selectedProvider === 'openai-api' ? 'sk-...' : 'sk-ant-...'}
+                  placeholder={
+                    selectedProvider === 'groq' ? 'gsk_...'
+                    : selectedProvider === 'openai-api' ? 'sk-...'
+                    : 'sk-ant-...'
+                  }
                   value={apiKey}
                   onChange={(event) => setApiKey(event.target.value)}
                   onKeyDown={(event) => {
@@ -346,7 +352,7 @@ export function InlineAiConnect() {
 
             {showOtherProviders && (
               <div className="mt-2 flex flex-wrap gap-2">
-                {(['openai-api', 'anthropic-api', 'ollama'] as const).map((name) => {
+                {(['groq', 'openai-api', 'anthropic-api', 'ollama'] as const).map((name) => {
                   if (name === 'ollama' && hostedMode) return null;
                   return (
                     <button
