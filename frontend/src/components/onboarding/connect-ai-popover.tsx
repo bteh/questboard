@@ -185,9 +185,9 @@ export function ConnectAiPopover({ children, side = 'top', align = 'start' }: Co
                     )}
                   >
                     {name === 'gemini'
-                      ? 'Gemini'
+                      ? 'Gemini ★'
                       : name === 'openai-api'
-                        ? 'ChatGPT'
+                        ? 'OpenAI'
                         : name === 'anthropic-api'
                           ? 'Claude'
                           : 'Local'}

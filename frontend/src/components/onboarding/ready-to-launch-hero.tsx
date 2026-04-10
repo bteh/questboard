@@ -14,8 +14,8 @@ import {
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { ConnectAiPopover } from '@/components/onboarding/connect-ai-popover';
 import { GeneratedProfileCard } from '@/components/onboarding/generated-profile-card';
+import { InlineAiConnect } from '@/components/onboarding/inline-ai-connect';
 import { useSearchContext } from '@/contexts/search-context';
 import { useLLMStatus } from '@/hooks/use-settings';
 import {
@@ -341,6 +341,12 @@ export function ReadyToLaunchHero() {
           </div>
         )}
 
+        {/* Inline AI connect — prominent card when AI is not configured.
+            Replaces the old hidden-in-a-popover link. Gemini-first with
+            step-by-step instructions so a non-technical user can connect
+            in 30 seconds. Skippable. */}
+        {showManualSummary && !aiAvailable && <InlineAiConnect />}
+
         {/* Primary CTA — hidden when the AI card is showing (it has its
             own primary button) */}
         <div className="space-y-3">
@@ -354,7 +360,7 @@ export function ReadyToLaunchHero() {
               {isStarting ? (
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
               ) : null}
-              Start your first search
+              {aiAvailable ? 'Start your AI-powered search' : 'Start your first search'}
               {!isStarting && <ArrowRight className="ml-2 h-5 w-5" />}
             </Button>
           )}
@@ -368,20 +374,6 @@ export function ReadyToLaunchHero() {
               <SettingsIcon className="h-3.5 w-3.5" />
               Edit search settings
             </button>
-            {!aiAvailable && (
-              <>
-                <span className="text-border-default">·</span>
-                <ConnectAiPopover side="bottom" align="center">
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1.5 text-text-muted transition-colors hover:text-text-secondary"
-                  >
-                    <Sparkles className="h-3.5 w-3.5" />
-                    Connect AI for better ranking
-                  </button>
-                </ConnectAiPopover>
-              </>
-            )}
           </div>
         </div>
       </div>

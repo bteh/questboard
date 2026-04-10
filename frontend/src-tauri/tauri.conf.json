@@ -33,6 +33,10 @@
     "resources": {
       "../../.desktop-build/tauri-sidecars/*": "sidecars/"
     },
-    "targets": "all"
+    "targets": "all",
+    "macOS": {
+      "signingIdentity": "-",
+      "entitlements": null
+    }
   }
 }

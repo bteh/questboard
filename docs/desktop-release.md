@@ -115,6 +115,38 @@ These map directly to the official Tauri environment variable interface document
 - [Tauri environment variables](https://v2.tauri.app/reference/environment-variables/)
 - [Tauri macOS signing / notarization](https://v2.tauri.app/distribute/sign/macos/)
 
+## For Users Downloading Unsigned Builds
+
+Until Apple signing credentials are configured, macOS Gatekeeper will block the app.
+Users downloading an unsigned build should do one of the following after dragging
+Launchboard.app to /Applications:
+
+**Option A — Right-click workaround (easiest):**
+
+1. Right-click (or Control-click) Launchboard.app in /Applications
+2. Click "Open" from the context menu
+3. Click "Open" again in the dialog that appears
+4. macOS remembers this choice — subsequent launches work normally
+
+**Option B — Terminal workaround:**
+
+```bash
+xattr -cr /Applications/Launchboard.app
+```
+
+This clears the quarantine flag. The app will launch normally after this.
+
+**Note:** Both workarounds are standard for open-source macOS apps that aren't
+signed with an Apple Developer certificate. Once signing is configured, users
+won't need to do either of these.
+
+## Tauri Signing Config
+
+`tauri.conf.json` sets `signingIdentity: "-"` (ad-hoc signing) for local dev
+builds. In CI, Tauri automatically uses the `APPLE_SIGNING_IDENTITY` environment
+variable when present, overriding this value. No additional config changes are
+needed once the GitHub secrets are populated.
+
 ## What You Need To Do
 
 1. Enroll in the Apple Developer Program if you have not already.
