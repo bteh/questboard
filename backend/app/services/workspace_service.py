@@ -989,6 +989,8 @@ def save_workspace_resume(
                     "industry": analysis.get("industry", ""),
                     "seniority": analysis.get("seniority", ""),
                     "years_experience": analysis.get("years_experience", 0),
+                    "suggested_target_roles": analysis.get("suggested_target_roles", []),
+                    "suggested_keywords": analysis.get("suggested_keywords", []),
                 }
             )
 
@@ -1109,28 +1111,43 @@ def derive_search_terms_from_resume(
         candidate = _clean_candidate(" ".join(reversed(collected)))
         return candidate if _looks_like_title(candidate) else ""
 
-    # 1) Use current_title from preferences as a role
-    if prefs.current_title:
+    # 1) Use roles and keywords already saved in preferences (from prior
+    #    resume upload analysis or user edits)
+    if prefs.roles:
+        roles.extend(prefs.roles)
+    if prefs.keywords:
+        keywords.extend(prefs.keywords)
+
+    # 2) Use current_title as a fallback role
+    if prefs.current_title and prefs.current_title not in roles:
         roles.append(prefs.current_title)
 
-    # 2) Try LLM analysis stored on the resume record
+    # 3) Try LLM analysis stored on the resume record — this persists
+    #    suggested_target_roles and suggested_keywords from the upload
+    #    analysis even if preferences were later cleared
     record = get_workspace_resume(db, workspace_id)
     if record and record.llm_summary:
         try:
             summary = json.loads(record.llm_summary)
             industry = summary.get("industry", "")
-            if industry and industry != "unknown":
+            if industry and industry != "unknown" and industry not in keywords:
                 keywords.append(industry)
+            for role in summary.get("suggested_target_roles", []):
+                if role and role not in roles:
+                    roles.append(role)
+            for kw in summary.get("suggested_keywords", []):
+                if kw and kw not in keywords:
+                    keywords.append(kw)
         except (json.JSONDecodeError, TypeError):
             pass
 
-    # 3) If still no roles, extract from resume text (basic heuristic)
+    # 4) If still no roles, extract from resume text (basic heuristic)
     if not roles and record and record.extracted_text:
         candidate = _extract_title_from_text(record.extracted_text)
         if candidate:
             roles.append(candidate)
 
-    return roles[:5], keywords[:10]
+    return roles[:15], keywords[:20]
 
 
 def place_labels(places: list[PlaceSelection]) -> list[str]:
