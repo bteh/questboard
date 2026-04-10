@@ -604,6 +604,34 @@ def _resolve_location_filter_preferences(
     return pref_locations, pref_states, pref_cities, _derive_place_payloads(pref_locations), remote_only, include_remote
 
 
+def _job_salary_passes(job: dict, hard_floor: float) -> bool:
+    """Return True if the job's salary meets the hard floor, or is unknown.
+
+    Uses the midpoint of the salary range when both min and max are known,
+    otherwise uses salary_max. Jobs with no salary data always pass —
+    filtering them out would remove most listings.
+    """
+    sal_max = job.get("salary_max_annualized") or job.get("salary_max")
+    sal_min = job.get("salary_min_annualized") or job.get("salary_min")
+
+    # No salary data → let it through
+    if not sal_max and not sal_min:
+        return True
+
+    # Both min and max → use midpoint (a $60K-$200K range shouldn't be
+    # killed by a $68K floor just because the min is low)
+    if sal_min and sal_max:
+        midpoint = (sal_min + sal_max) / 2
+        return midpoint >= hard_floor
+
+    # Only max known → check max directly
+    if sal_max:
+        return sal_max >= hard_floor
+
+    # Only min known → check min directly
+    return sal_min >= hard_floor
+
+
 def _filter_jobs_by_level(
     jobs: list[dict],
     career_cfg: dict | None,
@@ -1164,19 +1192,22 @@ class JobFinderPipeline:
             logger.warning("Location filter SKIPPED — no preferences configured")
 
         # --- Salary filter: remove jobs with known salary below minimum ---
+        # Use min_acceptable_tc if set (the user's real floor), otherwise
+        # fall back to min_base. Only a small flex (15%) to account for
+        # equity/bonus that aren't in the listed base range.
         comp_cfg = self.config.get("compensation", {})
-        min_base = annualize_amount(
-            comp_cfg.get("min_base", 0),
-            comp_cfg.get("pay_period", "annual"),
-        ) or 0
-        if min_base and min_base > 0:
-            # Allow 30% flex (e.g. min $190K filters out jobs < $133K)
-            hard_floor = min_base * 0.7
+        pay_period = comp_cfg.get("pay_period", "annual")
+        salary_floor_raw = (
+            comp_cfg.get("min_acceptable_tc")
+            or comp_cfg.get("min_base", 0)
+        )
+        salary_floor = annualize_amount(salary_floor_raw, pay_period) or 0
+        if salary_floor and salary_floor > 0:
+            hard_floor = salary_floor * 0.85  # 15% flex for equity/bonus
             pre_count = len(deduped)
             deduped = [
                 j for j in deduped
-                if not (j.get("salary_max_annualized") or j.get("salary_max"))
-                or (j.get("salary_max_annualized") or j.get("salary_max")) >= hard_floor
+                if _job_salary_passes(j, hard_floor)
             ]
             dropped = pre_count - len(deduped)
             if dropped and progress:
