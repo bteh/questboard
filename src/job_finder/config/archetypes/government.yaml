@@ -1,0 +1,57 @@
+archetype:
+  name: "Government / Public sector"
+  description: "Federal, state, and local government roles — civil service, policy, public administration"
+  emoji: "🏛️"
+
+scoring:
+  technical_skills: 0.20
+  leadership_signal: 0.10
+  career_progression: 0.15
+  platform_building: 0.05
+  comp_potential: 0.10
+  company_trajectory: 0.05
+  culture_fit: 0.35
+  thresholds:
+    strong_apply: 70
+    apply: 55
+    maybe: 40
+
+keywords:
+  technical:
+    - "GS-09"
+    - "GS-11"
+    - "GS-12"
+    - "GS-13"
+    - "GS-14"
+    - "security clearance"
+    - "Public Trust"
+    - "federal regulations"
+    - "FAR"
+    - "FISMA"
+    - "policy analysis"
+    - "program management"
+  leadership:
+    - "supervisor"
+    - "branch chief"
+    - "deputy director"
+    - "program manager"
+    - "team lead"
+
+enabled_scrapers:
+  - usajobs
+  - indeed
+  - linkedin
+  - google
+
+target_roles:
+  - "Program Analyst"
+  - "Policy Analyst"
+  - "Management Analyst"
+  - "Contract Specialist"
+
+compensation:
+  currency: "USD"
+  pay_period: "annual"
+  min_base: 65000
+  target_total_comp: 100000
+  include_equity: false

@@ -1,0 +1,59 @@
+archetype:
+  name: "Education"
+  description: "K-12 teachers, higher ed faculty, administrators, instructional designers"
+  emoji: "📚"
+
+scoring:
+  technical_skills: 0.15
+  leadership_signal: 0.15
+  career_progression: 0.20
+  platform_building: 0.05
+  comp_potential: 0.10
+  company_trajectory: 0.05
+  culture_fit: 0.30
+  thresholds:
+    strong_apply: 70
+    apply: 55
+    maybe: 40
+
+keywords:
+  technical:
+    - "curriculum"
+    - "lesson planning"
+    - "differentiated instruction"
+    - "IEP"
+    - "504 plan"
+    - "Common Core"
+    - "Google Classroom"
+    - "Canvas LMS"
+    - "Schoology"
+    - "Title I"
+  leadership:
+    - "department chair"
+    - "grade level lead"
+    - "instructional coach"
+    - "principal"
+    - "assistant principal"
+    - "dean"
+    - "tenure track"
+
+enabled_scrapers:
+  - indeed
+  - linkedin
+  - glassdoor
+  - google
+  - themuse
+
+target_roles:
+  - "Teacher"
+  - "Math Teacher"
+  - "Instructional Coach"
+  - "Assistant Principal"
+  - "Curriculum Coordinator"
+
+compensation:
+  currency: "USD"
+  pay_period: "annual"
+  min_base: 50000
+  target_total_comp: 75000
+  include_equity: false

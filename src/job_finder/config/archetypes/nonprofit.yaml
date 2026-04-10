@@ -1,0 +1,56 @@
+archetype:
+  name: "Nonprofit / Mission-driven"
+  description: "Nonprofits, NGOs, foundations, social impact, advocacy, community organizations"
+  emoji: "🤝"
+
+scoring:
+  technical_skills: 0.15
+  leadership_signal: 0.15
+  career_progression: 0.15
+  platform_building: 0.10
+  comp_potential: 0.10
+  company_trajectory: 0.05
+  culture_fit: 0.30
+  thresholds:
+    strong_apply: 70
+    apply: 55
+    maybe: 40
+
+keywords:
+  technical:
+    - "501c3"
+    - "fundraising"
+    - "grant writing"
+    - "donor management"
+    - "Salesforce NPSP"
+    - "program evaluation"
+    - "impact measurement"
+    - "community engagement"
+    - "stakeholder management"
+    - "advocacy"
+  leadership:
+    - "program director"
+    - "executive director"
+    - "development director"
+    - "chief of staff"
+    - "campaign manager"
+
+enabled_scrapers:
+  - idealist
+  - indeed
+  - linkedin
+  - google
+  - themuse
+
+target_roles:
+  - "Program Manager"
+  - "Development Director"
+  - "Communications Manager"
+  - "Grant Writer"
+
+compensation:
+  currency: "USD"
+  pay_period: "annual"
+  min_base: 55000
+  target_total_comp: 80000
+  include_equity: false

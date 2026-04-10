@@ -1,0 +1,59 @@
+archetype:
+  name: "Skilled trades"
+  description: "Construction, electrical, plumbing, HVAC, welding, mechanics, manufacturing"
+  emoji: "🔧"
+
+scoring:
+  technical_skills: 0.25
+  leadership_signal: 0.10
+  career_progression: 0.10
+  platform_building: 0.05
+  comp_potential: 0.20
+  company_trajectory: 0.10
+  culture_fit: 0.20
+  thresholds:
+    strong_apply: 70
+    apply: 55
+    maybe: 40
+
+keywords:
+  technical:
+    - "journeyman"
+    - "apprentice"
+    - "OSHA 30"
+    - "OSHA 10"
+    - "blueprint reading"
+    - "MIG welding"
+    - "TIG welding"
+    - "HVAC"
+    - "electrical license"
+    - "plumbing license"
+    - "EPA 608"
+    - "forklift certified"
+    - "CDL"
+  leadership:
+    - "foreman"
+    - "general foreman"
+    - "superintendent"
+    - "site supervisor"
+    - "shop lead"
+
+enabled_scrapers:
+  - indeed
+  - linkedin
+  - zip_recruiter
+  - google
+
+target_roles:
+  - "Electrician"
+  - "HVAC Technician"
+  - "Welder"
+  - "Plumber"
+  - "Construction Foreman"
+
+compensation:
+  currency: "USD"
+  pay_period: "annual"
+  min_base: 55000
+  target_total_comp: 85000
+  include_equity: false

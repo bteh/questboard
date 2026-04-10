@@ -1,0 +1,62 @@
+archetype:
+  name: "Creative / Design"
+  description: "Designers, writers, illustrators, art directors, brand, marketing creative"
+  emoji: "🎨"
+
+scoring:
+  technical_skills: 0.20
+  leadership_signal: 0.10
+  career_progression: 0.15
+  platform_building: 0.10
+  comp_potential: 0.15
+  company_trajectory: 0.10
+  culture_fit: 0.20
+  thresholds:
+    strong_apply: 70
+    apply: 55
+    maybe: 40
+
+keywords:
+  technical:
+    - "Figma"
+    - "Sketch"
+    - "Adobe Creative Suite"
+    - "Photoshop"
+    - "Illustrator"
+    - "After Effects"
+    - "InDesign"
+    - "design system"
+    - "brand identity"
+    - "art direction"
+    - "user research"
+    - "prototyping"
+    - "Webflow"
+  leadership:
+    - "design lead"
+    - "art director"
+    - "creative director"
+    - "head of design"
+    - "design manager"
+
+enabled_scrapers:
+  - indeed
+  - linkedin
+  - glassdoor
+  - google
+  - themuse
+  - builtin
+  - workatastartup
+
+target_roles:
+  - "Product Designer"
+  - "Senior Product Designer"
+  - "Brand Designer"
+  - "Art Director"
+  - "Design Lead"
+
+compensation:
+  currency: "USD"
+  pay_period: "annual"
+  min_base: 90000
+  target_total_comp: 140000
+  include_equity: false

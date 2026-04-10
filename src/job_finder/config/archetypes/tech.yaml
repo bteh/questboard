@@ -1,0 +1,73 @@
+archetype:
+  name: "Tech / Engineering"
+  description: "Software engineers, data, ML, infrastructure, security, product, design at tech companies"
+  emoji: "💻"
+
+scoring:
+  technical_skills: 0.30
+  leadership_signal: 0.10
+  career_progression: 0.15
+  platform_building: 0.15
+  comp_potential: 0.15
+  company_trajectory: 0.10
+  culture_fit: 0.05
+  thresholds:
+    strong_apply: 70
+    apply: 55
+    maybe: 40
+
+keywords:
+  technical:
+    - "Python"
+    - "TypeScript"
+    - "React"
+    - "Kubernetes"
+    - "AWS"
+    - "PostgreSQL"
+    - "distributed systems"
+    - "microservices"
+    - "CI/CD"
+  leadership:
+    - "tech lead"
+    - "staff engineer"
+    - "principal"
+    - "engineering manager"
+    - "architect"
+  platform_building:
+    - "greenfield"
+    - "rebuild"
+    - "platform"
+    - "infrastructure"
+    - "0 to 1"
+
+enabled_scrapers:
+  - indeed
+  - linkedin
+  - glassdoor
+  - google
+  - greenhouse
+  - lever
+  - ashby
+  - workday
+  - workatastartup
+  - builtin
+  - hackernews
+  - remoteok
+  - remotive
+  - himalayas
+  - weworkremotely
+  - arbeitnow
+  - themuse
+
+target_roles:
+  - "Software Engineer"
+  - "Senior Software Engineer"
+  - "Staff Engineer"
+  - "Engineering Manager"
+
+compensation:
+  currency: "USD"
+  pay_period: "annual"
+  min_base: 130000
+  target_total_comp: 220000
+  include_equity: true

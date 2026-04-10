@@ -1,0 +1,64 @@
+archetype:
+  name: "Healthcare"
+  description: "Nurses, physicians, therapists, allied health, clinical operations"
+  emoji: "🏥"
+
+scoring:
+  technical_skills: 0.20
+  leadership_signal: 0.10
+  career_progression: 0.15
+  platform_building: 0.05
+  comp_potential: 0.15
+  company_trajectory: 0.10
+  culture_fit: 0.25
+  thresholds:
+    strong_apply: 70
+    apply: 55
+    maybe: 40
+
+keywords:
+  technical:
+    - "RN"
+    - "BSN"
+    - "MSN"
+    - "ICU"
+    - "ER"
+    - "Med-Surg"
+    - "OR"
+    - "L&D"
+    - "telemetry"
+    - "EPIC"
+    - "Cerner"
+    - "BLS"
+    - "ACLS"
+    - "PALS"
+    - "patient acuity"
+    - "clinical workflow"
+  leadership:
+    - "charge nurse"
+    - "preceptor"
+    - "clinical lead"
+    - "nurse manager"
+    - "director of nursing"
+  platform_building: []
+
+enabled_scrapers:
+  - indeed
+  - linkedin
+  - glassdoor
+  - zip_recruiter
+  - google
+  - themuse
+
+target_roles:
+  - "Registered Nurse"
+  - "ICU Nurse"
+  - "Nurse Practitioner"
+  - "Clinical Nurse Specialist"
+
+compensation:
+  currency: "USD"
+  pay_period: "annual"
+  min_base: 70000
+  target_total_comp: 105000
+  include_equity: false
