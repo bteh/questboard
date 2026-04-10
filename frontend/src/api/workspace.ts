@@ -1,5 +1,6 @@
 import { apiGet, apiPost, apiUpload } from '@/lib/api-client';
 import type {
+  GeneratedProfile,
   HostedBootstrap,
   LocationSuggestion,
   OnboardingState,
@@ -37,4 +38,18 @@ export function startOnboardingSearch(preferences: WorkspacePreferences): Promis
 
 export function suggestLocations(query: string, limit = 8): Promise<LocationSuggestion[]> {
   return apiGet<LocationSuggestion[]>('/locations/suggest', { q: query, limit });
+}
+
+/**
+ * Generate an LLM-tailored search profile from the user's resume.
+ *
+ * Returns a complete GeneratedProfile (archetype, scoring weights,
+ * keywords, recommended scrapers + external boards). Throws if no
+ * resume is uploaded yet (400) or if the LLM is not configured (503).
+ *
+ * Cached on the backend per (workspace_id, resume_hash) so calling
+ * this repeatedly during one session does not burn LLM credits.
+ */
+export function generateWorkspaceProfile(): Promise<GeneratedProfile> {
+  return apiPost<GeneratedProfile>('/onboarding/generate-profile');
 }

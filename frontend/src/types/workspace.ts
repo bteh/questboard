@@ -154,6 +154,61 @@ export interface WorkspaceSearchRunResponse {
   completed_at: string | null;
 }
 
+/**
+ * LLM-tailored search profile generated from the workspace's resume.
+ *
+ * The whole point of this object is to make Launchboard work for *any*
+ * career, not just the seven hardcoded archetype templates. A user with
+ * an unusual or multi-domain background gets a profile generated
+ * specifically for them — covering niches we never modeled (climate
+ * tech, vet med, MTS at frontier labs, biotech regulatory, etc.).
+ *
+ * Wire-compat with the backend GeneratedProfileResponse and the
+ * pipeline-layer GeneratedProfile pydantic model — same field names
+ * top to bottom.
+ */
+export interface GeneratedProfileScoring {
+  technical_skills: number;
+  leadership_signal: number;
+  career_progression: number;
+  platform_building: number;
+  comp_potential: number;
+  company_trajectory: number;
+  culture_fit: number;
+}
+
+export interface GeneratedProfileKeywords {
+  technical: string[];
+  leadership: string[];
+  signal_terms: string[];
+}
+
+export interface GeneratedProfileCompensation {
+  currency: string;
+  pay_period: string;
+  min_base: number;
+  target_total_comp: number;
+  include_equity: boolean;
+}
+
+export interface GeneratedProfile {
+  detected_archetype: string;
+  confidence: number;
+  reasoning: string;
+  closest_template: string | null;
+  career_target: string;
+  seniority_signal: string;
+  scoring: GeneratedProfileScoring;
+  keywords: GeneratedProfileKeywords;
+  target_roles: string[];
+  compensation: GeneratedProfileCompensation;
+  enabled_scrapers: string[];
+  recommended_external_boards: string[];
+  primary_strengths: string[];
+  development_areas: string[];
+  cached: boolean;
+}
+
 export interface LocationSuggestion {
   label: string;
   kind: 'city' | 'region' | 'country' | 'manual';
