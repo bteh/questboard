@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import {
   ArrowRight,
@@ -22,7 +22,11 @@ import {
   useUploadWorkspaceResume,
 } from '@/hooks/use-workspace';
 import { useLLMStatus } from '@/hooks/use-settings';
-import { buildDefaultWorkspacePreferences } from '@/lib/profile-preferences';
+import {
+  buildDefaultWorkspacePreferences,
+  createManualPlace,
+  normalizePlaceList,
+} from '@/lib/profile-preferences';
 import { getSearchReadiness } from '@/lib/search-readiness';
 import { cn } from '@/lib/utils';
 import type { WorkspacePreferences } from '@/types/workspace';
@@ -97,6 +101,40 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
   // upload happen inside `handleFileUpload`, not here.
   const [step, setStep] = useState<Step>(resumeUploaded ? 'search' : 'resume');
 
+  // When the wizard opens with a resume already on disk but no roles
+  // pre-filled (e.g. user reset, or uploaded before but didn't finish),
+  // fire the AI suggest to populate roles/keywords/locations/companies.
+  const suggestFiredRef = useRef(false);
+  useEffect(() => {
+    if (
+      open &&
+      resumeUploaded &&
+      aiAvailable &&
+      !prefilledFromResume &&
+      !suggestSearch.isPending &&
+      !suggestFiredRef.current
+    ) {
+      suggestFiredRef.current = true;
+      suggestSearch.mutate('workspace', {
+        onSuccess: (suggestion) => {
+          setForm((prev) => {
+            const suggestedPlaces =
+              suggestion.locations.length > 0 && prev.preferred_places.length === 0
+                ? normalizePlaceList(suggestion.locations.map(createManualPlace))
+                : prev.preferred_places;
+            return {
+              ...prev,
+              roles: prev.roles.length > 0 ? prev.roles : suggestion.roles,
+              keywords: prev.keywords.length > 0 ? prev.keywords : suggestion.keywords,
+              companies: prev.companies.length > 0 ? prev.companies : suggestion.companies,
+              preferred_places: suggestedPlaces,
+            };
+          });
+        },
+      });
+    }
+  }, [open, resumeUploaded, aiAvailable, prefilledFromResume, suggestSearch, setForm]);
+
   const searchReadiness = getSearchReadiness({
     roles: form.roles,
     keywords: form.keywords,
@@ -135,12 +173,22 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
         if (llm?.available) {
           suggestSearch.mutate('workspace', {
             onSuccess: (suggestion) => {
-              setForm((prev) => ({
-                ...prev,
-                roles: prev.roles.length > 0 ? prev.roles : suggestion.roles,
-                keywords: prev.keywords.length > 0 ? prev.keywords : suggestion.keywords,
-                companies: prev.companies.length > 0 ? prev.companies : suggestion.companies,
-              }));
+              setForm((prev) => {
+                // Convert location strings from the LLM into PlaceSelection
+                // objects so the location chips render immediately.
+                const suggestedPlaces =
+                  suggestion.locations.length > 0 && prev.preferred_places.length === 0
+                    ? normalizePlaceList(suggestion.locations.map(createManualPlace))
+                    : prev.preferred_places;
+
+                return {
+                  ...prev,
+                  roles: prev.roles.length > 0 ? prev.roles : suggestion.roles,
+                  keywords: prev.keywords.length > 0 ? prev.keywords : suggestion.keywords,
+                  companies: prev.companies.length > 0 ? prev.companies : suggestion.companies,
+                  preferred_places: suggestedPlaces,
+                };
+              });
             },
           });
         }
