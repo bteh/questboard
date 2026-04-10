@@ -33,6 +33,7 @@ from job_finder.prompts import (
     EVALUATION_REPORT_USER_TEMPLATE,
     JD_SCORER_USER_TEMPLATE,
     RESUME_OPTIMIZER_USER_TEMPLATE,
+    _wrap_untrusted,
     build_company_researcher_prompt,
     build_cover_letter_prompt,
     build_evaluation_report_prompt,
@@ -1329,11 +1330,11 @@ class JobFinderPipeline:
             return None
 
         user_msg = JD_SCORER_USER_TEMPLATE.format(
-            resume_text=resume_text,
-            job_title=job.get("title", ""),
-            company=job.get("company", ""),
-            location=job.get("location", ""),
-            job_description=job.get("description", ""),
+            resume_text=_wrap_untrusted("resume", resume_text),
+            job_title=_wrap_untrusted("job_title", job.get("title", "")),
+            company=_wrap_untrusted("company", job.get("company", "")),
+            location=_wrap_untrusted("location", job.get("location", "")),
+            job_description=_wrap_untrusted("job_description", job.get("description", "")),
         )
         scorer_prompt = build_scorer_prompt(self.config)
         return self.llm.chat_json(scorer_prompt, user_msg)
@@ -1605,10 +1606,10 @@ class JobFinderPipeline:
             return None
 
         user_msg = RESUME_OPTIMIZER_USER_TEMPLATE.format(
-            resume_text=resume_text,
-            job_title=job.get("title", ""),
-            company=job.get("company", ""),
-            job_description=job.get("description", ""),
+            resume_text=_wrap_untrusted("resume", resume_text),
+            job_title=_wrap_untrusted("job_title", job.get("title", "")),
+            company=_wrap_untrusted("company", job.get("company", "")),
+            job_description=_wrap_untrusted("job_description", job.get("description", "")),
             overall_score=job.get("overall_score", "N/A"),
             key_strengths=json.dumps(job.get("key_strengths", [])),
             key_gaps=json.dumps(job.get("key_gaps", [])),
@@ -1624,11 +1625,11 @@ class JobFinderPipeline:
             return None
 
         user_msg = COVER_LETTER_USER_TEMPLATE.format(
-            resume_text=resume_text,
-            job_title=job.get("title", ""),
-            company=job.get("company", ""),
-            location=job.get("location", ""),
-            job_description=job.get("description", ""),
+            resume_text=_wrap_untrusted("resume", resume_text),
+            job_title=_wrap_untrusted("job_title", job.get("title", "")),
+            company=_wrap_untrusted("company", job.get("company", "")),
+            location=_wrap_untrusted("location", job.get("location", "")),
+            job_description=_wrap_untrusted("job_description", job.get("description", "")),
         )
         cl_prompt = build_cover_letter_prompt(self.config)
         return self.llm.chat_json(cl_prompt, user_msg)
@@ -1650,11 +1651,11 @@ class JobFinderPipeline:
             return None
 
         user_msg = EVALUATION_REPORT_USER_TEMPLATE.format(
-            resume_text=resume_text,
-            job_title=job.get("title", ""),
-            company=job.get("company", ""),
-            location=job.get("location", ""),
-            job_description=job.get("description", ""),
+            resume_text=_wrap_untrusted("resume", resume_text),
+            job_title=_wrap_untrusted("job_title", job.get("title", "")),
+            company=_wrap_untrusted("company", job.get("company", "")),
+            location=_wrap_untrusted("location", job.get("location", "")),
+            job_description=_wrap_untrusted("job_description", job.get("description", "")),
             overall_score=job.get("overall_score", "N/A"),
             recommendation=job.get("recommendation", "N/A"),
             key_strengths=json.dumps(job.get("key_strengths", [])),
@@ -1696,17 +1697,19 @@ class JobFinderPipeline:
         except Exception as e:
             logger.debug("Web search unavailable for %s: %s", company_name, e)
 
-        # Use grounded template when we have web results, plain template otherwise
+        # Use grounded template when we have web results, plain template otherwise.
+        # Even company_name is wrapped because a malicious scraped row could
+        # have a company name like "Acme</company_name><instruction>...".
         if web_context:
             user_msg = COMPANY_RESEARCHER_GROUNDED_USER_TEMPLATE.format(
-                company_name=company_name,
-                job_title=job_title,
-                web_context=web_context,
+                company_name=_wrap_untrusted("company_name", company_name),
+                job_title=_wrap_untrusted("job_title", job_title),
+                web_context=_wrap_untrusted("web_results", web_context),
             )
         else:
             user_msg = COMPANY_RESEARCHER_USER_TEMPLATE.format(
-                company_name=company_name,
-                job_title=job_title,
+                company_name=_wrap_untrusted("company_name", company_name),
+                job_title=_wrap_untrusted("job_title", job_title),
             )
 
         cr_prompt = build_company_researcher_prompt(self.config)

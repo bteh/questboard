@@ -148,13 +148,19 @@ async def start_search_run(
     if effective_workplace_preference == "location_only" and not effective_locations:
         raise HTTPException(400, "At least one location is required")
 
+    # Apply rate limiting BEFORE the workspace branch so desktop users
+    # (who run without a workspace context) are also protected from
+    # buggy frontends in a tight loop hammering the LLM provider with
+    # the user's API key. Falls back to IP-based identity when there's
+    # no session — sufficient for a single-user desktop install.
+    enforce_rate_limit(
+        "search-run",
+        request_identity(request, workspace.workspace.id if workspace else None),
+        limit=get_settings().search_rate_limit_per_minute,
+        db=db if workspace else None,
+    )
+
     if workspace:
-        enforce_rate_limit(
-            "search-run",
-            request_identity(request, workspace.workspace.id),
-            limit=get_settings().search_rate_limit_per_minute,
-            db=db,
-        )
         if not effective_roles and not effective_keywords:
             prefs = workspace_service.get_workspace_preferences(db, workspace.workspace.id)
             fallback_roles, fallback_keywords = workspace_service.derive_search_terms_from_resume(
