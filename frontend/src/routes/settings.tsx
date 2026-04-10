@@ -509,7 +509,7 @@ function SettingsPage() {
                 value={prefsForm.companies}
                 onChange={(companies) => setPrefsForm((prev) => ({ ...prev, companies }))}
                 placeholder="e.g. Stripe — press Enter to add"
-                helperText="Launchboard will search these company career pages directly on Greenhouse, Lever, and Ashby when available."
+                helperText="Launchboard scrapes these companies' career pages directly (Greenhouse, Lever, Ashby, Workday) — catching jobs that may not appear on Indeed or LinkedIn yet."
                 emptyText="No target companies added yet."
               />
             </div>

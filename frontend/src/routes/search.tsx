@@ -873,6 +873,9 @@ function SearchPage() {
                         </span>
                       )}
                     </div>
+                    <p className="text-[11px] leading-relaxed text-text-muted">
+                      Launchboard scrapes these companies' career pages directly (Greenhouse, Lever, Ashby, Workday) — catching jobs that may not appear on Indeed or LinkedIn yet. AI suggests companies from your resume; add any others you're interested in.
+                    </p>
                     <div className="flex gap-2">
                       <input
                         type="text"
@@ -1270,7 +1273,7 @@ function SearchPage() {
               <div className="space-y-3">
                 <SnapshotList label="Roles" values={snapshot.roles} emptyLabel="No roles provided" />
                 <SnapshotList label="Keywords" values={snapshot.keywords} emptyLabel="No keywords provided" />
-                <SnapshotList label="Target Companies" values={snapshot.companies ?? []} emptyLabel="No target companies provided" />
+                <SnapshotList label="Target Companies (direct career page scrape)" values={snapshot.companies ?? []} emptyLabel="No target companies — using job board search only" />
                 <SnapshotList
                   label="Preferred Locations"
                   values={snapshot.locations}
