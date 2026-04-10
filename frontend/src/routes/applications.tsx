@@ -112,15 +112,17 @@ function ApplicationsPage() {
   const [selectedJobId, setSelectedJobId] = useState<number | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Default filter: only Strong Apply (>=70) matches. Career-ops philosophy:
-  // target 5 well-matched roles instead of 50 generic blasts. The user can
-  // one-click "Show all tracked jobs" to drop the filter.
+  // When navigating from "View N Jobs" on the search page (explicit run),
+  // show ALL jobs from that run — the user expects to see everything they
+  // found. When landing on the page normally (no run param), default to
+  // strong matches so the user sees a curated list.
   const STRONG_MATCH_THRESHOLD = 70;
   const [filters, setFilters] = useState<ApplicationFilters>({
     sort_by: 'overall_score',
     sort_order: 'desc',
     page: 1,
     page_size: 25,
-    min_score: STRONG_MATCH_THRESHOLD,
+    min_score: searchRunId ? undefined : STRONG_MATCH_THRESHOLD,
   });
 
   const { data, isLoading } = useApplications({ ...filters, profile, search_run_id: effectiveRunId });
