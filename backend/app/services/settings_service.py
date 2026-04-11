@@ -252,6 +252,7 @@ def _auto_detect_and_configure() -> str:
 def get_llm_status() -> dict:
     """Return current LLM configuration and availability."""
     from job_finder.secrets import is_available as keyring_available
+    from app.services.error_translator import translate as translate_error
 
     auto_detected = os.getenv("LLM_AUTO_DETECTED", "")
     # If no provider is configured, try auto-detecting Ollama
@@ -261,11 +262,18 @@ def get_llm_status() -> dict:
     llm = get_llm()
     info = llm.get_provider_info()
     available = False
+    last_error_translation = None
     if llm.is_configured:
         try:
             available = llm.is_available()
         except Exception:
             pass
+        # If there's a captured error from the availability check, translate it
+        if llm.last_error is not None and not available:
+            last_error_translation = translate_error(
+                llm.last_error,
+                provider=os.getenv("LLM_PROVIDER", ""),
+            )
     return {
         "configured": llm.is_configured,
         "available": available,
@@ -275,6 +283,7 @@ def get_llm_status() -> dict:
         "runtime_configurable": bool(get_settings().allow_runtime_llm_config),
         "key_storage": "keychain" if keyring_available() else "local_file",
         "auto_detected": auto_detected,
+        "error": last_error_translation,
     }
 
 

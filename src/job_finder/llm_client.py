@@ -319,6 +319,8 @@ class LLMClient:
         self.api_key = api_key or os.getenv("LLM_API_KEY", "") or _get_keychain_key() or preset.get("api_key", "")
         self.model = model or os.getenv("LLM_MODEL", "") or preset.get("model", "")
 
+        # Most-recent error from is_available() — surfaced via translator
+        self.last_error: Exception | None = None
         self._client = None
         if self.base_url and self.model:
             try:
@@ -381,7 +383,11 @@ class LLMClient:
             cls._availability_cache.clear()
 
     def _check_availability(self) -> bool:
-        """Actually test inference — internal, called by is_available."""
+        """Actually test inference — internal, called by is_available.
+
+        Captures the raw exception in self.last_error so callers (and the
+        error translator) can surface a plain-language message.
+        """
         try:
             response = self._client.chat.completions.create(
                 model=self.model,
@@ -389,8 +395,10 @@ class LLMClient:
                 max_tokens=1,
                 temperature=0,
             )
+            self.last_error = None
             return bool(response.choices)
         except Exception as exc:
+            self.last_error = exc
             msg = str(exc).lower()
             # Auth / permission errors → definitively unavailable
             if any(term in msg for term in [

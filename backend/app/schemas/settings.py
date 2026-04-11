@@ -12,6 +12,13 @@ class LLMConfig(BaseModel):
     model: str = ""
 
 
+class TranslatedError(BaseModel):
+    code: str
+    title: str
+    message: str
+    next_action: dict[str, str]
+
+
 class LLMStatus(BaseModel):
     configured: bool = False
     available: bool = False
@@ -21,6 +28,7 @@ class LLMStatus(BaseModel):
     runtime_configurable: bool = False
     key_storage: str = "local_file"
     auto_detected: str = ""
+    error: TranslatedError | None = None
 
 
 class OllamaDetectResult(BaseModel):

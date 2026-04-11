@@ -1,11 +1,14 @@
+import { useEffect, useState } from 'react';
 import { Link, useMatchRoute } from '@tanstack/react-router';
-import { LayoutDashboard, Search, Briefcase, BarChart3, Settings as SettingsIcon, Zap, Sun, Moon, Monitor } from 'lucide-react';
+import { Activity, LayoutDashboard, Search, Briefcase, BarChart3, Settings as SettingsIcon, Zap, Sun, Moon, Monitor } from 'lucide-react';
 import { useDashboardStats } from '@/hooks/use-analytics';
 import { useLLMStatus } from '@/hooks/use-settings';
+import { useSystemHealth } from '@/hooks/use-system-health';
 import { useTheme } from '@/contexts/theme-context';
 import { useWorkspace } from '@/contexts/workspace-context';
 import { Button } from '@/components/ui/button';
-import { ConnectAiPopover } from '@/components/onboarding/connect-ai-popover';
+import { AiDiagnosticModal } from '@/components/onboarding/ai-diagnostic-modal';
+import { SystemHealthPanel } from '@/components/health/system-health-panel';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
@@ -33,9 +36,19 @@ function getAiLabel(provider: string | undefined, fallback: string | undefined):
 export function Sidebar() {
   const { data: stats } = useDashboardStats();
   const { data: llm } = useLLMStatus();
+  const { data: health } = useSystemHealth();
   const { theme, setTheme } = useTheme();
   const { hostedMode, currentPersona, signOut } = useWorkspace();
   const matchRoute = useMatchRoute();
+  const [aiModalOpen, setAiModalOpen] = useState(false);
+  const [healthPanelOpen, setHealthPanelOpen] = useState(false);
+
+  // Open health panel via global event (fired by diagnostic modal)
+  useEffect(() => {
+    const handler = () => setHealthPanelOpen(true);
+    window.addEventListener('launchboard:open-health', handler);
+    return () => window.removeEventListener('launchboard:open-health', handler);
+  }, []);
 
   return (
     <aside className="flex h-screen w-[260px] flex-col border-r border-border-default bg-bg-card">
@@ -134,35 +147,68 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* LLM connection — clickable to open inline connect popover */}
+      {/* System health — quick link to the dashboard */}
       <div className="border-t border-border-default">
-        <ConnectAiPopover side="top" align="start">
-          <button
-            type="button"
-            className="flex w-full items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-bg-subtle"
-            aria-label={`AI: ${llm?.available ? 'connected' : llm?.configured ? 'disconnected' : 'not connected'}. Click to manage.`}
-          >
-            <span
-              className={cn(
-                'h-1.5 w-1.5 rounded-full shrink-0',
-                llm?.available ? 'bg-success' : llm?.configured ? 'bg-danger' : 'bg-text-faint',
-              )}
-              aria-hidden="true"
-            />
-            <Zap className="h-3.5 w-3.5 text-text-muted shrink-0" />
-            <span className={cn(
-              'text-xs truncate flex-1',
-              llm?.configured && !llm?.available ? 'text-danger' : 'text-text-muted',
-            )}>
-              {llm?.available
-                ? getAiLabel(llm.provider, llm.label)
+        <button
+          type="button"
+          onClick={() => setHealthPanelOpen(true)}
+          className="flex w-full items-center gap-2 px-4 py-2.5 text-left transition-colors hover:bg-bg-subtle"
+          aria-label="Open system health dashboard"
+        >
+          <span
+            className={cn(
+              'h-1.5 w-1.5 rounded-full shrink-0',
+              health?.overall === 'ok' ? 'bg-success'
+                : health?.overall === 'warn' ? 'bg-warning'
+                : health?.overall === 'error' ? 'bg-danger'
+                : 'bg-text-faint',
+            )}
+            aria-hidden="true"
+          />
+          <Activity className="h-3.5 w-3.5 text-text-muted shrink-0" />
+          <span className="text-xs text-text-muted flex-1">
+            System Health
+          </span>
+        </button>
+      </div>
+
+      {/* LLM connection — click opens diagnostic modal */}
+      <div className="border-t border-border-default">
+        <button
+          type="button"
+          onClick={() => setAiModalOpen(true)}
+          className="flex w-full items-center gap-2 px-4 py-3 text-left transition-colors hover:bg-bg-subtle"
+          aria-label={`AI: ${llm?.available ? 'connected' : llm?.configured ? 'disconnected' : 'not connected'}. Click to manage.`}
+        >
+          <span
+            className={cn(
+              'h-1.5 w-1.5 rounded-full shrink-0',
+              llm?.available ? 'bg-success' : llm?.configured ? 'bg-danger' : 'bg-text-faint',
+            )}
+            aria-hidden="true"
+          />
+          <Zap className="h-3.5 w-3.5 text-text-muted shrink-0" />
+          <span className={cn(
+            'text-xs truncate flex-1',
+            llm?.configured && !llm?.available ? 'text-danger' : 'text-text-muted',
+          )}>
+            {llm?.available
+              ? getAiLabel(llm.provider, llm.label)
+              : llm?.error?.title
+                ? `${llm.error.title} — fix`
                 : llm?.configured
                   ? 'AI not responding — click to fix'
                   : 'Connect AI'}
-            </span>
-          </button>
-        </ConnectAiPopover>
+          </span>
+        </button>
       </div>
+
+      <AiDiagnosticModal open={aiModalOpen} onOpenChange={setAiModalOpen} />
+      <SystemHealthPanel
+        open={healthPanelOpen}
+        onOpenChange={setHealthPanelOpen}
+        onOpenDiagnostic={() => setAiModalOpen(true)}
+      />
     </aside>
   );
 }

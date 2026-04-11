@@ -77,6 +77,22 @@ def build_sidecar(*, target_arch: str = "") -> Path:
         str(root / "backend"),
         "--paths",
         str(root / "src"),
+        # Bundle the keyring library + OS backends so the packaged
+        # desktop runtime can store API keys in the system Keychain
+        # instead of a plaintext local file. This lets dev and desktop
+        # share config via the same Keychain entry.
+        "--collect-all",
+        "keyring",
+        "--hidden-import",
+        "keyring.backends.macOS",
+        "--hidden-import",
+        "keyring.backends.Windows",
+        "--hidden-import",
+        "keyring.backends.SecretService",
+        "--hidden-import",
+        "keyring.backends.chainer",
+        "--hidden-import",
+        "keyring.backends.fail",
         str(root / "backend" / "app" / "desktop_runtime.py"),
     ]
     if sys.platform == "darwin" and target_arch.strip():

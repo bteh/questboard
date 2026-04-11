@@ -126,3 +126,166 @@ def _get_tips(
     elif not llm_available:
         tips.append(f"LLM provider '{llm_provider}' is configured but not reachable")
     return tips
+
+
+@router.get("/api/health/system")
+def system_health(db: Session = Depends(get_db)):
+    """Unified health dashboard — shows the state of every subsystem.
+
+    Each row has: status (ok/warn/error), summary, detail, fix_action.
+    The frontend renders this as a "System Health" panel with one-click
+    fix buttons for anything broken.
+    """
+    from app.services import settings_service
+    from app.services.error_translator import translate as translate_error
+    from job_finder.secrets import is_available as keyring_available
+
+    subsystems = {}
+
+    # ── Backend ─────────────────────────────────────────────
+    subsystems["backend"] = {
+        "status": "ok",
+        "summary": "Running",
+        "detail": "API is responding on this port.",
+        "fix_action": None,
+    }
+
+    # ── LLM / AI ────────────────────────────────────────────
+    try:
+        llm_status = settings_service.get_llm_status()
+        if not llm_status.get("configured"):
+            subsystems["ai"] = {
+                "status": "warn",
+                "summary": "Not connected",
+                "detail": "AI scoring is disabled. Search works without AI but results are ranked by keyword matching only.",
+                "fix_action": {"kind": "open_diagnostic", "label": "Connect AI"},
+            }
+        elif not llm_status.get("available"):
+            err = llm_status.get("error") or {}
+            subsystems["ai"] = {
+                "status": "error",
+                "summary": err.get("title") or "AI is not responding",
+                "detail": err.get("message") or "Your AI provider is configured but not answering. Click 'Fix this' to diagnose.",
+                "fix_action": err.get("next_action") or {"kind": "open_diagnostic", "label": "Diagnose"},
+            }
+        else:
+            subsystems["ai"] = {
+                "status": "ok",
+                "summary": f"Connected to {llm_status.get('label') or llm_status.get('provider')}",
+                "detail": f"Model: {llm_status.get('model')}",
+                "fix_action": None,
+            }
+    except Exception as exc:
+        subsystems["ai"] = {
+            "status": "error",
+            "summary": "Cannot check AI status",
+            "detail": str(exc)[:200],
+            "fix_action": {"kind": "open_diagnostic", "label": "Diagnose"},
+        }
+
+    # ── Resume ──────────────────────────────────────────────
+    try:
+        from app.services import workspace_service
+        resume = None
+        try:
+            workspaces = db.query(workspace_service.Workspace).limit(1).all()
+            if workspaces:
+                record = workspace_service.get_workspace_resume(db, workspaces[0].id)
+                if record and record.parse_status == "parsed":
+                    resume = record
+        except Exception:
+            pass
+
+        if resume:
+            subsystems["resume"] = {
+                "status": "ok",
+                "summary": resume.original_filename or "Resume uploaded",
+                "detail": f"Parsed successfully ({(resume.file_size or 0) // 1024} KB)",
+                "fix_action": None,
+            }
+        else:
+            subsystems["resume"] = {
+                "status": "warn",
+                "summary": "No resume uploaded",
+                "detail": "Upload a resume to enable AI-powered scoring against your actual experience.",
+                "fix_action": {"kind": "open_settings", "label": "Upload resume"},
+            }
+    except Exception as exc:
+        subsystems["resume"] = {
+            "status": "warn",
+            "summary": "Resume status unknown",
+            "detail": str(exc)[:200],
+            "fix_action": None,
+        }
+
+    # ── Search / last run ───────────────────────────────────
+    try:
+        from app.services import pipeline_service
+        latest = None
+        for run in pipeline_service._runs.values():
+            if latest is None or (run.started_at or 0) > (latest.started_at or 0):
+                latest = run
+        if latest is None:
+            subsystems["search"] = {
+                "status": "warn",
+                "summary": "No searches yet",
+                "detail": "Run a search from the Dashboard or Search tab.",
+                "fix_action": {"kind": "open_search", "label": "New search"},
+            }
+        elif latest.status == "completed":
+            subsystems["search"] = {
+                "status": "ok",
+                "summary": f"Last search completed",
+                "detail": f"Run {latest.run_id[:8]} found {getattr(latest, 'jobs_found', 0)} jobs.",
+                "fix_action": None,
+            }
+        elif latest.status == "failed":
+            subsystems["search"] = {
+                "status": "error",
+                "summary": "Last search failed",
+                "detail": getattr(latest, "error", "") or "Unknown error.",
+                "fix_action": {"kind": "open_search", "label": "Retry"},
+            }
+        else:
+            subsystems["search"] = {
+                "status": "ok",
+                "summary": f"Search {latest.status}",
+                "detail": f"Run {latest.run_id[:8]} is {latest.status}.",
+                "fix_action": None,
+            }
+    except Exception as exc:
+        subsystems["search"] = {
+            "status": "warn",
+            "summary": "Search status unknown",
+            "detail": str(exc)[:200],
+            "fix_action": None,
+        }
+
+    # ── Key storage ─────────────────────────────────────────
+    if keyring_available():
+        subsystems["keychain"] = {
+            "status": "ok",
+            "summary": "Using OS Keychain",
+            "detail": "API keys are stored securely in your system keychain.",
+            "fix_action": None,
+        }
+    else:
+        subsystems["keychain"] = {
+            "status": "warn",
+            "summary": "Using local file",
+            "detail": "Keychain unavailable. API keys are stored in a local .env file.",
+            "fix_action": None,
+        }
+
+    # Overall status: error beats warn beats ok
+    overall = "ok"
+    for s in subsystems.values():
+        if s["status"] == "error":
+            overall = "error"
+            break
+        if s["status"] == "warn" and overall == "ok":
+            overall = "warn"
+
+    return {"overall": overall, "subsystems": subsystems}
+    # Silence unused import warning; translate_error is used indirectly via get_llm_status
+    _ = translate_error

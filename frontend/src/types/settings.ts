@@ -1,4 +1,5 @@
 import type { WorkplacePreference } from '@/lib/profile-preferences';
+import type { TranslatedError } from '@/lib/ai-errors';
 
 export interface LLMConfig {
   provider: string;
@@ -16,6 +17,7 @@ export interface LLMStatus {
   runtime_configurable: boolean;
   key_storage: 'keychain' | 'local_file';
   auto_detected: string;
+  error: TranslatedError | null;
 }
 
 export interface OllamaDetectResult {
