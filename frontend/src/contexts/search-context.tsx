@@ -186,22 +186,30 @@ export function SearchProvider({ children }: { children: ReactNode }) {
       queryClient.invalidateQueries({ queryKey: ['analytics'] });
     });
 
+    // Server-sent error events have data; native connection errors don't.
+    // Only handle server-sent errors here — connection drops are handled
+    // by onerror below.
     es.addEventListener('error', (e) => {
       const errorEvent = e as MessageEvent;
-      const errorMsg = errorEvent.data || 'Connection lost';
-      setError(errorMsg);
-      setState('failed');
-      es.close();
-      esRef.current = null;
-      queryClient.invalidateQueries({ queryKey: ['applications'] });
+      if (errorEvent.data) {
+        setError(errorEvent.data);
+        setState('failed');
+        es.close();
+        esRef.current = null;
+        queryClient.invalidateQueries({ queryKey: ['applications'] });
+      }
     });
 
     es.onerror = () => {
       if (es.readyState === EventSource.CLOSED) {
-        // Only mark failed if we haven't already completed
+        // Connection closed permanently — mark failed only if we
+        // haven't already completed or received a server error.
         setState((prev) => (prev === 'running' ? 'failed' : prev));
+        setError((prev) => prev || 'Connection lost');
         esRef.current = null;
       }
+      // readyState === CONNECTING means EventSource is auto-reconnecting
+      // — don't interfere, let it retry.
     };
 
     return () => {

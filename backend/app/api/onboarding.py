@@ -72,9 +72,15 @@ async def upload_workspace_resume(
         limit=settings.upload_rate_limit_per_minute,
         db=db,
     )
-    content = await file.read()
+    # Read with a size cap to prevent OOM from accidental large uploads.
+    # 10MB matches the limit enforced in save_workspace_resume, but we
+    # reject early before buffering the entire file into memory.
+    max_bytes = 10 * 1024 * 1024  # 10 MB
+    content = await file.read(max_bytes + 1)
     if not content:
         raise HTTPException(status_code=400, detail="Empty file")
+    if len(content) > max_bytes:
+        raise HTTPException(status_code=413, detail="File too large. Maximum size is 10 MB.")
     resume, analysis = workspace_service.save_workspace_resume(
         db,
         context.workspace.id,
@@ -223,13 +229,13 @@ def generate_workspace_profile(
             detail="No AI provider connected. Connect one in Settings or pick a template manually.",
         )
 
-    # Build a JobFinderPipeline-like context that just exposes the LLM +
-    # config. We don't need the full pipeline machinery — just the
-    # generate_profile_from_resume method.
+    # Build a pipeline instance with all attributes properly initialized.
+    # Override config after construction so workspace preferences take
+    # effect, but self.profile_name and self._preloaded_resume_text are
+    # set correctly (the old __new__ approach left them uninitialized).
     from job_finder.pipeline import JobFinderPipeline
 
-    pipeline = JobFinderPipeline.__new__(JobFinderPipeline)
-    pipeline.llm = llm
+    pipeline = JobFinderPipeline(llm=llm, profile="workspace")
     pipeline.config = workspace_service.build_pipeline_config_override(
         workspace_service.get_workspace_preferences(db, context.workspace.id),
         context.workspace.id,

@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import re
+import threading
 import time
 from typing import Any
 
@@ -341,7 +342,10 @@ class LLMClient:
 
     # Cache the inference-based health check to avoid burning API quota
     # on every status poll. TTL of 5 minutes; cleared on config change.
+    # Uses a lock for thread safety — the pipeline runs scoring in a
+    # ThreadPoolExecutor with up to 8 workers.
     _availability_cache: dict[str, tuple[float, bool]] = {}
+    _availability_lock = threading.Lock()
     _AVAILABILITY_TTL = 300  # seconds
 
     def is_available(self, force: bool = False) -> bool:
@@ -356,21 +360,24 @@ class LLMClient:
             return False
 
         cache_key = f"{self.base_url}:{self.model}:{self.api_key[:8] if self.api_key else ''}"
-        if not force:
-            cached = LLMClient._availability_cache.get(cache_key)
-            if cached:
-                ts, result = cached
-                if time.time() - ts < LLMClient._AVAILABILITY_TTL:
-                    return result
+        with LLMClient._availability_lock:
+            if not force:
+                cached = LLMClient._availability_cache.get(cache_key)
+                if cached:
+                    ts, result = cached
+                    if time.time() - ts < LLMClient._AVAILABILITY_TTL:
+                        return result
 
         available = self._check_availability()
-        LLMClient._availability_cache[cache_key] = (time.time(), available)
+        with LLMClient._availability_lock:
+            LLMClient._availability_cache[cache_key] = (time.time(), available)
         return available
 
     @classmethod
     def clear_availability_cache(cls) -> None:
         """Clear the cached health-check result (called on config change)."""
-        cls._availability_cache.clear()
+        with cls._availability_lock:
+            cls._availability_cache.clear()
 
     def _check_availability(self) -> bool:
         """Actually test inference — internal, called by is_available."""

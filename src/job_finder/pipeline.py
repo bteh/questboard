@@ -611,25 +611,30 @@ def _job_salary_passes(job: dict, hard_floor: float) -> bool:
     otherwise uses salary_max. Jobs with no salary data always pass —
     filtering them out would remove most listings.
     """
-    sal_max = job.get("salary_max_annualized") or job.get("salary_max")
-    sal_min = job.get("salary_min_annualized") or job.get("salary_min")
+    # Use explicit None checks — 0 is a valid (if incorrect) salary value
+    # and must not be treated as "no data"
+    _sal_max = job.get("salary_max_annualized")
+    if _sal_max is None:
+        _sal_max = job.get("salary_max")
+    _sal_min = job.get("salary_min_annualized")
+    if _sal_min is None:
+        _sal_min = job.get("salary_min")
 
     # No salary data → let it through
-    if not sal_max and not sal_min:
+    if _sal_max is None and _sal_min is None:
         return True
 
-    # Both min and max → use midpoint (a $60K-$200K range shouldn't be
-    # killed by a $68K floor just because the min is low)
-    if sal_min and sal_max:
-        midpoint = (sal_min + sal_max) / 2
+    # Both min and max → use midpoint
+    if _sal_min is not None and _sal_max is not None:
+        midpoint = (_sal_min + _sal_max) / 2
         return midpoint >= hard_floor
 
     # Only max known → check max directly
-    if sal_max:
-        return sal_max >= hard_floor
+    if _sal_max is not None:
+        return _sal_max >= hard_floor
 
     # Only min known → check min directly
-    return sal_min >= hard_floor
+    return _sal_min >= hard_floor
 
 
 def _filter_jobs_by_level(
