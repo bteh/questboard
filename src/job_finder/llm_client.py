@@ -346,7 +346,8 @@ class LLMClient:
     # ThreadPoolExecutor with up to 8 workers.
     _availability_cache: dict[str, tuple[float, bool]] = {}
     _availability_lock = threading.Lock()
-    _AVAILABILITY_TTL = 300  # seconds
+    _AVAILABILITY_TTL = 120  # seconds — keeps total staleness under 4 min
+    # (2 min backend cache + 2 min frontend staleTime)
 
     def is_available(self, force: bool = False) -> bool:
         """Verify the LLM can actually complete a request.

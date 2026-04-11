@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoute, useNavigate } from '@tanstack/react-router';
 import { Route as rootRoute } from './__root';
 import {
@@ -194,7 +194,11 @@ function SettingsPage() {
     navigate({ to: '/settings', search: { tab: next === 'resume' ? undefined : next } });
   };
   const { hostedMode } = useWorkspace();
-  const { data: llm } = useLLMStatus();
+  const { data: llm, refetch: refetchLLM } = useLLMStatus();
+  // Always fetch fresh LLM status when the user opens Settings — they're
+  // here to check/fix their AI connection, so stale data is worse than
+  // an extra request.
+  useEffect(() => { refetchLLM(); }, [refetchLLM]);
   const { data: presets } = useLLMPresets();
   const updateLLM = useUpdateLLM();
   const testConnection = useTestConnection();

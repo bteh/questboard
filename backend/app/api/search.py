@@ -219,6 +219,8 @@ async def start_search_run(
             llm_override=llm_override,
             snapshot=snapshot,
         )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return RunStatus(

@@ -6,21 +6,36 @@ import { Button } from '@/components/ui/button';
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
+  /** When this key changes (e.g. on route navigation), the error
+   *  state resets automatically so users aren't stuck on the error
+   *  screen after navigating away from a broken page. */
+  resetKey?: string;
 }
 
 interface State {
   hasError: boolean;
   error: Error | null;
+  /** Track the resetKey that was active when the error occurred.
+   *  When the prop changes, we know the user navigated away. */
+  prevResetKey?: string;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, error: null, prevResetKey: props.resetKey };
   }
 
-  static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: Error): Partial<State> {
     return { hasError: true, error };
+  }
+
+  static getDerivedStateFromProps(props: Props, state: State): Partial<State> | null {
+    // If the resetKey changed (user navigated), clear the error
+    if (props.resetKey !== state.prevResetKey) {
+      return { hasError: false, error: null, prevResetKey: props.resetKey };
+    }
+    return null;
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {

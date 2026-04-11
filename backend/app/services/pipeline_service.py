@@ -311,7 +311,23 @@ def start_run(
     llm_override: Any | None = None,
     snapshot=None,
 ) -> PipelineRun:
-    """Launch a pipeline run in a background thread. Returns immediately."""
+    """Launch a pipeline run in a background thread. Returns immediately.
+
+    Raises ValueError if a run is already active for the same workspace
+    to prevent concurrent scraping (rate limits, duplicate results).
+    """
+    # Guard against concurrent runs for the same workspace
+    if workspace_id:
+        for existing in _runs.values():
+            if (
+                existing.workspace_id == workspace_id
+                and existing.status in ("pending", "running")
+            ):
+                raise ValueError(
+                    f"A search is already running (run {existing.run_id}). "
+                    "Wait for it to finish before starting a new one."
+                )
+
     run_id = uuid.uuid4().hex[:12]
     queue: asyncio.Queue | None = asyncio.Queue() if not get_settings().hosted_mode else None
     run = PipelineRun(
