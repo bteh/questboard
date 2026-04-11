@@ -11,6 +11,7 @@ interface ConnectAiPopoverProps {
    *  opens a dialog instead. Kept for backwards compatibility with
    *  existing call sites that pass side/align. */
   side?: 'top' | 'right' | 'bottom' | 'left';
+  /** Deprecated — see `side`. */
   align?: 'start' | 'center' | 'end';
 }
 

@@ -343,21 +343,22 @@ class LLMClient:
 
 
     # Cache the inference-based health check to avoid burning API quota
-    # on every status poll. TTL of 5 minutes; cleared on config change.
-    # Uses a lock for thread safety — the pipeline runs scoring in a
-    # ThreadPoolExecutor with up to 8 workers.
-    _availability_cache: dict[str, tuple[float, bool]] = {}
+    # on every status poll. Caches (timestamp, available, last_error) so
+    # the error message survives across LLMClient instances.
+    _availability_cache: dict[str, tuple[float, bool, Exception | None]] = {}
     _availability_lock = threading.Lock()
-    _AVAILABILITY_TTL = 120  # seconds — keeps total staleness under 4 min
-    # (2 min backend cache + 2 min frontend staleTime)
+    _AVAILABILITY_TTL = 120  # seconds
 
     def is_available(self, force: bool = False) -> bool:
         """Verify the LLM can actually complete a request.
 
         Sends a 1-token completion to catch broken proxies, expired keys,
         and consumer-subscription misconfigurations. Result is cached for
-        5 minutes to avoid burning free-tier quota on health-check polls.
+        2 minutes to avoid burning free-tier quota on health-check polls.
         Pass force=True to skip the cache (used by "Test Connection").
+
+        Populates self.last_error so the caller / error translator can
+        surface a plain-language message, even when reading from the cache.
         """
         if not self.is_configured:
             return False
@@ -367,13 +368,14 @@ class LLMClient:
             if not force:
                 cached = LLMClient._availability_cache.get(cache_key)
                 if cached:
-                    ts, result = cached
+                    ts, result, cached_error = cached
                     if time.time() - ts < LLMClient._AVAILABILITY_TTL:
+                        self.last_error = cached_error
                         return result
 
         available = self._check_availability()
         with LLMClient._availability_lock:
-            LLMClient._availability_cache[cache_key] = (time.time(), available)
+            LLMClient._availability_cache[cache_key] = (time.time(), available, self.last_error)
         return available
 
     @classmethod

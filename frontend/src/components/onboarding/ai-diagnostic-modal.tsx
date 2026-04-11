@@ -251,7 +251,6 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
             <div className="flex gap-1 rounded-lg border border-border-default bg-bg-subtle p-0.5">
               {(['gemini', 'groq', 'openai-api', 'anthropic-api'] as PopularProviderName[]).map((name) => {
                 const active = selectedProvider === name;
-                const choice = POPULAR_PROVIDER_CHOICES[name];
                 return (
                   <button
                     key={name}
@@ -262,10 +261,24 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
                       active ? 'bg-bg-card text-text-primary shadow-sm' : 'text-text-muted hover:text-text-secondary',
                     )}
                   >
-                    {choice.title.split(' ')[0] + (name === 'gemini' ? ' ★' : '')}
+                    {name === 'gemini' ? 'Gemini' : name === 'groq' ? 'Groq' : name === 'openai-api' ? 'OpenAI' : 'Claude'}
                   </button>
                 );
               })}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className={cn(
+                'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                POPULAR_PROVIDER_CHOICES[selectedProvider].badgeClassName,
+              )}>
+                {POPULAR_PROVIDER_CHOICES[selectedProvider].badge}
+              </span>
+              {(selectedProvider === 'gemini' || selectedProvider === 'groq') && (
+                <span className="rounded-full bg-brand-light/60 px-2 py-0.5 text-[10px] font-medium text-brand">
+                  Recommended
+                </span>
+              )}
             </div>
 
             <p className="text-[11px] leading-relaxed text-text-muted">
