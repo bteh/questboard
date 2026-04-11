@@ -374,10 +374,15 @@ def _flush_llm_caches() -> None:
         _GENERATED_PROFILE_CACHE.clear()
     except Exception:
         pass
+    try:
+        from job_finder.llm_client import LLMClient
+        LLMClient.clear_availability_cache()
+    except Exception:
+        pass
 
 
 def test_llm_connection() -> dict:
-    """Test current LLM configuration."""
+    """Test current LLM configuration. Uses force=True to bypass cache."""
     llm = get_llm()
     if not llm.is_configured:
         return {
@@ -388,7 +393,7 @@ def test_llm_connection() -> dict:
         }
     info = llm.get_provider_info()
     try:
-        available = llm.is_available()
+        available = llm.is_available(force=True)
     except Exception as e:
         # Sanitize error message — never leak API keys or auth headers
         raw_msg = str(e)

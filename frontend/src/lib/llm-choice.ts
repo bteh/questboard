@@ -27,7 +27,7 @@ export const POPULAR_PROVIDER_CHOICES: Record<PopularProviderName, PopularProvid
     badge: 'Free',
     badgeClassName: 'text-emerald-600 bg-emerald-500/10',
     description: 'Free and easy. Get an API key from Google AI Studio in 30 seconds — no credit card needed.',
-    detail: 'Uses Gemini 2.5 Flash. 500 free requests/day, more than enough for job searching.',
+    detail: 'Uses Gemini 2.5 Flash Lite. 1,000 free requests/day, more than enough for job searching.',
     hostedSupported: true,
   },
   groq: {

@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import re
+import time
 from typing import Any
 
 import requests
@@ -204,7 +205,7 @@ PRESETS: dict[str, dict[str, str]] = {
     },
     "gemini": {
         "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
-        "model": "gemini-2.5-flash",
+        "model": "gemini-2.5-flash-lite",
         "api_key": "",
         "label": "Google Gemini",
         "needs_api_key": "true",
@@ -335,16 +336,41 @@ class LLMClient:
         return self._client is not None and bool(self.model)
 
 
-    def is_available(self) -> bool:
+    # Cache the inference-based health check to avoid burning API quota
+    # on every status poll. TTL of 5 minutes; cleared on config change.
+    _availability_cache: dict[str, tuple[float, bool]] = {}
+    _AVAILABILITY_TTL = 300  # seconds
+
+    def is_available(self, force: bool = False) -> bool:
         """Verify the LLM can actually complete a request.
 
-        Earlier versions just pinged /health or /models, which passes for
-        proxies that are online but reject real inference calls (e.g.
-        consumer-subscription proxies returning auth_unavailable). Now we
-        send a 1-token completion. If the model returns anything, it works.
+        Sends a 1-token completion to catch broken proxies, expired keys,
+        and consumer-subscription misconfigurations. Result is cached for
+        5 minutes to avoid burning free-tier quota on health-check polls.
+        Pass force=True to skip the cache (used by "Test Connection").
         """
         if not self.is_configured:
             return False
+
+        cache_key = f"{self.base_url}:{self.model}:{self.api_key[:8] if self.api_key else ''}"
+        if not force:
+            cached = LLMClient._availability_cache.get(cache_key)
+            if cached:
+                ts, result = cached
+                if time.time() - ts < LLMClient._AVAILABILITY_TTL:
+                    return result
+
+        available = self._check_availability()
+        LLMClient._availability_cache[cache_key] = (time.time(), available)
+        return available
+
+    @classmethod
+    def clear_availability_cache(cls) -> None:
+        """Clear the cached health-check result (called on config change)."""
+        cls._availability_cache.clear()
+
+    def _check_availability(self) -> bool:
+        """Actually test inference — internal, called by is_available."""
         try:
             response = self._client.chat.completions.create(
                 model=self.model,
@@ -361,8 +387,10 @@ class LLMClient:
                 "invalid api key", "api key",
             ]):
                 return False
-            # Other transient errors (timeout, rate limit, 500) → try
-            # a lighter /models check before giving up
+            # Rate limit → provider works, just throttled. Report available.
+            if "429" in msg or "rate" in msg or "quota" in msg:
+                return True
+            # Other transient errors → try lighter /models check
             try:
                 url = self.base_url.rstrip("/")
                 headers: dict[str, str] = {}
