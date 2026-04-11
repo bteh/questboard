@@ -94,6 +94,7 @@ export function AiSetupWizard() {
     setPath('local');
     setSetupStatus({ status: 'installing', step: 'Starting setup...', progress: 0, error: '', model: 'phi4-mini' });
 
+    // Fire the setup (returns immediately, runs in background thread)
     try {
       const resp = await fetch('/api/v1/settings/ollama/setup', { method: 'POST' });
       if (!resp.ok) {
@@ -101,27 +102,28 @@ export function AiSetupWizard() {
         setSetupStatus((s) => s ? { ...s, status: 'error', error: err.detail || 'Setup failed' } : s);
         return;
       }
-
-      // Start polling for progress
-      pollRef.current = setInterval(async () => {
-        try {
-          const statusResp = await fetch('/api/v1/settings/ollama/setup-status');
-          const status: OllamaSetupStatus = await statusResp.json();
-          setSetupStatus(status);
-
-          if (status.status === 'ready' || status.status === 'error') {
-            clearInterval(pollRef.current);
-            if (status.status === 'ready') {
-              toast.success('Local AI is ready!');
-            }
-          }
-        } catch {
-          // polling error — ignore, will retry
-        }
-      }, 1000);
     } catch {
       setSetupStatus({ status: 'error', step: 'Connection failed', progress: 0, error: 'Could not reach the backend. Make sure the app is running.', model: '' });
+      return;
     }
+
+    // Poll for progress immediately — the setup runs in the background
+    pollRef.current = setInterval(async () => {
+      try {
+        const statusResp = await fetch('/api/v1/settings/ollama/setup-status');
+        const status: OllamaSetupStatus = await statusResp.json();
+        setSetupStatus(status);
+
+        if (status.status === 'ready' || status.status === 'error') {
+          clearInterval(pollRef.current);
+          if (status.status === 'ready') {
+            toast.success('Local AI is ready!');
+          }
+        }
+      } catch {
+        // polling error — ignore, will retry
+      }
+    }, 1500);
   }, []);
 
   useEffect(() => {
