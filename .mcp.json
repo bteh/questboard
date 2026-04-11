@@ -3,10 +3,6 @@
     "aidesigner": {
       "type": "http",
       "url": "https://api.aidesigner.ai/api/v1/mcp"
-    },
-    "macos-control": {
-      "command": "npx",
-      "args": ["-y", "macos-control-mcp"]
     }
   }
 }
