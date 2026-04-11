@@ -170,6 +170,7 @@ fn kill_runtime(app: &tauri::AppHandle) {
 
 fn main() {
     let app = tauri::Builder::default()
+        .plugin(tauri_plugin_shell::init())
         .manage(RuntimeState::default())
         .setup(|app| {
             let child = spawn_runtime(app)?;

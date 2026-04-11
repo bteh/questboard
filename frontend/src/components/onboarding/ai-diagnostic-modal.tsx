@@ -1,9 +1,10 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import {
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
+  Download,
   ExternalLink,
   HardDrive,
   Loader2,
@@ -17,6 +18,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Progress } from '@/components/ui/progress';
 import {
   useLLMPresets,
   useLLMStatus,
@@ -24,6 +26,7 @@ import {
   useUpdateLLM,
 } from '@/hooks/use-settings';
 import { POPULAR_PROVIDER_CHOICES, type PopularProviderName } from '@/lib/llm-choice';
+import { openExternalClick } from '@/lib/open-external';
 import { cn } from '@/lib/utils';
 
 interface AiDiagnosticModalProps {
@@ -57,10 +60,25 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
 
   const [selectedProvider, setSelectedProvider] = useState<PopularProviderName>('gemini');
   const [apiKey, setApiKey] = useState('');
+  const [quickStartStatus, setQuickStartStatus] = useState<{
+    status: 'idle' | 'installing' | 'pulling' | 'configuring' | 'ready' | 'error';
+    step: string;
+    progress: number;
+    error: string;
+    model: string;
+  } | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
+
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
 
   const isConnected = !!llm?.available;
   const isBroken = !!llm?.configured && !llm?.available;
   const isWorking = updateLLM.isPending || testConnection.isPending;
+  const quickStartActive = quickStartStatus && quickStartStatus.status !== 'idle' && quickStartStatus.status !== 'ready';
 
   // ── Auto-detect provider from API key format ────────────────────────
   const detectProviderFromKey = (key: string): PopularProviderName | null => {
@@ -78,6 +96,45 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
     if (detected) setSelectedProvider(detected);
   };
 
+  // ── Quick Start local AI (inline) ─────────────────────────────────
+  const startQuickStart = useCallback(async () => {
+    setQuickStartStatus({ status: 'installing', step: 'Starting setup...', progress: 0, error: '', model: 'phi4-mini' });
+    try {
+      const resp = await fetch(
+        (import.meta.env.VITE_API_URL || '/api/v1') + '/settings/ollama/setup',
+        { method: 'POST', credentials: 'include' },
+      );
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({ detail: 'Setup failed' }));
+        setQuickStartStatus((s) => s ? { ...s, status: 'error', error: err.detail || 'Setup failed' } : s);
+        return;
+      }
+    } catch {
+      setQuickStartStatus({ status: 'error', step: 'Connection failed', progress: 0, error: 'Could not reach the backend.', model: '' });
+      return;
+    }
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = setInterval(async () => {
+      try {
+        const r = await fetch(
+          (import.meta.env.VITE_API_URL || '/api/v1') + '/settings/ollama/setup-status',
+          { credentials: 'include' },
+        );
+        const status = await r.json();
+        setQuickStartStatus(status);
+        if (status.status === 'ready') {
+          clearInterval(pollRef.current);
+          toast.success('Local AI is ready!');
+          refetchLLM();
+        } else if (status.status === 'error') {
+          clearInterval(pollRef.current);
+        }
+      } catch {
+        // ignore polling errors
+      }
+    }, 1500);
+  }, [refetchLLM]);
+
   // ── Actions ────────────────────────────────────────────────────────
   const handleTestConnection = useCallback(() => {
     testConnection.mutate(undefined, {
@@ -91,6 +148,18 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
       },
     });
   }, [testConnection, refetchLLM]);
+
+  const handleDisconnect = () => {
+    updateLLM.mutate(
+      { provider: '', base_url: '', api_key: '', model: '' },
+      {
+        onSuccess: () => {
+          toast.success('Disconnected. Pick a new provider below.');
+          refetchLLM();
+        },
+      },
+    );
+  };
 
   const handleConnect = () => {
     const trimmed = apiKey.trim();
@@ -210,15 +279,25 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
           {/* Action row when connected or broken */}
           <div className="mt-3 flex flex-wrap gap-2">
             {isConnected && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleTestConnection}
-                disabled={isWorking}
-              >
-                {isWorking ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
-                Test connection
-              </Button>
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleTestConnection}
+                  disabled={isWorking}
+                >
+                  {isWorking ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
+                  Test connection
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleDisconnect}
+                  disabled={isWorking}
+                >
+                  Disconnect
+                </Button>
+              </>
             )}
             {isBroken && err?.next_action && (
               <Button size="sm" onClick={() => handleAction(err.next_action.kind)}>
@@ -227,15 +306,25 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
               </Button>
             )}
             {isBroken && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleTestConnection}
-                disabled={isWorking}
-              >
-                {isWorking ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
-                Test again
-              </Button>
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleTestConnection}
+                  disabled={isWorking}
+                >
+                  {isWorking ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5 mr-1.5" />}
+                  Test again
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleDisconnect}
+                  disabled={isWorking}
+                >
+                  Disconnect
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -280,22 +369,23 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
               {POPULAR_PROVIDER_CHOICES[selectedProvider].description}
             </p>
 
-            <a
-              href={
+            {(() => {
+              const keyUrl =
                 selectedProvider === 'gemini' ? 'https://aistudio.google.com/apikey'
                 : selectedProvider === 'groq' ? 'https://console.groq.com/keys'
                 : selectedProvider === 'openai-api' ? 'https://platform.openai.com/api-keys'
-                : 'https://console.anthropic.com/settings/keys'
-              }
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-xs font-medium text-brand hover:underline"
-            >
-              {selectedProvider === 'gemini' || selectedProvider === 'groq'
-                ? `Get a free ${POPULAR_PROVIDER_CHOICES[selectedProvider].title} key`
-                : `Get a ${POPULAR_PROVIDER_CHOICES[selectedProvider].title} key`}
-              <ExternalLink className="h-3 w-3" />
-            </a>
+                : 'https://console.anthropic.com/settings/keys';
+              return (
+                <a
+                  href={keyUrl}
+                  onClick={openExternalClick(keyUrl)}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-brand hover:underline cursor-pointer"
+                >
+                  Get a {POPULAR_PROVIDER_CHOICES[selectedProvider].title} key
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              );
+            })()}
 
             <Input
               type="password"
@@ -332,28 +422,47 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
           </div>
         )}
 
-        {/* ── Quick Start local AI shortcut ───────────────────────── */}
+        {/* ── Quick Start local AI (inline, not navigation) ───────── */}
         {!isConnected && (
-          <div className="rounded-xl border border-border-default bg-bg-subtle/40 p-3">
+          <div className={cn(
+            'rounded-xl border p-3',
+            quickStartStatus?.status === 'error' ? 'border-danger/30 bg-danger/5'
+              : quickStartStatus?.status === 'ready' ? 'border-success/30 bg-success/5'
+              : 'border-border-default bg-bg-subtle/40',
+          )}>
             <div className="flex items-start gap-3">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand/10">
-                <HardDrive className="h-4 w-4 text-brand" />
+                {quickStartStatus?.status === 'error' ? <XCircle className="h-4 w-4 text-danger" />
+                  : quickStartStatus?.status === 'ready' ? <CheckCircle2 className="h-4 w-4 text-success" />
+                  : quickStartActive ? <Download className="h-4 w-4 animate-pulse text-brand" />
+                  : <HardDrive className="h-4 w-4 text-brand" />}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-semibold text-text-primary">
-                  Or use local AI (no account needed)
+                  {quickStartStatus?.status === 'ready' ? 'Local AI is ready!'
+                    : quickStartStatus?.status === 'error' ? 'Setup failed'
+                    : quickStartActive ? 'Setting up local AI...'
+                    : 'Or use local AI (no account needed)'}
                 </p>
                 <p className="mt-0.5 text-[11px] text-text-muted">
-                  Downloads a small model that runs on your computer. Private, free forever.
+                  {quickStartStatus?.step || 'Downloads a small model that runs on your computer. Private, free forever.'}
                 </p>
+                {quickStartActive && (
+                  <Progress value={Math.round((quickStartStatus?.progress ?? 0) * 100)} className="mt-2 h-1.5" />
+                )}
+                {quickStartStatus?.status === 'error' && quickStartStatus.error && (
+                  <p className="mt-1 text-[11px] text-danger">{quickStartStatus.error}</p>
+                )}
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => { onOpenChange(false); navigate({ to: '/' }); }}
-              >
-                Quick Start
-              </Button>
+              {!quickStartActive && quickStartStatus?.status !== 'ready' && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={startQuickStart}
+                >
+                  {quickStartStatus?.status === 'error' ? 'Retry' : 'Quick Start'}
+                </Button>
+              )}
             </div>
           </div>
         )}

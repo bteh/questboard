@@ -340,12 +340,31 @@ def _write_env_vars(env_vars: dict[str, str]) -> None:
 
 
 def update_llm_config(provider: str, base_url: str, api_key: str, model: str) -> dict:
-    """Store LLM config — API key goes to OS keychain, rest to .env."""
-    from job_finder.secrets import store_secret, is_available as keyring_available
+    """Store LLM config — API key goes to OS keychain, rest to .env.
+
+    Passing an empty provider disconnects the current LLM: clears all
+    env vars and keychain entries. The app continues to work with basic
+    keyword scoring.
+    """
+    from job_finder.secrets import store_secret, delete_secret, is_available as keyring_available
 
     # Clear auto-detected flag when user explicitly configures a provider
     _remove_env_var("LLM_AUTO_DETECTED")
     os.environ.pop("LLM_AUTO_DETECTED", None)
+
+    # Empty provider = disconnect: remove env + keychain entries
+    if not provider.strip():
+        for key in ("LLM_PROVIDER", "LLM_BASE_URL", "LLM_MODEL", "LLM_API_KEY"):
+            _remove_env_var(key)
+            os.environ.pop(key, None)
+        if keyring_available():
+            try:
+                delete_secret("llm_api_key")
+            except Exception:
+                pass
+        _flush_llm_caches()
+        logger.info("LLM disconnected — config cleared")
+        return get_llm_status()
 
     # Non-sensitive config → .env
     _write_env_vars({
