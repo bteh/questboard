@@ -14,8 +14,10 @@ import {
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { AiSetupWizard } from '@/components/onboarding/ai-setup-wizard';
 import { GeneratedProfileCard } from '@/components/onboarding/generated-profile-card';
 import { InlineAiConnect } from '@/components/onboarding/inline-ai-connect';
+import { isDesktopApp } from '@/lib/platform';
 import { useSearchContext } from '@/contexts/search-context';
 import { useLLMStatus } from '@/hooks/use-settings';
 import {
@@ -345,7 +347,9 @@ export function ReadyToLaunchHero() {
             Replaces the old hidden-in-a-popover link. Gemini-first with
             step-by-step instructions so a non-technical user can connect
             in 30 seconds. Skippable. */}
-        {showManualSummary && !aiAvailable && <InlineAiConnect />}
+        {showManualSummary && !aiAvailable && (
+          isDesktopApp() ? <AiSetupWizard /> : <InlineAiConnect />
+        )}
 
         {/* Primary CTA — hidden when the AI card is showing (it has its
             own primary button) */}

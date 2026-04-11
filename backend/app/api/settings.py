@@ -134,6 +134,28 @@ async def detect_local_ai():
     return await asyncio.to_thread(settings_service.detect_local_ai)
 
 
+@router.post("/settings/ollama/setup")
+async def setup_ollama():
+    """Install Ollama (if needed) and pull the default model.
+
+    Returns status at each step. The frontend polls this endpoint or
+    calls it once and then polls /settings/ollama/status for progress.
+
+    Steps: check_installed → install_binary → start_server → pull_model → configure
+    """
+    reject_legacy_route_in_hosted_mode("Ollama setup is not available in hosted mode")
+    import asyncio
+
+    return await asyncio.to_thread(settings_service.setup_ollama)
+
+
+@router.get("/settings/ollama/setup-status")
+async def ollama_setup_status():
+    """Poll the current Ollama setup progress."""
+    reject_legacy_route_in_hosted_mode("Ollama setup is not available in hosted mode")
+    return settings_service.get_ollama_setup_status()
+
+
 @router.post("/settings/llm/test", response_model=LLMTestResult)
 async def test_llm_connection(
     request: Request,

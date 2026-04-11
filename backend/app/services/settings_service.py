@@ -160,7 +160,7 @@ def detect_ollama() -> dict:
         result["detected"] = True
         result["models"] = models
         # Pick the best available model (prefer the one we install by default)
-        preferred = ["llama3.2:3b", "llama3.2", "llama3.1", "llama3", "mistral", "gemma2", "qwen2.5"]
+        preferred = ["phi4-mini", "llama3.2:3b", "llama3.2", "llama3.1", "llama3", "qwen3", "mistral", "gemma2", "qwen2.5"]
         for pref in preferred:
             for m in models:
                 if m.startswith(pref):
@@ -770,3 +770,141 @@ def get_database_info() -> dict:
         "size_mb": size_mb,
         "record_count": record_count,
     }
+
+
+# ── Ollama auto-setup ───────────────────────────────────────────────────
+
+_DEFAULT_OLLAMA_MODEL = "phi4-mini"
+
+# Mutable setup state — tracks progress across poll requests
+_ollama_setup_state: dict = {
+    "status": "idle",  # idle | installing | pulling | configuring | ready | error
+    "step": "",
+    "progress": 0.0,
+    "error": "",
+    "model": _DEFAULT_OLLAMA_MODEL,
+}
+
+
+def get_ollama_setup_status() -> dict:
+    """Return current Ollama setup progress for frontend polling."""
+    return {**_ollama_setup_state}
+
+
+def setup_ollama() -> dict:
+    """Install Ollama (if needed), start it, pull the default model, and configure.
+
+    This runs synchronously in a background thread. The frontend polls
+    get_ollama_setup_status() for progress updates.
+    """
+    import shutil
+    import subprocess
+    import time
+
+    global _ollama_setup_state
+    model = _DEFAULT_OLLAMA_MODEL
+
+    def _update(status: str, step: str, progress: float = 0.0, error: str = ""):
+        _ollama_setup_state.update(
+            status=status, step=step, progress=progress, error=error, model=model,
+        )
+
+    try:
+        # Step 1: Check if Ollama is already installed
+        _update("installing", "Checking for Ollama...")
+        ollama_bin = shutil.which("ollama")
+
+        if not ollama_bin:
+            # Try to install via brew (macOS) or direct download
+            _update("installing", "Downloading Ollama...", 0.1)
+            import platform
+            if platform.system() == "Darwin":
+                # Try brew first (non-interactive)
+                brew = shutil.which("brew")
+                if brew:
+                    result = subprocess.run(
+                        [brew, "install", "ollama"],
+                        capture_output=True, text=True, timeout=300,
+                    )
+                    if result.returncode == 0:
+                        ollama_bin = shutil.which("ollama")
+
+            if not ollama_bin:
+                # Direct download as fallback
+                _update("installing", "Downloading Ollama binary...", 0.2)
+                import platform as plat
+                arch = plat.machine().lower()
+                if arch in ("arm64", "aarch64"):
+                    url = "https://github.com/ollama/ollama/releases/latest/download/ollama-darwin"
+                else:
+                    url = "https://github.com/ollama/ollama/releases/latest/download/ollama-darwin-amd64"
+
+                install_dir = os.path.expanduser("~/.local/bin")
+                os.makedirs(install_dir, exist_ok=True)
+                target = os.path.join(install_dir, "ollama")
+
+                import urllib.request
+                urllib.request.urlretrieve(url, target)
+                os.chmod(target, 0o755)
+                # Remove quarantine on macOS
+                subprocess.run(["xattr", "-cr", target], capture_output=True)
+                ollama_bin = target
+
+        if not ollama_bin:
+            _update("error", "Failed to install Ollama", error="Could not download or find Ollama. Install it from ollama.com/download.")
+            return _ollama_setup_state
+
+        _update("installing", "Ollama installed", 0.3)
+
+        # Step 2: Start Ollama server if not running
+        detection = detect_ollama()
+        if not detection["detected"]:
+            _update("installing", "Starting Ollama server...", 0.35)
+            subprocess.Popen(
+                [ollama_bin, "serve"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            # Wait for server to be ready
+            for _ in range(30):
+                time.sleep(1)
+                detection = detect_ollama()
+                if detection["detected"]:
+                    break
+            if not detection["detected"]:
+                _update("error", "Ollama server failed to start", error="Ollama was installed but the server didn't start. Try running 'ollama serve' manually.")
+                return _ollama_setup_state
+
+        _update("pulling", "Ollama is running. Downloading AI model...", 0.4)
+
+        # Step 3: Pull the model
+        # Check if model is already available
+        if any(m.startswith(model) for m in detection.get("models", [])):
+            _update("pulling", f"{model} already downloaded", 0.9)
+        else:
+            _update("pulling", f"Downloading {model} (~2.5 GB)...", 0.4)
+            result = subprocess.run(
+                [ollama_bin, "pull", model],
+                capture_output=True, text=True, timeout=600,
+            )
+            if result.returncode != 0:
+                _update("error", "Model download failed", error=f"Failed to pull {model}: {result.stderr[:200]}")
+                return _ollama_setup_state
+
+        _update("configuring", "Configuring Launchboard to use local AI...", 0.95)
+
+        # Step 4: Configure LLM settings
+        update_llm_config(
+            provider="ollama",
+            base_url="http://localhost:11434/v1",
+            api_key="ollama",
+            model=model,
+        )
+
+        _update("ready", "Local AI is ready!", 1.0)
+        return _ollama_setup_state
+
+    except Exception as e:
+        logger.exception("Ollama setup failed")
+        _update("error", "Setup failed", error=str(e)[:300])
+        return _ollama_setup_state
