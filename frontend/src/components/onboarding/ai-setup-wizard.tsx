@@ -65,7 +65,7 @@ export function AiSetupWizard() {
   const [path, setPath] = useState<Path>('choose');
   const [apiKey, setApiKey] = useState('');
   const [setupStatus, setSetupStatus] = useState<OllamaSetupStatus | null>(null);
-  const pollRef = useRef<ReturnType<typeof setInterval>>();
+  const pollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
   const isWorking = updateLLM.isPending || testConnection.isPending;
 
