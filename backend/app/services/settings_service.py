@@ -145,20 +145,37 @@ _ENV_PATH = os.path.join(_PROJECT_ROOT, ".env")
 
 
 def detect_ollama() -> dict:
-    """Probe Ollama at localhost:11434 and return detection results."""
+    """Probe Ollama at localhost:11434 and return detection results.
+
+    We verify with /api/version AND /api/tags because port 11434 can be
+    occupied by other services (old Ollama versions, proxies, mocks).
+    Both endpoints must respond with the expected shape.
+    """
     import requests as http_requests
 
     result = {"detected": False, "models": [], "recommended_model": ""}
     try:
+        # Verify this is actually Ollama via /api/version
+        version_resp = http_requests.get("http://localhost:11434/api/version", timeout=3)
+        if version_resp.status_code != 200:
+            return result
+        version_data = version_resp.json()
+        if not isinstance(version_data, dict) or "version" not in version_data:
+            # Not Ollama — something else is on port 11434
+            return result
+
+        # Now list installed models
         resp = http_requests.get("http://localhost:11434/api/tags", timeout=3)
         if resp.status_code != 200:
+            # /api/version worked, /api/tags didn't — still counts as detected
+            result["detected"] = True
             return result
         data = resp.json()
         models = [m.get("name", "") for m in data.get("models", []) if m.get("name")]
-        if not models:
-            return result
         result["detected"] = True
         result["models"] = models
+        if not models:
+            return result
         # Pick the best available model (prefer the one we install by default)
         preferred = ["phi4-mini", "llama3.2:3b", "llama3.2", "llama3.1", "llama3", "qwen3", "mistral", "gemma2", "qwen2.5"]
         for pref in preferred:
@@ -228,11 +245,36 @@ def detect_local_ai() -> dict:
     return {"servers": servers}
 
 
+def _auto_detect_marker_path() -> str:
+    """Location of the one-time auto-detect marker file."""
+    home = os.path.expanduser("~")
+    marker_dir = os.path.join(home, ".launchboard")
+    os.makedirs(marker_dir, exist_ok=True)
+    return os.path.join(marker_dir, "auto_detect_done")
+
+
 def _auto_detect_and_configure() -> str:
-    """If no LLM is configured, try to auto-detect Ollama and configure it.
+    """If no LLM is configured AND we've never auto-detected before, try
+    to auto-detect Ollama and configure it.
 
     Returns the auto-detected provider name, or empty string if none.
+
+    This only runs ONCE per install — once the marker file exists, we
+    never auto-configure again. This prevents hijacking users who have
+    Ollama installed for other purposes, and eliminates the race where
+    GET /settings/llm can re-write env vars right after the user
+    disconnects.
     """
+    marker = _auto_detect_marker_path()
+    if os.path.exists(marker):
+        return ""
+
+    try:
+        with open(marker, "w") as f:
+            f.write("")
+    except Exception:
+        pass  # marker failure is non-fatal, just means we may re-run once
+
     detection = detect_ollama()
     if not detection["detected"] or not detection["recommended_model"]:
         return ""
@@ -348,6 +390,24 @@ def update_llm_config(provider: str, base_url: str, api_key: str, model: str) ->
     """
     from job_finder.secrets import store_secret, delete_secret, is_available as keyring_available
 
+    # Sanitize inputs — strip whitespace/newlines and reject obviously
+    # malformed values. Prevents corrupted .env from pasted multi-line
+    # junk or trailing newlines that come with some clipboard tools.
+    provider = (provider or "").strip()
+    base_url = (base_url or "").strip().split("\n")[0]
+    model = (model or "").strip().split("\n")[0]
+    api_key = (api_key or "").strip()
+    if api_key:
+        # First line only — clipboard sometimes includes trailing newline
+        api_key = api_key.splitlines()[0].strip()
+        # Sanity: keys are short printable strings. 4000 chars is a safe
+        # upper bound that accommodates every real provider but rejects
+        # someone accidentally pasting a PDF or random text file.
+        if len(api_key) > 4000:
+            raise ValueError("API key is too long. Did you paste the wrong thing?")
+        if any(c.isspace() for c in api_key):
+            raise ValueError("API key must not contain spaces or newlines.")
+
     # Clear auto-detected flag when user explicitly configures a provider
     _remove_env_var("LLM_AUTO_DETECTED")
     os.environ.pop("LLM_AUTO_DETECTED", None)
@@ -386,6 +446,11 @@ def update_llm_config(provider: str, base_url: str, api_key: str, model: str) ->
 
     # Clear stale suggest/profile caches so the new provider gets a fresh run
     _flush_llm_caches()
+
+    # If user configured a non-Ollama provider, reset the Ollama setup state
+    # so a stuck "Setup failed" message from a previous attempt clears.
+    if provider != "ollama":
+        reset_ollama_setup_state()
 
     return get_llm_status()
 
@@ -804,7 +869,10 @@ def get_database_info() -> dict:
 
 _DEFAULT_OLLAMA_MODEL = "phi4-mini"
 
-# Mutable setup state — tracks progress across poll requests
+# Mutable setup state — tracks progress across poll requests.
+# All reads/writes go through the lock to survive concurrent calls.
+import threading as _threading
+_ollama_setup_lock = _threading.Lock()
 _ollama_setup_state: dict = {
     "status": "idle",  # idle | installing | pulling | configuring | ready | error
     "step": "",
@@ -816,7 +884,22 @@ _ollama_setup_state: dict = {
 
 def get_ollama_setup_status() -> dict:
     """Return current Ollama setup progress for frontend polling."""
-    return {**_ollama_setup_state}
+    with _ollama_setup_lock:
+        return {**_ollama_setup_state}
+
+
+def reset_ollama_setup_state() -> None:
+    """Reset the setup state to idle (called after disconnect / non-ollama config)."""
+    with _ollama_setup_lock:
+        _ollama_setup_state.update(
+            status="idle", step="", progress=0.0, error="", model=_DEFAULT_OLLAMA_MODEL,
+        )
+
+
+def is_ollama_setup_in_progress() -> bool:
+    """True if a setup is currently running (used to reject double-submit)."""
+    with _ollama_setup_lock:
+        return _ollama_setup_state["status"] in ("installing", "pulling", "configuring")
 
 
 def setup_ollama() -> dict:
@@ -829,13 +912,17 @@ def setup_ollama() -> dict:
     import subprocess
     import time
 
-    global _ollama_setup_state
     model = _DEFAULT_OLLAMA_MODEL
 
     def _update(status: str, step: str, progress: float = 0.0, error: str = ""):
-        _ollama_setup_state.update(
-            status=status, step=step, progress=progress, error=error, model=model,
-        )
+        with _ollama_setup_lock:
+            _ollama_setup_state.update(
+                status=status, step=step, progress=progress, error=error, model=model,
+            )
+
+    # Reset state at the start so a stuck "error" from a previous attempt
+    # doesn't linger. (The endpoint guards against concurrent starts.)
+    _update("installing", "Starting setup...", 0.0, "")
 
     try:
         # Step 1: Check if Ollama is already installed or running
@@ -929,19 +1016,51 @@ def setup_ollama() -> dict:
                 _update("error", "Ollama not running", error="Ollama is installed but not running. Start the Ollama app or run 'ollama serve' in a terminal.")
                 return _ollama_setup_state
             _update("installing", "Starting Ollama server...", 0.35)
-            subprocess.Popen(
+            import tempfile
+            stderr_file = tempfile.NamedTemporaryFile(
+                mode="w+", suffix=".log", prefix="ollama-serve-", delete=False,
+            )
+            proc = subprocess.Popen(
                 [ollama_bin, "serve"],
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stderr=stderr_file,
             )
-            # Wait for server to be ready
+            # Wait for server to be ready (poll the process too so we
+            # bail out early if it dies)
+            started = False
             for _ in range(30):
                 time.sleep(1)
+                # Check if process died
+                if proc.poll() is not None:
+                    stderr_file.close()
+                    try:
+                        with open(stderr_file.name) as f:
+                            stderr_content = f.read()[:500]
+                    finally:
+                        os.unlink(stderr_file.name)
+                    _update(
+                        "error",
+                        "Ollama server crashed",
+                        error=f"'ollama serve' exited with code {proc.returncode}. {stderr_content or 'No error output.'}"[:400],
+                    )
+                    return _ollama_setup_state
                 detection = detect_ollama()
                 if detection["detected"]:
+                    started = True
                     break
-            if not detection["detected"]:
-                _update("error", "Ollama server failed to start", error="Ollama was installed but the server didn't start.")
+            if not started:
+                proc.terminate()
+                stderr_file.close()
+                try:
+                    with open(stderr_file.name) as f:
+                        stderr_content = f.read()[:500]
+                finally:
+                    os.unlink(stderr_file.name)
+                _update(
+                    "error",
+                    "Ollama server didn't respond",
+                    error=f"Ollama started but isn't answering on port 11434 after 30 seconds. {stderr_content}"[:400],
+                )
                 return _ollama_setup_state
 
         _update("pulling", "Ollama is running. Downloading AI model...", 0.4)

@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from app.models.database import get_db
@@ -129,16 +129,25 @@ def _get_tips(
 
 
 @router.get("/api/health/system")
-def system_health(db: Session = Depends(get_db)):
+def system_health(request: Request, db: Session = Depends(get_db)):
     """Unified health dashboard — shows the state of every subsystem.
 
     Each row has: status (ok/warn/error), summary, detail, fix_action.
     The frontend renders this as a "System Health" panel with one-click
     fix buttons for anything broken.
     """
-    from app.services import settings_service
-    from app.services.error_translator import translate as translate_error
+    from app.services import settings_service, workspace_service
     from job_finder.secrets import is_available as keyring_available
+
+    # Resolve the active workspace from the request so we never leak
+    # another user's data in hosted mode. None = no session (fresh user).
+    active_workspace_id = None
+    try:
+        ctx = workspace_service.get_workspace_context_optional(db, request)
+        if ctx:
+            active_workspace_id = ctx.workspace.id
+    except Exception:
+        pass
 
     subsystems = {}
 
@@ -185,22 +194,24 @@ def system_health(db: Session = Depends(get_db)):
 
     # ── Resume ──────────────────────────────────────────────
     try:
-        from app.services import workspace_service
         resume = None
-        try:
-            workspaces = db.query(workspace_service.Workspace).limit(1).all()
-            if workspaces:
-                record = workspace_service.get_workspace_resume(db, workspaces[0].id)
+        if active_workspace_id:
+            try:
+                record = workspace_service.get_workspace_resume(db, active_workspace_id)
                 if record and record.parse_status == "parsed":
                     resume = record
-        except Exception:
-            pass
+            except Exception:
+                pass
 
         if resume:
+            try:
+                size_kb = int(resume.file_size or 0) // 1024
+            except (TypeError, ValueError):
+                size_kb = 0
             subsystems["resume"] = {
                 "status": "ok",
                 "summary": resume.original_filename or "Resume uploaded",
-                "detail": f"Parsed successfully ({(resume.file_size or 0) // 1024} KB)",
+                "detail": f"Parsed successfully ({size_kb} KB)",
                 "fix_action": None,
             }
         else:
@@ -287,5 +298,3 @@ def system_health(db: Session = Depends(get_db)):
             overall = "warn"
 
     return {"overall": overall, "subsystems": subsystems}
-    # Silence unused import warning; translate_error is used indirectly via get_llm_status
-    _ = translate_error

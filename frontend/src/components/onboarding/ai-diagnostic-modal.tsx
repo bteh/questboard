@@ -59,6 +59,7 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
   const testConnection = useTestConnection();
 
   const [selectedProvider, setSelectedProvider] = useState<PopularProviderName>('gemini');
+  const [userSelectedTab, setUserSelectedTab] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [quickStartStatus, setQuickStartStatus] = useState<{
     status: 'idle' | 'installing' | 'pulling' | 'configuring' | 'ready' | 'error';
@@ -69,11 +70,23 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
   } | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
 
-  useEffect(() => {
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = undefined;
+    }
   }, []);
+
+  // Clear interval on unmount
+  useEffect(() => {
+    return () => stopPolling();
+  }, [stopPolling]);
+
+  // Clear interval when the modal is closed — the component stays mounted
+  // but we don't want background polling running while hidden.
+  useEffect(() => {
+    if (!open) stopPolling();
+  }, [open, stopPolling]);
 
   const isConnected = !!llm?.available;
   const isBroken = !!llm?.configured && !llm?.available;
@@ -92,12 +105,27 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
 
   const handleKeyChange = (value: string) => {
     setApiKey(value);
-    const detected = detectProviderFromKey(value);
-    if (detected) setSelectedProvider(detected);
+    // Only auto-switch the provider tab if:
+    //   1. The user hasn't manually selected a tab yet (respect intent)
+    //   2. The input is plausibly a full key (>= 20 chars, not a prefix)
+    if (userSelectedTab) return;
+    const trimmed = value.trim();
+    if (trimmed.length < 20) return;
+    const detected = detectProviderFromKey(trimmed);
+    if (detected && detected !== selectedProvider) setSelectedProvider(detected);
+  };
+
+  const handleSelectProvider = (name: PopularProviderName) => {
+    setSelectedProvider(name);
+    setUserSelectedTab(true);
+    setApiKey('');
   };
 
   // ── Quick Start local AI (inline) ─────────────────────────────────
   const startQuickStart = useCallback(async () => {
+    // Clear any prior polling before starting — prevents duplicate
+    // intervals from stacking on repeated Retry clicks.
+    stopPolling();
     setQuickStartStatus({ status: 'installing', step: 'Starting setup...', progress: 0, error: '', model: 'phi4-mini' });
     try {
       const resp = await fetch(
@@ -113,7 +141,6 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
       setQuickStartStatus({ status: 'error', step: 'Connection failed', progress: 0, error: 'Could not reach the backend.', model: '' });
       return;
     }
-    if (pollRef.current) clearInterval(pollRef.current);
     pollRef.current = setInterval(async () => {
       try {
         const r = await fetch(
@@ -123,17 +150,17 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
         const status = await r.json();
         setQuickStartStatus(status);
         if (status.status === 'ready') {
-          clearInterval(pollRef.current);
+          stopPolling();
           toast.success('Local AI is ready!');
           refetchLLM();
         } else if (status.status === 'error') {
-          clearInterval(pollRef.current);
+          stopPolling();
         }
       } catch {
         // ignore polling errors
       }
     }, 1500);
-  }, [refetchLLM]);
+  }, [refetchLLM, stopPolling]);
 
   // ── Actions ────────────────────────────────────────────────────────
   const handleTestConnection = useCallback(() => {
@@ -344,7 +371,7 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
                   <button
                     key={name}
                     type="button"
-                    onClick={() => { setSelectedProvider(name); setApiKey(''); }}
+                    onClick={() => handleSelectProvider(name)}
                     className={cn(
                       'flex-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors',
                       active ? 'bg-bg-card text-text-primary shadow-sm' : 'text-text-muted hover:text-text-secondary',

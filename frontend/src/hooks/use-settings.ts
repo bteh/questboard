@@ -29,6 +29,7 @@ export function useUpdateLLM() {
     mutationFn: (config: LLMConfig) => updateLLMConfig(config),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['settings', 'llm'] });
+      queryClient.invalidateQueries({ queryKey: ['health'] });
     },
   });
 }

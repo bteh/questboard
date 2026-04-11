@@ -363,19 +363,31 @@ class LLMClient:
         if not self.is_configured:
             return False
 
-        cache_key = f"{self.base_url}:{self.model}:{self.api_key[:8] if self.api_key else ''}"
+        # Use a hash of the FULL api key + base_url + model so rotating
+        # a key on the same provider invalidates the cache. Previous
+        # prefix-only key caused stale "available" results for rotated
+        # Gemini keys which all start with "AIzaSy".
+        import hashlib
+        key_material = f"{self.base_url}|{self.model}|{self.api_key or ''}"
+        cache_key = hashlib.sha256(key_material.encode("utf-8")).hexdigest()
         with LLMClient._availability_lock:
             if not force:
                 cached = LLMClient._availability_cache.get(cache_key)
                 if cached:
                     ts, result, cached_error = cached
                     if time.time() - ts < LLMClient._AVAILABILITY_TTL:
-                        self.last_error = cached_error
+                        self.last_error = cached_error if not result else None
                         return result
 
         available = self._check_availability()
         with LLMClient._availability_lock:
-            LLMClient._availability_cache[cache_key] = (time.time(), available, self.last_error)
+            # Only cache last_error when unavailable — a successful call
+            # should never leave a stale error hanging around.
+            LLMClient._availability_cache[cache_key] = (
+                time.time(),
+                available,
+                None if available else self.last_error,
+            )
         return available
 
     @classmethod

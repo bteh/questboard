@@ -111,6 +111,9 @@ async def update_llm_config(
             api_key=config.api_key,
             model=config.model,
         )
+    except ValueError as e:
+        # Validation failures (bad api_key format, etc.) → 400 with clean message
+        raise HTTPException(400, detail=str(e))
     except Exception as e:
         logger.exception("Failed to update LLM config")
         raise HTTPException(500, detail=str(e))
@@ -140,9 +143,16 @@ async def setup_ollama():
 
     Returns immediately with {"started": true}. The frontend polls
     /settings/ollama/setup-status for progress updates.
+    Returns 409 if a setup is already running (prevents double-submit).
     """
     reject_legacy_route_in_hosted_mode("Ollama setup is not available in hosted mode")
     import threading
+
+    if settings_service.is_ollama_setup_in_progress():
+        raise HTTPException(
+            status_code=409,
+            detail="An Ollama setup is already running. Wait for it to finish.",
+        )
 
     # Run in a daemon thread so the HTTP response returns immediately
     t = threading.Thread(target=settings_service.setup_ollama, daemon=True)
