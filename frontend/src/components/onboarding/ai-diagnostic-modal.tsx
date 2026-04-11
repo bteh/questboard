@@ -11,7 +11,6 @@ import {
   Shield,
   Sparkles,
   XCircle,
-  Zap,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
