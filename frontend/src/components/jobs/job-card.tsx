@@ -67,12 +67,14 @@ export function JobCard({ app, sourceLabels }: JobCardProps) {
       )}
       style={{ borderLeftColor: borderColor }}
     >
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         aria-expanded={expanded}
         aria-label={`${app.job_title} at ${app.company}, ${expanded ? 'collapse' : 'expand'} details`}
         className="flex items-start gap-4 p-5 w-full text-left cursor-pointer select-none focus-ring rounded-lg"
         onClick={() => setExpanded(!expanded)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(!expanded); } }}
       >
         <CompanyAvatar company={app.company} />
 
@@ -197,7 +199,7 @@ export function JobCard({ app, sourceLabels }: JobCardProps) {
             )}
           </div>
         </div>
-      </button>
+      </div>
 
       {expanded && app.overall_score != null && (
         <div className="border-t border-border-default bg-bg-subtle px-5 py-4" onClick={(e) => e.stopPropagation()}>
