@@ -267,27 +267,30 @@ PRESETS: dict[str, dict[str, str]] = {
         "api_key": "ollama",
         "label": "Ollama",
     },
-    # ── Internal / proxy (hidden from public UI) ──
+    # ── Use existing subscription (consumer proxies) ──
+    # These let users route through their ChatGPT Plus / Claude Max
+    # subscription via a local proxy. Requires running the proxy tool
+    # separately. May break when the provider updates their web interface.
     "claude-proxy": {
         "base_url": "http://localhost:8317/v1",
         "model": "claude-sonnet-4-20250514",
         "api_key": "not-needed",
-        "label": "Claude Proxy (CLIProxyAPI)",
-        "internal": "true",
+        "label": "Claude subscription (via local proxy)",
+        "subscription_proxy": "true",
     },
     "claude-proxy-alt": {
         "base_url": "http://localhost:3456/v1",
         "model": "claude-sonnet-4",
         "api_key": "not-needed",
-        "label": "Claude Proxy (claude-max-api-proxy)",
-        "internal": "true",
+        "label": "Claude subscription (via local proxy)",
+        "subscription_proxy": "true",
     },
     "openai-proxy": {
         "base_url": "http://localhost:3457/v1",
         "model": "gpt-4o",
         "api_key": "not-needed",
-        "label": "OpenAI Proxy (Codex)",
-        "internal": "true",
+        "label": "ChatGPT subscription (via local proxy)",
+        "subscription_proxy": "true",
     },
 }
 

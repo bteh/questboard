@@ -431,6 +431,7 @@ def get_provider_presets(include_internal: bool = False) -> list[dict]:
             "model": preset.get("model", ""),
             "needs_api_key": preset.get("needs_api_key") == "true",
             "internal": preset.get("internal") == "true",
+            "subscription_proxy": preset.get("subscription_proxy") == "true",
         })
     return results
 

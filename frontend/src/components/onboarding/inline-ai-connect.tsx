@@ -378,6 +378,22 @@ export function InlineAiConnect() {
               </div>
             )}
 
+            {showOtherProviders && !hostedMode && (
+              <div className="mt-2 rounded-lg border border-border-default/60 bg-bg-subtle/40 px-3 py-2">
+                <p className="text-[11px] text-text-muted">
+                  <span className="font-medium text-text-secondary">Have ChatGPT Plus or Claude Max?</span>{' '}
+                  You can use your existing subscription with a local proxy tool.{' '}
+                  <button
+                    type="button"
+                    onClick={() => navigate({ to: '/settings', search: { tab: 'ai' } })}
+                    className="font-medium text-brand hover:underline"
+                  >
+                    Set up in Settings →
+                  </button>
+                </p>
+              </div>
+            )}
+
             {/* Ollama auto-detect nudge */}
             {ollamaReady && (
               <button
