@@ -274,11 +274,6 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
               )}>
                 {POPULAR_PROVIDER_CHOICES[selectedProvider].badge}
               </span>
-              {(selectedProvider === 'gemini' || selectedProvider === 'groq') && (
-                <span className="rounded-full bg-brand-light/60 px-2 py-0.5 text-[10px] font-medium text-brand">
-                  Recommended
-                </span>
-              )}
             </div>
 
             <p className="text-[11px] leading-relaxed text-text-muted">
