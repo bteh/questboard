@@ -838,55 +838,96 @@ def setup_ollama() -> dict:
         )
 
     try:
-        # Step 1: Check if Ollama is already installed
+        # Step 1: Check if Ollama is already installed or running
         _update("installing", "Checking for Ollama...")
         ollama_bin = shutil.which("ollama")
 
+        # Also check known install locations that may not be on PATH
         if not ollama_bin:
-            # Try to install via brew (macOS) or direct download
-            _update("installing", "Downloading Ollama...", 0.1)
+            for candidate in (
+                "/usr/local/bin/ollama",
+                "/opt/homebrew/bin/ollama",
+                "/Applications/Ollama.app/Contents/Resources/ollama",
+                os.path.expanduser("~/.local/bin/ollama"),
+            ):
+                if os.path.exists(candidate) and os.access(candidate, os.X_OK):
+                    ollama_bin = candidate
+                    break
+
+        # It may already be running even if the binary isn't on PATH
+        # (e.g. macOS Ollama.app starts a server automatically).
+        already_running = detect_ollama().get("detected", False)
+
+        if not ollama_bin and not already_running:
+            _update("installing", "Installing Ollama...", 0.1)
             import platform
-            if platform.system() == "Darwin":
-                # Try brew first (non-interactive)
+            system = platform.system()
+
+            if system == "Darwin":
+                # Strategy 1: brew install ollama (if brew is available)
                 brew = shutil.which("brew")
                 if brew:
-                    result = subprocess.run(
-                        [brew, "install", "ollama"],
-                        capture_output=True, text=True, timeout=300,
-                    )
-                    if result.returncode == 0:
-                        ollama_bin = shutil.which("ollama")
+                    _update("installing", "Installing Ollama via Homebrew...", 0.15)
+                    try:
+                        result = subprocess.run(
+                            [brew, "install", "ollama"],
+                            capture_output=True, text=True, timeout=600,
+                        )
+                        if result.returncode == 0:
+                            ollama_bin = shutil.which("ollama")
+                    except Exception:
+                        pass
 
-            if not ollama_bin:
-                # Direct download as fallback
-                _update("installing", "Downloading Ollama binary...", 0.2)
-                import platform as plat
-                arch = plat.machine().lower()
-                if arch in ("arm64", "aarch64"):
-                    url = "https://github.com/ollama/ollama/releases/latest/download/ollama-darwin"
-                else:
-                    url = "https://github.com/ollama/ollama/releases/latest/download/ollama-darwin-amd64"
+                # Strategy 2: download the .tgz archive Ollama actually publishes
+                if not ollama_bin:
+                    _update("installing", "Downloading Ollama...", 0.2)
+                    try:
+                        import tarfile
+                        import urllib.request
+                        # The archive URL Ollama publishes for macOS:
+                        url = "https://ollama.com/download/Ollama-darwin.tgz"
+                        install_dir = os.path.expanduser("~/.launchboard/ollama")
+                        os.makedirs(install_dir, exist_ok=True)
+                        tgz_path = os.path.join(install_dir, "ollama.tgz")
+                        urllib.request.urlretrieve(url, tgz_path)
+                        _update("installing", "Extracting...", 0.3)
+                        with tarfile.open(tgz_path, "r:gz") as tf:
+                            tf.extractall(install_dir)
+                        os.remove(tgz_path)
+                        # Find the bin/ollama inside the extracted tree
+                        for root, _dirs, files in os.walk(install_dir):
+                            if "ollama" in files and "bin" in root:
+                                candidate = os.path.join(root, "ollama")
+                                if os.access(candidate, os.X_OK):
+                                    ollama_bin = candidate
+                                    break
+                        if ollama_bin:
+                            subprocess.run(["xattr", "-cr", os.path.dirname(os.path.dirname(ollama_bin))], capture_output=True)
+                    except Exception as dl_err:
+                        logger.warning("Ollama direct download failed: %s", dl_err)
+            else:
+                _update("error", "Platform not supported", error=f"Automatic install is only available on macOS. Download Ollama for {system} from ollama.com/download.")
+                return _ollama_setup_state
 
-                install_dir = os.path.expanduser("~/.local/bin")
-                os.makedirs(install_dir, exist_ok=True)
-                target = os.path.join(install_dir, "ollama")
-
-                import urllib.request
-                urllib.request.urlretrieve(url, target)
-                os.chmod(target, 0o755)
-                # Remove quarantine on macOS
-                subprocess.run(["xattr", "-cr", target], capture_output=True)
-                ollama_bin = target
-
-        if not ollama_bin:
-            _update("error", "Failed to install Ollama", error="Could not download or find Ollama. Install it from ollama.com/download.")
+        if not ollama_bin and not already_running:
+            _update(
+                "error",
+                "Couldn't install Ollama automatically",
+                error=(
+                    "Automatic setup failed. Please download Ollama manually from "
+                    "https://ollama.com/download, then come back and run this again."
+                ),
+            )
             return _ollama_setup_state
 
-        _update("installing", "Ollama installed", 0.3)
+        _update("installing", "Ollama ready", 0.3)
 
         # Step 2: Start Ollama server if not running
         detection = detect_ollama()
         if not detection["detected"]:
+            if not ollama_bin:
+                _update("error", "Ollama not running", error="Ollama is installed but not running. Start the Ollama app or run 'ollama serve' in a terminal.")
+                return _ollama_setup_state
             _update("installing", "Starting Ollama server...", 0.35)
             subprocess.Popen(
                 [ollama_bin, "serve"],
@@ -900,23 +941,47 @@ def setup_ollama() -> dict:
                 if detection["detected"]:
                     break
             if not detection["detected"]:
-                _update("error", "Ollama server failed to start", error="Ollama was installed but the server didn't start. Try running 'ollama serve' manually.")
+                _update("error", "Ollama server failed to start", error="Ollama was installed but the server didn't start.")
                 return _ollama_setup_state
 
         _update("pulling", "Ollama is running. Downloading AI model...", 0.4)
 
-        # Step 3: Pull the model
-        # Check if model is already available
+        # Step 3: Pull the model via Ollama's HTTP API (works without the CLI binary).
+        # Ollama's /api/pull endpoint streams progress events — we parse them to
+        # update the progress bar in real time.
         if any(m.startswith(model) for m in detection.get("models", [])):
             _update("pulling", f"{model} already downloaded", 0.9)
         else:
-            _update("pulling", f"Downloading {model} (~2.5 GB)...", 0.4)
-            result = subprocess.run(
-                [ollama_bin, "pull", model],
-                capture_output=True, text=True, timeout=600,
-            )
-            if result.returncode != 0:
-                _update("error", "Model download failed", error=f"Failed to pull {model}: {result.stderr[:200]}")
+            _update("pulling", f"Downloading {model}...", 0.4)
+            try:
+                import json as _json
+                import urllib.request
+                req = urllib.request.Request(
+                    "http://localhost:11434/api/pull",
+                    data=_json.dumps({"name": model, "stream": True}).encode(),
+                    headers={"Content-Type": "application/json"},
+                    method="POST",
+                )
+                with urllib.request.urlopen(req, timeout=900) as resp:
+                    for line in resp:
+                        if not line.strip():
+                            continue
+                        try:
+                            event = _json.loads(line)
+                        except Exception:
+                            continue
+                        total = event.get("total") or 0
+                        completed = event.get("completed") or 0
+                        if total > 0:
+                            frac = 0.4 + 0.5 * (completed / total)
+                            _update("pulling", f"Downloading {model} ({completed // (1024*1024)} / {total // (1024*1024)} MB)...", frac)
+                        elif event.get("status"):
+                            _update("pulling", f"{event['status']}", _ollama_setup_state.get("progress", 0.4))
+                        if event.get("error"):
+                            _update("error", "Model download failed", error=str(event["error"])[:200])
+                            return _ollama_setup_state
+            except Exception as pull_err:
+                _update("error", "Model download failed", error=str(pull_err)[:300])
                 return _ollama_setup_state
 
         _update("configuring", "Configuring Launchboard to use local AI...", 0.95)
