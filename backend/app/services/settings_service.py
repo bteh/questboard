@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading as _threading
 from datetime import datetime, timezone
 
 from app.config import get_settings
@@ -351,8 +352,20 @@ def _remove_env_var(key: str) -> None:
         f.writelines(new_lines)
 
 
+_env_write_lock = _threading.Lock()
+
+
 def _write_env_vars(env_vars: dict[str, str]) -> None:
-    """Write key=value pairs to .env, updating existing or appending."""
+    """Write key=value pairs to .env, updating existing or appending.
+
+    Uses a file lock to prevent concurrent writes from corrupting
+    the .env file (e.g. two rapid Connect clicks in the UI).
+    """
+    with _env_write_lock:
+        _write_env_vars_locked(env_vars)
+
+
+def _write_env_vars_locked(env_vars: dict[str, str]) -> None:
     lines: list[str] = []
     if os.path.exists(_ENV_PATH):
         with open(_ENV_PATH, "r", encoding="utf-8") as f:
@@ -498,11 +511,24 @@ def test_llm_connection() -> dict:
             "model": info.get("model", ""),
             "message": f"Connection failed: {safe_msg}",
         }
+    if available:
+        return {
+            "success": True,
+            "provider": os.getenv("LLM_PROVIDER", ""),
+            "model": info.get("model", ""),
+            "message": "Connected successfully",
+        }
+    # Use the translated error for a human-readable failure message
+    from app.services.error_translator import translate as translate_error
+    translated = translate_error(
+        llm.last_error,
+        provider=os.getenv("LLM_PROVIDER", ""),
+    )
     return {
-        "success": available,
+        "success": False,
         "provider": os.getenv("LLM_PROVIDER", ""),
         "model": info.get("model", ""),
-        "message": "Connected successfully" if available else "Failed to reach LLM endpoint",
+        "message": translated["message"],
     }
 
 
@@ -871,7 +897,6 @@ _DEFAULT_OLLAMA_MODEL = "phi4-mini"
 
 # Mutable setup state — tracks progress across poll requests.
 # All reads/writes go through the lock to survive concurrent calls.
-import threading as _threading
 _ollama_setup_lock = _threading.Lock()
 _ollama_setup_state: dict = {
     "status": "idle",  # idle | installing | pulling | configuring | ready | error

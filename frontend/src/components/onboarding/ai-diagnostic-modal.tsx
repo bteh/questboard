@@ -103,16 +103,28 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
     return null;
   };
 
+  const prevKeyLenRef = useRef(0);
+
   const handleKeyChange = (value: string) => {
     setApiKey(value);
-    // Only auto-switch the provider tab if:
-    //   1. The user hasn't manually selected a tab yet (respect intent)
-    //   2. The input is plausibly a full key (>= 20 chars, not a prefix)
-    if (userSelectedTab) return;
     const trimmed = value.trim();
-    if (trimmed.length < 20) return;
-    const detected = detectProviderFromKey(trimmed);
-    if (detected && detected !== selectedProvider) setSelectedProvider(detected);
+
+    // Auto-detect provider from key format (only if user hasn't picked a tab)
+    if (!userSelectedTab && trimmed.length >= 20) {
+      const detected = detectProviderFromKey(trimmed);
+      if (detected && detected !== selectedProvider) setSelectedProvider(detected);
+    }
+
+    // Test-on-paste: if the input jumped from ~0 to 20+ chars in one
+    // change, the user probably pasted a full key. Auto-connect so
+    // they see instant feedback without clicking "Connect".
+    const wasPaste = prevKeyLenRef.current < 5 && trimmed.length >= 20;
+    prevKeyLenRef.current = trimmed.length;
+
+    if (wasPaste && detectProviderFromKey(trimmed)) {
+      // Pass the key directly — React state hasn't updated yet
+      setTimeout(() => handleConnect(trimmed), 0);
+    }
   };
 
   const handleSelectProvider = (name: PopularProviderName) => {
@@ -188,20 +200,22 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
     );
   };
 
-  const handleConnect = () => {
-    const trimmed = apiKey.trim();
+  const handleConnect = (keyOverride?: string) => {
+    const trimmed = (keyOverride ?? apiKey).trim();
     if (!trimmed && selectedProvider !== 'ollama') {
       toast.error('Paste an API key first.');
       return;
     }
-    const preset = presets?.find((p) => p.name === selectedProvider);
+    const detected = detectProviderFromKey(trimmed);
+    const provider = detected || selectedProvider;
+    const preset = presets?.find((p) => p.name === provider);
     if (!preset) {
-      toast.error(`${selectedProvider} preset not available`);
+      toast.error(`${provider} preset not available`);
       return;
     }
-    const config = selectedProvider === 'ollama'
+    const config = provider === 'ollama'
       ? { provider: 'ollama', base_url: 'http://localhost:11434/v1', api_key: 'ollama', model: 'phi4-mini' }
-      : { provider: selectedProvider, base_url: preset.base_url, api_key: trimmed, model: preset.model };
+      : { provider, base_url: preset.base_url, api_key: trimmed, model: preset.model };
 
     updateLLM.mutate(config, {
       onSuccess: () => {
@@ -213,10 +227,15 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
               refetchLLM();
             } else {
               toast.error(result.message || 'Connection failed — check your key');
+              refetchLLM();
             }
           },
+          onError: (err) =>
+            toast.error(err instanceof Error ? err.message : 'Connection test failed — is the backend running?'),
         });
       },
+      onError: (err) =>
+        toast.error(err instanceof Error ? err.message : 'Could not save settings — is the backend running?'),
     });
   };
 
@@ -431,7 +450,7 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
             />
 
             <Button
-              onClick={handleConnect}
+              onClick={() => handleConnect()}
               disabled={isWorking || !apiKey.trim()}
               className="w-full"
             >
