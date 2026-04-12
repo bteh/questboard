@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
-import { ArrowRight, FileText, Loader2, Search, Shield, Upload } from 'lucide-react';
+import { ArrowRight, FileText, Loader2, Search, Shield, Sparkles, Upload } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { OnboardingWizard } from '@/components/onboarding/onboarding-wizard';
 import { useOnboardingState, useStartOnboardingSearch, useUploadWorkspaceResume } from '@/hooks/use-workspace';
 import { useSearchContext } from '@/contexts/search-context';
 import {
@@ -26,6 +27,8 @@ export function FirstRunHero() {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [jobTitle, setJobTitle] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   const { data } = useOnboardingState();
   const uploadResume = useUploadWorkspaceResume();
@@ -35,6 +38,30 @@ export function FirstRunHero() {
   const resumeUploaded = data?.resume.exists === true;
   const isUploading = uploadResume.isPending;
   const isStartingQuickSearch = startOnboardingSearch.isPending;
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    if (file.type !== 'application/pdf' && !file.name.endsWith('.pdf')) {
+      toast.error('Please drop a PDF file.');
+      return;
+    }
+    uploadResume.mutate(file, {
+      onSuccess: (result) => {
+        toast.success(
+          result.resume.parse_status === 'parsed'
+            ? 'Resume uploaded — pick your search settings next'
+            : 'Resume uploaded with warnings',
+        );
+        navigate({ to: '/search' });
+      },
+      onError: (error) => {
+        toast.error(error instanceof Error ? error.message : 'Upload failed');
+      },
+    });
+  };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -121,14 +148,19 @@ export function FirstRunHero() {
           </p>
         </div>
 
-        {/* Primary CTA — drop target */}
+        {/* Primary CTA — drag-and-drop resume upload */}
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={isUploading}
+          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={handleDrop}
           className={cn(
-            'group relative w-full rounded-2xl border border-dashed border-border-default bg-bg-card/60 p-10 text-center shadow-sm transition-all',
-            'hover:border-brand/40 hover:bg-brand-light/20 hover:shadow-md',
+            'group relative w-full rounded-2xl border-2 border-dashed bg-bg-card/60 p-10 text-center shadow-sm transition-all',
+            isDragging
+              ? 'border-brand bg-brand-light/30 shadow-md scale-[1.01]'
+              : 'border-border-default hover:border-brand/40 hover:bg-brand-light/20 hover:shadow-md',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-bg-page',
             'disabled:cursor-not-allowed disabled:opacity-60',
           )}
@@ -188,10 +220,20 @@ export function FirstRunHero() {
           </div>
         </div>
 
-        {/* Reassurance */}
-        <div className="flex items-center justify-center gap-2 text-xs text-text-muted">
-          <Shield className="h-3.5 w-3.5" />
-          <span>Your resume and AI keys stay on this computer. No account required.</span>
+        {/* Reassurance + guided setup link */}
+        <div className="flex flex-col items-center gap-3">
+          <div className="flex items-center gap-2 text-xs text-text-muted">
+            <Shield className="h-3.5 w-3.5" />
+            <span>Your resume and AI keys stay on this computer. No account required.</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setWizardOpen(true)}
+            className="inline-flex items-center gap-1.5 text-xs text-text-muted transition-colors hover:text-text-secondary"
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            Prefer a guided setup? Open the wizard
+          </button>
         </div>
 
         {resumeUploaded && (
@@ -214,6 +256,13 @@ export function FirstRunHero() {
         accept=".pdf,application/pdf"
         className="hidden"
         onChange={handleFileUpload}
+      />
+
+      {/* Optional guided wizard — accessible but not forced */}
+      <OnboardingWizard
+        open={wizardOpen}
+        onComplete={() => setWizardOpen(false)}
+        onDismiss={() => setWizardOpen(false)}
       />
     </div>
   );

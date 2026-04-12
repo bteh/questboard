@@ -10,8 +10,6 @@ import { ThemeProvider } from '@/contexts/theme-context';
 import { WorkspaceProvider, useWorkspace } from '@/contexts/workspace-context';
 import { ErrorBoundary } from '@/components/shared/error-boundary';
 import { Sidebar } from '@/components/layout/sidebar';
-import { OnboardingWizard } from '@/components/onboarding/onboarding-wizard';
-import { useOnboarding } from '@/hooks/use-onboarding';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { ArrowRight, Briefcase, Menu, ShieldCheck, Sparkles, Upload, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -50,18 +48,13 @@ const PAGE_TITLES: Record<string, string> = {
 };
 
 function OnboardingGate() {
-  const { isLoading, error, isAuthenticated, hostedMode } = useWorkspace();
-  const { shouldShow, dismiss } = useOnboarding();
-
-  if (isLoading) return null;
-  if (error) return null;
-  if (hostedMode && !isAuthenticated) return null;
-  if (!shouldShow) return null;
-
-  // `dismiss` persists to localStorage via useOnboarding, so closing the
-  // wizard once sticks across reloads. Users can still bring it back
-  // explicitly from Settings → Restart onboarding.
-  return <OnboardingWizard open onComplete={dismiss} onDismiss={dismiss} />;
+  // The wizard no longer auto-opens on first run. Instead, the
+  // FirstRunHero IS the onboarding — it has a resume drop zone and
+  // a quick search input. The wizard is still accessible via a
+  // "Guided setup" link on the hero, or via Settings → Restart
+  // onboarding. This way new users aren't blocked by a modal before
+  // they've even seen the app.
+  return null;
 }
 
 function HostedAuthScreen() {
