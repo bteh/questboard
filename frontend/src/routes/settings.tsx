@@ -778,7 +778,7 @@ function SettingsPage() {
         {/* ── AI Provider ─────────────────────────────────────── */}
         {activeTab === 'ai' && (
         <>
-        {/* Primary card — same simple flow as the sidebar popover. */}
+        {/* Primary card — uses the unified diagnostic modal for connect/switch/fix. */}
         <Card>
           <CardHeader>
             <div className="space-y-1">
@@ -787,7 +787,8 @@ function SettingsPage() {
                 AI for ranking and drafting
               </CardTitle>
               <p className="text-sm text-text-tertiary">
-                Pick a provider, paste a key, click connect. Launchboard uses it for resume-fit ranking and tailored drafts.
+                Launchboard uses AI to score jobs against your resume and generate tailored drafts.
+                {!llm?.available && ' Your ChatGPT/Claude subscription works in their apps only — get a free key below.'}
               </p>
             </div>
           </CardHeader>

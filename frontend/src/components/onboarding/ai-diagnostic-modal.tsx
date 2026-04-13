@@ -314,8 +314,10 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
                   <p className="text-sm font-semibold text-text-primary">
                     AI is not connected
                   </p>
-                  <p className="mt-0.5 text-xs text-text-tertiary">
-                    Connect a provider below to enable AI scoring. Search still works without AI.
+                  <p className="mt-1 text-xs leading-relaxed text-text-secondary">
+                    Launchboard needs its own AI connection to score jobs against your resume.
+                    ChatGPT Plus and Claude Pro subscriptions only work in their own apps — but
+                    you can <span className="font-medium text-text-primary">get a free key in 30 seconds</span> below.
                   </p>
                 </>
               )}
@@ -379,12 +381,12 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
         {!isConnected && (
           <div className="space-y-3">
             <p className="text-xs font-medium uppercase tracking-wide text-text-muted">
-              {isBroken ? 'Switch to a different provider' : 'Connect a provider'}
+              {isBroken ? 'Switch to a different provider' : 'Get a free AI key (no credit card)'}
             </p>
 
-            {/* Provider tabs */}
+            {/* Provider tabs — free options first, paid collapsed */}
             <div className="flex gap-1 rounded-lg border border-border-default bg-bg-subtle p-0.5">
-              {(['gemini', 'groq', 'openai-api', 'anthropic-api'] as PopularProviderName[]).map((name) => {
+              {(['gemini', 'groq'] as PopularProviderName[]).map((name) => {
                 const active = selectedProvider === name;
                 return (
                   <button
@@ -396,20 +398,44 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
                       active ? 'bg-bg-card text-text-primary shadow-sm' : 'text-text-muted hover:text-text-secondary',
                     )}
                   >
-                    {name === 'gemini' ? 'Gemini' : name === 'groq' ? 'Groq' : name === 'openai-api' ? 'OpenAI' : 'Claude'}
+                    {name === 'gemini' ? 'Gemini' : 'Groq'}
+                    <span className="ml-1 text-[9px] text-emerald-600">free</span>
                   </button>
                 );
               })}
+              <button
+                type="button"
+                onClick={() => handleSelectProvider('openai-api')}
+                className={cn(
+                  'flex-1 rounded-md px-2 py-1.5 text-[11px] font-medium transition-colors',
+                  (selectedProvider === 'openai-api' || selectedProvider === 'anthropic-api')
+                    ? 'bg-bg-card text-text-primary shadow-sm'
+                    : 'text-text-muted hover:text-text-secondary',
+                )}
+              >
+                Other
+              </button>
             </div>
 
-            <div className="flex items-center gap-2">
-              <span className={cn(
-                'rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                POPULAR_PROVIDER_CHOICES[selectedProvider].badgeClassName,
-              )}>
-                {POPULAR_PROVIDER_CHOICES[selectedProvider].badge}
-              </span>
-            </div>
+            {/* Show sub-tabs for paid providers when "Other" is selected */}
+            {(selectedProvider === 'openai-api' || selectedProvider === 'anthropic-api') && (
+              <div className="flex gap-1 rounded-md border border-border-default/60 bg-bg-subtle/50 p-0.5">
+                {(['openai-api', 'anthropic-api'] as PopularProviderName[]).map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => handleSelectProvider(name)}
+                    className={cn(
+                      'flex-1 rounded px-2 py-1 text-[10px] font-medium transition-colors',
+                      selectedProvider === name ? 'bg-bg-card text-text-primary shadow-sm' : 'text-text-muted hover:text-text-secondary',
+                    )}
+                  >
+                    {name === 'openai-api' ? 'OpenAI' : 'Claude'}
+                    <span className="ml-1 text-[9px] text-amber-600">paid</span>
+                  </button>
+                ))}
+              </div>
+            )}
 
             <p className="text-[11px] leading-relaxed text-text-muted">
               {POPULAR_PROVIDER_CHOICES[selectedProvider].description}
