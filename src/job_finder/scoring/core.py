@@ -162,14 +162,31 @@ def score_job_basic(
     apply_thresh = thresholds.get("apply", 55)
     maybe_thresh = thresholds.get("maybe", 40)
 
-    if overall >= strong_thresh:
-        rec = "STRONG_APPLY"
-    elif overall >= apply_thresh:
-        rec = "APPLY"
-    elif overall >= maybe_thresh:
-        rec = "MAYBE"
+    # Keyword-only scoring is structurally low (TF-IDF can't capture
+    # semantic relevance), so we use gentler thresholds to avoid marking
+    # good jobs as "Skip" just because the AI didn't score them. A
+    # keyword score of 25+ typically means the job title and some terms
+    # matched — that's at least a MAYBE, not a definitive SKIP.
+    ai_scored = bool(company_baselines)
+    if ai_scored:
+        if overall >= strong_thresh:
+            rec = "STRONG_APPLY"
+        elif overall >= apply_thresh:
+            rec = "APPLY"
+        elif overall >= maybe_thresh:
+            rec = "MAYBE"
+        else:
+            rec = "SKIP"
     else:
-        rec = "SKIP"
+        # Keyword-only: shift thresholds down since scores are lower
+        if overall >= strong_thresh * 0.65:
+            rec = "STRONG_APPLY"
+        elif overall >= apply_thresh * 0.55:
+            rec = "APPLY"
+        elif overall >= maybe_thresh * 0.5:
+            rec = "MAYBE"
+        else:
+            rec = "SKIP"
 
     # Strengths & gaps
     source = "AI intel" if company_baselines else company_type
@@ -201,6 +218,8 @@ def score_job_basic(
     if culture >= 55:
         strengths.append("Good culture signals")
 
+    scoring_method = "ai" if ai_scored else "keyword"
+
     return {
         "overall_score": round(overall, 1),
         "technical_score": round(technical, 1),
@@ -211,10 +230,14 @@ def score_job_basic(
         "culture_fit_score": round(culture, 1),
         "career_progression_score": round(progression, 1),
         "recommendation": rec,
-        "score_reasoning": f"Scoring ({source}): {overall:.0f}/100 overall. "
-                           f"Technical {technical:.0f}, leadership {leadership:.0f}, "
-                           f"comp {comp_potential:.0f}, trajectory {trajectory:.0f}, "
-                           f"culture {culture:.0f}, progression {progression:.0f}.",
+        "scoring_method": scoring_method,
+        "score_reasoning": (
+            f"Scoring ({source}): {overall:.0f}/100 overall. "
+            f"Technical {technical:.0f}, leadership {leadership:.0f}, "
+            f"comp {comp_potential:.0f}, trajectory {trajectory:.0f}, "
+            f"culture {culture:.0f}, progression {progression:.0f}."
+            + ("" if ai_scored else " (keyword-only — AI scoring unavailable)")
+        ),
         "key_strengths": strengths,
         "key_gaps": gaps,
     }

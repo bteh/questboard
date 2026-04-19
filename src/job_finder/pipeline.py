@@ -1095,6 +1095,7 @@ class JobFinderPipeline:
 
         deduped = _deduplicate(all_jobs)
         cross_source = len(all_jobs) - len(deduped)
+        self._last_pre_filter_count = len(deduped)
         if progress:
             msg = f"Found {len(deduped)} unique jobs (from {len(all_jobs)} raw, {cross_source} cross-source duplicates merged)"
             progress(msg)
@@ -1230,6 +1231,10 @@ class JobFinderPipeline:
 
         # --- Staffing agency filter ---
         deduped = self.filter_staffing_agencies(deduped, progress=progress)
+
+        # Store the pre-filter count so callers can show a "1,080 → 29" funnel
+        self._last_pre_filter_count = getattr(self, '_last_pre_filter_count', len(deduped))
+        self._last_post_filter_count = len(deduped)
 
         return deduped
 

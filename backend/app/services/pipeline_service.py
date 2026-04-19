@@ -70,6 +70,9 @@ class PipelineRun:
     jobs_found: int = 0
     jobs_scored: int = 0
     strong_matches: int = 0
+    jobs_before_filters: int = 0
+    ai_scored_count: int = 0
+    keyword_scored_count: int = 0
     error: str | None = None
     queue: asyncio.Queue | None = None
     loop: asyncio.AbstractEventLoop | None = None
@@ -563,7 +566,15 @@ def _execute_pipeline(
                 search_run_id=run.run_id,
             )
             run.jobs_found = len(jobs) if jobs else 0
+            run.jobs_before_filters = getattr(pipeline, '_last_pre_filter_count', run.jobs_found)
             run.jobs_scored = sum(1 for j in (jobs or []) if j.get("overall_score") is not None)
+            run.ai_scored_count = sum(
+                1 for j in (jobs or [])
+                if j.get("scoring_method") == "ai" or (
+                    j.get("score_reasoning") and "AI intel" in str(j.get("score_reasoning", ""))
+                )
+            )
+            run.keyword_scored_count = run.jobs_scored - run.ai_scored_count
             strong_threshold = pipeline.config.get("scoring", {}).get("thresholds", {}).get("strong_apply", 70)
             run.strong_matches = sum(
                 1 for j in (jobs or [])
@@ -590,8 +601,11 @@ def _execute_pipeline(
             "complete",
             json.dumps({
                 "jobs_found": run.jobs_found,
+                "jobs_before_filters": run.jobs_before_filters,
                 "jobs_scored": run.jobs_scored,
                 "strong_matches": run.strong_matches,
+                "ai_scored_count": run.ai_scored_count,
+                "keyword_scored_count": run.keyword_scored_count,
                 "duration_seconds": round(duration, 1),
                 "sources": sources,
             }),
