@@ -1009,10 +1009,20 @@ class JobFinderPipeline:
                 elif meta.enabled_by_default:
                     enabled_names.append(name)
 
-            # Build watchlist_by_ats from profile config
-            watchlist = self.config.get("watchlist", [])
+            # Build watchlist_by_ats from profile config + company catalog.
+            # The catalog resolves company names (e.g. "Anthropic") to their
+            # ATS platform and slug automatically, so users don't need to
+            # know about Greenhouse/Lever/Ashby internals.
+            from job_finder.config.company_catalog import resolve_watchlist
+            raw_watchlist = self.config.get("watchlist", [])
+            # Also resolve any target companies that are just names
+            target_company_names = [
+                entry.get("name", entry) if isinstance(entry, dict) else entry
+                for entry in raw_watchlist
+            ]
+            resolved = resolve_watchlist(target_company_names)
             watchlist_by_ats: dict[str, list[str]] = {}
-            for entry in watchlist:
+            for entry in resolved:
                 ats = entry.get("ats", "")
                 slug = entry.get("slug", "")
                 if ats and slug and ats != "unknown":

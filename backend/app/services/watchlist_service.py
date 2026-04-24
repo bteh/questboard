@@ -160,9 +160,15 @@ def discover_company(name: str) -> dict:
 def build_watchlist_entries(company_names: list[str]) -> list[dict]:
     """Discover ATS-backed watchlist entries for a list of company names.
 
+    First checks the curated company catalog (instant, no network) for
+    known companies like Anthropic, Vercel, Supabase. Falls back to
+    live ATS discovery (network probe) for unknown companies.
+
     Only confirmed ATS boards are returned. Unknown/unconfirmed companies are
     skipped so the scraper layer does not spray guessed slugs across every ATS.
     """
+    from job_finder.config.company_catalog import lookup_company
+
     cleaned_names: list[str] = []
     seen: set[str] = set()
     for name in company_names:
@@ -179,21 +185,44 @@ def build_watchlist_entries(company_names: list[str]) -> list[dict]:
         return []
 
     results_by_name: dict[str, dict] = {}
-    workers = min(len(cleaned_names), 6)
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {pool.submit(discover_company, name): name for name in cleaned_names}
-        for future in as_completed(futures):
-            name = futures[future]
-            try:
-                result = future.result()
-            except Exception:
-                logger.debug("ATS discovery failed for %s", name, exc_info=True)
-                continue
-            if not result:
-                continue
-            if result.get("ats") == "unknown" or not result.get("slug"):
-                continue
-            results_by_name[name.lower()] = result
+    needs_discovery: list[str] = []
+
+    # Phase 1: instant catalog lookup (no network)
+    for name in cleaned_names:
+        match = lookup_company(name)
+        if match and match.get("ats") != "unknown" and match.get("slug"):
+            results_by_name[name.lower()] = {
+                "name": match["name"],
+                "slug": match["slug"],
+                "ats": match["ats"],
+                "job_count": 0,
+                "careers_url": "",
+            }
+        else:
+            needs_discovery.append(name)
+
+    # Phase 2: live ATS discovery for companies not in catalog
+    if needs_discovery:
+        workers = min(len(needs_discovery), 6)
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {pool.submit(discover_company, name): name for name in needs_discovery}
+            for future in as_completed(futures):
+                name = futures[future]
+                try:
+                    result = future.result()
+                except Exception:
+                    logger.debug("ATS discovery failed for %s", name, exc_info=True)
+                    continue
+                if not result:
+                    continue
+                if result.get("ats") == "unknown" or not result.get("slug"):
+                    continue
+                results_by_name[name.lower()] = result
+
+    cataloged = len(results_by_name) - len([n for n in needs_discovery if n.lower() in results_by_name])
+    if cataloged > 0:
+        logger.info("Resolved %d/%d companies from catalog (no network), %d via live discovery",
+                     cataloged, len(cleaned_names), len(results_by_name) - cataloged)
 
     return [results_by_name[name.lower()] for name in cleaned_names if name.lower() in results_by_name]
 
