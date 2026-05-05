@@ -2,9 +2,15 @@ name: Desktop Release
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - "v*"
+  # Disabled: push-on-tag trigger removed because Apple Developer
+  # Program ($99/year) is required for signing + notarization.
+  # Without it, the build succeeds but produces unsigned artifacts
+  # that macOS Gatekeeper blocks. Re-enable when signing creds are
+  # added to GitHub Secrets (see docs/desktop-release.md).
+  #
+  # push:
+  #   tags:
+  #     - "v*"
 
 permissions:
   contents: write
