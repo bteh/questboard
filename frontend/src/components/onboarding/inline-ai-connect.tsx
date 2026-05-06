@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import {
   CheckCircle2,
@@ -42,7 +42,7 @@ import { cn } from '@/lib/utils';
 export function InlineAiConnect() {
   const navigate = useNavigate();
   const { hostedMode } = useWorkspace();
-  const { data: llm } = useLLMStatus();
+  const { data: llm, refetch: refetchLLM } = useLLMStatus();
   const { data: presets } = useLLMPresets();
   const updateLLM = useUpdateLLM();
   const testConnection = useTestConnection();
@@ -52,10 +52,64 @@ export function InlineAiConnect() {
   const [showOtherProviders, setShowOtherProviders] = useState(false);
   const [selectedProvider, setSelectedProvider] = useState<PopularProviderName>('gemini');
   const [justConnected, setJustConnected] = useState(false);
+  const [proxyDetected, setProxyDetected] = useState(false);
+  const [proxyConnecting, setProxyConnecting] = useState(false);
 
   const isWorking = updateLLM.isPending || testConnection.isPending;
   const ollamaReady = !!ollamaDetect?.detected;
   const isOllama = selectedProvider === 'ollama';
+
+  // Detect subscription proxy (cliproxyapi) on port 8317
+  useEffect(() => {
+    if (hostedMode) return;
+    (async () => {
+      try {
+        const resp = await fetch('http://localhost:8317/v1/models', { signal: AbortSignal.timeout(2000) });
+        if (resp.ok) setProxyDetected(true);
+      } catch { /* not running */ }
+    })();
+  }, [hostedMode]);
+
+  const handleConnectProxy = async () => {
+    setProxyConnecting(true);
+    updateLLM.mutate(
+      { provider: 'claude-proxy', base_url: 'http://localhost:8317/v1', api_key: 'not-needed', model: 'claude-sonnet-4-20250514' },
+      {
+        onSuccess: () => {
+          testConnection.mutate(undefined, {
+            onSuccess: (result) => {
+              setProxyConnecting(false);
+              if (result.success) {
+                toast.success('Connected to Claude via your subscription!');
+                setJustConnected(true);
+                refetchLLM();
+              } else {
+                // Auth expired — trigger re-auth
+                handleReauthProxy();
+              }
+            },
+            onError: () => { setProxyConnecting(false); toast.error('Connection test failed.'); },
+          });
+        },
+        onError: () => { setProxyConnecting(false); toast.error('Could not save proxy config.'); },
+      },
+    );
+  };
+
+  const handleReauthProxy = async () => {
+    setProxyConnecting(false);
+    try {
+      const resp = await fetch('/api/v1/settings/proxy/reauth', { method: 'POST', credentials: 'include' });
+      const result = await resp.json();
+      if (result.success) {
+        toast.success('Sign in page opened in your browser. Come back after signing in and click "Use my Claude subscription" again.');
+      } else {
+        toast.error(result.message || 'Re-authentication failed.');
+      }
+    } catch {
+      toast.error('Could not reach the backend.');
+    }
+  };
 
   // If AI just got connected, show success state
   if (justConnected || llm?.available) {
@@ -125,6 +179,38 @@ export function InlineAiConnect() {
 
   return (
     <div className="space-y-3">
+      {/* Subscription proxy detected — show first */}
+      {proxyDetected && !justConnected && (
+        <div className="rounded-2xl border border-brand/30 bg-gradient-to-br from-brand-light/40 to-brand-light/10 p-5">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand/15">
+              <Sparkles className="h-5 w-5 text-brand" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-text-primary">
+                Use your Claude subscription
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-text-tertiary">
+                We detected your Claude subscription running locally.
+                No API key needed — use what you're already paying for.
+              </p>
+              <Button
+                size="sm"
+                className="mt-3"
+                onClick={handleConnectProxy}
+                disabled={proxyConnecting}
+              >
+                {proxyConnecting ? (
+                  <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Connecting...</>
+                ) : (
+                  'Use my Claude subscription'
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Value prop card */}
       <div className="rounded-2xl border border-brand/20 bg-gradient-to-br from-brand-light/30 to-brand-light/5 p-5">
         <div className="flex items-start gap-3">

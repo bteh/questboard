@@ -103,28 +103,37 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
 
   useEffect(() => {
     if (!open) return;
-    // Probe port 8317 for a running proxy
+    // Probe port 8317 for a running cliproxyapi proxy.
+    // When auth is expired, the proxy still responds on /v1/models
+    // but returns an empty list — we detect THAT as "proxy running,
+    // needs re-auth" rather than ignoring it.
     (async () => {
       try {
         const resp = await fetch('http://localhost:8317/v1/models', { signal: AbortSignal.timeout(2000) });
         if (!resp.ok) return;
         const data = await resp.json();
         const models = (data.data || []).map((m: { id?: string }) => m.id).filter(Boolean) as string[];
-        if (models.length === 0) return;
-        // Test if auth works
-        let authOk = false;
-        try {
-          const testResp = await fetch('http://localhost:8317/v1/chat/completions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ model: models[0], messages: [{ role: 'user', content: 'hi' }], max_tokens: 1 }),
-            signal: AbortSignal.timeout(5000),
-          });
-          const testData = await testResp.json();
-          authOk = !!testData.choices;
-        } catch { /* auth check failed */ }
-        setProxyDetected({ port: 8317, models, authOk });
-      } catch { /* proxy not running */ }
+
+        if (models.length > 0) {
+          // Models listed — test if auth actually works for inference
+          let authOk = false;
+          try {
+            const testResp = await fetch('http://localhost:8317/v1/chat/completions', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ model: models[0], messages: [{ role: 'user', content: 'hi' }], max_tokens: 1 }),
+              signal: AbortSignal.timeout(5000),
+            });
+            const testData = await testResp.json();
+            authOk = !!testData.choices;
+          } catch { /* auth check failed */ }
+          setProxyDetected({ port: 8317, models, authOk });
+        } else {
+          // Empty models = proxy running but auth expired. Still show
+          // the card so user can re-authenticate.
+          setProxyDetected({ port: 8317, models: ['claude-sonnet-4-20250514'], authOk: false });
+        }
+      } catch { /* proxy not running at all — don't show card */ }
     })();
   }, [open]);
 
