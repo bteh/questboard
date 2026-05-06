@@ -460,6 +460,26 @@ def _execute_pipeline(
                 else:
                     pipeline.config[key] = value
 
+        # ── AI Company Discovery ─────────────────────────────────
+        # If the LLM is available and we have a resume, ask it to discover
+        # companies at search time — not just keyword-blast job boards.
+        # This is what makes the search smarter than a basic aggregator:
+        # the LLM reasons about which companies would want THIS person
+        # based on their full background, not just role title keywords.
+        if pipeline.llm and pipeline.llm.is_configured and use_ai:
+            _send_event(run, "progress", "AI is discovering companies that match your background...")
+            discovered_companies = _ai_discover_companies(
+                pipeline, roles, target_companies or [], run,
+            )
+            if discovered_companies:
+                if target_companies is None:
+                    target_companies = []
+                existing_lower = {c.lower() for c in target_companies}
+                for name in discovered_companies:
+                    if name.lower() not in existing_lower:
+                        target_companies.append(name)
+                        existing_lower.add(name.lower())
+
         # Inject AI-suggested target companies into the pipeline config, but
         # only after ATS discovery confirms which board each company actually
         # uses. This avoids blasting guessed slugs at every ATS API.
@@ -586,6 +606,17 @@ def _execute_pipeline(
         if merged > 0:
             _send_event(run, "progress", f"Merged {merged} cross-source duplicates")
 
+        # Auto-check URLs to mark dead postings. Runs in the background
+        # after scoring so the user sees results immediately while expired
+        # jobs are quietly flagged.
+        if jobs and workspace_id:
+            try:
+                _send_event(run, "progress", "Checking which job postings are still active...")
+                from app.services.application_service import check_urls as _check_urls
+                _with_db(lambda db: _check_urls(db, limit=50))
+            except Exception as exc:
+                logger.debug("Auto URL check failed (non-fatal): %s", exc)
+
         # Count jobs by source
         sources: dict[str, int] = {}
         if jobs:
@@ -619,6 +650,75 @@ def _execute_pipeline(
         if emit_error_event:
             _send_event(run, "error", str(e))
         _persist_workspace_run_status(run, error=str(e))
+
+
+def _ai_discover_companies(
+    pipeline: Any,
+    roles: list[str],
+    existing_companies: list[str],
+    run: PipelineRun,
+) -> list[str]:
+    """Use the LLM to discover companies at search time.
+
+    This is the key differentiator vs basic job board aggregation.
+    Instead of just keyword-blasting Indeed/LinkedIn, we ask the LLM:
+    "Given this resume and these target roles, which specific companies
+    are likely hiring and would be a strong fit?"
+
+    The LLM can reason about industry overlap, tech stack alignment,
+    company stage, and culture — things keyword search can't do.
+    """
+    if not pipeline.llm or not pipeline.llm.is_configured:
+        return []
+
+    resume_text = getattr(pipeline, '_preloaded_resume_text', None) or ""
+    if not resume_text:
+        return []
+
+    # Truncate resume for speed
+    resume_snippet = resume_text[:3000]
+    existing_str = ", ".join(existing_companies[:20]) if existing_companies else "none yet"
+
+    prompt = f"""Based on this resume, suggest 20-30 SPECIFIC companies that are likely hiring for these roles and would be a strong fit for this candidate.
+
+Roles: {', '.join(roles[:8])}
+Already targeting: {existing_str}
+
+Think about:
+- Companies with matching tech stack (check the resume's tools/frameworks)
+- Companies at the right stage for this person's seniority
+- Companies in adjacent industries that hire similar roles
+- Growing companies that are actively hiring
+- Include niche/emerging companies, not just FAANG
+
+Return ONLY a JSON array of company names. No explanations.
+Example: ["Databricks", "Snowflake", "Fivetran", "dbt Labs"]
+
+Resume:
+{resume_snippet}"""
+
+    try:
+        result = pipeline.llm.chat_json(
+            "You are a career advisor. Return only valid JSON.",
+            prompt,
+            max_tokens=1024,
+            temperature=0.3,
+        )
+        if isinstance(result, list):
+            companies = [str(c).strip() for c in result if isinstance(c, str) and c.strip()]
+            if companies:
+                _send_event(run, "progress", f"AI discovered {len(companies)} companies to check: {', '.join(companies[:10])}...")
+                return companies
+        elif isinstance(result, dict) and "companies" in result:
+            companies = [str(c).strip() for c in result["companies"] if isinstance(c, str)]
+            if companies:
+                _send_event(run, "progress", f"AI discovered {len(companies)} companies to check")
+                return companies
+    except Exception as exc:
+        logger.warning("AI company discovery failed: %s", exc)
+        _send_event(run, "progress", "AI company discovery skipped (will use job boards only)")
+
+    return []
 
 
 def _auto_deduplicate(profile: str | None = None, workspace_id: str | None = None) -> int:
