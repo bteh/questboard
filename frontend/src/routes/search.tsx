@@ -420,6 +420,24 @@ function SearchPage() {
 
   const canSuggest = llmAvailable && onboarding?.resume.exists && !suggest.isPending && state !== 'running';
 
+  // Auto-trigger AI suggest when the search page loads with sparse data
+  // (≤1 role = just the resume title fallback, not real AI analysis).
+  // This ensures the user always sees a fully populated search form
+  // without needing to manually click "Re-fill from resume".
+  const autoSuggestFiredRef = useRef(false);
+  useEffect(() => {
+    if (
+      canSuggest &&
+      !autoSuggestFiredRef.current &&
+      !configLoading &&
+      roles != null &&
+      roles.split('\n').filter(Boolean).length <= 1
+    ) {
+      autoSuggestFiredRef.current = true;
+      handleSuggest();
+    }
+  }, [canSuggest, configLoading, roles]);
+
   // When running/completed, use the mode from context (what was actually started)
   // When idle, use the locally selected mode
   const activeMode = state === 'idle' ? selectedMode : mode;
@@ -666,8 +684,10 @@ function SearchPage() {
                 </div>
               ) : (
                 <div className="space-y-5">
-                  {/* Suggest CTA when fields are empty */}
-                  {!roles && !keywords && (suggest.isPending ? (
+                  {/* Suggest CTA when fields are empty or sparse (1 role = fallback from resume title).
+                      The keyword extractor gives ~15 terms even without AI, so we can't just check
+                      emptiness — we check if the roles look like a minimal fallback. */}
+                  {((!roles && !keywords) || (roles && roles.length <= 1 && canSuggest)) && (suggest.isPending ? (
                     <SuggestLoadingState />
                   ) : canSuggest ? (
                     <button
