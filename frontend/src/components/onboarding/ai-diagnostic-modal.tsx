@@ -93,6 +93,68 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
   const isWorking = updateLLM.isPending || testConnection.isPending;
   const quickStartActive = quickStartStatus && quickStartStatus.status !== 'idle' && quickStartStatus.status !== 'ready';
 
+  // ── Detect subscription proxy (cliproxyapi) ────────────────────────
+  const [proxyDetected, setProxyDetected] = useState<{
+    port: number;
+    models: string[];
+    authOk: boolean;
+  } | null>(null);
+  const [proxyConnecting, setProxyConnecting] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    // Probe port 8317 for a running proxy
+    (async () => {
+      try {
+        const resp = await fetch('http://localhost:8317/v1/models', { signal: AbortSignal.timeout(2000) });
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const models = (data.data || []).map((m: { id?: string }) => m.id).filter(Boolean) as string[];
+        if (models.length === 0) return;
+        // Test if auth works
+        let authOk = false;
+        try {
+          const testResp = await fetch('http://localhost:8317/v1/chat/completions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model: models[0], messages: [{ role: 'user', content: 'hi' }], max_tokens: 1 }),
+            signal: AbortSignal.timeout(5000),
+          });
+          const testData = await testResp.json();
+          authOk = !!testData.choices;
+        } catch { /* auth check failed */ }
+        setProxyDetected({ port: 8317, models, authOk });
+      } catch { /* proxy not running */ }
+    })();
+  }, [open]);
+
+  const handleConnectProxy = async () => {
+    if (!proxyDetected) return;
+    setProxyConnecting(true);
+    const model = proxyDetected.models.find(m => m.includes('sonnet')) || proxyDetected.models[0];
+    updateLLM.mutate(
+      { provider: 'claude-proxy', base_url: 'http://localhost:8317/v1', api_key: 'not-needed', model },
+      {
+        onSuccess: () => {
+          testConnection.mutate(undefined, {
+            onSuccess: (result) => {
+              setProxyConnecting(false);
+              if (result.success) {
+                toast.success('Connected to Claude via your subscription!');
+                refetchLLM();
+              } else {
+                toast.error('Proxy connected but authentication failed. Click "Re-authenticate" to sign in again.');
+                refetchLLM();
+              }
+            },
+            onError: () => { setProxyConnecting(false); toast.error('Connection test failed.'); },
+          });
+        },
+        onError: () => { setProxyConnecting(false); toast.error('Could not save proxy config.'); },
+      },
+    );
+  };
+
   // ── Auto-detect provider from API key format ────────────────────────
   const detectProviderFromKey = (key: string): PopularProviderName | null => {
     const k = key.trim();
@@ -399,11 +461,65 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
           </div>
         </div>
 
+        {/* ── Detected subscription proxy ────────────────────────── */}
+        {!isConnected && proxyDetected && (
+          <div className={cn(
+            'rounded-xl border p-4',
+            proxyDetected.authOk
+              ? 'border-success/30 bg-success/5'
+              : 'border-brand/30 bg-brand-light/10',
+          )}>
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand/10">
+                <Sparkles className="h-5 w-5 text-brand" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-text-primary">
+                  {proxyDetected.authOk
+                    ? 'Your Claude subscription is ready'
+                    : 'We found your Claude subscription'}
+                </p>
+                <p className="mt-0.5 text-xs text-text-tertiary">
+                  {proxyDetected.authOk
+                    ? `${proxyDetected.models.length} model${proxyDetected.models.length === 1 ? '' : 's'} available via your existing subscription. No API key needed.`
+                    : 'Your subscription proxy is running but needs to be signed in. Click below to authenticate.'}
+                </p>
+              </div>
+            </div>
+            <div className="mt-3 flex gap-2">
+              {proxyDetected.authOk ? (
+                <Button
+                  size="sm"
+                  onClick={handleConnectProxy}
+                  disabled={proxyConnecting}
+                  className="w-full"
+                >
+                  {proxyConnecting ? (
+                    <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Connecting...</>
+                  ) : (
+                    'Use my Claude subscription'
+                  )}
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={handleReauthProxy}
+                  className="w-full"
+                >
+                  Sign in to Claude
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ── Connect or switch provider ──────────────────────────── */}
         {!isConnected && (
           <div className="space-y-3">
             <p className="text-xs font-medium uppercase tracking-wide text-text-muted">
-              {isBroken ? 'Switch to a different provider' : 'Get a free AI key (no credit card)'}
+              {proxyDetected
+                ? 'Or use a different AI provider'
+                : isBroken ? 'Switch to a different provider' : 'Get a free AI key (no credit card)'}
             </p>
 
             {/* Provider tabs — free options first, paid collapsed */}
