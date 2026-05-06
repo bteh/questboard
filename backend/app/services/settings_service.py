@@ -893,6 +893,63 @@ def get_database_info() -> dict:
 
 # ── Ollama auto-setup ───────────────────────────────────────────────────
 
+def reauth_proxy() -> dict:
+    """Re-authenticate the local subscription proxy (cliproxyapi).
+
+    Detects the proxy binary and runs the appropriate -claude-login or
+    -codex-login command, which opens the user's browser for OAuth.
+    Returns immediately — the login happens in the browser.
+    """
+    import shutil
+    import subprocess
+
+    # Find cliproxyapi
+    proxy_bin = shutil.which("cliproxyapi")
+    if not proxy_bin:
+        for candidate in (
+            "/usr/local/opt/cliproxyapi/bin/cliproxyapi",
+            "/usr/local/bin/cliproxyapi",
+            "/opt/homebrew/bin/cliproxyapi",
+        ):
+            if os.path.exists(candidate):
+                proxy_bin = candidate
+                break
+
+    if not proxy_bin:
+        return {
+            "success": False,
+            "message": "cliproxyapi not found. Install it with: brew install cliproxyapi",
+        }
+
+    # Detect which provider is configured by checking the current LLM config
+    provider = os.getenv("LLM_PROVIDER", "")
+    if "claude" in provider.lower():
+        login_flag = "-claude-login"
+    elif "codex" in provider.lower() or "openai" in provider.lower():
+        login_flag = "-codex-login"
+    else:
+        # Default to Claude since that's the most common subscription proxy
+        login_flag = "-claude-login"
+
+    try:
+        # Run the login command — this opens the browser and returns
+        subprocess.Popen(
+            [proxy_bin, login_flag],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return {
+            "success": True,
+            "message": f"Login page opened in your browser. Sign in to refresh your session.",
+            "login_flag": login_flag,
+        }
+    except Exception as exc:
+        return {
+            "success": False,
+            "message": f"Failed to start re-authentication: {str(exc)[:200]}",
+        }
+
+
 _DEFAULT_OLLAMA_MODEL = "phi4-mini"
 
 # Mutable setup state — tracks progress across poll requests.

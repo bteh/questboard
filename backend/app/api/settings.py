@@ -160,6 +160,19 @@ async def setup_ollama():
     return {"started": True}
 
 
+@router.post("/settings/proxy/reauth")
+async def reauth_proxy():
+    """Re-authenticate the local subscription proxy (cliproxyapi).
+
+    Detects which proxy is running and triggers the appropriate OAuth
+    login flow, which opens the user's browser for authentication.
+    """
+    reject_legacy_route_in_hosted_mode("Proxy re-auth is not available in hosted mode")
+    import asyncio
+
+    return await asyncio.to_thread(settings_service.reauth_proxy)
+
+
 @router.get("/settings/ollama/setup-status")
 async def ollama_setup_status():
     """Poll the current Ollama setup progress."""

@@ -239,16 +239,38 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
     });
   };
 
+  const handleReauthProxy = async () => {
+    try {
+      const resp = await fetch(
+        (import.meta.env.VITE_API_URL || '/api/v1') + '/settings/proxy/reauth',
+        { method: 'POST', credentials: 'include' },
+      );
+      const result = await resp.json();
+      if (result.success) {
+        toast.success(result.message || 'Login page opened — sign in to refresh your session.');
+      } else {
+        toast.error(result.message || 'Re-authentication failed.');
+      }
+    } catch {
+      toast.error('Could not reach the backend.');
+    }
+  };
+
   const handleAction = (kind: string) => {
-    onOpenChange(false);
     switch (kind) {
+      case 'reauth_proxy':
+        handleReauthProxy();
+        return; // Don't close modal — user needs to see the result
       case 'open_quick_start':
+        onOpenChange(false);
         navigate({ to: '/' });
         break;
       case 'open_settings':
+        onOpenChange(false);
         navigate({ to: '/settings', search: { tab: 'ai' } });
         break;
       case 'open_search':
+        onOpenChange(false);
         navigate({ to: '/search' });
         break;
       case 'switch_provider':

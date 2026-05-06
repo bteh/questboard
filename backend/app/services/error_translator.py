@@ -90,9 +90,9 @@ def translate(raw: Exception | str | None, *, provider: str = "") -> Translation
     if "auth_unavailable" in lowered or ("proxy" in lowered and "auth" in lowered):
         return _make(
             "proxy_expired",
-            "Subscription proxy session expired",
-            "Your Claude/ChatGPT subscription proxy needs to be re-authenticated. This is a limitation of consumer proxies — free Gemini/Groq keys are more reliable.",
-            _action("switch_provider", "Switch to free Gemini"),
+            "Claude/ChatGPT session expired",
+            "Your subscription proxy needs to re-authenticate. Click below to open the login page in your browser.",
+            _action("reauth_proxy", "Re-authenticate"),
         )
 
     # ── Quota exceeded (daily/project) ────────────────────────────────
