@@ -9,13 +9,16 @@ from job_finder.tools.scrapers._registry import register_scraper
 from job_finder.tools.scrapers._utils import (
     _clean_company_name,
     _get_json,
+    _load_seed_slugs,
     _match_roles,
     _strip_html,
 )
 
 logger = logging.getLogger(__name__)
 
-_LEVER_COMPANIES: list[str] = []  # Populated at runtime via watchlist + config
+# Seeded from scrapers/data/lever_seed.txt at import. Watchlist entries from
+# the user's config are additive on top of this list.
+_LEVER_COMPANIES: list[str] = _load_seed_slugs("lever_seed.txt")
 
 
 def _fetch_company_postings(slug: str, roles: list[str] | None) -> list[dict]:

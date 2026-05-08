@@ -9,13 +9,16 @@ from job_finder.tools.scrapers._registry import register_scraper
 from job_finder.tools.scrapers._utils import (
     _clean_company_name,
     _get_json,
+    _load_seed_slugs,
     _match_roles,
     _strip_html,
 )
 
 logger = logging.getLogger(__name__)
 
-_GREENHOUSE_COMPANIES: list[str] = []  # Populated at runtime via watchlist + config
+# Seeded from scrapers/data/greenhouse_seed.txt at import. Watchlist
+# entries from the user's config are additive on top of this list.
+_GREENHOUSE_COMPANIES: list[str] = _load_seed_slugs("greenhouse_seed.txt")
 
 
 def _fetch_company_jobs(slug: str, roles: list[str] | None) -> list[dict]:

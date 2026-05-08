@@ -27,6 +27,15 @@ export function updateApplicationStatus(id: number, data: StatusUpdate): Promise
   return apiPatch<ApplicationResponse>(`/applications/${id}/status`, data);
 }
 
+export interface FeedbackUpdate {
+  feedback: 'up' | 'down' | '';
+  notes?: string | null;
+}
+
+export function updateApplicationFeedback(id: number, data: FeedbackUpdate): Promise<ApplicationResponse> {
+  return apiPatch<ApplicationResponse>(`/applications/${id}/feedback`, data);
+}
+
 export function deleteApplication(id: number): Promise<void> {
   return apiDelete(`/applications/${id}`);
 }

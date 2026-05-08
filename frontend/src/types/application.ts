@@ -87,6 +87,8 @@ export interface ApplicationResponse extends ApplicationBase {
   referral_source: string;
   url_status: string;
   last_checked_at: string | null;
+  user_feedback: string;
+  feedback_notes: string;
   created_at: string | null;
   updated_at: string | null;
 }

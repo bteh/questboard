@@ -1,0 +1,37 @@
+# Lever seed company list — slugs for the api.lever.co/v0/postings endpoint.
+# Format: one slug per line. Lines starting with # are ignored.
+# A "slug" is the URL path segment in https://jobs.lever.co/<slug>.
+#
+# Each slug below was verified live as of 2026-05 (returned >0 postings).
+# Wrong/inactive slugs return 404 silently. User watchlist entries are
+# additive on top.
+#
+# Lever is smaller than Greenhouse — many former Lever users have moved
+# to Greenhouse or Ashby. Fewer high-signal slugs here than the other two.
+
+# --- AI / ML --------------------------------------------------------------
+mistral
+
+# --- Productivity / dev tools -------------------------------------------
+metabase
+
+# --- Fintech --------------------------------------------------------------
+wealthfront
+
+# --- Data / analytics ----------------------------------------------------
+acceldata
+
+# --- Consumer / marketplace ----------------------------------------------
+gopuff
+skillshare
+
+# --- Healthcare ----------------------------------------------------------
+includedhealth
+ro
+
+# --- Marketing / sales / GTM ---------------------------------------------
+clari
+outreach
+
+# --- Misc -----------------------------------------------------------------
+prismic

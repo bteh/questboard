@@ -14,6 +14,7 @@ from app.schemas.application import (
     ApplicationListResponse,
     ApplicationResponse,
     ApplicationUpdate,
+    FeedbackUpdate,
     StatusUpdate,
 )
 from app.schemas.apply import PrepareResponse, SubmitRequest, SubmitResponse
@@ -94,6 +95,8 @@ def _to_response(record) -> ApplicationResponse:
         referral_source=record.referral_source or "",
         url_status=getattr(record, "url_status", "unknown") or "unknown",
         last_checked_at=getattr(record, "last_checked_at", None),
+        user_feedback=getattr(record, "user_feedback", "") or "",
+        feedback_notes=getattr(record, "feedback_notes", "") or "",
         created_at=record.created_at,
         updated_at=record.updated_at,
     )
@@ -259,6 +262,28 @@ def update_status(
     kwargs = {"status": body.status}
     if body.notes:
         kwargs["notes"] = body.notes
+    record = application_service.update_application(
+        db,
+        app_id,
+        workspace_id=workspace.workspace.id if workspace else None,
+        **kwargs,
+    )
+    if not record:
+        raise HTTPException(status_code=404, detail="Application not found")
+    return _to_response(record)
+
+
+@router.patch("/{app_id}/feedback", response_model=ApplicationResponse)
+def update_feedback(
+    app_id: int,
+    body: FeedbackUpdate,
+    workspace = Depends(get_active_workspace_context_csrf),
+    db: Session = Depends(get_db),
+):
+    """Record a thumbs up/down (or clear) on a job."""
+    kwargs: dict = {"user_feedback": body.feedback}
+    if body.notes is not None:
+        kwargs["feedback_notes"] = body.notes
     record = application_service.update_application(
         db,
         app_id,

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ExternalLink, ChevronDown, MapPin, Send, CheckCircle2, AlertTriangle, Trash2 } from 'lucide-react';
+import { ExternalLink, ChevronDown, MapPin, Send, CheckCircle2, AlertTriangle, Trash2, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CompanyAvatar } from '@/components/shared/company-avatar';
@@ -11,7 +11,7 @@ import { SalaryBadge } from '@/components/badges/salary-badge';
 import { FundingBadge } from '@/components/badges/funding-badge';
 import { JobDetail } from './job-detail';
 import { ApplyDrawer } from './apply-drawer';
-import { useDeleteApplication } from '@/hooks/use-applications';
+import { useDeleteApplication, useUpdateFeedback } from '@/hooks/use-applications';
 import { truncateDescription, formatDate } from '@/utils/format';
 import { cn } from '@/lib/utils';
 import { resolveSourceLabel } from '@/hooks/use-scrapers';
@@ -52,8 +52,20 @@ export function JobCard({ app, sourceLabels }: JobCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [applyOpen, setApplyOpen] = useState(false);
   const deleteApp = useDeleteApplication();
+  const updateFeedback = useUpdateFeedback();
   const labels = sourceLabels;
   const isApplied = app.status === 'applied';
+  const feedback = app.user_feedback || '';
+
+  const sendFeedback = (next: 'up' | 'down') => {
+    const value: 'up' | 'down' | '' = feedback === next ? '' : next;
+    updateFeedback.mutate(
+      { id: app.id, data: { feedback: value } },
+      {
+        onError: () => toast.error('Failed to save feedback'),
+      },
+    );
+  };
 
   const borderColor = REC_BORDER_COLORS[app.recommendation] || REC_BORDER_COLORS.SKIP;
   const recency = getRecencyLabel(app.date_found);
@@ -151,6 +163,38 @@ export function JobCard({ app, sourceLabels }: JobCardProps) {
                 Apply
               </Button>
             )}
+            <div className="flex items-center gap-1 ml-1">
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); sendFeedback('up'); }}
+                disabled={updateFeedback.isPending}
+                className={cn(
+                  'inline-flex items-center justify-center h-7 w-7 rounded-md transition-colors cursor-pointer',
+                  feedback === 'up'
+                    ? 'text-success bg-success/10'
+                    : 'text-text-muted hover:text-success hover:bg-success/10',
+                )}
+                title={feedback === 'up' ? 'You liked this — click to clear' : 'Good match'}
+                aria-pressed={feedback === 'up'}
+              >
+                <ThumbsUp className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); sendFeedback('down'); }}
+                disabled={updateFeedback.isPending}
+                className={cn(
+                  'inline-flex items-center justify-center h-7 w-7 rounded-md transition-colors cursor-pointer',
+                  feedback === 'down'
+                    ? 'text-danger bg-danger/10'
+                    : 'text-text-muted hover:text-danger hover:bg-danger/10',
+                )}
+                title={feedback === 'down' ? 'You disliked this — click to clear' : 'Not a match'}
+                aria-pressed={feedback === 'down'}
+              >
+                <ThumbsDown className="h-3.5 w-3.5" />
+              </button>
+            </div>
             <button
               type="button"
               onClick={(e) => {
@@ -202,30 +246,64 @@ export function JobCard({ app, sourceLabels }: JobCardProps) {
       </div>
 
       {expanded && app.overall_score != null && (
-        <div className="border-t border-border-default bg-bg-subtle px-5 py-4" onClick={(e) => e.stopPropagation()}>
-          <p className="text-xs font-medium text-text-secondary mb-2.5">Score Breakdown</p>
-          <div className="space-y-1.5">
-            {SCORE_DIMENSIONS.map(({ key, label }) => {
-              const value = (app as unknown as Record<string, unknown>)[key] as number | null;
-              const pct = value != null ? Math.min(value, 100) : 0;
-              return (
-                <div key={key} className="flex items-center gap-2">
-                  <span className="w-[120px] shrink-0 text-[11px] text-text-tertiary truncate">{label}</span>
-                  <div className="flex-1 h-1.5 rounded-full bg-bg-muted overflow-hidden">
-                    <div
-                      className={cn('h-full rounded-full transition-all', scoreBgClass(value))}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                  <span
-                    className="w-6 text-right text-[11px] font-medium tabular-nums"
-                    style={{ color: scoreColorHex(value) }}
-                  >
-                    {value != null ? Math.round(value) : '\u2014'}
-                  </span>
+        <div className="border-t border-border-default bg-bg-subtle px-5 py-4 space-y-4" onClick={(e) => e.stopPropagation()}>
+          {app.score_reasoning && (
+            <div>
+              <p className="text-xs font-medium text-text-secondary mb-1.5">Why this score</p>
+              <p className="text-xs text-text-secondary leading-relaxed whitespace-pre-line">
+                {app.score_reasoning}
+              </p>
+            </div>
+          )}
+          {(app.key_strengths?.length || app.key_gaps?.length) ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {app.key_strengths?.length ? (
+                <div>
+                  <p className="text-xs font-medium text-success mb-1.5">Strengths</p>
+                  <ul className="space-y-0.5">
+                    {app.key_strengths.map((s, i) => (
+                      <li key={i} className="text-xs text-text-secondary leading-relaxed">+ {s}</li>
+                    ))}
+                  </ul>
                 </div>
-              );
-            })}
+              ) : null}
+              {app.key_gaps?.length ? (
+                <div>
+                  <p className="text-xs font-medium text-warning mb-1.5">Room to grow</p>
+                  <ul className="space-y-0.5">
+                    {app.key_gaps.map((g, i) => (
+                      <li key={i} className="text-xs text-text-secondary leading-relaxed">\u2212 {g}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          <div>
+            <p className="text-xs font-medium text-text-secondary mb-2">Score breakdown</p>
+            <div className="space-y-1.5">
+              {SCORE_DIMENSIONS.map(({ key, label }) => {
+                const value = (app as unknown as Record<string, unknown>)[key] as number | null;
+                const pct = value != null ? Math.min(value, 100) : 0;
+                return (
+                  <div key={key} className="flex items-center gap-2">
+                    <span className="w-[120px] shrink-0 text-[11px] text-text-tertiary truncate">{label}</span>
+                    <div className="flex-1 h-1.5 rounded-full bg-bg-muted overflow-hidden">
+                      <div
+                        className={cn('h-full rounded-full transition-all', scoreBgClass(value))}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <span
+                      className="w-6 text-right text-[11px] font-medium tabular-nums"
+                      style={{ color: scoreColorHex(value) }}
+                    >
+                      {value != null ? Math.round(value) : '\u2014'}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}

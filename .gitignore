@@ -61,6 +61,7 @@ Thumbs.db
 =*
 data/workspaces/
 data/settings_audit.log
+backend/data/
 .desktop-build/
 test-results/
 .aidesigner/*

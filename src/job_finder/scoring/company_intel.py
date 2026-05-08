@@ -120,16 +120,28 @@ def get_company_baselines(
     )
 
     result = llm.chat_json(_COMPANY_INTEL_PROMPT, user_msg)
-    if not result:
+    if not result or not isinstance(result, dict):
         return None
 
-    # Validate and clamp
+    # Validate and clamp. Wrap float() in try/except — a misbehaving LLM
+    # can return non-numeric values like {"technical": "high"} or null.
+    # One bad response should fall back gracefully, not crash the caller
+    # and poison every job for this company.
     baselines: dict[str, float] = {}
+    invalid: list[str] = []
     for key in ("technical", "leadership", "trajectory", "comp", "culture", "platform"):
         val = result.get(key)
         if val is None:
             continue  # tolerate missing keys (backward compat with cached results)
-        baselines[key] = max(0.0, min(float(val), 100.0))
+        try:
+            baselines[key] = max(0.0, min(float(val), 100.0))
+        except (TypeError, ValueError):
+            invalid.append(f"{key}={val!r}")
+    if invalid:
+        logger.warning(
+            "LLM company baselines for %s had non-numeric values (%s) — falling back to tier baseline for those keys",
+            company, ", ".join(invalid),
+        )
     if not baselines:
         return None
 

@@ -783,11 +783,37 @@ class JobFinderPipeline:
 
         Returns the original roles + AI-generated expansions.  Falls back to
         just the original roles if the LLM is unavailable or fails.
+
+        Results are cached to disk per profile + role-set hash so we don't
+        re-pay the LLM call every search run. Cache file:
+        ``<data_dir>/expanded_roles_<profile>_<hash>.json``.
         """
         if not self.llm or not self.llm.is_configured:
             return roles
         if not roles:
             return roles
+
+        # Try persistent cache before hitting the LLM. Roles + profile hash
+        # invalidates naturally when the user edits target_roles or switches
+        # profile. Cache is only used when LLM is configured — keeps the
+        # no-LLM offline path identical to before.
+        import hashlib
+        cache_key = hashlib.sha1(
+            ("|".join(sorted(r.lower().strip() for r in roles))).encode("utf-8")
+        ).hexdigest()[:10]
+        profile_slug = (self.profile_name or "default").replace("/", "_")
+        data_dir = os.getenv("JOB_FINDER_DATA_DIR", os.path.join(os.getcwd(), "data"))
+        cache_path = os.path.join(data_dir, f"expanded_roles_{profile_slug}_{cache_key}.json")
+        try:
+            if os.path.exists(cache_path):
+                with open(cache_path, encoding="utf-8") as f:
+                    cached = json.load(f)
+                if isinstance(cached, list) and cached:
+                    if progress:
+                        progress(f"Using cached role expansion ({len(cached)} keywords)")
+                    return cached
+        except Exception as e:
+            logger.debug("Role expansion cache read failed (non-fatal): %s", e)
 
         roles_str = ", ".join(f'"{r}"' for r in roles)
         system_prompt = (
@@ -827,6 +853,13 @@ class JobFinderPipeline:
                             f"AI expanded {len(roles)} roles → {len(all_keywords)} "
                             f"keywords (+{len(all_keywords) - len(roles)} related titles)"
                         )
+                    # Persist to disk so future runs reuse instead of paying again.
+                    try:
+                        os.makedirs(data_dir, exist_ok=True)
+                        with open(cache_path, "w", encoding="utf-8") as f:
+                            json.dump(all_keywords, f, ensure_ascii=False, indent=2)
+                    except Exception as e:
+                        logger.debug("Role expansion cache write failed (non-fatal): %s", e)
                     return all_keywords
         except Exception as e:
             logger.warning("AI role expansion failed (non-fatal): %s", e)

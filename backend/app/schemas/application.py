@@ -56,6 +56,8 @@ class ApplicationResponse(ApplicationBase):
     referral_source: str = ""
     url_status: str = "unknown"
     last_checked_at: datetime | None = None
+    user_feedback: str = ""
+    feedback_notes: str = ""
     created_at: datetime | None = None
     updated_at: datetime | None = None
 
@@ -79,6 +81,13 @@ class ApplicationUpdate(BaseModel):
 
 class StatusUpdate(BaseModel):
     status: Literal["found", "reviewed", "applying", "applied", "interviewing", "offer", "rejected", "withdrawn"]
+    notes: str | None = None
+
+
+class FeedbackUpdate(BaseModel):
+    """Quick thumbs up/down signal from job cards."""
+
+    feedback: Literal["up", "down", ""]
     notes: str | None = None
 
 

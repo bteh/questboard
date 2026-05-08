@@ -5,10 +5,37 @@ from __future__ import annotations
 import logging
 import re
 from html import unescape
+from pathlib import Path
 
 import requests
 
 logger = logging.getLogger(__name__)
+
+
+_SEED_DIR = Path(__file__).parent / "data"
+
+
+def _load_seed_slugs(filename: str) -> list[str]:
+    """Load a newline-delimited slug list from scrapers/data/<filename>.
+
+    Lines starting with '#' and blank lines are ignored. Used by ATS scrapers
+    (Greenhouse, Lever, Ashby) to populate a default company list so that
+    fresh users get startup coverage without configuring a watchlist.
+    Returns [] if the file is missing — scrapers fall back gracefully.
+    """
+    path = _SEED_DIR / filename
+    if not path.exists():
+        return []
+    seen: set[str] = set()
+    slugs: list[str] = []
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line not in seen:
+            seen.add(line)
+            slugs.append(line)
+    return slugs
 
 _HEADERS = {
     "User-Agent": (
@@ -110,12 +137,55 @@ def _clean_company_name(slug: str) -> str:
     return _COMPANY_NAME_CORRECTIONS.get(name, name)
 
 
-def _match_roles(title: str, roles: list[str] | None) -> bool:
+# Founding-role aliases bypass the role-matching gate by default.
+# These titles ("Founding Engineer", "Member of Technical Staff") rarely
+# word-overlap with a user's normal target roles, so strict matching drops
+# them. They're high-signal startup roles that almost any "want a startup
+# job" user wants to see — global default per design.
+_FOUNDING_TITLE_PATTERNS: tuple[str, ...] = (
+    "founding engineer",
+    "founding designer",
+    "founding pm",
+    "founding product manager",
+    "founding product",
+    "founding software",
+    "founding member",
+    "founding team",
+    "member of technical staff",
+    "member of the technical staff",
+    "early engineer",
+    "first engineer",
+    "first engineering hire",
+    "first product hire",
+    "first design hire",
+)
+# Standalone tokens (matched as whole words). "mts" is a common shorthand at
+# AI labs but we don't want to match it inside other words.
+_FOUNDING_TOKEN_PATTERNS: tuple[str, ...] = ("mts",)
+
+
+def _is_founding_title(title_lower: str, title_words: set[str]) -> bool:
+    """True if the (lowercased) title looks like a founding/early-hire role."""
+    if any(p in title_lower for p in _FOUNDING_TITLE_PATTERNS):
+        return True
+    return any(t in title_words for t in _FOUNDING_TOKEN_PATTERNS)
+
+
+def _match_roles(
+    title: str,
+    roles: list[str] | None,
+    *,
+    include_founding: bool = True,
+) -> bool:
     """Check if a job title matches any of the target roles.
 
     Matching strategy (in order):
-    1. Exact substring — "data engineer" in "Senior Data Engineer" ✓
-    2. Word overlap  — all significant words of the role appear in the title
+    1. Founding-role bypass — "Founding Engineer", "Member of Technical Staff",
+       "MTS", etc. always pass when ``include_founding=True`` (the default).
+       These titles rarely word-overlap with normal target roles, but they're
+       high-signal startup positions users almost always want to see.
+    2. Exact substring — "data engineer" in "Senior Data Engineer" ✓
+    3. Word overlap  — all significant words of the role appear in the title
        (any order), so "Platform Engineer, Data" matches role "data platform engineer"
 
     Returns False if none match — no broad fallback so that role filtering
@@ -127,23 +197,29 @@ def _match_roles(title: str, roles: list[str] | None) -> bool:
     # Noise words to ignore during word-overlap matching
     _NOISE = {"a", "an", "the", "and", "or", "of", "for", "in", "at", "to", "with", "&"}
     # Strip punctuation for word-level matching
-    import re as _re
-    title_words = set(_re.findall(r"[a-z0-9]+", title_lower))
+    title_words = set(re.findall(r"[a-z0-9]+", title_lower))
+    if include_founding and _is_founding_title(title_lower, title_words):
+        return True
     for r in roles:
         role_lower = r.lower()
         # Fast path: exact substring
         if role_lower in title_lower:
             return True
         # Word overlap: all meaningful role words present in title (any order)
-        role_words = set(_re.findall(r"[a-z0-9]+", role_lower)) - _NOISE
+        role_words = set(re.findall(r"[a-z0-9]+", role_lower)) - _NOISE
         if role_words and role_words.issubset(title_words):
             return True
     return False
 
 
-def _match_roles_crypto(title: str, roles: list[str] | None) -> bool:
+def _match_roles_crypto(
+    title: str,
+    roles: list[str] | None,
+    *,
+    include_founding: bool = True,
+) -> bool:
     """Extended role matching that includes crypto/web3/blockchain terms."""
-    if _match_roles(title, roles):
+    if _match_roles(title, roles, include_founding=include_founding):
         return True
     title_lower = title.lower()
     crypto_terms = [

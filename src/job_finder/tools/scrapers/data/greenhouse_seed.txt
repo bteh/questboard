@@ -1,0 +1,117 @@
+# Greenhouse seed company list — slugs for the boards-api.greenhouse.io endpoint.
+# Format: one slug per line. Lines starting with # are ignored.
+# A "slug" is the URL path segment in https://boards.greenhouse.io/<slug>.
+#
+# Each slug below was verified live as of 2026-05 (returned >0 jobs).
+# Wrong/inactive slugs return 404 and are silent — feel free to add
+# speculative entries; user watchlist entries are additive on top.
+#
+# Refresh: re-run the slug health-check script periodically — companies
+# do migrate ATSes (e.g. OpenAI → Ashby).
+
+# --- AI / ML labs and infra -----------------------------------------------
+anthropic
+assemblyai
+databricks
+fireworksai
+gleanwork
+inflectionai
+maven
+otterai
+speechmatics
+xai
+
+# --- Developer tools / infra ---------------------------------------------
+algolia
+buildkite
+chainguard
+circleci
+cloudflare
+cockroachlabs
+contentful
+dagsterlabs
+elastic
+fastly
+figma
+gitlab
+grafanalabs
+greenhouse
+hightouch
+honeycomb
+launchdarkly
+materialize
+mongodb
+neo4j
+newrelic
+okta
+pagerduty
+planetscale
+postman
+sendbird
+storyblok
+tailscale
+twilio
+vercel
+yugabyte
+
+# --- Fintech --------------------------------------------------------------
+alloy
+brex
+checkr
+chime
+fireblocks
+mercury
+monzo
+n26
+nubank
+robinhood
+sofi
+treasuryprime
+upstart
+
+# --- Data / analytics / observability ------------------------------------
+datadog
+dataiku
+fivetran
+sigmacomputing
+
+# --- Consumer / marketplace / social --------------------------------------
+airbnb
+calm
+descript
+discord
+duolingo
+faire
+glossier
+instacart
+khanacademy
+lyft
+medium
+nextdoor
+peloton
+pinterest
+reddit
+remote
+roblox
+twitch
+
+# --- Productivity / workplace ---------------------------------------------
+asana
+calendly
+gusto
+intercom
+lattice
+
+# --- B2B SaaS / vertical / enterprise ------------------------------------
+6sense
+apolloio
+attentive
+celonis
+cresta
+salesloft
+zoominfo
+
+# --- Healthcare / hardware / climate -------------------------------------
+ceribell
+oscar
+samsara

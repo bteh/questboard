@@ -102,6 +102,11 @@ class ApplicationRecord(Base):
     contact_email = Column(String(300), default="")
     referral_source = Column(String(300), default="")
 
+    # User feedback — quick thumbs signal collected from job cards. Drives
+    # future per-user weight tuning; for now, just stored.
+    user_feedback = Column(String(8), default="")  # "up" | "down" | ""
+    feedback_notes = Column(Text, default="")
+
     # URL liveness
     url_status = Column(String(20), default="unknown")  # alive, dead, unknown
     last_checked_at = Column(DateTime, nullable=True)
@@ -220,6 +225,14 @@ def _migrate_db(engine) -> None:
         if "evaluation_report_json" not in existing_cols:
             conn.execute(
                 text("ALTER TABLE applications ADD COLUMN evaluation_report_json TEXT DEFAULT ''")
+            )
+        if "user_feedback" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN user_feedback VARCHAR(8) DEFAULT ''")
+            )
+        if "feedback_notes" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN feedback_notes TEXT DEFAULT ''")
             )
         # Convert empty job_url strings to NULL (allows multiple NULLs in unique column)
         conn.execute(text("UPDATE applications SET job_url = NULL WHERE job_url = ''"))

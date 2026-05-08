@@ -6,12 +6,19 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from job_finder.tools.scrapers._registry import register_scraper
-from job_finder.tools.scrapers._utils import _clean_company_name, _get_json, _match_roles
+from job_finder.tools.scrapers._utils import (
+    _clean_company_name,
+    _get_json,
+    _load_seed_slugs,
+    _match_roles,
+)
 
 logger = logging.getLogger(__name__)
 
-# Ashby has no universally useful default list — populated via user watchlist
-_ASHBY_COMPANIES: list[str] = []
+# Seeded from scrapers/data/ashby_seed.txt at import. Ashby is the newer ATS
+# preferred by AI-native and modern dev-tool startups — high-signal coverage
+# for the Series A–C cohort. Watchlist entries are additive.
+_ASHBY_COMPANIES: list[str] = _load_seed_slugs("ashby_seed.txt")
 
 
 def _fetch_company_jobs(slug: str, roles: list[str] | None) -> list[dict]:
@@ -69,7 +76,6 @@ def _fetch_company_jobs(slug: str, roles: list[str] | None) -> list[dict]:
     url="https://ashbyhq.com",
     description="Direct job postings from Ashby career pages",
     category="ats",
-    enabled_by_default=False,
 )
 def search_ashby(
     roles: list[str] | None = None,

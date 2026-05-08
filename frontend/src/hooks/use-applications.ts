@@ -1,5 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getApplications, getApplication, createApplication, updateApplication, updateApplicationStatus, deleteApplication, deduplicateApplications } from '@/api/applications';
+import {
+  getApplications,
+  getApplication,
+  createApplication,
+  updateApplication,
+  updateApplicationStatus,
+  updateApplicationFeedback,
+  deleteApplication,
+  deduplicateApplications,
+  type FeedbackUpdate,
+} from '@/api/applications';
 import type { ApplicationFilters, ApplicationCreate, ApplicationUpdate, StatusUpdate, ApplicationResponse, ApplicationListResponse } from '@/types/application';
 
 export function useApplications(filters: ApplicationFilters = {}) {
@@ -72,6 +82,41 @@ export function useUpdateStatus() {
     },
   });
 }
+
+export function useUpdateFeedback() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: FeedbackUpdate }) => updateApplicationFeedback(id, data),
+    onMutate: async ({ id, data }) => {
+      await queryClient.cancelQueries({ queryKey: ['applications'] });
+      const previousLists = queryClient.getQueriesData<ApplicationListResponse>({ queryKey: ['applications'] });
+      queryClient.setQueriesData<ApplicationListResponse>(
+        { queryKey: ['applications'] },
+        (old) => {
+          if (!old) return old;
+          return {
+            ...old,
+            items: old.items.map((item: ApplicationResponse) =>
+              item.id === id ? { ...item, user_feedback: data.feedback } : item
+            ),
+          };
+        }
+      );
+      return { previousLists };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousLists) {
+        context.previousLists.forEach(([key, data]) => {
+          queryClient.setQueryData(key, data);
+        });
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['applications'] });
+    },
+  });
+}
+
 
 export function useDeleteApplication() {
   const queryClient = useQueryClient();

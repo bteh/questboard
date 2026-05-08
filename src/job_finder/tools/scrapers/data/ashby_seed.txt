@@ -1,0 +1,85 @@
+# Ashby seed company list — slugs for the api.ashbyhq.com job board API.
+# Format: one slug per line. Lines starting with # are ignored.
+# A "slug" is the org segment in https://jobs.ashbyhq.com/<slug>.
+#
+# Each slug below was verified live as of 2026-05 (returned >0 jobs).
+# Wrong/inactive slugs return 404 silently. User watchlist entries are
+# additive on top.
+#
+# Ashby is the modern AI-native ATS — high signal for the Series A–C
+# AI/dev-tools cohort.
+
+# --- AI / ML labs ---------------------------------------------------------
+character
+cohere
+elevenlabs
+mistral
+openai
+perplexity
+poolside
+runway
+suno
+
+# --- AI / ML infra --------------------------------------------------------
+braintrust
+e2b
+langfuse
+mintlify
+modal
+pinecone
+unstructured
+weaviate
+
+# --- Dev tools / infra ---------------------------------------------------
+attio
+clerk
+graphite
+inngest
+knock
+linear
+materialize
+neon
+notion
+posthog
+railway
+render
+sanity
+sentry
+supabase
+warp
+zapier
+zed
+
+# --- Productivity / consumer ---------------------------------------------
+clickup
+fathom
+gamma
+patreon
+substack
+
+# --- Fintech --------------------------------------------------------------
+column
+copilot-money
+finch
+plaid
+ramp
+unit
+
+# --- Data / analytics ----------------------------------------------------
+airbyte
+hightouch
+
+# --- B2B SaaS / vertical -------------------------------------------------
+commonroom
+dust
+n8n
+
+# --- Crypto / web3 -------------------------------------------------------
+alchemy
+magiceden
+phantom
+
+# --- Healthcare / climate / hardware -------------------------------------
+crusoe
+maven
+nuna
