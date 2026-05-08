@@ -69,26 +69,8 @@ export function AiSetupWizard() {
 
   const isWorking = updateLLM.isPending || testConnection.isPending;
 
-  // If AI just became available, show success
-  if (llm?.available && path !== 'local') {
-    return (
-      <div className="rounded-2xl border border-success/30 bg-success/5 p-5">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-success/15">
-            <CheckCircle2 className="h-5 w-5 text-success" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-text-primary">AI is ready</p>
-            <p className="mt-0.5 text-xs text-text-tertiary">
-              Jobs will be scored across 7 dimensions against your resume.
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Quick Start: auto-install Ollama ──────────────────────────────────
+  // ── Hooks must run in the same order on every render — declare before
+  // any conditional return below. (rules-of-hooks)
 
   const startLocalSetup = useCallback(async () => {
     setPath('local');
@@ -131,6 +113,27 @@ export function AiSetupWizard() {
       if (pollRef.current) clearInterval(pollRef.current);
     };
   }, []);
+
+  // If AI just became available, show success
+  if (llm?.available && path !== 'local') {
+    return (
+      <div className="rounded-2xl border border-success/30 bg-success/5 p-5">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-success/15">
+            <CheckCircle2 className="h-5 w-5 text-success" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-text-primary">AI is ready</p>
+            <p className="mt-0.5 text-xs text-text-tertiary">
+              Jobs will be scored across 7 dimensions against your resume.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Quick Start: auto-install Ollama ──────────────────────────────────
 
   // ── API Key: auto-detect provider from key format ────────────────────
 

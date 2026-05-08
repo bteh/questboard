@@ -156,6 +156,26 @@ GitHub Actions currently validates:
 - Ensure `pytest` and `tsc --noEmit` pass
 - Don't commit `.env`, `data/*.db`, or files in `knowledge/`
 
+### Team PR workflow
+
+We work via PRs on `main`; direct pushes to `main` are blocked.
+
+```bash
+git checkout main && git pull
+git checkout -b feat/<topic>      # or fix/<topic>, chore/<topic>
+# … hack, commit small atomic changes …
+git push -u origin feat/<topic>
+gh pr create --fill               # opens PR using your latest commit message
+# wait for CI green + a teammate's approval, then:
+gh pr merge --squash --delete-branch
+```
+
+CI must be green before merge. Fastest local pre-flight:
+
+```bash
+pytest tests/ -q && (cd frontend && npm run typecheck && npm run lint)
+```
+
 ## Reporting Issues
 
 Open an issue on GitHub with:

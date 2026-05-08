@@ -22,13 +22,18 @@ class TestProfileValidation(unittest.TestCase):
     """Validate that the profile schema catches misconfigurations."""
 
     # ------------------------------------------------------------------
-    # 1. A real starter profile (default.yaml) passes validation
+    # 1. A real starter profile passes validation
+    #    Prefer default.yaml (user-local, gitignored) but fall back to
+    #    _template.yaml (always tracked) so this test runs in CI on a
+    #    fresh checkout without requiring user-specific config.
     # ------------------------------------------------------------------
     def test_valid_profile_passes(self) -> None:
         from job_finder.config.profile_schema import validate_profile_safe
 
         default_path = os.path.join(_PROFILES_DIR, "default.yaml")
-        with open(default_path, "r", encoding="utf-8") as f:
+        template_path = os.path.join(_PROFILES_DIR, "_template.yaml")
+        path = default_path if os.path.exists(default_path) else template_path
+        with open(path, "r", encoding="utf-8") as f:
             raw = yaml.safe_load(f)
 
         profile, errors = validate_profile_safe(raw)
