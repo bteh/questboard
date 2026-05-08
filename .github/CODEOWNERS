@@ -1,0 +1,6 @@
+# Default reviewers — every PR auto-requests review from both maintainers.
+#
+# When the repo gets branch protection (GitHub Pro on private, or once we
+# go public), flip "1 approver required" to enforced. For now it's a team
+# norm documented in CONTRIBUTING.md.
+*       @bteh @McGuo

@@ -158,7 +158,8 @@ GitHub Actions currently validates:
 
 ### Team PR workflow
 
-We work via PRs on `main`; direct pushes to `main` are blocked.
+We work via PRs on `main`. Direct pushes to `main` are discouraged
+(branch protection will enforce this once available).
 
 ```bash
 git checkout main && git pull
@@ -166,11 +167,21 @@ git checkout -b feat/<topic>      # or fix/<topic>, chore/<topic>
 # … hack, commit small atomic changes …
 git push -u origin feat/<topic>
 gh pr create --fill               # opens PR using your latest commit message
-# wait for CI green + a teammate's approval, then:
+# wait for CI green + 1 teammate's approval, then:
 gh pr merge --squash --delete-branch
 ```
 
-CI must be green before merge. Fastest local pre-flight:
+**Merge requirements (team norm — not yet enforced by branch protection):**
+
+1. CI green (Python tests, frontend typecheck/lint/build)
+2. **At least 1 approving review** from another collaborator
+3. No unresolved review comments
+
+`.github/CODEOWNERS` auto-requests review from both maintainers on every
+PR — accept the request and approve when you've read the diff. Self-approval
+doesn't count.
+
+Fastest local pre-flight:
 
 ```bash
 pytest tests/ -q && (cd frontend && npm run typecheck && npm run lint)
