@@ -81,6 +81,11 @@ jobs:
 
   desktop-smoke:
     name: Desktop Smoke
+    # Release-grade integration test — slow, brittle for per-PR feedback.
+    # Only runs post-merge to main + workflow_dispatch. Re-enable on
+    # pull_request once the .venv/Make dependency in the workflow is
+    # fixed and the test stabilizes.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -110,6 +115,8 @@ jobs:
 
   desktop-scaffold:
     name: Desktop Scaffold
+    # See note on desktop-smoke. Same gating rationale.
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -146,6 +153,9 @@ jobs:
 
   desktop-macos:
     name: Desktop macOS Bundle
+    # See note on desktop-smoke. Bundle build needs an Apple Developer
+    # account for signing/notarization to be useful end-to-end anyway.
+    if: github.event_name != 'pull_request'
     runs-on: macos-latest
     timeout-minutes: 60
     steps:
