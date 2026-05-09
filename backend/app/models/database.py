@@ -170,7 +170,6 @@ def init_db(db_path: str | None = None) -> None:
     # Import models to register them with Base.metadata
     from app.models.application import ApplicationRecord  # noqa: F401
     from app.models.rate_limit import RateLimitEvent  # noqa: F401
-    from app.models.schedule import Schedule  # noqa: F401
     from app.models.workspace import (  # noqa: F401
         FileAsset,
         Profile,

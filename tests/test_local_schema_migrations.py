@@ -8,7 +8,6 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -32,7 +31,6 @@ class LocalSchemaMigrationTest(unittest.TestCase):
             "HOSTED_MODE",
             "MANAGE_SCHEMA_ON_STARTUP",
             "DATABASE_URL",
-            "EMBEDDED_SCHEDULER_ENABLED",
         ]}
         self.temp_dir = tempfile.mkdtemp(prefix="launchboard-local-migrate-")
         self.data_dir = os.path.join(self.temp_dir, "data")
@@ -44,7 +42,6 @@ class LocalSchemaMigrationTest(unittest.TestCase):
         os.environ["HOSTED_MODE"] = "false"
         os.environ["MANAGE_SCHEMA_ON_STARTUP"] = "true"
         os.environ.pop("DATABASE_URL", None)
-        os.environ["EMBEDDED_SCHEDULER_ENABLED"] = "false"
 
         self._create_legacy_database()
 
@@ -60,12 +57,6 @@ class LocalSchemaMigrationTest(unittest.TestCase):
         self.backend_db = importlib.import_module("app.models.database")
         self.backend_db.init_db(self.db_path)
         self.app_main = importlib.import_module("app.main")
-        self.scheduler_start = patch.object(self.app_main, "start_scheduler", lambda: None)
-        self.scheduler_stop = patch.object(self.app_main, "stop_scheduler", lambda: None)
-        self.scheduler_start.start()
-        self.scheduler_stop.start()
-        self.addCleanup(self.scheduler_start.stop)
-        self.addCleanup(self.scheduler_stop.stop)
 
         self.client = TestClient(self.app_main.app)
         self.addCleanup(self.client.close)

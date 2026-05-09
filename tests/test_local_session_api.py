@@ -7,7 +7,6 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -65,12 +64,6 @@ class LocalSessionBootstrapTest(unittest.TestCase):
         self.backend_db.init_db(self.db_path)
 
         app_main = importlib.import_module("app.main")
-        self.scheduler_start = patch.object(app_main, "start_scheduler", lambda: None)
-        self.scheduler_stop = patch.object(app_main, "stop_scheduler", lambda: None)
-        self.scheduler_start.start()
-        self.scheduler_stop.start()
-        self.addCleanup(self.scheduler_start.stop)
-        self.addCleanup(self.scheduler_stop.stop)
 
         self.client_one = TestClient(app_main.app)
         self.client_two = TestClient(app_main.app)

@@ -40,7 +40,6 @@ def configure_desktop_environment(
     os.environ["RESUME_DIR"] = str(resume_dir)
     os.environ["CONFIG_DIR"] = str(config_dir)
     os.environ["MANAGE_SCHEMA_ON_STARTUP"] = "true"
-    os.environ["EMBEDDED_SCHEDULER_ENABLED"] = "true"
     os.environ["CORS_ORIGINS"] = ",".join(desktop_cors_origins(dev_origin))
     os.environ["LAUNCHBOARD_DESKTOP_MODE"] = "true"
 

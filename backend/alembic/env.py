@@ -18,7 +18,6 @@ from app.config import get_settings
 from app.models.database import Base
 from app.models.application import ApplicationRecord  # noqa: F401
 from app.models.rate_limit import RateLimitEvent  # noqa: F401
-from app.models.schedule import Schedule  # noqa: F401
 from app.models.workspace import (  # noqa: F401
     FileAsset,
     Profile,
