@@ -1,15 +1,13 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createRoute, useNavigate } from '@tanstack/react-router';
 import { Route as rootRoute } from './__root';
-import { Search as SearchIcon, CheckCircle2, XCircle, FileText, Loader2, Sparkles, ArrowRight, Circle, Clock, RefreshCw, SlidersHorizontal, ChevronDown, ChevronRight, BarChart3, Bot, Zap, Globe } from 'lucide-react';
+import { Search as SearchIcon, CheckCircle2, XCircle, FileText, Loader2, Sparkles, ArrowRight, Circle, SlidersHorizontal, ChevronDown, ChevronRight, BarChart3, Bot, Zap, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { SearchAreaSection } from '@/components/shared/search-area-section';
 import { JobBoardOptionsSection } from '@/components/shared/job-board-options-section';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -28,7 +26,6 @@ import { cn } from '@/lib/utils';
 import type { SearchRequest, SearchRunSnapshot } from '@/types/search';
 import type { PlaceSelection } from '@/types/workspace';
 import { useScraperSources, buildSourceLabels, resolveSourceLabel } from '@/hooks/use-scrapers';
-import { useSchedule, useUpdateSchedule } from '@/hooks/use-schedule';
 import {
   createManualPlace,
   getWorkplacePreferenceLabel,
@@ -57,10 +54,6 @@ export const Route = createRoute({
   component: SearchPage,
 });
 
-const FREQ_LABELS: Record<number, string> = {
-  1: 'Every hour', 2: 'Every 2 hours', 4: 'Every 4 hours',
-  6: 'Every 6 hours', 12: 'Every 12 hours', 24: 'Once a day',
-};
 const MODE_LABELS: Record<string, string> = {
   search_only: 'Find Jobs', search_score: 'Find & Rank', full_pipeline: 'Find, Rank & Prepare',
 };
@@ -120,20 +113,6 @@ function SnapshotList({ label, values, emptyLabel = 'Not set' }: { label: string
   );
 }
 
-function formatRelativeTime(iso: string): string {
-  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
-  if (diff < 0) {
-    const abs = Math.abs(diff);
-    if (abs < 60) return 'in <1m';
-    if (abs < 3600) return `in ${Math.floor(abs / 60)}m`;
-    return `in ${Math.floor(abs / 3600)}h`;
-  }
-  if (diff < 60) return 'just now';
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
-}
-
 function SuggestLoadingState() {
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
@@ -174,8 +153,6 @@ function SearchPage() {
   const { state, runId, messages, result, error, mode, progress, snapshot, activate, reset: resetSearch } = useSearchContext();
   const { data: scraperSources } = useScraperSources();
   const sourceLabels = useMemo(() => buildSourceLabels(scraperSources), [scraperSources]);
-  const { data: schedule } = useSchedule(profile, !hostedMode);
-  const updateSchedule = useUpdateSchedule(profile);
 
   const [roles, setRoles] = useState('');
   const [keywords, setKeywords] = useState('');
@@ -1037,103 +1014,6 @@ function SearchPage() {
             </CardContent>
           </Card>
 
-          {/* Scheduled Search */}
-          {!hostedMode && (
-            <Card className="overflow-hidden">
-              <CardContent className="p-0">
-                <div className="flex items-center justify-between px-5 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className={cn(
-                      'flex h-9 w-9 items-center justify-center rounded-xl transition-colors',
-                      schedule?.enabled ? 'bg-emerald-100/80 dark:bg-emerald-950' : 'bg-bg-muted',
-                    )}>
-                      <Clock className={cn('h-4.5 w-4.5', schedule?.enabled ? 'text-emerald-600' : 'text-text-muted')} />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-semibold text-text-primary">Scheduled Search</h3>
-                      <p className="text-xs text-text-tertiary">Run searches automatically on a schedule</p>
-                    </div>
-                  </div>
-                  <Checkbox
-                    id="schedule-enabled"
-                    checked={schedule?.enabled ?? false}
-                    onCheckedChange={(checked) => {
-                      updateSchedule.mutate(
-                        { enabled: !!checked, interval_hours: schedule?.interval_hours ?? 6, mode: schedule?.mode ?? 'search_score' },
-                        { onSuccess: () => toast.success(checked ? 'Scheduled search enabled' : 'Scheduled search disabled') },
-                      );
-                    }}
-                  />
-                </div>
-                <div className="px-5 pb-5 space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-xs font-medium text-text-tertiary mb-1.5 block">Frequency</Label>
-                      <Select
-                        value={String(schedule?.interval_hours ?? 6)}
-                        onValueChange={(v) => {
-                          updateSchedule.mutate({ enabled: schedule?.enabled ?? false, interval_hours: Number(v), mode: schedule?.mode ?? 'search_score' });
-                        }}
-                      >
-                        <SelectTrigger className="h-9 text-sm">
-                          <span className="flex flex-1 text-left">
-                            {FREQ_LABELS[schedule?.interval_hours ?? 6] ?? 'Every 6 hours'}
-                          </span>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="1">Every hour</SelectItem>
-                          <SelectItem value="2">Every 2 hours</SelectItem>
-                          <SelectItem value="4">Every 4 hours</SelectItem>
-                          <SelectItem value="6">Every 6 hours</SelectItem>
-                          <SelectItem value="12">Every 12 hours</SelectItem>
-                          <SelectItem value="24">Once a day</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label className="text-xs font-medium text-text-tertiary mb-1.5 block">Search Type</Label>
-                      <Select
-                        value={schedule?.mode ?? 'search_score'}
-                        onValueChange={(v) => {
-                          if (!v) return;
-                          updateSchedule.mutate({ enabled: schedule?.enabled ?? false, interval_hours: schedule?.interval_hours ?? 6, mode: v });
-                        }}
-                      >
-                        <SelectTrigger className="h-9 text-sm">
-                          <span className="flex flex-1 text-left">
-                            {MODE_LABELS[schedule?.mode ?? 'search_score'] ?? 'Find & Rank'}
-                          </span>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="search_only">Find Jobs</SelectItem>
-                          <SelectItem value="search_score">Find & Rank</SelectItem>
-                          <SelectItem value="full_pipeline">Find, Rank & Prepare</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  {(schedule?.enabled || schedule?.last_run_at) && (
-                    <div className="flex items-center gap-3 rounded-xl bg-bg-subtle border border-border-default px-3.5 py-2.5 text-xs">
-                      {schedule?.enabled && (
-                        <span className="inline-flex items-center gap-1.5 text-emerald-600 font-medium">
-                          <RefreshCw className="h-3 w-3 animate-[spin_3s_linear_infinite]" /> Active
-                        </span>
-                      )}
-                      {schedule?.last_run_at && (
-                        <span className="text-text-muted">
-                          Last run {formatRelativeTime(schedule.last_run_at)}
-                          {schedule.last_run_jobs_found > 0 && ` · ${schedule.last_run_jobs_found} jobs found`}
-                        </span>
-                      )}
-                      {schedule?.next_run_at && schedule.enabled && (
-                        <span className="text-text-muted ml-auto">Next {formatRelativeTime(schedule.next_run_at)}</span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
         </div>
       </div>
     );

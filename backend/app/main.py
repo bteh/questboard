@@ -8,7 +8,6 @@ from app.config import get_settings
 from app.dependencies import _src_dir  # noqa: F401 — ensures src/ is on sys.path
 from app.api.router import api_router
 from app.models.database import get_db, init_db
-from app.services.scheduler_service import start_scheduler, stop_scheduler
 from app.services import workspace_service
 
 _DEFAULT_CORS_ORIGINS = ["http://localhost:5173", "http://localhost:3000"]
@@ -39,11 +38,7 @@ async def lifespan(app: FastAPI):
             next(db_gen)
         except StopIteration:
             pass
-    if settings.use_embedded_scheduler:
-        start_scheduler()
     yield
-    if settings.use_embedded_scheduler:
-        stop_scheduler()
 
 
 app = FastAPI(

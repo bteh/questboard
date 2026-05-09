@@ -9,7 +9,6 @@ from app.api import (
     me,
     onboarding,
     resume,
-    schedule,
     scrapers,
     search,
     session,
@@ -33,6 +32,5 @@ api_router.include_router(onboarding.router, prefix="/api/v1")
 api_router.include_router(locations.router, prefix="/api/v1")
 api_router.include_router(settings.router, prefix="/api/v1")
 api_router.include_router(resume.router, prefix="/api/v1")
-api_router.include_router(schedule.router, prefix="/api/v1")
 api_router.include_router(scrapers.router, prefix="/api/v1")
 api_router.include_router(watchlist.router, prefix="/api/v1")

@@ -89,12 +89,6 @@ class HostedWorkspaceApiTest(unittest.TestCase):
         pipeline_service._runs.clear()
 
         app_main = importlib.import_module("app.main")
-        self.scheduler_start = patch.object(app_main, "start_scheduler", lambda: None)
-        self.scheduler_stop = patch.object(app_main, "stop_scheduler", lambda: None)
-        self.scheduler_start.start()
-        self.scheduler_stop.start()
-        self.addCleanup(self.scheduler_start.stop)
-        self.addCleanup(self.scheduler_stop.stop)
 
         self.client = TestClient(app_main.app)
         self.addCleanup(self.client.close)

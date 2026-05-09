@@ -27,7 +27,6 @@ class Settings(BaseSettings):
     session_cookie_name: str = "lb_session"
     csrf_cookie_name: str = "lb_csrf"
     session_secure_cookies: bool = False
-    embedded_scheduler_enabled: bool | None = None
     workspace_ttl_days: int = 7
     workspace_storage_dir: str = ""
     supabase_url: str = ""
@@ -102,12 +101,6 @@ class Settings(BaseSettings):
         if self.manage_schema_on_startup is not None:
             return bool(self.manage_schema_on_startup)
         return self.using_sqlite
-
-    @property
-    def use_embedded_scheduler(self) -> bool:
-        if self.embedded_scheduler_enabled is not None:
-            return bool(self.embedded_scheduler_enabled)
-        return not self.hosted_mode
 
     @cached_property
     def resolved_app_release(self) -> str:

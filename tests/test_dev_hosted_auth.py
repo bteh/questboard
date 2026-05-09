@@ -7,7 +7,6 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -35,7 +34,6 @@ class DevHostedAuthTest(unittest.TestCase):
             "DATABASE_URL",
             "SUPABASE_URL",
             "SUPABASE_JWT_AUDIENCE",
-            "EMBEDDED_SCHEDULER_ENABLED",
         ]}
         self.temp_dir = tempfile.mkdtemp(prefix="launchboard-dev-hosted-auth-")
         self.data_dir = os.path.join(self.temp_dir, "data")
@@ -51,7 +49,6 @@ class DevHostedAuthTest(unittest.TestCase):
         os.environ["DATABASE_URL"] = f"sqlite:///{self.db_path}"
         os.environ.pop("SUPABASE_URL", None)
         os.environ["SUPABASE_JWT_AUDIENCE"] = "authenticated"
-        os.environ["EMBEDDED_SCHEDULER_ENABLED"] = "false"
 
         for module_name in list(sys.modules):
             if (
@@ -67,12 +64,6 @@ class DevHostedAuthTest(unittest.TestCase):
         self.workspace_service = importlib.import_module("app.services.workspace_service")
         self.dev_auth_service = importlib.import_module("app.services.dev_auth_service")
         self.app_main = importlib.import_module("app.main")
-        self.scheduler_start = patch.object(self.app_main, "start_scheduler", lambda: None)
-        self.scheduler_stop = patch.object(self.app_main, "stop_scheduler", lambda: None)
-        self.scheduler_start.start()
-        self.scheduler_stop.start()
-        self.addCleanup(self.scheduler_start.stop)
-        self.addCleanup(self.scheduler_stop.stop)
 
         self.client = TestClient(self.app_main.app)
         self.addCleanup(self.client.close)
