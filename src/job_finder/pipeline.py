@@ -767,6 +767,31 @@ class JobFinderPipeline:
         self.profile_name = profile or "default"
         self.config = _load_search_config(profile)
         self._preloaded_resume_text: str | None = None
+        self._last_funnel: list[dict] = []
+
+    def _record_funnel_stage(
+        self,
+        key: str,
+        label: str,
+        count_in: int,
+        count_out: int,
+        *,
+        active: bool = True,
+    ) -> None:
+        """Append a stage entry to the per-search funnel.
+
+        ``active=False`` records that the stage was skipped (no preference
+        configured) so the UI can grey it out instead of hiding it.
+        """
+        dropped = max(count_in - count_out, 0)
+        self._last_funnel.append({
+            "key": key,
+            "label": label,
+            "count_in": count_in,
+            "count_out": count_out,
+            "dropped": dropped,
+            "active": active,
+        })
 
     # -- Stage 0.5: AI role expansion (optional) ----------------------------
 
@@ -1136,11 +1161,21 @@ class JobFinderPipeline:
                     progress("Warning: some scrapers timed out, using partial results")
             all_jobs.extend(extra_jobs_result)
 
+        # Reset funnel for this run
+        self._last_funnel = []
+        raw_count = len(all_jobs)
         deduped = _deduplicate(all_jobs)
-        cross_source = len(all_jobs) - len(deduped)
+        cross_source = raw_count - len(deduped)
         self._last_pre_filter_count = len(deduped)
+        # Funnel stage 1: raw -> deduped
+        self._record_funnel_stage(
+            "deduped",
+            "Cross-source dedup",
+            raw_count,
+            len(deduped),
+        )
         if progress:
-            msg = f"Found {len(deduped)} unique jobs (from {len(all_jobs)} raw, {cross_source} cross-source duplicates merged)"
+            msg = f"Found {len(deduped)} unique jobs (from {raw_count} raw, {cross_source} cross-source duplicates merged)"
             progress(msg)
 
         # Backfill descriptions for LinkedIn-only jobs that lack them.
@@ -1217,6 +1252,7 @@ class JobFinderPipeline:
                     preferred_places=pref_places,
                 )
             ]
+            self._record_funnel_stage("location", "Location filter", pre_count, len(deduped))
             if progress:
                 dropped = pre_count - len(deduped)
                 progress(f"Location filter: {pre_count} → {len(deduped)} jobs ({dropped} filtered out)")
@@ -1238,6 +1274,9 @@ class JobFinderPipeline:
             except Exception as e:
                 logger.debug("DB location purge failed (non-fatal): %s", e)
         else:
+            self._record_funnel_stage(
+                "location", "Location filter", len(deduped), len(deduped), active=False,
+            )
             logger.warning("Location filter SKIPPED — no preferences configured")
 
         # --- Salary filter: remove jobs with known salary below minimum ---
@@ -1259,21 +1298,47 @@ class JobFinderPipeline:
                 if _job_salary_passes(j, hard_floor)
             ]
             dropped = pre_count - len(deduped)
+            self._record_funnel_stage("salary", "Salary floor", pre_count, len(deduped))
             if dropped and progress:
                 progress(f"Salary filter: removed {dropped} jobs below ${hard_floor:,.0f}")
+        else:
+            self._record_funnel_stage(
+                "salary", "Salary floor", len(deduped), len(deduped), active=False,
+            )
 
         # --- Level filter: remove jobs too far above or below current level ---
+        pre_level = len(deduped)
         deduped = _filter_jobs_by_level(
             deduped,
             self.config.get("career_baseline", {}),
             progress=progress,
         )
+        career_cfg = self.config.get("career_baseline") or {}
+        level_active = bool(
+            str(career_cfg.get("current_title", "") or "").strip()
+            or str(career_cfg.get("current_level", "") or "").strip()
+        )
+        self._record_funnel_stage(
+            "level", "Level range", pre_level, len(deduped), active=level_active,
+        )
 
         # --- Role relevance filter ---
+        pre_role = len(deduped)
         deduped = self.filter_by_role(deduped, progress=progress)
+        target_roles = getattr(self, "_expanded_roles", None) or self.config.get("target_roles", [])
+        self._record_funnel_stage(
+            "role", "Role relevance", pre_role, len(deduped), active=bool(target_roles),
+        )
 
         # --- Staffing agency filter ---
+        pre_staffing = len(deduped)
         deduped = self.filter_staffing_agencies(deduped, progress=progress)
+        staffing_active = bool(
+            (self.config.get("search_settings") or {}).get("exclude_staffing_agencies", False)
+        )
+        self._record_funnel_stage(
+            "staffing", "Staffing agencies", pre_staffing, len(deduped), active=staffing_active,
+        )
 
         # Store the pre-filter count so callers can show a "1,080 → 29" funnel
         self._last_pre_filter_count = getattr(self, '_last_pre_filter_count', len(deduped))

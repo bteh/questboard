@@ -12,7 +12,15 @@ from fastapi.responses import StreamingResponse
 import logging
 from sqlalchemy.orm import Session
 
-from app.schemas.search import RunResult, RunStatus, SearchDefaults, SearchRequest, SearchSuggestions
+from app.schemas.search import (
+    FunnelStage,
+    FunnelSummary,
+    RunResult,
+    RunStatus,
+    SearchDefaults,
+    SearchRequest,
+    SearchSuggestions,
+)
 from app.services import pipeline_service, resume_service, workspace_service
 from app.dependencies import (
     get_active_workspace_context,
@@ -347,6 +355,53 @@ async def list_runs(
         )
         for r in runs
     ]
+
+
+def _funnel_from_run(run) -> FunnelSummary:
+    """Build a FunnelSummary from a PipelineRun's stage list."""
+    stages_raw = list(getattr(run, "funnel", []) or [])
+    stages = [FunnelStage(**s) for s in stages_raw if isinstance(s, dict)]
+    raw_count = stages[0].count_in if stages else 0
+    final_count = stages[-1].count_out if stages else 0
+    return FunnelSummary(
+        run_id=run.run_id,
+        status=run.status,
+        started_at=run.started_at,
+        completed_at=run.completed_at,
+        raw_count=raw_count,
+        final_count=final_count,
+        stages=stages,
+    )
+
+
+@router.get("/funnel/latest", response_model=FunnelSummary)
+async def get_latest_funnel(
+    workspace = Depends(get_active_workspace_context),
+):
+    """Return the per-stage filter funnel from the most recent completed run.
+
+    Lets the UI show "1080 found → 612 location → 488 salary → ..." so the
+    user can see why their result count is what it is.
+    """
+    workspace_id = workspace.workspace.id if workspace else None
+    runs = pipeline_service.list_runs(limit=20, workspace_id=workspace_id)
+    completed = next((r for r in runs if getattr(r, "funnel", None)), None)
+    if not completed:
+        return FunnelSummary(stages=[])
+    return _funnel_from_run(completed)
+
+
+@router.get("/runs/{run_id}/funnel", response_model=FunnelSummary)
+async def get_run_funnel(
+    run_id: str,
+    workspace = Depends(get_active_workspace_context),
+):
+    """Return the funnel for a specific run."""
+    run = pipeline_service.get_run(run_id)
+    if not run:
+        raise HTTPException(404, f"Run {run_id} not found")
+    _authorize_run_access(run, workspace)
+    return _funnel_from_run(run)
 
 
 @router.get("/defaults", response_model=SearchDefaults)

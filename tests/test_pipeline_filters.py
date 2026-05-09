@@ -367,5 +367,42 @@ class AIWorkTypeCorrectionLocationFilterTest(unittest.TestCase):
         self.assertIn("RemoteCo", companies)
 
 
+class FunnelTrackingTest(unittest.TestCase):
+    """The pipeline records a per-stage funnel so the UI can show drop counts."""
+
+    def test_record_funnel_stage_active(self) -> None:
+        pipe = JobFinderPipeline(llm=None, profile=None)
+        pipe._last_funnel = []
+        pipe._record_funnel_stage("location", "Location filter", 100, 60)
+        self.assertEqual(len(pipe._last_funnel), 1)
+        stage = pipe._last_funnel[0]
+        self.assertEqual(stage["key"], "location")
+        self.assertEqual(stage["label"], "Location filter")
+        self.assertEqual(stage["count_in"], 100)
+        self.assertEqual(stage["count_out"], 60)
+        self.assertEqual(stage["dropped"], 40)
+        self.assertTrue(stage["active"])
+
+    def test_record_funnel_stage_skipped(self) -> None:
+        pipe = JobFinderPipeline(llm=None, profile=None)
+        pipe._last_funnel = []
+        pipe._record_funnel_stage("salary", "Salary floor", 60, 60, active=False)
+        stage = pipe._last_funnel[0]
+        self.assertFalse(stage["active"])
+        self.assertEqual(stage["dropped"], 0)
+
+    def test_record_funnel_clamps_negative_dropped(self) -> None:
+        """If a filter somehow grows the list, dropped must not go negative."""
+        pipe = JobFinderPipeline(llm=None, profile=None)
+        pipe._last_funnel = []
+        pipe._record_funnel_stage("role", "Role relevance", 50, 60)
+        self.assertEqual(pipe._last_funnel[0]["dropped"], 0)
+
+    def test_funnel_attribute_initialized(self) -> None:
+        """A fresh pipeline starts with an empty funnel list."""
+        pipe = JobFinderPipeline(llm=None, profile=None)
+        self.assertEqual(pipe._last_funnel, [])
+
+
 if __name__ == "__main__":
     unittest.main()

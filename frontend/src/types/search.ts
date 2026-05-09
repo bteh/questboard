@@ -90,3 +90,22 @@ export interface ProgressUpdate {
   stage_label: string;
   elapsed: number;
 }
+
+export interface FunnelStage {
+  key: string;
+  label: string;
+  count_in: number;
+  count_out: number;
+  dropped: number;
+  active: boolean;
+}
+
+export interface FunnelSummary {
+  run_id: string | null;
+  status: string;
+  started_at: string | null;
+  completed_at: string | null;
+  raw_count: number;
+  final_count: number;
+  stages: FunnelStage[];
+}

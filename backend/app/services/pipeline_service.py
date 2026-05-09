@@ -73,6 +73,7 @@ class PipelineRun:
     jobs_before_filters: int = 0
     ai_scored_count: int = 0
     keyword_scored_count: int = 0
+    funnel: list[dict] = field(default_factory=list)
     error: str | None = None
     queue: asyncio.Queue | None = None
     loop: asyncio.AbstractEventLoop | None = None
@@ -565,6 +566,8 @@ def _execute_pipeline(
                 roles=roles, locations=locations, progress=progress_cb
             )
             run.jobs_found = len(jobs) if jobs else 0
+            run.funnel = list(getattr(pipeline, '_last_funnel', []) or [])
+            run.jobs_before_filters = getattr(pipeline, '_last_pre_filter_count', run.jobs_found)
             # Save to DB
             if jobs:
                 _save_search_results(
@@ -587,6 +590,7 @@ def _execute_pipeline(
             )
             run.jobs_found = len(jobs) if jobs else 0
             run.jobs_before_filters = getattr(pipeline, '_last_pre_filter_count', run.jobs_found)
+            run.funnel = list(getattr(pipeline, '_last_funnel', []) or [])
             run.jobs_scored = sum(1 for j in (jobs or []) if j.get("overall_score") is not None)
             run.ai_scored_count = sum(
                 1 for j in (jobs or [])

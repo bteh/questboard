@@ -58,6 +58,25 @@ class RunResult(BaseModel):
     error: str | None = None
 
 
+class FunnelStage(BaseModel):
+    key: str
+    label: str
+    count_in: int
+    count_out: int
+    dropped: int
+    active: bool = True
+
+
+class FunnelSummary(BaseModel):
+    run_id: str | None = None
+    status: str = "completed"
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    raw_count: int = 0
+    final_count: int = 0
+    stages: list[FunnelStage] = Field(default_factory=list)
+
+
 class SearchDefaults(BaseModel):
     roles: list[str] = Field(default_factory=list)
     locations: list[str] = Field(default_factory=list)

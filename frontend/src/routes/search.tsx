@@ -25,7 +25,9 @@ import { useWorkspace } from '@/contexts/workspace-context';
 import { useProfile } from '@/contexts/profile-context';
 import { useSearchContext } from '@/contexts/search-context';
 import { cn } from '@/lib/utils';
-import type { SearchRequest, SearchRunSnapshot } from '@/types/search';
+import type { FunnelSummary as FunnelSummaryData, SearchRequest, SearchRunSnapshot } from '@/types/search';
+import { getRunFunnel } from '@/api/search';
+import { FunnelSummary } from '@/components/jobs/funnel-summary';
 import type { PlaceSelection } from '@/types/workspace';
 import { useScraperSources, buildSourceLabels, resolveSourceLabel } from '@/hooks/use-scrapers';
 import { useSchedule, useUpdateSchedule } from '@/hooks/use-schedule';
@@ -186,6 +188,8 @@ function SearchPage() {
   const [selectedMode, setSelectedMode] = useState<SearchRequest['mode']>(mode);
   const [showFilters, setShowFilters] = useState(false);
   const [suggestedCompanies, setSuggestedCompanies] = useState<string[]>([]);
+  const [funnel, setFunnel] = useState<FunnelSummaryData | null>(null);
+  const [funnelDismissed, setFunnelDismissed] = useState(false);
 
   const logRef = useRef<HTMLDivElement>(null);
   const formSeed = useMemo(() => buildSearchFormSeed(searchDefaults), [searchDefaults]);
@@ -219,6 +223,28 @@ function SearchPage() {
       logRef.current.scrollTop = logRef.current.scrollHeight;
     }
   }, [messages]);
+
+  // Fetch the per-stage filter funnel once the run completes so the user can
+  // see why their result count is what it is.
+  useEffect(() => {
+    if (state !== 'completed' || !runId) {
+      return;
+    }
+    let cancelled = false;
+    getRunFunnel(runId)
+      .then((data) => {
+        if (!cancelled) {
+          setFunnel(data);
+          setFunnelDismissed(false);
+        }
+      })
+      .catch(() => {
+        // Funnel is best-effort; missing data shouldn't break the search UI.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [state, runId]);
 
   // First-run hand-off: when the brand-new user's very first search completes,
   // ship them straight to the results so they don't get stranded staring at
@@ -1220,6 +1246,12 @@ function SearchPage() {
                   </span>
                 ))}
             </div>
+          )}
+          {funnel && !funnelDismissed && funnel.stages.length > 0 && (
+            <FunnelSummary
+              data={funnel}
+              onDismiss={() => setFunnelDismissed(true)}
+            />
           )}
           {snapshot && !snapshot.use_ai && (
             <div className="flex flex-col gap-3 rounded-lg border border-brand/20 bg-bg-card/70 p-3 sm:flex-row sm:items-center sm:justify-between">
