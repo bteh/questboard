@@ -7,12 +7,11 @@ import { ScoreCircle } from '@/components/scores/score-circle';
 import { RecommendationBadge } from '@/components/badges/recommendation-badge';
 import { CompanyTypeBadge } from '@/components/badges/company-type-badge';
 import { WorkTypeBadge } from '@/components/badges/work-type-badge';
-import { SalaryBadge } from '@/components/badges/salary-badge';
 import { FundingBadge } from '@/components/badges/funding-badge';
 import { JobDetail } from './job-detail';
 import { ApplyDrawer } from './apply-drawer';
 import { useDeleteApplication, useUpdateFeedback } from '@/hooks/use-applications';
-import { truncateDescription, formatDate } from '@/utils/format';
+import { truncateDescription, formatDate, formatSalary } from '@/utils/format';
 import { cn } from '@/lib/utils';
 import { resolveSourceLabel } from '@/hooks/use-scrapers';
 import { toast } from 'sonner';
@@ -69,6 +68,7 @@ export function JobCard({ app, sourceLabels }: JobCardProps) {
 
   const borderColor = REC_BORDER_COLORS[app.recommendation] || REC_BORDER_COLORS.SKIP;
   const recency = getRecencyLabel(app.date_found);
+  const salaryText = formatSalary(app.salary_min, app.salary_max);
 
   return (
     <Card
@@ -88,15 +88,15 @@ export function JobCard({ app, sourceLabels }: JobCardProps) {
         onClick={() => setExpanded(!expanded)}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(!expanded); } }}
       >
-        <CompanyAvatar company={app.company} />
+        <CompanyAvatar company={app.company} size={48} />
 
         <div className="flex-1 min-w-0">
-          {/* Title row */}
+          {/* Title row — title and salary share top-line emphasis */}
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h3 className="text-sm font-semibold text-text-primary leading-snug">{app.job_title}</h3>
+              <h3 className="text-base font-semibold text-text-primary leading-snug truncate">{app.job_title}</h3>
               <p className="text-sm text-text-secondary mt-0.5">
-                {app.company}
+                <span className="font-medium text-text-primary">{app.company}</span>
                 {app.location && (
                   <span className="inline-flex items-center gap-1 text-text-tertiary ml-1.5">
                     <span>·</span>
@@ -108,7 +108,12 @@ export function JobCard({ app, sourceLabels }: JobCardProps) {
                 )}
               </p>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-3 shrink-0">
+              {salaryText && (
+                <span className="text-sm font-semibold text-success tabular-nums whitespace-nowrap">
+                  {salaryText}
+                </span>
+              )}
               <ScoreCircle score={app.overall_score} />
               <ChevronDown
                 className={cn(
@@ -126,19 +131,17 @@ export function JobCard({ app, sourceLabels }: JobCardProps) {
             </p>
           )}
 
-          {/* Score rationale */}
-          {app.score_reasoning && (
-            <p className="mt-1.5 text-xs text-text-muted italic line-clamp-1">
-              {app.score_reasoning.split(/[.!]/)[0]?.trim() || app.score_reasoning}
-            </p>
-          )}
-
-          {/* Badges */}
-          <div className="mt-3 flex flex-wrap gap-1.5">
+          {/* Slim badge row — primary signals only. Company-type and funding
+              live in the expanded detail to keep the card scannable. */}
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
             <RecommendationBadge recommendation={app.recommendation} />
-            <CompanyTypeBadge companyType={app.company_type} />
             <WorkTypeBadge workType={app.work_type} isRemote={app.is_remote} />
-            <SalaryBadge min={app.salary_min} max={app.salary_max} />
+            {app.source && (
+              <span className="inline-flex items-center rounded-md bg-bg-subtle border border-border-default px-2 py-0.5 text-[11px] font-medium text-text-secondary">
+                {resolveSourceLabel(app.source, labels)}
+              </span>
+            )}
+            <CompanyTypeBadge companyType={app.company_type} />
             <FundingBadge app={app} />
           </div>
 
@@ -212,13 +215,9 @@ export function JobCard({ app, sourceLabels }: JobCardProps) {
             </button>
           </div>
 
-          {/* Meta row */}
+          {/* Meta footer — date, employees, link out. Source already shown
+              in the badge row above to call out where the listing came from. */}
           <div className="mt-2 flex items-center gap-3 text-xs text-text-muted">
-            {app.source && (
-              <span className="inline-flex items-center rounded-md bg-bg-subtle border border-border-default px-1.5 py-0.5 text-[11px] font-medium text-text-tertiary">
-                {resolveSourceLabel(app.source, labels)}
-              </span>
-            )}
             {recency && <span>{recency}</span>}
             {app.date_found && !recency && <span>{formatDate(app.date_found, 'relative')}</span>}
             {app.employee_count && <span>{app.employee_count} employees</span>}
