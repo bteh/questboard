@@ -1,13 +1,18 @@
+# PARKED: this file lives in .github/workflows-disabled/ on purpose.
+# GitHub only parses workflows under .github/workflows/, so keeping it
+# here preserves the code without firing a 0s validation failure on every
+# push. Move it back to .github/workflows/ once Apple Developer Program
+# signing creds are added to GitHub Secrets (see docs/desktop-release.md).
+#
+# Original disable reason: push-on-tag trigger was removed because Apple
+# Developer Program ($99/year) is required for signing + notarization.
+# Without it, the build succeeds but produces unsigned artifacts that
+# macOS Gatekeeper blocks.
+
 name: Desktop Release
 
 on:
   workflow_dispatch:
-  # Disabled: push-on-tag trigger removed because Apple Developer
-  # Program ($99/year) is required for signing + notarization.
-  # Without it, the build succeeds but produces unsigned artifacts
-  # that macOS Gatekeeper blocks. Re-enable when signing creds are
-  # added to GitHub Secrets (see docs/desktop-release.md).
-  #
   # push:
   #   tags:
   #     - "v*"
