@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   FileText,
   Loader2,
-  Shield,
   Sparkles,
   Upload,
   X,
@@ -270,17 +269,10 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
           ────────────────────────────────────────────────────────── */}
           {step === 'resume' && (
             <div className="space-y-6">
-              <div className="space-y-3 text-center">
+              <div className="text-center">
                 <h2 className="text-2xl font-semibold tracking-tight text-text-primary">
-                  Upload Your Resume
+                  Upload your resume
                 </h2>
-                <p className="mx-auto max-w-md text-sm leading-relaxed text-text-tertiary">
-                  Upload your resume{' '}
-                  <ArrowRight className="inline h-3 w-3 -mt-0.5 opacity-50" /> we suggest roles{' '}
-                  <ArrowRight className="inline h-3 w-3 -mt-0.5 opacity-50" /> we search 14+ job boards{' '}
-                  <ArrowRight className="inline h-3 w-3 -mt-0.5 opacity-50" />{' '}
-                  <span className="font-medium text-text-secondary">you see your best matches</span>.
-                </p>
               </div>
 
               {resumeUploaded ? (
@@ -329,11 +321,6 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
                   <p className="mt-1 text-xs text-text-muted">PDF up to 10MB</p>
                 </button>
               )}
-
-              <div className="flex items-center justify-center gap-2 text-xs text-text-muted">
-                <Shield className="h-3.5 w-3.5" />
-                <span>Your resume and AI keys stay on this computer. No account required.</span>
-              </div>
 
               <div className="flex gap-3">
                 <Button
@@ -389,8 +376,6 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
                     value={form.roles}
                     onChange={(roles) => setForm((prev) => ({ ...prev, roles }))}
                     placeholder="e.g. Nurse Practitioner — press Enter to add"
-                    helperText="Type a role and press Enter."
-                    emptyText="No roles added yet."
                     inputProps={{ 'data-testid': 'onboarding-roles-input' }}
                   />
                 </div>
@@ -407,47 +392,21 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
                 />
               </div>
 
-              {aiFailed && aiAvailable && (
-                <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3">
-                  <div className="flex items-start gap-2.5">
-                    <Sparkles className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-xs font-medium text-text-secondary">
-                        AI couldn't analyze your resume
-                      </p>
-                      <p className="mt-0.5 text-[11px] leading-relaxed text-text-muted">
-                        Your AI provider is configured but not responding. Check your API key in{' '}
-                        <button
-                          type="button"
-                          onClick={() => { handleDismiss(); navigate({ to: '/settings', search: { tab: 'ai' } }); }}
-                          className="font-medium text-brand hover:underline"
-                        >
-                          Settings → AI
-                        </button>
-                        . You can still search — results will use basic keyword matching instead of
-                        AI-powered 7-dimension scoring.
-                      </p>
-                    </div>
-                  </div>
+              {(aiFailed && aiAvailable) || !aiAvailable ? (
+                <div className="flex items-center gap-2 text-xs text-text-muted">
+                  <Sparkles className="h-3.5 w-3.5 shrink-0" />
+                  <span>
+                    {aiFailed ? 'AI offline — using keyword ranking. ' : 'Keyword ranking only. '}
+                    <button
+                      type="button"
+                      onClick={() => { handleDismiss(); navigate({ to: '/settings', search: { tab: 'ai' } }); }}
+                      className="font-medium text-brand hover:underline"
+                    >
+                      Connect AI
+                    </button>
+                  </span>
                 </div>
-              )}
-
-              {!aiAvailable && (
-                <div className="rounded-xl border border-border-default bg-bg-subtle/50 p-3">
-                  <div className="flex items-start gap-2.5">
-                    <Sparkles className="h-4 w-4 text-text-muted shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-xs font-medium text-text-secondary">
-                        Searching now without AI
-                      </p>
-                      <p className="mt-0.5 text-[11px] leading-relaxed text-text-muted">
-                        You'll get keyword-based ranking. Connect AI later from the sidebar to
-                        unlock resume-fit scoring and tailored drafts — takes about 30 seconds with a free Gemini key.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
+              ) : null}
 
               <div className="flex gap-3">
                 <Button variant="outline" onClick={() => setStep('resume')} className="flex-1">

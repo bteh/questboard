@@ -32,7 +32,6 @@ import {
   createManualPlace,
   getWorkplacePreferenceLabel,
   normalizePlaceList,
-  placeLabel,
   type WorkplacePreference,
 } from '@/lib/profile-preferences';
 import {
@@ -76,22 +75,55 @@ function compactList(values: string[], limit = 8): { visible: string[]; hidden: 
   };
 }
 
-function SnapshotField({ label, value }: { label: string; value: string }) {
+function SnapshotField({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+}) {
   return (
     <div className="rounded-lg border border-border-default bg-bg-card/70 px-3 py-2">
-      <p className="text-[10px] font-medium uppercase tracking-wide text-text-muted">{label}</p>
-      <p className="mt-1 text-xs text-text-secondary">{value}</p>
+      <p
+        className="text-[11px] font-medium text-text-muted"
+        title={hint}
+      >
+        {label}
+      </p>
+      <p className="mt-0.5 text-sm text-text-primary tabular-nums">{value}</p>
     </div>
   );
 }
 
-function SnapshotList({ label, values, emptyLabel = 'Not set' }: { label: string; values: string[]; emptyLabel?: string }) {
+function titleCase(value: string): string {
+  if (!value) return value;
+  return value
+    .split(/\s+/)
+    .map((word) => (word.length === 0 ? word : word[0].toUpperCase() + word.slice(1).toLowerCase()))
+    .join(' ');
+}
+
+function SnapshotList({
+  label,
+  values,
+  emptyLabel = 'Not set',
+  hint,
+}: {
+  label: string;
+  values: string[];
+  emptyLabel?: string;
+  hint?: string;
+}) {
   const filtered = values.filter(Boolean);
   const { visible, hidden } = compactList(filtered);
 
   return (
     <div className="space-y-1.5">
-      <p className="text-[10px] font-medium uppercase tracking-wide text-text-muted">{label}</p>
+      <p className="text-[11px] font-medium text-text-muted" title={hint}>
+        {label}
+      </p>
       {visible.length > 0 ? (
         <div className="flex flex-wrap gap-1.5">
           {visible.map((value) => (
@@ -249,7 +281,7 @@ function SearchPage() {
   }, [state, runId, navigate]);
 
   const llmAvailable = llm?.available ?? false;
-  const searchAreaSummary = getSearchAreaSummary(workplacePreference, locations, 'search');
+  const searchAreaSummary = getSearchAreaSummary(workplacePreference, locations);
   const effectiveWorkplacePreference = searchAreaSummary.effectiveWorkplacePreference;
   const includeRemote = effectiveWorkplacePreference !== 'location_only';
   const parsedRoles = parseMultilineSearchInput(roles);
@@ -276,11 +308,6 @@ function SearchPage() {
     includeLinkedInJobs ? 'LinkedIn enabled' : null,
     suggestedCompanies.length > 0 ? `${suggestedCompanies.length} target companies` : null,
   ].filter(Boolean);
-  const savedDefaultSummary = getSearchAreaSummary(
-    savedSearchAreaDefaults.workplacePreference,
-    savedSearchAreaDefaults.preferredPlaces,
-    'search',
-  );
   const searchAreaOverridesSavedDefaults = hasSearchAreaOverride(
     {
       preferredPlaces: locations,
@@ -587,7 +614,7 @@ function SearchPage() {
   if (state === 'idle') {
     return (
       <div>
-        <PageHeader title="Search" description={sourceCount > 0 ? `Search ${sourceCount} job boards at once, ranked by how well they match your experience` : 'Search multiple job boards at once, ranked by how well they match your experience'} />
+        <PageHeader title="Search" description={sourceCount > 0 ? `${sourceCount} sources, ranked by fit` : 'Multi-source search, ranked by fit'} />
 
         <div className="mb-6">
           <PipelineSteps llmAvailable={llmAvailable} activeStep={undefined} sourceCount={sourceCount} />
@@ -771,86 +798,29 @@ function SearchPage() {
                             <Slider value={[maxDays]} onValueChange={(v) => setMaxDays(Array.isArray(v) ? v[0] : v)} min={1} max={30} step={1} />
                           </div>
 
-                          <div className="rounded-xl border border-border-default bg-bg-subtle px-3.5 py-3">
-                            <p className="text-sm font-medium text-text-primary">Saved defaults + run overrides</p>
-                            <p className="text-xs text-text-muted mt-1 leading-relaxed">
-                              This form starts from your profile settings. Changes here affect only this search and are shown in the run log.
-                            </p>
-                          </div>
-
                         </div>
                       </div>
                     )}
                   </div>
 
-                  <div className="rounded-xl border border-border-default bg-bg-subtle/50 px-3.5 py-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-xs font-medium text-text-secondary">Using for this run:</span>
-                      <span className="inline-flex items-center rounded-full bg-bg-card px-2.5 py-1 text-[11px] text-text-secondary ring-1 ring-border-default">
-                        {getWorkplacePreferenceLabel(effectiveWorkplacePreference)}
-                      </span>
-                      <span className="inline-flex items-center rounded-full bg-bg-card px-2.5 py-1 text-[11px] text-text-secondary ring-1 ring-border-default">
-                        {maxDays} day window
-                      </span>
-                      {includeLinkedInJobs && (
-                        <span className="inline-flex items-center rounded-full bg-bg-card px-2.5 py-1 text-[11px] text-text-secondary ring-1 ring-border-default">
-                          LinkedIn enabled
-                        </span>
-                      )}
-                      {locations.map((location) => (
-                        <span key={location.label} className="inline-flex items-center rounded-full bg-bg-card px-2.5 py-1 text-[11px] text-text-secondary ring-1 ring-border-default">
-                          {placeLabel(location)}
-                        </span>
-                      ))}
-                      {locations.length === 0 && isRemoteOnly && (
-                        <span className="inline-flex items-center rounded-full bg-bg-card px-2.5 py-1 text-[11px] text-text-secondary ring-1 ring-border-default">
-                          {searchAreaSummary.shortLabel}
-                        </span>
-                      )}
-                      {locations.length === 0 && usesRemoteFallback && (
-                        <span className="inline-flex items-center rounded-full bg-bg-card px-2.5 py-1 text-[11px] text-text-secondary ring-1 ring-border-default">
-                          {searchAreaSummary.shortLabel}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className={cn(
-                    'rounded-xl border px-3.5 py-3',
-                    searchAreaOverridesSavedDefaults
-                      ? 'border-amber-200 bg-amber-50/70 dark:border-amber-900/50 dark:bg-amber-950/20'
-                      : 'border-border-default bg-bg-subtle/40',
-                  )}>
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-text-primary">
-                          {searchAreaOverridesSavedDefaults ? 'This run is overriding your saved defaults' : 'Search matches your saved defaults'}
-                        </p>
-                        <p className="mt-1 text-xs text-text-muted leading-relaxed">
-                          Saved area: {savedDefaultSummary.shortLabel}
-                          {savedSearchAreaDefaults.preferredPlaces.length > 0 ? ` · ${savedDefaultSummary.placesSummary}` : ''}
-                          {savedSearchAreaDefaults.maxDaysOld ? ` · ${savedSearchAreaDefaults.maxDaysOld} day window` : ''}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {searchAreaOverridesSavedDefaults && (
-                          <Button type="button" variant="outline" size="sm" onClick={applySavedSearchArea}>
-                            Use saved defaults
-                          </Button>
-                        )}
-                        <Button
+                  {searchAreaOverridesSavedDefaults && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-text-muted px-1">
+                      <span>Overriding saved defaults</span>
+                      <div className="flex gap-3">
+                        <button type="button" className="text-text-secondary hover:text-text-primary underline-offset-2 hover:underline" onClick={applySavedSearchArea}>
+                          Reset
+                        </button>
+                        <button
                           type="button"
-                          variant="outline"
-                          size="sm"
+                          className="text-brand underline-offset-2 hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
                           onClick={handleSaveSearchAreaDefaults}
-                          disabled={savePreferences.isPending || !searchAreaOverridesSavedDefaults}
+                          disabled={savePreferences.isPending}
                         >
-                          {savePreferences.isPending ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : null}
-                          Save this as default
-                        </Button>
+                          {savePreferences.isPending ? 'Saving…' : 'Save as default'}
+                        </button>
                       </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Resume status */}
                   <div className={cn(
@@ -889,16 +859,18 @@ function SearchPage() {
                   {/* Target companies (AI suggested + user-added) */}
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <Label className="text-sm font-medium">Target Companies</Label>
+                      <Label
+                        className="text-sm font-medium"
+                        title="Searches these companies' ATS career pages (Greenhouse, Lever, Ashby, Workday) directly. AI suggests from your resume."
+                      >
+                        Target companies
+                      </Label>
                       {suggestedCompanies.length > 0 && (
                         <span className="text-[10px] bg-brand-light text-brand font-medium rounded-full px-1.5 py-0.5">
-                          {suggestedCompanies.length} companies
+                          {suggestedCompanies.length}
                         </span>
                       )}
                     </div>
-                    <p className="text-[11px] leading-relaxed text-text-muted">
-                      Launchboard scrapes these companies' career pages directly (Greenhouse, Lever, Ashby, Workday) — catching jobs that may not appear on Indeed or LinkedIn yet. AI suggests companies from your resume; add any others you're interested in.
-                    </p>
                     <div className="flex gap-2">
                       <input
                         type="text"
@@ -1173,14 +1145,14 @@ function SearchPage() {
       {/* Full-width log — fills remaining viewport */}
       <div className="flex-1 min-h-[300px] rounded-lg border border-border-default bg-bg-card overflow-hidden flex flex-col">
         <div className="flex items-center justify-between px-4 py-2 border-b border-border-default bg-bg-subtle">
-          <span className="text-[11px] font-medium text-text-muted uppercase tracking-wider">Output Log</span>
+          <span className="text-[11px] font-medium text-text-muted">Output log</span>
           <span className="text-[11px] text-text-muted tabular-nums">{messages.length} messages</span>
         </div>
         {snapshot && (
           <div className="border-b border-border-default bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.08),transparent_45%),linear-gradient(to_bottom,rgba(148,163,184,0.08),transparent)] px-4 py-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] font-medium uppercase tracking-wider text-text-muted">Run Settings</p>
+                <p className="text-[11px] font-medium text-text-muted">Run settings</p>
                 <p className="mt-1 text-sm font-medium text-text-primary">
                   {MODE_LABELS[snapshot.mode]} on profile <span className="text-brand">{snapshot.profile}</span>
                 </p>
@@ -1203,26 +1175,39 @@ function SearchPage() {
 
             <div className="mt-4 grid gap-4 xl:grid-cols-[1.25fr_1fr]">
               <div className="space-y-3">
-                <SnapshotList label="Roles" values={snapshot.roles} emptyLabel="No roles provided" />
-                <SnapshotList label="Keywords" values={snapshot.keywords} emptyLabel="No keywords provided" />
-                <SnapshotList label="Target Companies (direct career page scrape)" values={snapshot.companies ?? []} emptyLabel="No target companies — using job board search only" />
+                <SnapshotList label="Roles" values={snapshot.roles} emptyLabel="None" />
+                <SnapshotList label="Keywords" values={snapshot.keywords} emptyLabel="None" />
                 <SnapshotList
-                  label="Preferred Locations"
+                  label="Target companies"
+                  values={snapshot.companies ?? []}
+                  emptyLabel="None — searching job boards only"
+                  hint="Searches these companies' ATS career pages (Greenhouse, Lever, Ashby, Workday) directly"
+                />
+                <SnapshotList
+                  label="Locations"
                   values={snapshot.locations}
-                  emptyLabel={snapshot.workplace_preference === 'remote_only' ? 'Remote only' : 'No locations provided'}
+                  emptyLabel={snapshot.workplace_preference === 'remote_only' ? 'Remote only' : 'None'}
                 />
               </div>
 
               <div className="space-y-3">
                 <div className="grid gap-2 sm:grid-cols-2">
-                  <SnapshotField label="Workplace Type" value={getWorkplacePreferenceLabel(snapshot.workplace_preference)} />
-                  <SnapshotField label="Current Title" value={snapshot.current_title || 'Not set'} />
-                  <SnapshotField label="Current Level" value={snapshot.current_level || 'Not set'} />
-                  <SnapshotField label="Comp Period" value={`${snapshot.compensation_currency} · ${snapshot.compensation_period}`} />
+                  <SnapshotField label="Current title" value={snapshot.current_title || 'Not set'} />
+                  <SnapshotField label="Current level" value={snapshot.current_level ? titleCase(snapshot.current_level) : 'Not set'} />
+                  <SnapshotField label="Workplace" value={getWorkplacePreferenceLabel(snapshot.workplace_preference)} />
+                  <SnapshotField label="Currency" value={`${snapshot.compensation_currency} · ${snapshot.compensation_period}`} />
                   <SnapshotField label="Current TC" value={formatCurrency(snapshot.current_tc, snapshot.compensation_currency)} />
-                  <SnapshotField label="Minimum Base" value={formatCurrency(snapshot.min_base, snapshot.compensation_currency)} />
                   <SnapshotField label="Target TC" value={formatCurrency(snapshot.target_total_comp, snapshot.compensation_currency)} />
-                  <SnapshotField label="Hard-floor TC" value={formatCurrency(snapshot.min_acceptable_tc, snapshot.compensation_currency)} />
+                  <SnapshotField
+                    label="Min base"
+                    value={formatCurrency(snapshot.min_base, snapshot.compensation_currency)}
+                    hint="Floor on base salary (excludes bonus/equity)"
+                  />
+                  <SnapshotField
+                    label="Min TC"
+                    value={formatCurrency(snapshot.min_acceptable_tc, snapshot.compensation_currency)}
+                    hint="Auto-skips jobs paying total comp below this"
+                  />
                 </div>
 
                 <div className="flex flex-wrap gap-1.5">

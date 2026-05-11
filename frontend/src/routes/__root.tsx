@@ -11,7 +11,7 @@ import { WorkspaceProvider, useWorkspace } from '@/contexts/workspace-context';
 import { ErrorBoundary } from '@/components/shared/error-boundary';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
-import { ArrowRight, Briefcase, Menu, ShieldCheck, Sparkles, Upload, Users } from 'lucide-react';
+import { ArrowRight, Menu, ShieldCheck, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -137,56 +137,13 @@ function HostedAuthScreen() {
                       </div>
                     </div>
 
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       <h1 className="max-w-xl text-3xl font-semibold tracking-tight text-text-primary sm:text-4xl">
-                        Test the real hosted flow before you ship it
+                        Sign in to Launchboard
                       </h1>
-                      <p className="max-w-xl text-sm leading-6 text-text-secondary sm:text-base">
-                        Create a blank account, upload a resume, and walk through Launchboard the same way a hosted user would.
-                        Sample users are still available, but they are optional.
+                      <p className="max-w-xl text-sm leading-6 text-text-secondary">
+                        Create a blank account or pick a sample persona below.
                       </p>
-                    </div>
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    {[
-                      {
-                        icon: Upload,
-                        title: 'Upload-first',
-                        description: 'Start empty and verify the real resume onboarding path.',
-                      },
-                      {
-                        icon: Briefcase,
-                        title: 'Hosted semantics',
-                        description: 'Bearer auth, isolated workspaces, durable jobs, and worker-backed runs.',
-                      },
-                      {
-                        icon: Sparkles,
-                        title: 'QA ready',
-                        description: 'Optional seeded users let you compare different industries and search goals.',
-                      },
-                    ].map(({ icon: Icon, title, description }) => (
-                      <div key={title} className="rounded-2xl border border-border-default bg-bg-subtle/70 p-4">
-                        <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-brand-light">
-                          <Icon className="h-4 w-4 text-brand" />
-                        </div>
-                        <p className="text-sm font-medium text-text-primary">{title}</p>
-                        <p className="mt-1 text-xs leading-5 text-text-tertiary">{description}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="rounded-2xl border border-border-default bg-bg-subtle/60 p-4">
-                  <p className="text-xs font-medium uppercase tracking-[0.14em] text-text-muted">What this is for</p>
-                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-xl bg-bg-card px-4 py-3">
-                      <p className="text-sm font-medium text-text-primary">Primary path</p>
-                      <p className="mt-1 text-sm text-text-secondary">Create a test account and upload your own resume.</p>
-                    </div>
-                    <div className="rounded-xl bg-bg-card px-4 py-3">
-                      <p className="text-sm font-medium text-text-primary">Secondary path</p>
-                      <p className="mt-1 text-sm text-text-secondary">Switch to seeded personas when you need richer QA scenarios.</p>
                     </div>
                   </div>
                 </div>
@@ -206,17 +163,6 @@ function HostedAuthScreen() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-6 pt-6">
-                <div className="grid gap-3">
-                  <div className="rounded-xl border border-border-default bg-bg-subtle px-4 py-3">
-                    <p className="text-sm font-medium text-text-primary">1. Start with a clean user</p>
-                    <p className="mt-1 text-sm text-text-secondary">No seeded resume or preferences unless you choose sample users below.</p>
-                  </div>
-                  <div className="rounded-xl border border-border-default bg-bg-subtle px-4 py-3">
-                    <p className="text-sm font-medium text-text-primary">2. Upload a resume</p>
-                    <p className="mt-1 text-sm text-text-secondary">Verify parsing, AI suggestions, search setup, and application flow end to end.</p>
-                  </div>
-                </div>
-
                 <div className="grid gap-4">
                   <div className="space-y-2">
                     <label className="text-xs font-medium uppercase tracking-[0.12em] text-text-muted">Full name</label>
@@ -236,10 +182,6 @@ function HostedAuthScreen() {
                     />
                   </div>
                 </div>
-
-                <p className="text-xs text-text-muted">
-                  These are editable sandbox defaults. Continuing here resets this test account to a blank workspace.
-                </p>
 
                 <Button
                   className="h-10 w-full justify-between px-4"
@@ -297,10 +239,6 @@ function HostedAuthScreen() {
                       ))}
                     </div>
                   )}
-                </div>
-
-                <div className="rounded-xl bg-bg-subtle px-4 py-3 text-xs leading-5 text-text-muted">
-                  This screen only appears when the local sandbox is started with dev hosted auth enabled.
                 </div>
 
                 {(authError || error) && (

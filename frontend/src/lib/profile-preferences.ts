@@ -38,21 +38,9 @@ export const LEVEL_OPTIONS = [
 ] as const;
 
 export const WORKPLACE_OPTIONS = [
-  {
-    value: 'remote_friendly' as const,
-    label: 'Remote + selected places',
-    description: 'Remote jobs anywhere, plus hybrid or on-site jobs in the places below.',
-  },
-  {
-    value: 'remote_only' as const,
-    label: 'Remote only',
-    description: 'Only show fully remote roles.',
-  },
-  {
-    value: 'location_only' as const,
-    label: 'Selected places only',
-    description: 'Only show hybrid or on-site jobs in the places below. Remote jobs are excluded.',
-  },
+  { value: 'remote_friendly' as const, label: 'Remote + places' },
+  { value: 'remote_only' as const, label: 'Remote only' },
+  { value: 'location_only' as const, label: 'Places only' },
 ] as const;
 
 export const REMOTE_LOCATION_VALUES = new Set([

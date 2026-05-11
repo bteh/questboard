@@ -102,7 +102,6 @@ export function ReadyToLaunchHero() {
   const searchAreaSummary = getSearchAreaSummary(
     prefs.workplace_preference,
     prefs.preferred_places,
-    'onboarding',
   );
 
   // Merge a generated profile into the workspace preferences before
@@ -290,54 +289,30 @@ export function ReadyToLaunchHero() {
         {showManualSummary && canGenerate && !generatedProfile && (
           <div className="rounded-xl border border-brand/30 bg-brand-light/20 p-3.5">
             {isGenerating ? (
-              <div className="flex items-start gap-3">
-                <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-brand" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-text-primary">
-                    Tailoring a profile from your resume…
-                  </p>
-                  <p className="mt-0.5 text-[11px] leading-relaxed text-text-tertiary">
-                    Reading your background and matching it to the right job sources, keywords,
-                    and weights for your specific career. Takes 5–15 seconds.
-                  </p>
-                </div>
+              <div className="flex items-center gap-3">
+                <Loader2 className="h-4 w-4 shrink-0 animate-spin text-brand" />
+                <p className="text-sm font-medium text-text-primary">
+                  Tailoring a profile from your resume…
+                </p>
               </div>
             ) : generationError ? (
               <div className="space-y-2">
                 <div className="flex items-start gap-3">
                   <Brain className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-text-primary">
-                      AI couldn't generate a profile
-                    </p>
-                    <p className="mt-0.5 text-[11px] leading-relaxed text-text-tertiary">
-                      {generationError instanceof Error ? generationError.message : 'Unknown error'}
-                    </p>
-                  </div>
+                  <p className="text-sm text-text-primary">
+                    AI couldn't generate a profile — {generationError instanceof Error ? generationError.message : 'unknown error'}
+                  </p>
                 </div>
                 <Button variant="outline" size="sm" onClick={handleGenerate} className="w-full">
                   Try again
                 </Button>
               </div>
             ) : (
-              <div className="flex items-start gap-3">
-                <Brain className="mt-0.5 h-4 w-4 shrink-0 text-brand" />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-text-primary">
-                    Get an AI-tailored profile from your resume
-                  </p>
-                  <p className="mt-0.5 text-[11px] leading-relaxed text-text-tertiary">
-                    Skips the templates entirely. Reads your resume and produces a profile specifically for
-                    your career — works for any niche (AI/ML, web3, healthcare, government, climate tech, etc.).
-                  </p>
-                  <Button
-                    size="sm"
-                    onClick={handleGenerate}
-                    className="mt-2"
-                  >
-                    Tailor my profile with AI
-                  </Button>
-                </div>
+              <div className="flex items-center gap-3">
+                <Brain className="h-4 w-4 shrink-0 text-brand" />
+                <Button size="sm" onClick={handleGenerate}>
+                  Tailor my profile with AI
+                </Button>
               </div>
             )}
           </div>

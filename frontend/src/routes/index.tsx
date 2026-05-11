@@ -84,7 +84,7 @@ function DashboardPage() {
 
   return (
     <div>
-      <PageHeader title="Dashboard" description="Your job search at a glance">
+      <PageHeader title="Dashboard">
         <Button
           onClick={() => navigate({ to: '/search' })}
           size="sm"
@@ -118,19 +118,6 @@ function DashboardPage() {
             </CardContent>
           </Card>
         ))}
-      </div>
-
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <p className="text-xs text-text-muted">
-          {latestRunId
-            ? `Showing your latest completed search${stats?.total_jobs != null ? ` · ${stats.total_jobs} jobs in scope` : ''}`
-            : (topJobs.length > 0 ? `Showing top opportunities from ${stats?.total_jobs ?? 0} tracked jobs` : 'No completed search yet. Your dashboard will populate after the first run.')}
-        </p>
-        {latestRunId ? (
-          <Link to="/applications" search={{ scope: 'all', run: undefined }} className="text-xs text-brand hover:text-brand-hover transition-colors inline-flex items-center gap-1">
-            Browse all tracked jobs <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        ) : null}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -174,12 +161,9 @@ function DashboardPage() {
                 </>
               ) : (
                 <>
-                  <h3 className="text-base font-semibold text-text-primary mb-1.5">Welcome to Launchboard</h3>
-                  <p className="text-sm text-text-tertiary mb-5 max-w-sm leading-relaxed">
-                    Search multiple job boards at once, see which jobs match your skills and experience, and track your applications — all in one place.
-                  </p>
+                  <h3 className="text-base font-semibold text-text-primary mb-5">Start your first search</h3>
                   <Button onClick={() => navigate({ to: '/search' })} size="sm">
-                    <Search className="h-4 w-4 mr-2" /> Start your first search
+                    <Search className="h-4 w-4 mr-2" /> New search
                   </Button>
                 </>
               )}
