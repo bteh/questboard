@@ -176,25 +176,33 @@ def _match_roles(
     roles: list[str] | None,
     *,
     include_founding: bool = True,
+    match_mode: str = "all_significant",
 ) -> bool:
     """Check if a job title matches any of the target roles.
 
-    Matching strategy (in order):
-    1. Founding-role bypass — "Founding Engineer", "Member of Technical Staff",
-       "MTS", etc. always pass when ``include_founding=True`` (the default).
-       These titles rarely word-overlap with normal target roles, but they're
-       high-signal startup positions users almost always want to see.
-    2. Exact substring — "data engineer" in "Senior Data Engineer" ✓
-    3. Word overlap  — all significant words of the role appear in the title
-       (any order), so "Platform Engineer, Data" matches role "data platform engineer"
+    ``match_mode`` controls the matching strategy:
 
-    Returns False if none match — no broad fallback so that role filtering
-    stays precise to the user's profile.
+    - ``"exact"``     — substring tier only. Strictest. "data engineer" must
+                        appear contiguously in the title.
+    - ``"all_significant"`` (default) — substring OR every significant role
+                        word appears in the title (any order). "Platform
+                        Engineer, Data" matches role "data platform engineer".
+    - ``"any_word"``  — substring OR any single significant role word appears
+                        in the title. Wide net for the ``loose`` strictness
+                        preset. "Senior Coordinator" matches "Marketing
+                        Coordinator" because both share "coordinator".
+
+    Founding-role bypass — "Founding Engineer", "Member of Technical Staff",
+    "MTS", etc. always pass when ``include_founding=True``. These titles
+    rarely word-overlap with normal target roles, but they're high-signal
+    startup positions users almost always want to see.
+
+    Returns False if no role matches under the chosen mode.
     """
     if not roles:
         return True
     title_lower = title.lower()
-    # Noise words to ignore during word-overlap matching
+    # Noise words to ignore during word-level matching
     _NOISE = {"a", "an", "the", "and", "or", "of", "for", "in", "at", "to", "with", "&"}
     # Strip punctuation for word-level matching
     title_words = set(re.findall(r"[a-z0-9]+", title_lower))
@@ -202,13 +210,20 @@ def _match_roles(
         return True
     for r in roles:
         role_lower = r.lower()
-        # Fast path: exact substring
+        # Exact substring tier — fires in every mode
         if role_lower in title_lower:
             return True
-        # Word overlap: all meaningful role words present in title (any order)
+        if match_mode == "exact":
+            continue
         role_words = set(re.findall(r"[a-z0-9]+", role_lower)) - _NOISE
-        if role_words and role_words.issubset(title_words):
-            return True
+        if not role_words:
+            continue
+        if match_mode == "any_word":
+            if role_words & title_words:
+                return True
+        else:  # "all_significant" (default)
+            if role_words.issubset(title_words):
+                return True
     return False
 
 

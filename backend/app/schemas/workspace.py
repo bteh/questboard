@@ -80,12 +80,18 @@ class WorkspacePreferences(BaseModel):
     companies: list[str] = Field(default_factory=list)
     preferred_places: list[PlaceSelection] = Field(default_factory=list)
     workplace_preference: Literal["remote_friendly", "remote_only", "location_only"] = "remote_friendly"
-    max_days_old: int = 14
+    max_days_old: int = 30
     include_linkedin_jobs: bool = False
     current_title: str = ""
-    current_level: str = "mid"
+    # Empty string skips the level filter entirely — wider net by default. Users
+    # opt in to level narrowing by selecting a value in Settings.
+    current_level: str = ""
     compensation: CompensationPreference = Field(default_factory=CompensationPreference)
     exclude_staffing_agencies: bool = True
+    # Filter aggressiveness preset. "loose" pulls the widest net (new-user
+    # default); "strict" only surfaces tight matches. See _FILTER_PRESETS in
+    # src/job_finder/pipeline.py for the exact thresholds each preset uses.
+    match_strictness: Literal["loose", "balanced", "strict"] = "loose"
 
 
 class WorkspaceResumeStatus(BaseModel):
@@ -136,12 +142,13 @@ class SearchSnapshot(BaseModel):
     companies: list[str] = Field(default_factory=list)
     preferred_places: list[PlaceSelection] = Field(default_factory=list)
     workplace_preference: Literal["remote_friendly", "remote_only", "location_only"] = "remote_friendly"
-    max_days_old: int = 14
+    max_days_old: int = 30
     include_linkedin_jobs: bool = False
     current_title: str = ""
     current_level: str = ""
     compensation: CompensationPreference = Field(default_factory=CompensationPreference)
     exclude_staffing_agencies: bool = True
+    match_strictness: Literal["loose", "balanced", "strict"] = "loose"
 
 
 class GeneratedProfileResponse(BaseModel):

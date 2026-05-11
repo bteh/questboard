@@ -188,16 +188,18 @@ async def start_search_run(
     snapshot = None
     if workspace:
         prefs = workspace_service.get_workspace_preferences(db, workspace.workspace.id)
-        merged_prefs = prefs.model_copy(
-            update={
-                "roles": effective_roles,
-                "keywords": effective_keywords,
-                "preferred_places": request_places,
-                "workplace_preference": effective_workplace_preference,
-                "max_days_old": req.max_days_old,
-                "include_linkedin_jobs": req.include_linkedin_jobs,
-            }
-        )
+        merged_updates = {
+            "roles": effective_roles,
+            "keywords": effective_keywords,
+            "preferred_places": request_places,
+            "workplace_preference": effective_workplace_preference,
+            "max_days_old": req.max_days_old,
+            "include_linkedin_jobs": req.include_linkedin_jobs,
+        }
+        # Per-run override: only apply if the client explicitly sent a value.
+        if req.match_strictness is not None:
+            merged_updates["match_strictness"] = req.match_strictness
+        merged_prefs = prefs.model_copy(update=merged_updates)
         config_override = workspace_service.build_pipeline_config_override(
             merged_prefs,
             workspace.workspace.id,
@@ -433,6 +435,7 @@ async def get_search_defaults(
             compensation_currency=prefs.compensation.currency,
             compensation_period=prefs.compensation.pay_period,
             exclude_staffing_agencies=prefs.exclude_staffing_agencies,
+            match_strictness=prefs.match_strictness,
         )
 
     profile = sanitize_profile(profile)
@@ -448,7 +451,7 @@ async def get_search_defaults(
         ),
         include_remote=workplace_preference != "location_only",
         workplace_preference=workplace_preference,
-        max_days_old=cfg.get("search_settings", {}).get("max_days_old", 14),
+        max_days_old=cfg.get("search_settings", {}).get("max_days_old", 30),
         include_linkedin_jobs="linkedin" in [
             str(board).strip().lower()
             for board in cfg.get("job_boards", [])
@@ -464,6 +467,9 @@ async def get_search_defaults(
         compensation_currency=cfg.get("compensation", {}).get("currency", "USD"),
         compensation_period=cfg.get("compensation", {}).get("pay_period", "annual"),
         exclude_staffing_agencies=cfg.get("search_settings", {}).get("exclude_staffing_agencies", True),
+        match_strictness=str(
+            cfg.get("filters", {}).get("strictness", "loose") or "loose"
+        ).lower(),
     )
 
 

@@ -637,10 +637,68 @@ def _job_salary_passes(job: dict, hard_floor: float) -> bool:
     return _sal_min >= hard_floor
 
 
+# Filter-strictness presets. Each preset is a complete default; user-supplied
+# keys in config["filters"] override individual values via _resolve_filter_settings().
+# Loose = wide net (new default), Balanced = the previous hardcoded behavior,
+# Strict = tight matches only. Surfaced via the SearchRequest.match_strictness
+# field and the Match strictness segmented control in the UI.
+_FILTER_PRESETS: dict[str, dict[str, Any]] = {
+    "loose": {
+        "salary_flex": 0.70,
+        "level_tolerance_senior": 2.5,
+        "level_tolerance_junior": 3.0,
+        "include_founding_titles": True,
+        "role_match_mode": "any_word",
+    },
+    "balanced": {
+        "salary_flex": 0.85,
+        "level_tolerance_senior": 1.5,
+        "level_tolerance_junior": 2.0,
+        "include_founding_titles": True,
+        "role_match_mode": "all_significant",
+    },
+    "strict": {
+        "salary_flex": 1.00,
+        "level_tolerance_senior": 1.0,
+        "level_tolerance_junior": 1.0,
+        "include_founding_titles": False,
+        "role_match_mode": "exact",
+    },
+}
+
+_DEFAULT_STRICTNESS = "loose"
+
+
+def _resolve_filter_settings(config: dict | None) -> dict[str, Any]:
+    """Materialize the active filter settings.
+
+    Reads ``config["filters"]``. The optional ``strictness`` key picks a preset
+    (``loose|balanced|strict``); any other keys override the preset values
+    one-by-one. Unknown strictness values fall back to the default preset so a
+    typo in YAML never silently disables filtering.
+    """
+    raw = (config or {}).get("filters") or {}
+    strictness = str(raw.get("strictness") or _DEFAULT_STRICTNESS).strip().lower()
+    preset = _FILTER_PRESETS.get(strictness) or _FILTER_PRESETS[_DEFAULT_STRICTNESS]
+    resolved = dict(preset)
+    for key in (
+        "salary_flex",
+        "level_tolerance_senior",
+        "level_tolerance_junior",
+        "include_founding_titles",
+        "role_match_mode",
+    ):
+        if key in raw:
+            resolved[key] = raw[key]
+    resolved["strictness"] = strictness if strictness in _FILTER_PRESETS else _DEFAULT_STRICTNESS
+    return resolved
+
+
 def _filter_jobs_by_level(
     jobs: list[dict],
     career_cfg: dict | None,
     *,
+    filters: dict | None = None,
     progress: Callable[[str], None] | None = None,
 ) -> list[dict]:
     """Filter jobs that are too far above or below the configured level."""
@@ -650,17 +708,21 @@ def _filter_jobs_by_level(
     if not current_title and not current_level_label:
         return jobs
 
+    resolved = filters or _resolve_filter_settings(None)
+    tol_senior = float(resolved.get("level_tolerance_senior", 1.5))
+    tol_junior = float(resolved.get("level_tolerance_junior", 2.0))
+
     current_level = resolve_current_level(career_cfg)
     pre_count = len(jobs)
     if current_level >= 3:
         filtered = [
             job for job in jobs
-            if _extract_level(job.get("title", "")) >= current_level - 1.5
+            if _extract_level(job.get("title", "")) >= current_level - tol_senior
         ]
     else:
         filtered = [
             job for job in jobs
-            if _extract_level(job.get("title", "")) <= current_level + 2.0
+            if _extract_level(job.get("title", "")) <= current_level + tol_junior
         ]
 
     dropped = pre_count - len(filtered)
@@ -1221,6 +1283,10 @@ class JobFinderPipeline:
         if progress:
             progress(f"Work types: {remote_count} remote, {hybrid_count} hybrid, {onsite_count} onsite")
 
+        # Resolve filter strictness once for the whole filter section.
+        # Preset (loose/balanced/strict) with optional per-key overrides.
+        filter_settings = _resolve_filter_settings(self.config)
+
         # Post-search location filter
         # Use explicit location_preferences if configured, otherwise auto-derive
         # from the search locations so filtering always works.
@@ -1291,7 +1357,7 @@ class JobFinderPipeline:
         )
         salary_floor = annualize_amount(salary_floor_raw, pay_period) or 0
         if salary_floor and salary_floor > 0:
-            hard_floor = salary_floor * 0.85  # 15% flex for equity/bonus
+            hard_floor = salary_floor * float(filter_settings["salary_flex"])
             pre_count = len(deduped)
             deduped = [
                 j for j in deduped
@@ -1311,6 +1377,7 @@ class JobFinderPipeline:
         deduped = _filter_jobs_by_level(
             deduped,
             self.config.get("career_baseline", {}),
+            filters=filter_settings,
             progress=progress,
         )
         career_cfg = self.config.get("career_baseline") or {}
@@ -1324,7 +1391,7 @@ class JobFinderPipeline:
 
         # --- Role relevance filter ---
         pre_role = len(deduped)
-        deduped = self.filter_by_role(deduped, progress=progress)
+        deduped = self.filter_by_role(deduped, filters=filter_settings, progress=progress)
         target_roles = getattr(self, "_expanded_roles", None) or self.config.get("target_roles", [])
         self._record_funnel_stage(
             "role", "Role relevance", pre_role, len(deduped), active=bool(target_roles),
@@ -1352,6 +1419,7 @@ class JobFinderPipeline:
         self,
         jobs: list[dict],
         *,
+        filters: dict | None = None,
         progress: Callable[[str], None] | None = None,
     ) -> list[dict]:
         """Remove jobs whose titles don't match any target role.
@@ -1375,8 +1443,20 @@ class JobFinderPipeline:
 
         from job_finder.tools.scrapers._utils import _match_roles
 
+        resolved = filters or _resolve_filter_settings(self.config)
+        include_founding = bool(resolved.get("include_founding_titles", True))
+        match_mode = str(resolved.get("role_match_mode", "all_significant"))
+
         pre_count = len(jobs)
-        filtered = [j for j in jobs if _match_roles(j.get("title", ""), target_roles)]
+        filtered = [
+            j for j in jobs
+            if _match_roles(
+                j.get("title", ""),
+                target_roles,
+                include_founding=include_founding,
+                match_mode=match_mode,
+            )
+        ]
         dropped = pre_count - len(filtered)
         if dropped:
             logger.info("Role filter: removed %d/%d jobs not matching target roles", dropped, pre_count)

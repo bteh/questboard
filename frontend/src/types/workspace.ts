@@ -118,6 +118,7 @@ export interface WorkspacePreferences {
   current_level: string;
   compensation: CompensationPreference;
   exclude_staffing_agencies: boolean;
+  match_strictness: 'loose' | 'balanced' | 'strict';
 }
 
 export interface WorkspaceResumeStatus {

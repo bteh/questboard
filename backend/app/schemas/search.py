@@ -16,7 +16,7 @@ class SearchRequest(BaseModel):
     companies: list[str] = Field(default_factory=list)
     include_remote: bool = True
     workplace_preference: Literal["remote_friendly", "remote_only", "location_only"] = "remote_friendly"
-    max_days_old: int = 14
+    max_days_old: int = 30
     include_linkedin_jobs: bool = False
     use_ai: bool = False
     profile: str = "default"
@@ -24,6 +24,9 @@ class SearchRequest(BaseModel):
         default="search_score",
         description="search_only | search_score | full_pipeline",
     )
+    # Per-run override for filter strictness. None = inherit saved default
+    # (WorkspacePreferences.match_strictness).
+    match_strictness: Literal["loose", "balanced", "strict"] | None = None
 
     @field_validator("profile")
     @classmethod
@@ -85,7 +88,7 @@ class SearchDefaults(BaseModel):
     companies: list[str] = Field(default_factory=list)
     include_remote: bool = True
     workplace_preference: Literal["remote_friendly", "remote_only", "location_only"] = "remote_friendly"
-    max_days_old: int = 14
+    max_days_old: int = 30
     include_linkedin_jobs: bool = False
     profile: str = "default"
     current_title: str = ""
@@ -97,6 +100,7 @@ class SearchDefaults(BaseModel):
     compensation_currency: str = "USD"
     compensation_period: Literal["hourly", "monthly", "annual"] = "annual"
     exclude_staffing_agencies: bool = True
+    match_strictness: Literal["loose", "balanced", "strict"] = "loose"
 
 
 class SearchSuggestions(BaseModel):

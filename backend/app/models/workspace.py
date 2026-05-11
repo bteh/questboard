@@ -123,6 +123,10 @@ class WorkspacePreferences(Base):
     include_equity = Column(Boolean, default=True)
     exclude_staffing_agencies = Column(Boolean, default=True)
     include_remote = Column(Boolean, default=True)
+    # Filter-strictness preset: loose | balanced | strict.
+    # See _FILTER_PRESETS in src/job_finder/pipeline.py for the exact thresholds
+    # each preset applies. Default "loose" pulls the widest net for new users.
+    match_strictness = Column(String(16), default="loose")
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 

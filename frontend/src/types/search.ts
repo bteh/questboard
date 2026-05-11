@@ -1,6 +1,8 @@
 import type { WorkplacePreference } from '@/lib/profile-preferences';
 import type { PlaceSelection } from '@/types/workspace';
 
+export type MatchStrictness = 'loose' | 'balanced' | 'strict';
+
 export interface SearchRequest {
   roles: string[];
   locations: string[];
@@ -14,6 +16,8 @@ export interface SearchRequest {
   use_ai: boolean;
   profile: string;
   mode: 'search_only' | 'search_score' | 'full_pipeline';
+  // null = use saved default
+  match_strictness?: MatchStrictness | null;
 }
 
 export interface SearchRunSnapshot {
@@ -38,6 +42,7 @@ export interface SearchRunSnapshot {
   compensation_period: 'hourly' | 'monthly' | 'annual';
   include_equity: boolean | null;
   exclude_staffing_agencies: boolean | null;
+  match_strictness?: MatchStrictness;
 }
 
 export interface SearchDefaults {
@@ -60,6 +65,7 @@ export interface SearchDefaults {
   compensation_currency: string;
   compensation_period: 'hourly' | 'monthly' | 'annual';
   exclude_staffing_agencies: boolean;
+  match_strictness: MatchStrictness;
 }
 
 export interface RunStatus {
