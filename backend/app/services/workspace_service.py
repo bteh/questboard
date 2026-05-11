@@ -49,7 +49,7 @@ from app.services.workspace_naming import allocate_workspace_slug
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_JOBSPY_BOARDS = ["indeed", "glassdoor", "zip_recruiter", "google"]
+_DEFAULT_JOBSPY_BOARDS = ["google", "glassdoor", "zip_recruiter"]
 _LINKEDIN_JOBSPY_BOARD = "linkedin"
 _DESKTOP_SESSION_HEADER = "X-Launchboard-Session"
 

@@ -437,15 +437,32 @@ def _execute_pipeline(
     run.started_at = _coerce_utc(run.started_at) or _utcnow()
     _persist_workspace_run_status(run)
 
+    # Report only the sources actually in use, not the full plugin registry.
+    # Without this filter, the "searching N sources" line lies — it lists
+    # every registered scraper even when the user has disabled most of them.
     try:
-        from job_finder.tools.scrapers import get_all_metadata
-        all_sources = get_all_metadata()
-        source_names = ", ".join(m.display_name for m in all_sources)
+        from job_finder.tools.scrapers import get_registry
+        from job_finder.pipeline import _load_search_config
+        _cfg = _load_search_config(run.profile)
+        _registry = get_registry()
+        _enabled_names: list[str] = []
+        for _board in _cfg.get("job_boards", []) or []:
+            _key = str(_board).strip().lower()
+            if _key in _registry:
+                _enabled_names.append(_registry[_key].display_name)
+        for _entry in _cfg.get("additional_sources", []) or []:
+            if not isinstance(_entry, dict) or not _entry.get("enabled"):
+                continue
+            _key = str(_entry.get("name", "")).strip().lower()
+            if _key in _registry:
+                _enabled_names.append(_registry[_key].display_name)
+        active_source_count = len(_enabled_names)
+        source_names = ", ".join(_enabled_names) if _enabled_names else "multiple sources"
     except Exception:
-        all_sources = []
+        active_source_count = 0
         source_names = "multiple sources"
     mode_label = _MODE_LABELS.get(mode, mode)
-    _send_event(run, "progress", f"{mode_label} started — searching {len(all_sources) or 'multiple'} sources: {source_names}")
+    _send_event(run, "progress", f"{mode_label} started — searching {active_source_count or 'multiple'} sources: {source_names}")
     _send_event(run, "progress", f"Searching {len(roles)} terms across {len(locations)} locations")
 
     try:

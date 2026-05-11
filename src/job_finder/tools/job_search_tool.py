@@ -77,11 +77,21 @@ def search_jobs(
 
     site_names = boards or _DEFAULT_BOARDS
 
+    # Google Jobs interprets "jobs near <location>" literally. For remote
+    # searches or empty/wildcard locations, "near Remote" returns ~nothing.
+    # Build a remote-aware query so Google contributes real volume.
+    _loc = (location or "").strip().lower()
+    _is_remote_query = is_remote is True or _loc in ("", "remote", "anywhere", "us", "usa", "united states")
+    if _is_remote_query:
+        google_search_term = f"remote {search_term} jobs"
+    else:
+        google_search_term = f"{search_term} jobs near {location}"
+
     try:
         scrape_kwargs = dict(
             site_name=site_names,
             search_term=search_term,
-            google_search_term=f"{search_term} jobs near {location}",
+            google_search_term=google_search_term,
             location=location,
             results_wanted=results_wanted,
             hours_old=hours_old,
