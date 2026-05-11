@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, Filter, X } from 'lucide-react';
+import { ChevronDown, Filter, X } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -15,59 +15,52 @@ function formatCount(n: number): string {
   return n.toLocaleString();
 }
 
-function StageCell({ stage, isLast }: { stage: FunnelStage; isLast: boolean }) {
-  const skipped = !stage.active;
-  const dropped = stage.dropped;
-  const droppedPct = stage.count_in > 0 ? (dropped / stage.count_in) * 100 : 0;
-
+function StageDeltaLine({ stage }: { stage: FunnelStage }) {
+  if (!stage.active) {
+    return <span className="italic text-[var(--lb-text-muted)]">skipped</span>;
+  }
+  const droppedPct = stage.count_in > 0 ? (stage.dropped / stage.count_in) * 100 : 0;
+  if (stage.dropped <= 0) {
+    return <span className="text-[var(--lb-text-muted)]">no change</span>;
+  }
   return (
-    <div className="flex items-stretch min-w-0 flex-1">
+    <span className="text-[var(--lb-text-tertiary)]">
+      <span className="text-[var(--lb-danger)]">−{formatCount(stage.dropped)}</span>
+      {droppedPct >= 1 && <> · {droppedPct.toFixed(0)}%</>}
+    </span>
+  );
+}
+
+function StageCell({ stage }: { stage: FunnelStage }) {
+  const skipped = !stage.active;
+  return (
+    <div
+      className={cn(
+        'flex flex-1 basis-0 flex-col justify-between rounded-md border p-3 min-w-[7.5rem]',
+        skipped
+          ? 'border-dashed border-[var(--lb-border-default)] bg-transparent'
+          : 'border-[var(--lb-border-default)] bg-[var(--lb-bg-card)]',
+      )}
+    >
       <div
         className={cn(
-          'flex flex-1 flex-col gap-1 rounded-md border px-3 py-2.5 min-w-0',
-          skipped
-            ? 'border-dashed border-[var(--lb-border-default)] bg-transparent'
-            : 'border-[var(--lb-border-default)] bg-[var(--lb-bg-card)]',
+          'text-[11px] font-medium leading-tight break-words min-h-[2.2rem]',
+          skipped ? 'text-[var(--lb-text-muted)]' : 'text-[var(--lb-text-tertiary)]',
         )}
       >
-        <div
-          className={cn(
-            'truncate text-[11px] font-medium uppercase tracking-wide',
-            skipped ? 'text-[var(--lb-text-muted)]' : 'text-[var(--lb-text-tertiary)]',
-          )}
-          title={stage.label}
-        >
-          {stage.label}
-        </div>
-        <div
-          className={cn(
-            'text-lg font-semibold tabular-nums',
-            skipped ? 'text-[var(--lb-text-muted)]' : 'text-[var(--lb-text-primary)]',
-          )}
-        >
-          {formatCount(stage.count_out)}
-        </div>
-        <div className="text-[11px] tabular-nums">
-          {skipped ? (
-            <span className="text-[var(--lb-text-muted)]">skipped</span>
-          ) : dropped > 0 ? (
-            <span className="text-[var(--lb-danger)]">
-              −{formatCount(dropped)}
-              {droppedPct >= 1 && (
-                <span className="text-[var(--lb-text-tertiary)]"> ({droppedPct.toFixed(0)}%)</span>
-              )}
-            </span>
-          ) : (
-            <span className="text-[var(--lb-text-tertiary)]">—</span>
-          )}
-        </div>
+        {stage.label}
       </div>
-      {!isLast && (
-        <ChevronRight
-          aria-hidden
-          className="mx-1 h-4 w-4 shrink-0 self-center text-[var(--lb-text-muted)]"
-        />
-      )}
+      <div
+        className={cn(
+          'mt-2 text-xl font-semibold tabular-nums leading-none',
+          skipped ? 'text-[var(--lb-text-muted)]' : 'text-[var(--lb-text-primary)]',
+        )}
+      >
+        {formatCount(stage.count_out)}
+      </div>
+      <div className="mt-1.5 text-[11px] tabular-nums">
+        <StageDeltaLine stage={stage} />
+      </div>
     </div>
   );
 }
@@ -151,30 +144,20 @@ export function FunnelSummary({ data, onDismiss, className }: FunnelSummaryProps
       {expanded && (
         <div
           id="funnel-summary-stages"
-          className="mt-3 flex w-full items-stretch gap-0 overflow-x-auto pb-1"
+          className="mt-3 flex w-full items-stretch gap-2 overflow-x-auto pb-1"
         >
-          <div className="flex flex-1 items-stretch gap-0 min-w-0">
-            <div className="flex flex-1 flex-col gap-1 rounded-md border border-[var(--lb-border-default)] bg-[var(--lb-bg-card)] px-3 py-2.5 min-w-[5.5rem]">
-              <div className="text-[11px] font-medium uppercase tracking-wide text-[var(--lb-text-tertiary)]">
-                Raw
-              </div>
-              <div className="text-lg font-semibold tabular-nums text-[var(--lb-text-primary)]">
-                {formatCount(rawCount)}
-              </div>
-              <div className="text-[11px] text-[var(--lb-text-tertiary)]">found</div>
+          <div className="flex flex-1 basis-0 flex-col justify-between rounded-md border border-[var(--lb-border-default)] bg-[var(--lb-bg-card)] p-3 min-w-[7.5rem]">
+            <div className="text-[11px] font-medium leading-tight text-[var(--lb-text-tertiary)] min-h-[2.2rem]">
+              Raw results
             </div>
-            <ChevronRight
-              aria-hidden
-              className="mx-1 h-4 w-4 shrink-0 self-center text-[var(--lb-text-muted)]"
-            />
-            {stages.map((stage, idx) => (
-              <StageCell
-                key={stage.key}
-                stage={stage}
-                isLast={idx === stages.length - 1}
-              />
-            ))}
+            <div className="mt-2 text-xl font-semibold tabular-nums leading-none text-[var(--lb-text-primary)]">
+              {formatCount(rawCount)}
+            </div>
+            <div className="mt-1.5 text-[11px] text-[var(--lb-text-muted)]">found</div>
           </div>
+          {stages.map((stage) => (
+            <StageCell key={stage.key} stage={stage} />
+          ))}
         </div>
       )}
     </Card>

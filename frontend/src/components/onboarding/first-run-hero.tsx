@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
-import { ArrowRight, FileText, Loader2, Search, Shield, Sparkles, Upload } from 'lucide-react';
+import { ArrowRight, FileText, Loader2, Search, Sparkles, Upload } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -133,19 +133,10 @@ export function FirstRunHero() {
     <div className="flex min-h-[70vh] flex-col items-center justify-center px-4">
       <div className="w-full max-w-2xl space-y-10">
         {/* Headline */}
-        <div className="space-y-4 text-center">
+        <div className="text-center">
           <h1 className="text-balance text-4xl font-semibold tracking-tight text-text-primary sm:text-5xl">
             Let's start your job search
           </h1>
-          <p className="mx-auto max-w-lg text-balance text-sm leading-relaxed text-text-tertiary sm:text-base">
-            <span>Upload your resume</span>{' '}
-            <ArrowRight className="inline h-3 w-3 -mt-0.5 opacity-50" />{' '}
-            <span>we suggest roles</span>{' '}
-            <ArrowRight className="inline h-3 w-3 -mt-0.5 opacity-50" />{' '}
-            <span>we search 14+ job boards</span>{' '}
-            <ArrowRight className="inline h-3 w-3 -mt-0.5 opacity-50" />{' '}
-            <span className="font-medium text-text-secondary">you see your best matches</span>
-          </p>
         </div>
 
         {/* Primary CTA — drag-and-drop resume upload */}
@@ -220,19 +211,14 @@ export function FirstRunHero() {
           </div>
         </div>
 
-        {/* Reassurance + guided setup link */}
-        <div className="flex flex-col items-center gap-3">
-          <div className="flex items-center gap-2 text-xs text-text-muted">
-            <Shield className="h-3.5 w-3.5" />
-            <span>Your resume and AI keys stay on this computer. No account required.</span>
-          </div>
+        <div className="text-center">
           <button
             type="button"
             onClick={() => setWizardOpen(true)}
             className="inline-flex items-center gap-1.5 text-xs text-text-muted transition-colors hover:text-text-secondary"
           >
             <Sparkles className="h-3.5 w-3.5" />
-            Prefer a guided setup? Open the wizard
+            Guided setup instead
           </button>
         </div>
 

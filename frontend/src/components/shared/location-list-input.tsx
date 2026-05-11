@@ -182,7 +182,7 @@ export function LocationListInput({
         <p className="text-xs text-text-muted">{emptyText}</p>
       )}
 
-      <p className="text-xs text-text-muted">{helperText}</p>
+      {helperText && <p className="text-xs text-text-muted">{helperText}</p>}
     </div>
   );
 }

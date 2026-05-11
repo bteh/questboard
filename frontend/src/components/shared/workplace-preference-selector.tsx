@@ -31,19 +31,14 @@ export function WorkplacePreferenceSelector({
             aria-checked={selected}
             onClick={() => onChange(option.value)}
             className={cn(
-              'rounded-xl border px-3.5 py-3 text-left transition-all',
+              'rounded-lg border px-3 py-2 text-sm font-medium text-center transition-colors',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2',
               selected
-                ? 'border-brand bg-brand-light/50 shadow-sm ring-1 ring-brand/20'
-                : 'border-border-default bg-bg-card hover:border-brand/40 hover:bg-bg-subtle',
+                ? 'border-brand bg-brand-light/50 text-brand'
+                : 'border-border-default bg-bg-card text-text-secondary hover:border-brand/40 hover:bg-bg-subtle',
             )}
           >
-            <p className={cn('text-sm font-medium', selected ? 'text-brand' : 'text-text-primary')}>
-              {option.label}
-            </p>
-            <p className="mt-1 text-xs leading-relaxed text-text-muted">
-              {option.description}
-            </p>
+            {option.label}
           </button>
         );
       })}

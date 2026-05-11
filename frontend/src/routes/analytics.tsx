@@ -104,7 +104,7 @@ function AnalyticsPage() {
   if (noData && !statsLoading && !l1) {
     return (
       <div>
-        <PageHeader title="Analytics" description="Insights and trends from your job search" />
+        <PageHeader title="Analytics" />
         <EmptyState icon={BarChart3} title="No analytics data" description="Run a search to start seeing insights about your job market." />
       </div>
     );

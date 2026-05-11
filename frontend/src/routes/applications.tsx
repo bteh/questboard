@@ -4,7 +4,7 @@ import { Route as rootRoute } from './__root';
 import {
   LayoutGrid, List, Search, X, SlidersHorizontal, Inbox, SearchX,
   ArrowUpDown, ChevronLeft, ChevronRight, Rocket, LinkIcon, Loader2, Trash2,
-  Sparkles, Filter,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,6 +24,7 @@ import { STATUS_OPTIONS, STATUS_LABELS, COMPANY_TYPES, SORT_OPTIONS } from '@/ut
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import type { ApplicationFilters } from '@/types/application';
+import { cn } from '@/lib/utils';
 
 export const Route = createRoute({
   getParentRoute: () => rootRoute,
@@ -199,79 +200,45 @@ function ApplicationsPage() {
               effectiveRunId ? (isExplicitRunScope ? 'No jobs found in this search' : 'No jobs found in your latest search') : 'No jobs tracked yet'
             )}
           </p>
-          {effectiveRunId && (
-            <div className="mt-1 flex items-center gap-3">
+        </div>
+        <div className="flex items-center gap-1 rounded-lg border border-border-default bg-bg-card p-0.5">
+          {(['latest', 'all'] as const).map((value) => {
+            const active = value === 'latest' ? !!effectiveRunId && !isExplicitRunScope : scope === 'all';
+            const onClick = () =>
+              navigate({
+                to: '/applications',
+                search: value === 'all'
+                  ? { scope: 'all', run: undefined }
+                  : { run: undefined, scope: undefined },
+              });
+            return (
               <button
+                key={value}
                 type="button"
-                className="text-xs text-brand hover:text-brand-dark font-medium cursor-pointer"
-                onClick={() => navigate({ to: '/applications', search: { scope: 'all', run: undefined } })}
+                onClick={onClick}
+                className={cn(
+                  'px-2.5 py-1 text-xs font-medium rounded-md transition-colors',
+                  active ? 'bg-brand-light/60 text-brand' : 'text-text-tertiary hover:text-text-secondary',
+                )}
               >
-                Show all jobs
+                {value === 'latest' ? 'Latest search' : 'All tracked'}
               </button>
-              {scope === 'all' && latestCompletedRun && (
-                <button
-                  type="button"
-                  className="text-xs text-text-muted hover:text-text-secondary font-medium cursor-pointer"
-                  onClick={() => navigate({ to: '/applications', search: { run: undefined, scope: undefined } })}
-                >
-                  Back to latest search
-                </button>
-              )}
-            </div>
-          )}
-          {!effectiveRunId && scope === 'all' && latestCompletedRun && (
-            <button
-              type="button"
-              className="mt-1 text-xs text-brand hover:text-brand-dark font-medium cursor-pointer"
-              onClick={() => navigate({ to: '/applications', search: { run: undefined, scope: undefined } })}
-            >
-              Back to latest search
-            </button>
-          )}
+            );
+          })}
         </div>
       </div>
 
-      {/* Strong-matches-only banner — the philosophy: apply to fewer, better jobs. */}
-      {isStrongMatchesOnly ? (
-        <div className="mt-4 flex flex-col gap-3 rounded-xl border border-brand/20 bg-brand-light/30 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-brand/10">
-              <Sparkles className="h-4 w-4 text-brand" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-text-primary">Showing your strongest matches</p>
-              <p className="mt-0.5 text-[11px] leading-relaxed text-text-tertiary">
-                Launchboard is designed to help you apply to fewer, better jobs — not more jobs.
-                Every application a human reads costs someone's attention.
-              </p>
-            </div>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={showAllTrackedJobs}
-            className="shrink-0"
-          >
-            Show all tracked jobs
-          </Button>
-        </div>
-      ) : (
-        <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-border-default bg-bg-subtle/50 px-4 py-2.5">
-          <div className="flex items-center gap-2 text-xs text-text-muted">
-            <Filter className="h-3.5 w-3.5" />
-            Showing every tracked job — including ones Launchboard didn't rate as a strong match.
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={focusOnStrongMatches}
-            className="shrink-0 text-brand hover:text-brand-hover"
-          >
-            <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-            Focus on strong matches
-          </Button>
-        </div>
-      )}
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={isStrongMatchesOnly ? showAllTrackedJobs : focusOnStrongMatches}
+          className="text-xs text-text-secondary hover:text-text-primary"
+        >
+          <Sparkles className={cn('mr-1.5 h-3.5 w-3.5', isStrongMatchesOnly && 'text-brand')} />
+          {isStrongMatchesOnly ? 'Showing strong matches only' : 'Focus on strong matches'}
+        </Button>
+      </div>
 
       {/* Toolbar: Search + Filters toggle + View toggle */}
       <div className="flex items-center gap-3 mt-4 mb-3">

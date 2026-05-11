@@ -389,7 +389,7 @@ function SettingsPage() {
 
   return (
     <div>
-      <PageHeader title="Settings" description="Configure what you're looking for and how Launchboard finds it" />
+      <PageHeader title="Settings" />
 
       {/* Real top-level tabs — only the active tab's cards render below.
           The user only sees one focused page at a time instead of one
@@ -490,9 +490,7 @@ function SettingsPage() {
               <TagListInput
                 value={prefsForm.roles}
                 onChange={(roles) => setPrefsForm((prev) => ({ ...prev, roles }))}
-                placeholder="e.g. Your target role — press Enter to add"
-                helperText="Type a role and press Enter. Separate multiple with commas."
-                emptyText="No target roles added yet."
+                placeholder="e.g. Senior Engineer — press Enter to add"
               />
             </div>
 
@@ -501,20 +499,20 @@ function SettingsPage() {
               <TagListInput
                 value={prefsForm.keywords}
                 onChange={(keywords) => setPrefsForm((prev) => ({ ...prev, keywords }))}
-                placeholder="e.g. A key skill — press Enter to add"
-                helperText="Skills or specialties to match against job descriptions."
-                emptyText="No keywords added yet."
+                placeholder="e.g. Kubernetes — press Enter to add"
               />
             </div>
 
             <div className="space-y-1.5">
-              <Label>Target companies</Label>
+              <Label
+                title="Searches these companies' ATS career pages (Greenhouse, Lever, Ashby, Workday) directly."
+              >
+                Target companies
+              </Label>
               <TagListInput
                 value={prefsForm.companies}
                 onChange={(companies) => setPrefsForm((prev) => ({ ...prev, companies }))}
                 placeholder="e.g. Stripe — press Enter to add"
-                helperText="Launchboard scrapes these companies' career pages directly (Greenhouse, Lever, Ashby, Workday) — catching jobs that may not appear on Indeed or LinkedIn yet."
-                emptyText="No target companies added yet."
               />
             </div>
           </CardContent>
@@ -786,10 +784,11 @@ function SettingsPage() {
                 <Sparkles className="h-4 w-4" />
                 AI for ranking and drafting
               </CardTitle>
-              <p className="text-sm text-text-tertiary">
-                Launchboard uses AI to score jobs against your resume and generate tailored drafts.
-                {!llm?.available && ' Your ChatGPT/Claude subscription works in their apps only — get a free key below.'}
-              </p>
+              {!llm?.available && (
+                <p className="text-sm text-text-tertiary">
+                  ChatGPT/Claude subscriptions don't work here — get a free key below.
+                </p>
+              )}
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -1001,15 +1000,6 @@ function SettingsPage() {
               </div>
             ) : (
               <>
-                {!llm?.configured && (
-                  <div className="rounded-xl border border-brand/20 bg-brand-light/20 p-4">
-                    <p className="text-sm font-medium text-text-primary">Start searching now, then connect AI for the full experience.</p>
-                    <p className="mt-1 text-xs text-text-muted">
-                      Without AI, Launchboard can still search and apply your filters. With AI, it can understand your resume, rank by fit, and draft application materials.
-                    </p>
-                  </div>
-                )}
-
                 {/* ── Connected status ────────────────────────────── */}
                 {llm?.available && (
                   <div className="rounded-xl border border-success/20 bg-success/5 p-4">
@@ -1934,27 +1924,8 @@ function SettingsPage() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-text-tertiary">
-              Launchboard will automatically apply to your top-scored jobs through Greenhouse and Lever career pages.
-              You'll review matches first, then approve applications in bulk.
+              Bulk-approve applications to top-scored Greenhouse and Lever jobs after a manual review step.
             </p>
-            <div className="mt-4 rounded-xl border border-border-default bg-bg-subtle/40 p-4 space-y-3">
-              <div className="flex items-center gap-3 text-sm text-text-secondary">
-                <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
-                AI scores and ranks jobs against your resume
-              </div>
-              <div className="flex items-center gap-3 text-sm text-text-secondary">
-                <CheckCircle2 className="h-4 w-4 text-success shrink-0" />
-                Generates tailored cover letters per company
-              </div>
-              <div className="flex items-center gap-3 text-sm text-text-muted">
-                <div className="h-4 w-4 shrink-0 rounded-full border-2 border-border-default" />
-                One-click apply to Greenhouse & Lever jobs
-              </div>
-              <div className="flex items-center gap-3 text-sm text-text-muted">
-                <div className="h-4 w-4 shrink-0 rounded-full border-2 border-border-default" />
-                LinkedIn Easy Apply integration
-              </div>
-            </div>
           </CardContent>
         </Card>
         )}
