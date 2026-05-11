@@ -6,6 +6,7 @@ import json
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.models.database import get_db
@@ -311,18 +312,23 @@ def delete_application(
     return {"deleted": True}
 
 
+class CheckUrlsRequest(BaseModel):
+    ids: list[int] | None = None
+    limit: int = Field(default=100, ge=1, le=500)
+
+
 @router.post("/check-urls")
 def check_urls(
-    ids: list[int] | None = None,
-    limit: int = Query(100, ge=1, le=500),
+    payload: CheckUrlsRequest | None = None,
     workspace = Depends(get_active_workspace_context_csrf),
     db: Session = Depends(get_db),
 ):
     """Check if job posting URLs are still live. Updates url_status in DB."""
+    body = payload or CheckUrlsRequest()
     return application_service.check_urls(
         db,
-        ids=ids,
-        limit=limit,
+        ids=body.ids,
+        limit=body.limit,
         workspace_id=workspace.workspace.id if workspace else None,
     )
 
