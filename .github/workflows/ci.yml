@@ -83,8 +83,7 @@ jobs:
     name: Desktop Smoke
     # Release-grade integration test — slow, brittle for per-PR feedback.
     # Only runs post-merge to main + workflow_dispatch. Re-enable on
-    # pull_request once the .venv/Make dependency in the workflow is
-    # fixed and the test stabilizes.
+    # pull_request once the test stabilizes.
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -101,9 +100,10 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Install Python dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -e .
-          pip install -e ./backend
+          python -m venv .venv
+          ./.venv/bin/python -m pip install --upgrade pip
+          ./.venv/bin/pip install -e .
+          ./.venv/bin/pip install -e ./backend
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
@@ -135,9 +135,10 @@ jobs:
           components: rustfmt
       - name: Install Python dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -e .
-          pip install -e ./backend
+          python -m venv .venv
+          ./.venv/bin/python -m pip install --upgrade pip
+          ./.venv/bin/pip install -e .
+          ./.venv/bin/pip install -e ./backend
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
@@ -172,9 +173,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Install Python dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -e .
-          pip install -e ./backend
+          python -m venv .venv
+          ./.venv/bin/python -m pip install --upgrade pip
+          ./.venv/bin/pip install -e .
+          ./.venv/bin/pip install -e ./backend
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm ci
