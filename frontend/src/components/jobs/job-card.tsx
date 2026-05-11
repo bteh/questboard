@@ -47,6 +47,52 @@ function scoreBgClass(value: number | null): string {
   return 'bg-red-500';
 }
 
+/**
+ * Compact dimension breakdown — one mini bar per scoring dimension.
+ * Bar height encodes the dimension's score (0-100); color encodes the band.
+ * Surfaces *why* a job got its overall score without expanding the card.
+ */
+function DimensionSparkline({ app }: { app: ApplicationResponse }) {
+  const entries = SCORE_DIMENSIONS.map(({ key, label }) => ({
+    key,
+    label,
+    value: (app as unknown as Record<string, unknown>)[key] as number | null,
+  }));
+  const scored = entries.filter((e) => e.value != null);
+  if (scored.length === 0) return null;
+
+  const top = [...scored].sort((a, b) => (b.value as number) - (a.value as number)).slice(0, 2);
+
+  return (
+    <div className="mt-2.5 flex items-center gap-2.5">
+      <div className="flex items-end gap-[3px]" aria-label="Score dimensions">
+        {entries.map(({ key, label, value }) => {
+          const pct = value != null ? Math.max(6, Math.min(100, value)) : 0;
+          const color = scoreBgClass(value);
+          return (
+            <div
+              key={key}
+              className="flex h-4 w-[5px] items-end overflow-hidden rounded-[2px] bg-bg-muted"
+              title={value != null ? `${label} · ${Math.round(value)}` : `${label} · not scored`}
+            >
+              <div
+                className={cn('w-full rounded-[2px] transition-[height] duration-300', color)}
+                style={{ height: `${pct}%` }}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <span className="text-[11px] leading-none text-text-tertiary truncate">
+        Strongest:{' '}
+        <span className="text-text-secondary">
+          {top.map((t) => t.label).join(' · ')}
+        </span>
+      </span>
+    </div>
+  );
+}
+
 export function JobCard({ app, sourceLabels }: JobCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [applyOpen, setApplyOpen] = useState(false);
@@ -130,6 +176,10 @@ export function JobCard({ app, sourceLabels }: JobCardProps) {
               {truncateDescription(app.description, 220)}
             </p>
           )}
+
+          {/* Dimension breakdown — visible without expanding so the user
+              can see what the overall score is made of at a glance. */}
+          <DimensionSparkline app={app} />
 
           {/* Slim badge row — primary signals only. Company-type and funding
               live in the expanded detail to keep the card scannable. */}
