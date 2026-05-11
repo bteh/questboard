@@ -247,9 +247,21 @@ function attachPageMonitors(page, apiIssues, pageIssues) {
 }
 
 async function prepareFixture(tempRoot) {
-  const resumeSource = path.join(repoRoot, 'knowledge', 'default_resume.pdf');
-  if (!(await fileExists(resumeSource))) {
-    throw new Error(`Resume fixture missing at ${resumeSource}`);
+  // Prefer the committed CI fixture; fall back to a local-dev resume so
+  // contributors with a real default_resume.pdf can still run smoke locally.
+  const candidates = [
+    path.join(repoRoot, 'tests', 'fixtures', 'smoke_resume.pdf'),
+    path.join(repoRoot, 'knowledge', 'default_resume.pdf'),
+  ];
+  let resumeSource;
+  for (const candidate of candidates) {
+    if (await fileExists(candidate)) {
+      resumeSource = candidate;
+      break;
+    }
+  }
+  if (!resumeSource) {
+    throw new Error(`Resume fixture missing. Tried: ${candidates.join(', ')}`);
   }
   const resumeTarget = path.join(tempRoot, uploadedResumeName);
   await fs.copyFile(resumeSource, resumeTarget);
