@@ -91,21 +91,15 @@ def run_scrapers(
 
     _ats_scrapers = {"greenhouse", "lever", "ashby"}
     ats_watchlist = watchlist_by_ats or {}
-    skipped_ats: list[str] = []
-    runnable: list[str] = []
-
-    for name in active:
-        if name in _ats_scrapers and not ats_watchlist.get(name):
-            skipped_ats.append(name)
-            continue
-        runnable.append(name)
+    # ATS scrapers ship with curated seed lists (data/{ats}_seed.txt) that
+    # cover 100+ high-signal companies between them. They used to be skipped
+    # entirely when the user had no watchlist, which made all those seed
+    # companies dead code. Now they always run; the user's watchlist is
+    # additive on top via the watchlist_companies kwarg below.
+    runnable: list[str] = list(active)
 
     if progress:
         progress(f"Searching {len(runnable)} additional sources in parallel...")
-        for name in skipped_ats:
-            meta = _REGISTRY.get(name)
-            display = meta.display_name if meta else name
-            progress(f"  {display}: skipped — no companies configured")
 
     if not runnable:
         return []
