@@ -31,6 +31,8 @@ logger = logging.getLogger(__name__)
 def search_cryptojobslist(
     roles: list[str] | None = None,
     max_results: int = 50,
+    match_mode: str = "all_significant",
+    include_founding: bool = True,
     **kwargs,
 ) -> list[dict]:
     """Fetch crypto/web3 jobs from CryptoJobsList."""
@@ -63,7 +65,7 @@ def _parse_cryptojobs_json(
         if not title:
             continue
 
-        if roles and not _match_roles_crypto(title, roles):
+        if roles and not _match_roles_crypto(title, roles, match_mode=match_mode, include_founding=include_founding):
             continue
 
         sal_min, sal_max = _parse_salary(job.get("salary", ""))
@@ -131,7 +133,7 @@ def _parse_cryptojobs_rss(
 
         company = item.findtext("dc:creator", "", ns) or ""
 
-        if roles and not _match_roles_crypto(title, roles):
+        if roles and not _match_roles_crypto(title, roles, match_mode=match_mode, include_founding=include_founding):
             continue
 
         desc_html = item.findtext("description", "")

@@ -21,6 +21,8 @@ logger = logging.getLogger(__name__)
 def search_arbeitnow(
     roles: list[str] | None = None,
     max_results: int = 50,
+    match_mode: str = "all_significant",
+    include_founding: bool = True,
     **kwargs,
 ) -> list[dict]:
     """Fetch jobs from Arbeitnow's public job board API with pagination."""
@@ -45,7 +47,7 @@ def search_arbeitnow(
 
         for job in jobs:
             title = job.get("title", "")
-            if not _match_roles(title, roles):
+            if not _match_roles(title, roles, match_mode=match_mode, include_founding=include_founding):
                 continue
 
             tags = job.get("tags", []) or []

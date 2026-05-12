@@ -20,6 +20,8 @@ logger = logging.getLogger(__name__)
 def search_himalayas(
     roles: list[str] | None = None,
     max_results: int = 50,
+    match_mode: str = "all_significant",
+    include_founding: bool = True,
     **kwargs,
 ) -> list[dict]:
     """Fetch remote jobs from Himalayas API."""
@@ -43,7 +45,7 @@ def search_himalayas(
 
         for job in jobs:
             title = job.get("title", "")
-            if not _match_roles(title, roles):
+            if not _match_roles(title, roles, match_mode=match_mode, include_founding=include_founding):
                 continue
 
             sal_min = job.get("minSalary")

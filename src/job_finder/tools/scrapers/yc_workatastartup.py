@@ -355,6 +355,8 @@ def search_yc_jobs(
     roles: list[str] | None = None,
     max_results: int = 50,
     fetch_details: bool = True,
+    match_mode: str = "all_significant",
+    include_founding: bool = True,
     **kwargs,
 ) -> list[dict]:
     """Scrape YC Work at a Startup for jobs matching target roles.
@@ -387,7 +389,10 @@ def search_yc_jobs(
 
     # Filter by target roles
     if roles:
-        all_jobs = [j for j in all_jobs if _match_roles(j["title"], roles)]
+        all_jobs = [
+            j for j in all_jobs
+            if _match_roles(j["title"], roles, match_mode=match_mode, include_founding=include_founding)
+        ]
 
     all_jobs = all_jobs[:max_results]
 

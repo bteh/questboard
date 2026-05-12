@@ -22,6 +22,8 @@ def search_remotive(
     roles: list[str] | None = None,
     max_results: int = 50,
     category: str | None = None,
+    match_mode: str = "all_significant",
+    include_founding: bool = True,
     **kwargs,
 ) -> list[dict]:
     """Fetch remote jobs from Remotive's public API."""
@@ -39,7 +41,7 @@ def search_remotive(
     results: list[dict] = []
     for job in data["jobs"]:
         title = job.get("title", "")
-        if not _match_roles(title, roles):
+        if not _match_roles(title, roles, match_mode=match_mode, include_founding=include_founding):
             continue
 
         sal_min, sal_max = _parse_salary(job.get("salary", ""))

@@ -21,7 +21,13 @@ logger = logging.getLogger(__name__)
 _GREENHOUSE_COMPANIES: list[str] = _load_seed_slugs("greenhouse_seed.txt")
 
 
-def _fetch_company_jobs(slug: str, roles: list[str] | None) -> list[dict]:
+def _fetch_company_jobs(
+    slug: str,
+    roles: list[str] | None,
+    *,
+    match_mode: str = "all_significant",
+    include_founding: bool = True,
+) -> list[dict]:
     """Fetch matching jobs for a single Greenhouse company board."""
     data = _get_json(
         f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs?content=true",
@@ -33,7 +39,7 @@ def _fetch_company_jobs(slug: str, roles: list[str] | None) -> list[dict]:
     jobs: list[dict] = []
     for job in data["jobs"]:
         title = job.get("title", "")
-        if not _match_roles(title, roles):
+        if not _match_roles(title, roles, match_mode=match_mode, include_founding=include_founding):
             continue
 
         loc = job.get("location", {})
@@ -72,6 +78,8 @@ def search_greenhouse(
     max_results: int = 50,
     companies: list[str] | None = None,
     watchlist_companies: list[str] | None = None,
+    match_mode: str = "all_significant",
+    include_founding: bool = True,
     **kwargs,
 ) -> list[dict]:
     """Fetch jobs directly from Greenhouse boards API for known companies."""
@@ -88,7 +96,10 @@ def search_greenhouse(
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {
-            pool.submit(_fetch_company_jobs, slug, roles): slug
+            pool.submit(
+                _fetch_company_jobs, slug, roles,
+                match_mode=match_mode, include_founding=include_founding,
+            ): slug
             for slug in company_list
         }
         for future in as_completed(futures):

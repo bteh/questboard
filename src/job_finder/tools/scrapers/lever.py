@@ -21,7 +21,13 @@ logger = logging.getLogger(__name__)
 _LEVER_COMPANIES: list[str] = _load_seed_slugs("lever_seed.txt")
 
 
-def _fetch_company_postings(slug: str, roles: list[str] | None) -> list[dict]:
+def _fetch_company_postings(
+    slug: str,
+    roles: list[str] | None,
+    *,
+    match_mode: str = "all_significant",
+    include_founding: bool = True,
+) -> list[dict]:
     """Fetch matching postings for a single Lever company."""
     data = _get_json(
         f"https://api.lever.co/v0/postings/{slug}",
@@ -33,7 +39,7 @@ def _fetch_company_postings(slug: str, roles: list[str] | None) -> list[dict]:
     results: list[dict] = []
     for posting in data:
         title = posting.get("text", "")
-        if not _match_roles(title, roles):
+        if not _match_roles(title, roles, match_mode=match_mode, include_founding=include_founding):
             continue
 
         categories = posting.get("categories", {})
@@ -73,6 +79,8 @@ def search_lever(
     max_results: int = 50,
     companies: list[str] | None = None,
     watchlist_companies: list[str] | None = None,
+    match_mode: str = "all_significant",
+    include_founding: bool = True,
     **kwargs,
 ) -> list[dict]:
     """Fetch jobs directly from Lever postings API for known companies."""
@@ -89,7 +97,10 @@ def search_lever(
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {
-            pool.submit(_fetch_company_postings, slug, roles): slug
+            pool.submit(
+                _fetch_company_postings, slug, roles,
+                match_mode=match_mode, include_founding=include_founding,
+            ): slug
             for slug in company_list
         }
         for future in as_completed(futures):

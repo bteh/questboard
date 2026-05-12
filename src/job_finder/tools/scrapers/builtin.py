@@ -96,7 +96,14 @@ def _icon_sibling_text(card, icon_class: str) -> str:
     return ""
 
 
-def _parse_html_jobs(html: str, roles: list[str] | None, max_results: int) -> list[dict]:
+def _parse_html_jobs(
+    html: str,
+    roles: list[str] | None,
+    max_results: int,
+    *,
+    match_mode: str = "all_significant",
+    include_founding: bool = True,
+) -> list[dict]:
     """Parse job cards from BuiltIn search results HTML."""
     soup = BeautifulSoup(html, "html.parser")
     results: list[dict] = []
@@ -123,7 +130,7 @@ def _parse_html_jobs(html: str, roles: list[str] | None, max_results: int) -> li
         if not title:
             continue
 
-        if not _match_roles(title, roles):
+        if not _match_roles(title, roles, match_mode=match_mode, include_founding=include_founding):
             continue
 
         # URL
@@ -235,6 +242,8 @@ def search_builtin(
     max_results: int = 50,
     locations: list[str] | None = None,
     max_days_old: int = 14,
+    match_mode: str = "all_significant",
+    include_founding: bool = True,
     **kwargs,
 ) -> list[dict]:
     """Scrape BuiltIn for jobs matching target roles.
@@ -266,7 +275,13 @@ def search_builtin(
             if not html:
                 break  # Blocked or error — stop pagination
 
-            jobs = _parse_html_jobs(html, roles, max_results - len(all_jobs))
+            jobs = _parse_html_jobs(
+                html,
+                roles,
+                max_results - len(all_jobs),
+                match_mode=match_mode,
+                include_founding=include_founding,
+            )
             if not jobs:
                 break  # No more results
 
