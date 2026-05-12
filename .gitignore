@@ -7,6 +7,8 @@ venv/
 
 # Runtime caches (auto-created)
 src/job_finder/tools/scrapers/data/cache/
+src/job_finder/data/cache/
+data/cache/ai_scores/
 
 # Python
 __pycache__/

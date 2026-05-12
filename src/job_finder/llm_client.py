@@ -503,6 +503,172 @@ class LLMClient:
         logger.error("Failed to parse LLM JSON response: %s…", _strip_markdown_fences(raw)[:200])
         return None
 
+    # -- Anthropic native path (prompt caching) ---------------------------
+    #
+    # The OpenAI-compatible path goes through cliproxyapi which translates
+    # `messages.create` → /chat/completions. That layer doesn't forward
+    # Anthropic's `cache_control` markers, so we bypass it for the AI
+    # scoring hot loop by calling the Anthropic SDK directly. The same
+    # base_url + api_key works because cliproxyapi exposes /v1/messages
+    # alongside the OpenAI-compatible endpoint.
+    #
+    # Direct Anthropic API (api.anthropic.com) is also supported.
+
+    _ANTHROPIC_PROVIDER_HINTS = ("anthropic", "claude")
+
+    def _is_anthropic_provider(self) -> bool:
+        """True when the active provider is Anthropic-backed.
+
+        Used to decide whether to take the cache_control-enabled native
+        SDK path for AI scoring.
+        """
+        provider = (self.provider or "").lower()
+        if any(h in provider for h in self._ANTHROPIC_PROVIDER_HINTS):
+            return True
+        base = (self.base_url or "").lower()
+        if "anthropic" in base:
+            return True
+        # cliproxyapi local proxies map 1:1 to Claude subscription.
+        # 8317 = launchboard's primary proxy; 3456/3457 = legacy ports.
+        if any(p in base for p in ("localhost:8317", "127.0.0.1:8317", "localhost:3456", "127.0.0.1:3456")):
+            return True
+        # Model name hint (catches custom base_urls pointed at Claude).
+        model = (self.model or "").lower()
+        return "claude" in model
+
+    def chat_json_anthropic_cached(
+        self,
+        system_prompt: str,
+        user_message: str,
+        *,
+        cache_prefix_in_user: str | None = None,
+        temperature: float = 0.3,
+        max_tokens: int = 4096,
+        model: str | None = None,
+    ) -> dict | None:
+        """JSON-returning chat call that uses Anthropic prompt caching.
+
+        Marks both the system prompt and (optionally) a prefix of the user
+        message — typically the resume — as cacheable. After the first call
+        in a 5-minute window, subsequent calls hit the warm cache and skip
+        re-processing the prefix entirely, dramatically reducing TTFT and
+        cutting input-token cost to ~10%.
+
+        Falls back to :meth:`chat_json` (OpenAI-compatible path) when:
+          - the ``anthropic`` SDK isn't importable
+          - the SDK call raises (network, auth, etc.)
+
+        Returns ``None`` on any failure — same contract as ``chat_json``.
+
+        Parameters
+        ----------
+        cache_prefix_in_user : str or None
+            When provided, this exact string is split out of ``user_message``
+            and sent as a separate, cache-controlled content block so the
+            combined ``[system + cache_prefix_in_user]`` prefix has enough
+            tokens to satisfy the model's cache minimum (1,024 for
+            Sonnet 4.5, 2,048+ for newer models).
+        """
+        if not self.is_configured:
+            return None
+
+        try:
+            from anthropic import Anthropic
+        except ImportError:
+            logger.debug("anthropic SDK not installed — falling back to chat_json")
+            return self.chat_json(system_prompt, user_message,
+                                  temperature=temperature, max_tokens=max_tokens, model=model)
+
+        # Anthropic's /v1/messages endpoint is at the same base_url as the
+        # OpenAI-compatible endpoint for both cliproxyapi and api.anthropic.com.
+        # The SDK appends the path itself.
+        try:
+            client = Anthropic(
+                api_key=self.api_key or "not-needed",
+                base_url=self.base_url or None,
+                timeout=180.0,
+            )
+        except Exception as exc:
+            logger.debug("Anthropic client init failed: %s — falling back", exc)
+            return self.chat_json(system_prompt, user_message,
+                                  temperature=temperature, max_tokens=max_tokens, model=model)
+
+        # Build user-message content blocks. If a cache_prefix_in_user is
+        # supplied and we can find it as a prefix of user_message, split
+        # it into its own cache-controlled block. Otherwise send the whole
+        # user_message as a single uncached block.
+        user_blocks: list[dict] = []
+        rest = user_message
+        if cache_prefix_in_user:
+            # Find the prefix in the user message — JD_SCORER_USER_TEMPLATE
+            # wraps the resume so the literal cache_prefix_in_user won't
+            # appear verbatim. Use a heuristic: cache everything up to and
+            # including the last </resume> tag if present, else just send
+            # uncached. This keeps cache_control aligned with a stable
+            # token boundary.
+            idx = rest.find("</resume>")
+            if idx >= 0:
+                prefix = rest[: idx + len("</resume>")]
+                rest = rest[idx + len("</resume>") :]
+                user_blocks.append({
+                    "type": "text",
+                    "text": prefix,
+                    "cache_control": {"type": "ephemeral"},
+                })
+        user_blocks.append({"type": "text", "text": rest})
+
+        try:
+            response = client.messages.create(
+                model=model or self.model,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                system=[
+                    {
+                        "type": "text",
+                        "text": system_prompt,
+                        "cache_control": {"type": "ephemeral"},
+                    }
+                ],
+                messages=[{"role": "user", "content": user_blocks}],
+            )
+        except Exception as exc:
+            logger.debug("Anthropic messages.create failed: %s — falling back", exc)
+            return self.chat_json(system_prompt, user_message,
+                                  temperature=temperature, max_tokens=max_tokens, model=model)
+
+        # Log cache stats so we can verify caching is actually firing.
+        usage = getattr(response, "usage", None)
+        if usage is not None:
+            cache_read = getattr(usage, "cache_read_input_tokens", 0) or 0
+            cache_create = getattr(usage, "cache_creation_input_tokens", 0) or 0
+            if cache_read or cache_create:
+                logger.debug(
+                    "Anthropic cache: read=%d, created=%d, input=%d",
+                    cache_read, cache_create,
+                    getattr(usage, "input_tokens", 0) or 0,
+                )
+
+        # Concatenate text blocks. Anthropic returns a list of content blocks;
+        # JSON responses are typically a single text block.
+        try:
+            parts: list[str] = []
+            for block in response.content or []:
+                text = getattr(block, "text", None)
+                if text:
+                    parts.append(text)
+            raw = "".join(parts)
+        except Exception as exc:
+            logger.debug("Anthropic response parse failed: %s", exc)
+            return None
+
+        if not raw:
+            return None
+        parsed = _parse_loose_json(raw)
+        if parsed is not None:
+            return parsed
+        logger.error("Failed to parse Anthropic JSON response: %s…", _strip_markdown_fences(raw)[:200])
+        return None
+
     def get_provider_info(self) -> dict[str, str]:
         """Return human-readable config for the Settings UI."""
         preset = PRESETS.get(self.provider, {})

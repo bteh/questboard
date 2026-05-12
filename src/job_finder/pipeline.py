@@ -53,6 +53,9 @@ from job_finder.scoring.dimensions import (
     resolve_current_level,
 )  # re-export for tests/consumers
 from job_finder.scoring.helpers import annualize_amount
+from job_finder.scoring.score_cache import cache_key as ai_score_cache_key
+from job_finder.scoring.score_cache import load_cached as load_cached_ai_score
+from job_finder.scoring.score_cache import save_cached as save_cached_ai_score
 from job_finder.tools.job_search_tool import search_jobs
 from job_finder.tools.resume_parser_tool import find_resume, parse_resume
 
@@ -1581,9 +1584,21 @@ class JobFinderPipeline:
     # -- Stage 3: Scoring --------------------------------------------------
 
     def score_job_with_ai(self, job: dict, resume_text: str) -> dict | None:
-        """Score a single job using the LLM. Returns None if unavailable."""
+        """Score a single job using the LLM. Returns None if unavailable.
+
+        Hits the per-job disk cache first (provider-agnostic). On miss,
+        routes to the Anthropic native SDK path with prompt caching when
+        available, else the OpenAI-compatible path.
+        """
         if not self.llm or not self.llm.is_configured:
             return None
+
+        workspace_id = (self.config.get("workspace") or {}).get("workspace_id")
+        scoring_cfg = self.config.get("scoring") or {}
+        key = ai_score_cache_key(workspace_id, resume_text, job, scoring_cfg)
+        cached = load_cached_ai_score(key)
+        if cached:
+            return cached
 
         user_msg = JD_SCORER_USER_TEMPLATE.format(
             resume_text=_wrap_untrusted("resume", resume_text),
@@ -1593,7 +1608,17 @@ class JobFinderPipeline:
             job_description=_wrap_untrusted("job_description", job.get("description", "")),
         )
         scorer_prompt = build_scorer_prompt(self.config)
-        return self.llm.chat_json(scorer_prompt, user_msg)
+
+        if self.llm._is_anthropic_provider():
+            result = self.llm.chat_json_anthropic_cached(
+                scorer_prompt, user_msg, cache_prefix_in_user=resume_text,
+            )
+        else:
+            result = self.llm.chat_json(scorer_prompt, user_msg)
+
+        if isinstance(result, dict) and result:
+            save_cached_ai_score(key, result)
+        return result
 
     def score_jobs(
         self,
@@ -1742,7 +1767,13 @@ class JobFinderPipeline:
         done = 0
         work_type_corrections = 0
         failed = 0
-        with ThreadPoolExecutor(max_workers=8) as pool:
+        # max_workers configurable via search_settings.ai_scoring_workers.
+        # 16 is safely below provider rate limits while ~2× the prior 8.
+        ai_workers = int(
+            (self.config.get("search_settings") or {}).get("ai_scoring_workers", 16) or 16
+        )
+        ai_workers = max(1, min(ai_workers, 32))
+        with ThreadPoolExecutor(max_workers=ai_workers) as pool:
             futures = {pool.submit(_score_one, j): j for j in jobs}
             for future in as_completed(futures):
                 try:
