@@ -3,7 +3,7 @@ import {
   normalizePlaceList,
   type WorkplacePreference,
 } from '@/lib/profile-preferences';
-import type { SearchDefaults, SearchRequest, SearchRunSnapshot } from '@/types/search';
+import type { MatchStrictness, SearchDefaults, SearchRequest, SearchRunSnapshot } from '@/types/search';
 import type { PlaceSelection, WorkspacePreferences } from '@/types/workspace';
 
 export interface SearchFormSeed {
@@ -14,6 +14,7 @@ export interface SearchFormSeed {
   workplacePreference: WorkplacePreference;
   maxDaysOld: number;
   includeLinkedInJobs: boolean;
+  matchStrictness: MatchStrictness;
 }
 
 export interface SearchAreaDefaults {
@@ -21,6 +22,7 @@ export interface SearchAreaDefaults {
   workplacePreference: WorkplacePreference;
   maxDaysOld: number;
   includeLinkedInJobs: boolean;
+  matchStrictness: MatchStrictness;
 }
 
 export interface SearchSnapshotMetadata {
@@ -74,8 +76,9 @@ export function buildSearchFormSeed(searchDefaults: SearchDefaults | null | unde
     ),
     workplacePreference: searchDefaults.workplace_preference
       ?? (searchDefaults.include_remote ? 'remote_friendly' : 'location_only'),
-    maxDaysOld: searchDefaults.max_days_old ?? 14,
+    maxDaysOld: searchDefaults.max_days_old ?? 30,
     includeLinkedInJobs: !!searchDefaults.include_linkedin_jobs,
+    matchStrictness: searchDefaults.match_strictness ?? 'loose',
   };
 }
 
@@ -92,8 +95,9 @@ export function resolveSavedSearchAreaDefaults(
     workplacePreference: searchDefaults?.workplace_preference
       ?? preferences?.workplace_preference
       ?? 'remote_friendly',
-    maxDaysOld: searchDefaults?.max_days_old ?? preferences?.max_days_old ?? 14,
+    maxDaysOld: searchDefaults?.max_days_old ?? preferences?.max_days_old ?? 30,
     includeLinkedInJobs: searchDefaults?.include_linkedin_jobs ?? preferences?.include_linkedin_jobs ?? false,
+    matchStrictness: searchDefaults?.match_strictness ?? preferences?.match_strictness ?? 'loose',
   };
 }
 
@@ -104,6 +108,7 @@ export function hasSearchAreaOverride(
   return current.workplacePreference !== saved.workplacePreference
     || current.maxDaysOld !== saved.maxDaysOld
     || current.includeLinkedInJobs !== saved.includeLinkedInJobs
+    || current.matchStrictness !== saved.matchStrictness
     || !samePlaceSelections(current.preferredPlaces, saved.preferredPlaces);
 }
 
@@ -116,6 +121,7 @@ export function buildSearchRequestFromForm({
   workplacePreference,
   maxDaysOld,
   includeLinkedInJobs,
+  matchStrictness,
   useAi,
   profile,
   mode,
@@ -128,6 +134,7 @@ export function buildSearchRequestFromForm({
   workplacePreference: WorkplacePreference;
   maxDaysOld: number;
   includeLinkedInJobs: boolean;
+  matchStrictness: MatchStrictness;
   useAi: boolean;
   profile: string;
   mode: SearchRequest['mode'];
@@ -142,6 +149,7 @@ export function buildSearchRequestFromForm({
     workplace_preference: workplacePreference,
     max_days_old: maxDaysOld,
     include_linkedin_jobs: includeLinkedInJobs,
+    match_strictness: matchStrictness,
     use_ai: useAi,
     profile,
     mode,
@@ -200,6 +208,7 @@ export function buildSearchRunSnapshot({
   | 'max_days_old'
   | 'include_linkedin_jobs'
   | 'use_ai'
+  | 'match_strictness'
   >;
   profile: string;
   metadata: SearchSnapshotMetadata;
@@ -218,6 +227,7 @@ export function buildSearchRunSnapshot({
     max_days_old: request.max_days_old,
     include_linkedin_jobs: request.include_linkedin_jobs,
     use_ai: request.use_ai,
+    match_strictness: request.match_strictness ?? 'loose',
     current_title: metadata.currentTitle,
     current_level: metadata.currentLevel,
     current_tc: metadata.currentTc,

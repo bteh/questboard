@@ -263,10 +263,10 @@ def _seed_preferences_from_default() -> WorkspacePreferencesSchema:
         ),
         preferred_places=[PlaceSelection.model_validate(place) for place in preferred_places],
         workplace_preference=loc_prefs.get("workplace_preference", "remote_friendly"),
-        max_days_old=int(search.get("max_days_old", 14) or 14),
+        max_days_old=int(search.get("max_days_old", 30) or 30),
         include_linkedin_jobs=_LINKEDIN_JOBSPY_BOARD in job_boards,
         current_title=str(career.get("current_title", "") or ""),
-        current_level=str(career.get("current_level", "mid") or "mid"),
+        current_level=str(career.get("current_level", "") or ""),
         compensation=CompensationPreference(
             currency=str(comp.get("currency", "USD") or "USD"),
             pay_period=str(comp.get("pay_period", "annual") or "annual"),
@@ -301,10 +301,13 @@ def _prefs_to_schema(prefs: WorkspacePreferences | None) -> WorkspacePreferences
         companies=_clean_string_list(companies, 60),
         preferred_places=_deserialize_places(prefs.preferred_places_json),
         workplace_preference=prefs.workplace_preference or "remote_friendly",
-        max_days_old=int(prefs.max_days_old or 14),
+        max_days_old=int(prefs.max_days_old or 30),
         include_linkedin_jobs=bool(getattr(prefs, "include_linkedin_jobs", False)),
         current_title=prefs.current_title or "",
-        current_level=prefs.current_level or "mid",
+        # Empty current_level disables the level filter. Legacy rows that had
+        # a stored value still surface it; new users get "" which is the
+        # widest possible default.
+        current_level=prefs.current_level or "",
         compensation=CompensationPreference(
             currency=prefs.compensation_currency or "USD",
             pay_period=prefs.compensation_period or "annual",
@@ -315,7 +318,19 @@ def _prefs_to_schema(prefs: WorkspacePreferences | None) -> WorkspacePreferences
             include_equity=bool(prefs.include_equity),
         ),
         exclude_staffing_agencies=bool(prefs.exclude_staffing_agencies),
+        match_strictness=_clean_strictness(getattr(prefs, "match_strictness", None)),
     )
+
+
+_VALID_STRICTNESS = {"loose", "balanced", "strict"}
+
+
+def _clean_strictness(value: str | None) -> str:
+    """Normalize stored strictness; fall back to 'loose' for empty/legacy rows."""
+    if not value:
+        return "loose"
+    candidate = str(value).strip().lower()
+    return candidate if candidate in _VALID_STRICTNESS else "loose"
 
 
 def _resume_to_schema(resume: WorkspaceResume | None) -> WorkspaceResumeStatus:
@@ -648,7 +663,9 @@ def save_workspace_preferences(
     record.max_days_old = preferences.max_days_old
     record.include_linkedin_jobs = bool(preferences.include_linkedin_jobs)
     record.current_title = preferences.current_title.strip()
-    record.current_level = preferences.current_level.strip() or "mid"
+    # Empty string is now a valid value — it disables the level filter and
+    # is the new default for users who haven't set a current level.
+    record.current_level = preferences.current_level.strip()
     record.current_comp = preferences.compensation.current_comp
     record.compensation_currency = preferences.compensation.currency.upper() or "USD"
     record.compensation_period = preferences.compensation.pay_period
@@ -658,6 +675,7 @@ def save_workspace_preferences(
     record.include_equity = bool(preferences.compensation.include_equity)
     record.exclude_staffing_agencies = bool(preferences.exclude_staffing_agencies)
     record.include_remote = preferences.workplace_preference != "location_only"
+    record.match_strictness = _clean_strictness(preferences.match_strictness)
     db.commit()
     return _prefs_to_schema(record)
 
@@ -1269,6 +1287,7 @@ def build_search_snapshot(preferences: WorkspacePreferencesSchema) -> SearchSnap
         current_level=preferences.current_level,
         compensation=preferences.compensation,
         exclude_staffing_agencies=preferences.exclude_staffing_agencies,
+        match_strictness=preferences.match_strictness,
     )
 
 
@@ -1670,6 +1689,9 @@ def build_pipeline_config_override(preferences: WorkspacePreferencesSchema, work
         "search_settings": {
             "max_days_old": preferences.max_days_old,
             "exclude_staffing_agencies": preferences.exclude_staffing_agencies,
+        },
+        "filters": {
+            "strictness": preferences.match_strictness,
         },
         "workspace": {
             "workspace_id": workspace_id,

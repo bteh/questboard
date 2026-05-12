@@ -168,15 +168,22 @@ class LevelFilterTest(unittest.TestCase):
     """Explicit current_level should affect pre-scoring job filtering."""
 
     def test_current_level_filters_even_without_current_title(self) -> None:
+        from job_finder.pipeline import _resolve_filter_settings
+
         jobs = [
             {"title": "Associate Product Manager", "company": "A", "url": "http://a"},
             {"title": "Senior Product Manager", "company": "B", "url": "http://b"},
             {"title": "Staff Product Manager", "company": "C", "url": "http://c"},
         ]
 
+        # Pin to balanced strictness — the new "loose" default has a wider
+        # tolerance (2.5) that intentionally keeps Associate-level jobs for a
+        # senior user. This test asserts the historical narrowing behavior
+        # remains correct when the user has explicitly opted into it.
         filtered = _filter_jobs_by_level(
             jobs,
             {"current_level": "senior"},
+            filters=_resolve_filter_settings({"filters": {"strictness": "balanced"}}),
         )
 
         titles = {job["title"] for job in filtered}

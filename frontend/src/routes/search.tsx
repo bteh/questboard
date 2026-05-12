@@ -23,7 +23,7 @@ import { useWorkspace } from '@/contexts/workspace-context';
 import { useProfile } from '@/contexts/profile-context';
 import { useSearchContext } from '@/contexts/search-context';
 import { cn } from '@/lib/utils';
-import type { FunnelSummary as FunnelSummaryData, SearchRequest, SearchRunSnapshot } from '@/types/search';
+import type { FunnelSummary as FunnelSummaryData, MatchStrictness, SearchRequest, SearchRunSnapshot } from '@/types/search';
 import { getRunFunnel } from '@/api/search';
 import { FunnelSummary } from '@/components/jobs/funnel-summary';
 import type { PlaceSelection } from '@/types/workspace';
@@ -73,6 +73,51 @@ function compactList(values: string[], limit = 8): { visible: string[]; hidden: 
     visible: values.slice(0, limit),
     hidden: Math.max(values.length - limit, 0),
   };
+}
+
+const STRICTNESS_OPTIONS: { value: MatchStrictness; label: string; hint: string }[] = [
+  { value: 'loose', label: 'Loose', hint: 'Wider net — more results, looser matches' },
+  { value: 'balanced', label: 'Balanced', hint: 'Default behavior — matches most users' },
+  { value: 'strict', label: 'Strict', hint: 'Tight matches only — fewer, more relevant results' },
+];
+
+function MatchStrictnessControl({
+  value,
+  onChange,
+}: {
+  value: MatchStrictness;
+  onChange: (value: MatchStrictness) => void;
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Match strictness"
+      className="grid grid-cols-3 gap-1 rounded-lg border border-border-default bg-bg-card p-1"
+    >
+      {STRICTNESS_OPTIONS.map((opt) => {
+        const selected = opt.value === value;
+        return (
+          <button
+            key={opt.value}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            title={opt.hint}
+            onClick={() => onChange(opt.value)}
+            className={cn(
+              'rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+              selected
+                ? 'bg-brand-light/60 text-brand'
+                : 'text-text-tertiary hover:text-text-secondary',
+            )}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 function SnapshotField({
@@ -191,9 +236,10 @@ function SearchPage() {
   const [roles, setRoles] = useState('');
   const [keywords, setKeywords] = useState('');
   const [locations, setLocations] = useState<PlaceSelection[]>([]);
-  const [maxDays, setMaxDays] = useState(14);
+  const [maxDays, setMaxDays] = useState(30);
   const [includeLinkedInJobs, setIncludeLinkedInJobs] = useState(false);
   const [workplacePreference, setWorkplacePreference] = useState<WorkplacePreference>('remote_friendly');
+  const [matchStrictness, setMatchStrictness] = useState<MatchStrictness>('loose');
   const [selectedMode, setSelectedMode] = useState<SearchRequest['mode']>(mode);
   const [showFilters, setShowFilters] = useState(false);
   const [suggestedCompanies, setSuggestedCompanies] = useState<string[]>([]);
@@ -222,6 +268,7 @@ function SearchPage() {
       setWorkplacePreference(formSeed.workplacePreference);
       setMaxDays(formSeed.maxDaysOld);
       setIncludeLinkedInJobs(formSeed.includeLinkedInJobs);
+      setMatchStrictness(formSeed.matchStrictness);
       /* eslint-enable react-hooks/set-state-in-effect */
     }
   }, [formSeed]);
@@ -304,8 +351,9 @@ function SearchPage() {
         : usesRemoteFallback
           ? searchAreaSummary.shortLabel
           : null,
-    maxDays !== 14 ? `${maxDays} day window` : null,
+    maxDays !== 30 ? `${maxDays} day window` : null,
     includeLinkedInJobs ? 'LinkedIn enabled' : null,
+    matchStrictness !== 'loose' ? `${matchStrictness} matching` : null,
     suggestedCompanies.length > 0 ? `${suggestedCompanies.length} target companies` : null,
   ].filter(Boolean);
   const searchAreaOverridesSavedDefaults = hasSearchAreaOverride(
@@ -314,6 +362,7 @@ function SearchPage() {
       workplacePreference,
       maxDaysOld: maxDays,
       includeLinkedInJobs,
+      matchStrictness,
     },
     savedSearchAreaDefaults,
   );
@@ -323,6 +372,7 @@ function SearchPage() {
     setWorkplacePreference(savedSearchAreaDefaults.workplacePreference);
     setMaxDays(savedSearchAreaDefaults.maxDaysOld);
     setIncludeLinkedInJobs(savedSearchAreaDefaults.includeLinkedInJobs);
+    setMatchStrictness(savedSearchAreaDefaults.matchStrictness);
     toast.success('Search reset to your saved defaults');
   };
 
@@ -338,6 +388,7 @@ function SearchPage() {
         workplace_preference: workplacePreference,
         max_days_old: maxDays,
         include_linkedin_jobs: includeLinkedInJobs,
+        match_strictness: matchStrictness,
       },
       {
         onSuccess: () => toast.success('Saved this search area as your default'),
@@ -357,6 +408,7 @@ function SearchPage() {
       workplacePreference: effectiveWorkplacePreference,
       maxDaysOld: maxDays,
       includeLinkedInJobs,
+      matchStrictness,
       useAi: aiEnabledForRun,
       profile,
       mode: selectedMode,
@@ -793,9 +845,14 @@ function SearchPage() {
                         </div>
 
                         <div className="space-y-4">
+                          <div className="space-y-1.5">
+                            <Label className="text-sm font-medium">Match strictness</Label>
+                            <MatchStrictnessControl value={matchStrictness} onChange={setMatchStrictness} />
+                          </div>
+
                           <div className="space-y-2">
                             <Label className="text-sm font-medium">Posted within: <span className="text-brand tabular-nums">{maxDays} days</span></Label>
-                            <Slider value={[maxDays]} onValueChange={(v) => setMaxDays(Array.isArray(v) ? v[0] : v)} min={1} max={30} step={1} />
+                            <Slider value={[maxDays]} onValueChange={(v) => setMaxDays(Array.isArray(v) ? v[0] : v)} min={1} max={60} step={1} />
                           </div>
 
                         </div>
@@ -1195,6 +1252,11 @@ function SearchPage() {
                   <SnapshotField label="Current title" value={snapshot.current_title || 'Not set'} />
                   <SnapshotField label="Current level" value={snapshot.current_level ? titleCase(snapshot.current_level) : 'Not set'} />
                   <SnapshotField label="Workplace" value={getWorkplacePreferenceLabel(snapshot.workplace_preference)} />
+                  <SnapshotField
+                    label="Match strictness"
+                    value={titleCase(snapshot.match_strictness ?? 'loose')}
+                    hint="Loose pulls a wider net; Strict only surfaces tight matches"
+                  />
                   <SnapshotField label="Currency" value={`${snapshot.compensation_currency} · ${snapshot.compensation_period}`} />
                   <SnapshotField label="Current TC" value={formatCurrency(snapshot.current_tc, snapshot.compensation_currency)} />
                   <SnapshotField label="Target TC" value={formatCurrency(snapshot.target_total_comp, snapshot.compensation_currency)} />

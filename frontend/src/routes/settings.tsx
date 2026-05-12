@@ -605,8 +605,46 @@ function SettingsPage() {
                   <SelectItem value="7">7 days</SelectItem>
                   <SelectItem value="14">14 days</SelectItem>
                   <SelectItem value="30">30 days</SelectItem>
+                  <SelectItem value="60">60 days</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Match strictness</Label>
+              <div
+                role="radiogroup"
+                aria-label="Match strictness"
+                className="inline-grid grid-cols-3 gap-1 rounded-lg border border-border-default bg-bg-card p-1"
+              >
+                {(['loose', 'balanced', 'strict'] as const).map((value) => {
+                  const selected = prefsForm.match_strictness === value;
+                  const hint = value === 'loose'
+                    ? 'Wider net — more results, looser matches'
+                    : value === 'balanced'
+                      ? 'Default behavior — matches most users'
+                      : 'Tight matches only — fewer, more relevant results';
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      title={hint}
+                      onClick={() => setPrefsForm((prev) => ({ ...prev, match_strictness: value }))}
+                      className={cn(
+                        'rounded-md px-3 py-1.5 text-xs font-medium capitalize transition-colors',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+                        selected
+                          ? 'bg-brand-light/60 text-brand'
+                          : 'text-text-tertiary hover:text-text-secondary',
+                      )}
+                    >
+                      {value}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* ── Advanced (collapsed by default) ──────────────── */}

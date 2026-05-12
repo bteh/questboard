@@ -93,31 +93,50 @@ scoring:
     maybe: 40           # Score >= this = "MAYBE", below = "SKIP"
 
 # --- CAREER BASELINE ---
-# Your current position — used for career progression scoring
+# Your current position — used for career progression scoring. Leave
+# current_level empty to skip the level filter entirely (the widest net).
 career_baseline:
   current_title: ""                    # e.g., "Marketing Manager", "Senior Nurse", "Sales Director"
-  current_level: "mid"                 # intern, junior, associate, mid, senior, staff, principal, manager, director, vp
-  current_tc: 80000                    # Current total compensation
-  min_acceptable_tc: 70000
+  current_level: ""                    # intern, junior, associate, mid, senior, staff, principal, manager, director, vp — or "" to disable level filtering
+  current_tc: 0                        # Current total compensation (0 = unset)
+  # min_acceptable_tc: 70000           # Optional hard floor for total comp — uncomment to enable salary filter
 
 # --- COMPENSATION ---
 compensation:
   currency: "USD"
   pay_period: "annual"
-  min_base: 60000
-  target_total_comp: 100000
+  # min_base: 60000                    # Optional base-salary floor — uncomment to enable salary filter
+  target_total_comp: 0                 # Target comp used for scoring (0 = unset)
   include_equity: false                # Set true if targeting tech/startup roles with equity
 
 # --- SEARCH SETTINGS ---
 search_settings:
-  results_per_board: 25               # Results per job board per query
-  max_days_old: 14                    # Only show listings from the last N days
+  results_per_board: 75               # Results per JobSpy board per query (75 × 3 boards = 225 raw)
+  results_per_additional_source: 150  # Per-plugin cap for additional scrapers (Remotive, HN, etc.)
+  max_days_old: 30                    # Only show listings from the last N days
   exclude_staffing_agencies: true
   country: "USA"
   max_parallel_searches: 6            # Concurrent search threads (6 × 5 boards = 30 requests)
-  max_unique_jobs: 300                # Stop searching after finding this many unique jobs
+  max_unique_jobs: 600                # Stop searching after finding this many unique jobs
   max_search_tasks: 20                # Hard cap on total JobSpy queries (term × location combos)
   ai_score_top_n: 60                  # Keyword-score all jobs, then AI-score only the top N for speed
+
+# --- FILTER STRICTNESS ---
+# Controls how aggressively the post-search filters narrow your results.
+# Preset shorthand — pick one; explicit keys below (commented) override.
+#
+# | preset    | salary_flex | level_tol (senior/junior) | role_match_mode  | founding bypass |
+# |-----------|-------------|---------------------------|-------------------|-----------------|
+# | loose     | 0.70        | 2.5 / 3.0                 | any_word          | on              |
+# | balanced  | 0.85        | 1.5 / 2.0                 | all_significant   | on              |
+# | strict    | 1.00        | 1.0 / 1.0                 | exact             | off             |
+filters:
+  strictness: "loose"
+  # salary_flex: 0.70                  # Accept jobs paying down to this fraction of your salary floor
+  # level_tolerance_senior: 2.5        # For senior+ users — accept jobs N levels below
+  # level_tolerance_junior: 3.0        # For junior/mid users — accept jobs N levels above
+  # include_founding_titles: true      # "Founding Engineer", "MTS" etc. always pass when true
+  # role_match_mode: "any_word"        # exact | all_significant | any_word
 
 # --- JOB BOARDS ---
 job_boards:
