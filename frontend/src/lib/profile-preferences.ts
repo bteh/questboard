@@ -415,20 +415,22 @@ export function buildDefaultWorkspacePreferences(): WorkspacePreferences {
     companies: [],
     preferred_places: [],
     workplace_preference: 'remote_friendly',
-    max_days_old: 14,
+    max_days_old: 30,
     include_linkedin_jobs: false,
     current_title: '',
-    current_level: 'mid',
+    // Empty disables the level filter. Wider net for new users.
+    current_level: '',
     compensation: {
       currency: 'USD',
       pay_period: 'annual',
-      current_comp: 100000,
-      min_base: 80000,
-      target_total_comp: 150000,
+      current_comp: null,
+      min_base: null,
+      target_total_comp: null,
       min_acceptable_tc: null,
       include_equity: true,
     },
     exclude_staffing_agencies: true,
+    match_strictness: 'loose',
   };
 }
 
