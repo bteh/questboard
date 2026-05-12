@@ -21,6 +21,8 @@ logger = logging.getLogger(__name__)
 def search_themuse(
     roles: list[str] | None = None,
     max_results: int = 50,
+    match_mode: str = "all_significant",
+    include_founding: bool = True,
     **kwargs,
 ) -> list[dict]:
     """Fetch jobs from The Muse's public API with pagination."""
@@ -47,7 +49,7 @@ def search_themuse(
 
         for job in jobs:
             title = job.get("name", "")
-            if not _match_roles(title, roles):
+            if not _match_roles(title, roles, match_mode=match_mode, include_founding=include_founding):
                 continue
 
             # Extract company name from nested object

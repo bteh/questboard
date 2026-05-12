@@ -1167,6 +1167,13 @@ class JobFinderPipeline:
         # concurrently in their own thread.
         extra_jobs_result: list[dict] = []
 
+        # Resolve filter strictness once and pass it into scrapers so their
+        # per-job _match_roles calls use the same mode/founding-bypass as
+        # the pipeline-level filter. Otherwise scrapers silently default to
+        # "all_significant" and reject legitimate matches the user's loose
+        # preset would otherwise pass.
+        scraper_filter_settings = _resolve_filter_settings(self.config)
+
         def _run_additional_scrapers() -> None:
             nonlocal extra_jobs_result
             try:
@@ -1179,6 +1186,7 @@ class JobFinderPipeline:
                     locations=locations,
                     max_days_old=max_days_old,
                     watchlist_by_ats=watchlist_by_ats,
+                    filters=scraper_filter_settings,
                 )
             except Exception as e:
                 logger.warning("Additional scrapers failed (non-fatal): %s", e)

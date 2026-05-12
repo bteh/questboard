@@ -22,6 +22,8 @@ logger = logging.getLogger(__name__)
 def search_hn_hiring(
     roles: list[str] | None = None,
     max_results: int = 50,
+    match_mode: str = "all_significant",
+    include_founding: bool = True,
     **kwargs,
 ) -> list[dict]:
     """Fetch jobs from the latest HN 'Who is hiring?' thread."""
@@ -110,7 +112,7 @@ def search_hn_hiring(
             if not title:
                 title = pipe_parts[1] if len(pipe_parts) > 1 else company
 
-            if not _match_roles(title, roles):
+            if not _match_roles(title, roles, match_mode=match_mode, include_founding=include_founding):
                 continue
 
             url_match = re.search(r'https?://[^\s<"]+', text)

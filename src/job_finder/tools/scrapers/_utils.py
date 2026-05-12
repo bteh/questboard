@@ -232,9 +232,15 @@ def _match_roles_crypto(
     roles: list[str] | None,
     *,
     include_founding: bool = True,
+    match_mode: str = "all_significant",
 ) -> bool:
     """Extended role matching that includes crypto/web3/blockchain terms."""
-    if _match_roles(title, roles, include_founding=include_founding):
+    if _match_roles(
+        title,
+        roles,
+        include_founding=include_founding,
+        match_mode=match_mode,
+    ):
         return True
     title_lower = title.lower()
     crypto_terms = [

@@ -34,6 +34,8 @@ def search_weworkremotely(
     roles: list[str] | None = None,
     max_results: int = 50,
     categories: list[str] | None = None,
+    match_mode: str = "all_significant",
+    include_founding: bool = True,
     **kwargs,
 ) -> list[dict]:
     """Fetch remote jobs from We Work Remotely RSS feeds."""
@@ -81,7 +83,7 @@ def search_weworkremotely(
                 region = loc_match.group(1)
                 title = title[: loc_match.start()].strip()
 
-            if not _match_roles(title, roles):
+            if not _match_roles(title, roles, match_mode=match_mode, include_founding=include_founding):
                 continue
 
             desc_html = item.findtext("description", "")

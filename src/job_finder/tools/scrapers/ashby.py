@@ -21,7 +21,13 @@ logger = logging.getLogger(__name__)
 _ASHBY_COMPANIES: list[str] = _load_seed_slugs("ashby_seed.txt")
 
 
-def _fetch_company_jobs(slug: str, roles: list[str] | None) -> list[dict]:
+def _fetch_company_jobs(
+    slug: str,
+    roles: list[str] | None,
+    *,
+    match_mode: str = "all_significant",
+    include_founding: bool = True,
+) -> list[dict]:
     """Fetch matching jobs for a single Ashby company board."""
     data = _get_json(
         f"https://api.ashbyhq.com/posting-api/job-board/{slug}?includeCompensation=true",
@@ -33,7 +39,7 @@ def _fetch_company_jobs(slug: str, roles: list[str] | None) -> list[dict]:
     jobs: list[dict] = []
     for job in data["jobs"]:
         title = job.get("title", "")
-        if not _match_roles(title, roles):
+        if not _match_roles(title, roles, match_mode=match_mode, include_founding=include_founding):
             continue
 
         location = job.get("location", "")
@@ -82,6 +88,8 @@ def search_ashby(
     max_results: int = 50,
     companies: list[str] | None = None,
     watchlist_companies: list[str] | None = None,
+    match_mode: str = "all_significant",
+    include_founding: bool = True,
     **kwargs,
 ) -> list[dict]:
     """Fetch jobs directly from Ashby job board API for specified companies."""
@@ -98,7 +106,10 @@ def search_ashby(
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {
-            pool.submit(_fetch_company_jobs, slug, roles): slug
+            pool.submit(
+                _fetch_company_jobs, slug, roles,
+                match_mode=match_mode, include_founding=include_founding,
+            ): slug
             for slug in company_list
         }
         for future in as_completed(futures):

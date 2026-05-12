@@ -67,6 +67,7 @@ def run_scrapers(
     locations: list[str] | None = None,
     max_days_old: int = 14,
     watchlist_by_ats: dict[str, list[str]] | None = None,
+    filters: dict[str, Any] | None = None,
 ) -> list[dict]:
     """Run selected scrapers **in parallel** and merge results.
 
@@ -141,13 +142,25 @@ def run_scrapers(
     if not runnable:
         return []
 
+    # Extract role-match strictness from the resolved filter dict so every
+    # scraper applies the same `_match_roles` semantics as the pipeline-level
+    # role filter. Without this, individual scrapers fall back to the strict
+    # default ("all_significant") and silently drop legitimate matches like
+    # "Research Engineer" for the role "ai engineer" — which was the largest
+    # single throughput drain inside the ATS scrapers.
+    _filters = filters or {}
+    role_match_kwargs: dict[str, Any] = {
+        "match_mode": _filters.get("role_match_mode", "all_significant"),
+        "include_founding": _filters.get("include_founding_titles", True),
+    }
+
     def _run_one(name: str) -> tuple[str, list[dict]]:
         meta = _REGISTRY.get(name)
         if not meta or not meta.search_fn:
             logger.warning("Unknown or metadata-only source: %s", name)
             return name, []
         try:
-            kwargs: dict[str, Any] = {}
+            kwargs: dict[str, Any] = dict(role_match_kwargs)
             if name in _ats_scrapers:
                 extra = ats_watchlist.get(name, [])
                 if extra:
