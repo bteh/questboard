@@ -53,11 +53,25 @@ def _get_json(
     params: dict | None = None,
     *,
     quiet_statuses: set[int] | None = None,
+    timeout: int | float | None = None,
 ) -> dict | list | None:
-    """GET a JSON endpoint with error handling."""
+    """GET a JSON endpoint with error handling.
+
+    ``timeout`` overrides the module-level default (15s). Per-call control
+    matters for ATS scrapers (Ashby/Greenhouse/Lever) which fan out to
+    dozens of company boards in parallel — one slow company at 15s blocks
+    a worker for far too long when most companies respond in <1s. Those
+    callers pass a tighter timeout (e.g. 5s) so the pipeline fails fast
+    on unreachable boards instead of stalling the whole search.
+    """
     quiet_statuses = quiet_statuses or set()
     try:
-        resp = requests.get(url, headers=_HEADERS, params=params, timeout=_TIMEOUT)
+        resp = requests.get(
+            url,
+            headers=_HEADERS,
+            params=params,
+            timeout=timeout if timeout is not None else _TIMEOUT,
+        )
         resp.raise_for_status()
         return resp.json()
     except requests.RequestException as e:
