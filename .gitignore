@@ -5,6 +5,9 @@
 .venv/
 venv/
 
+# Runtime caches (auto-created)
+src/job_finder/tools/scrapers/data/cache/
+
 # Python
 __pycache__/
 *.py[cod]

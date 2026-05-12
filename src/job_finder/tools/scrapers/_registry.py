@@ -90,13 +90,50 @@ def run_scrapers(
         return []
 
     _ats_scrapers = {"greenhouse", "lever", "ashby"}
-    ats_watchlist = watchlist_by_ats or {}
+    # Defensive copy — we may extend this dict with discovered slugs below.
+    ats_watchlist: dict[str, list[str]] = {
+        k: list(v) for k, v in (watchlist_by_ats or {}).items()
+    }
     # ATS scrapers ship with curated seed lists (data/{ats}_seed.txt) that
     # cover 100+ high-signal companies between them. They used to be skipped
     # entirely when the user had no watchlist, which made all those seed
     # companies dead code. Now they always run; the user's watchlist is
     # additive on top via the watchlist_companies kwarg below.
     runnable: list[str] = list(active)
+
+    # Dynamic ATS slug discovery — expand each ATS scraper's watchlist with
+    # company slugs harvested from DuckDuckGo for the user's target roles.
+    # Cache-first (7-day TTL) so this only hits the network occasionally.
+    # Failures are swallowed — ATS scrapers still run on their seed lists.
+    if roles:
+        try:
+            from job_finder.tools.scrapers._ats_discovery import discover_and_cache
+        except ImportError as exc:
+            logger.warning("ATS discovery unavailable: %s", exc)
+            discover_and_cache = None
+        if discover_and_cache is not None:
+            for ats_name in _ats_scrapers:
+                if ats_name not in active:
+                    continue
+                try:
+                    discovered = discover_and_cache(ats_name, list(roles))
+                except Exception as exc:
+                    logger.warning(
+                        "ATS discovery for %s failed (non-fatal): %s", ats_name, exc,
+                    )
+                    discovered = set()
+                if not discovered:
+                    continue
+                existing = set(ats_watchlist.get(ats_name, []))
+                ats_watchlist[ats_name] = sorted(existing | discovered)
+                if progress:
+                    new_count = len(discovered - existing)
+                    meta = _REGISTRY.get(ats_name)
+                    display = meta.display_name if meta else ats_name
+                    progress(
+                        f"  {display}: discovered {new_count} new companies "
+                        f"(watchlist now {len(ats_watchlist[ats_name])})"
+                    )
 
     if progress:
         progress(f"Searching {len(runnable)} additional sources in parallel...")
