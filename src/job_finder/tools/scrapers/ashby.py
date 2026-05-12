@@ -29,9 +29,15 @@ def _fetch_company_jobs(
     include_founding: bool = True,
 ) -> list[dict]:
     """Fetch matching jobs for a single Ashby company board."""
+    # Tight per-board timeout: with 100+ seeded + discovered companies, a
+    # 15s default would let a single slow board stall the worker pool for
+    # 15s — multiply by dozens of unreachable boards and the whole search
+    # ends up minutes behind. 5s is plenty for a healthy Ashby endpoint
+    # (typical response is <1s).
     data = _get_json(
         f"https://api.ashbyhq.com/posting-api/job-board/{slug}?includeCompensation=true",
         quiet_statuses={404},
+        timeout=5,
     )
     if not data or "jobs" not in data:
         return []

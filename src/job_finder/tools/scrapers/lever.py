@@ -29,9 +29,11 @@ def _fetch_company_postings(
     include_founding: bool = True,
 ) -> list[dict]:
     """Fetch matching postings for a single Lever company."""
+    # Tight per-board timeout — see ashby.py for rationale.
     data = _get_json(
         f"https://api.lever.co/v0/postings/{slug}",
         quiet_statuses={404},
+        timeout=5,
     )
     if not data or not isinstance(data, list):
         return []

@@ -29,9 +29,12 @@ def _fetch_company_jobs(
     include_founding: bool = True,
 ) -> list[dict]:
     """Fetch matching jobs for a single Greenhouse company board."""
+    # Tight per-board timeout — see ashby.py for rationale. A single slow
+    # board must not block the whole search.
     data = _get_json(
         f"https://boards-api.greenhouse.io/v1/boards/{slug}/jobs?content=true",
         quiet_statuses={404},
+        timeout=5,
     )
     if not data or "jobs" not in data:
         return []
