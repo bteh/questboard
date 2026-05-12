@@ -58,6 +58,12 @@ class ApplicationResponse(ApplicationBase):
     last_checked_at: datetime | None = None
     user_feedback: str = ""
     feedback_notes: str = ""
+    # Tags the run that last surfaced this job (overwritten on each rediscovery).
+    search_run_id: str | None = None
+    # Tags the run that originally found this job (set once, never overwritten).
+    # The UI uses this to mark truly-new jobs in the latest run vs jobs that
+    # earlier runs already surfaced.
+    first_seen_run_id: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
 

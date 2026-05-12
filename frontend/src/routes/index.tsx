@@ -171,7 +171,12 @@ function DashboardPage() {
           ) : (
             <div className="space-y-4">
               {topJobs.map((app) => (
-                <JobCard key={app.id} app={app} sourceLabels={sourceLabels} />
+                <JobCard
+                  key={app.id}
+                  app={app}
+                  sourceLabels={sourceLabels}
+                  latestRunId={latestRunId ?? null}
+                />
               ))}
             </div>
           )}

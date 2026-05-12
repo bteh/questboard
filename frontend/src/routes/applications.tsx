@@ -32,7 +32,12 @@ export const Route = createRoute({
   component: ApplicationsPage,
   validateSearch: (search: Record<string, unknown>) => ({
     run: (search.run as string) || undefined,
-    scope: search.scope === 'all' ? 'all' : undefined,
+    scope:
+      search.scope === 'all'
+        ? 'all'
+        : search.scope === 'new'
+          ? 'new'
+          : undefined,
   }),
 });
 
@@ -78,8 +83,15 @@ function ApplicationsPage() {
   const sourceLabels = useSourceLabels();
   const { data: runs } = useSearchRuns(10);
   const latestCompletedRun = useMemo(() => pickLatestCompletedRun(runs), [runs]);
-  const effectiveRunId = scope === 'all' ? undefined : (searchRunId ?? latestCompletedRun?.run_id);
+  // Three scopes:
+  //   "new"    — only jobs first surfaced in the latest run (first_seen_run_id filter).
+  //   "all"    — every tracked job, regardless of which run found it.
+  //   default  — jobs the latest run surfaced (search_run_id filter; new + re-discoveries).
+  const effectiveRunId =
+    scope === 'all' ? undefined : (searchRunId ?? latestCompletedRun?.run_id);
+  const firstSeenRunIdFilter = scope === 'new' ? effectiveRunId : undefined;
   const isExplicitRunScope = !!searchRunId;
+  const isNewOnly = scope === 'new' && !!effectiveRunId;
   const urlCheck = useMutation({
     mutationFn: () => checkUrls(undefined, 100),
     onSuccess: (result) => {
@@ -126,7 +138,14 @@ function ApplicationsPage() {
     min_score: searchRunId ? undefined : STRONG_MATCH_THRESHOLD,
   });
 
-  const { data, isLoading } = useApplications({ ...filters, profile, search_run_id: effectiveRunId });
+  const { data, isLoading } = useApplications({
+    ...filters,
+    profile,
+    // When scope=new we filter by first_seen_run_id only — searching by
+    // search_run_id too would be redundant since first_seen implies search.
+    search_run_id: isNewOnly ? undefined : effectiveRunId,
+    first_seen_run_id: firstSeenRunIdFilter,
+  });
 
   const updateFilter = useCallback((key: keyof ApplicationFilters, value: unknown) => {
     setFilters((prev) => ({ ...prev, [key]: value, page: 1 }));
@@ -193,35 +212,61 @@ function ApplicationsPage() {
           <p className="mt-0.5 text-sm text-text-tertiary tabular-nums">
             {total > 0 ? (
               <>
-                {total} {effectiveRunId ? (isExplicitRunScope ? 'jobs from this search' : 'jobs from your latest search') : 'jobs tracked'}
+                {total}{' '}
+                {isNewOnly
+                  ? 'new in your latest search'
+                  : effectiveRunId
+                    ? (isExplicitRunScope ? 'jobs from this search' : 'jobs from your latest search')
+                    : 'jobs tracked'}
                 {hasActiveFilters && <span> · {items.length} matching filters</span>}
               </>
             ) : (
-              effectiveRunId ? (isExplicitRunScope ? 'No jobs found in this search' : 'No jobs found in your latest search') : 'No jobs tracked yet'
+              isNewOnly
+                ? 'No new jobs in your latest search'
+                : effectiveRunId
+                  ? (isExplicitRunScope ? 'No jobs found in this search' : 'No jobs found in your latest search')
+                  : 'No jobs tracked yet'
             )}
           </p>
         </div>
         <div className="flex items-center gap-1 rounded-lg border border-border-default bg-bg-card p-0.5">
-          {(['latest', 'all'] as const).map((value) => {
-            const active = value === 'latest' ? !!effectiveRunId && !isExplicitRunScope : scope === 'all';
+          {(['new', 'latest', 'all'] as const).map((value) => {
+            const active =
+              value === 'new'
+                ? scope === 'new'
+                : value === 'all'
+                  ? scope === 'all'
+                  : !!effectiveRunId && !isExplicitRunScope && scope !== 'new';
             const onClick = () =>
               navigate({
                 to: '/applications',
-                search: value === 'all'
-                  ? { scope: 'all', run: undefined }
-                  : { run: undefined, scope: undefined },
+                search:
+                  value === 'all'
+                    ? { scope: 'all', run: undefined }
+                    : value === 'new'
+                      ? { scope: 'new', run: undefined }
+                      : { run: undefined, scope: undefined },
               });
+            const label =
+              value === 'new' ? 'New' : value === 'latest' ? 'Latest search' : 'All tracked';
+            const hint =
+              value === 'new'
+                ? 'Jobs first surfaced by your latest search'
+                : value === 'latest'
+                  ? 'Every job the latest search returned (new + re-discoveries)'
+                  : 'Every tracked job, regardless of which run found it';
             return (
               <button
                 key={value}
                 type="button"
+                title={hint}
                 onClick={onClick}
                 className={cn(
                   'px-2.5 py-1 text-xs font-medium rounded-md transition-colors',
                   active ? 'bg-brand-light/60 text-brand' : 'text-text-tertiary hover:text-text-secondary',
                 )}
               >
-                {value === 'latest' ? 'Latest search' : 'All tracked'}
+                {label}
               </button>
             );
           })}
@@ -481,7 +526,12 @@ function ApplicationsPage() {
         ) : view === 'cards' ? (
           <div className="space-y-4">
             {items.map((app) => (
-              <JobCard key={app.id} app={app} sourceLabels={sourceLabels} />
+              <JobCard
+                key={app.id}
+                app={app}
+                sourceLabels={sourceLabels}
+                latestRunId={latestCompletedRun?.run_id ?? null}
+              />
             ))}
           </div>
         ) : (
@@ -496,7 +546,11 @@ function ApplicationsPage() {
               if (!selected) return null;
               return (
                 <div className="mt-4">
-                  <JobCard app={selected} sourceLabels={sourceLabels} />
+                  <JobCard
+                    app={selected}
+                    sourceLabels={sourceLabels}
+                    latestRunId={latestCompletedRun?.run_id ?? null}
+                  />
                 </div>
               );
             })()}
