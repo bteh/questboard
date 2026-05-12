@@ -49,7 +49,14 @@ from app.services.workspace_naming import allocate_workspace_slug
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_JOBSPY_BOARDS = ["google", "glassdoor", "zip_recruiter"]
+# JobSpy boards enabled by default for hosted/workspace searches.
+# Glassdoor and ZipRecruiter were dropped from the default set because they
+# fail consistently from a local IP: Glassdoor with "location not parsed"
+# when the request location is Remote, ZipRecruiter with Cloudflare 403 on
+# every request. Each failure retries inside JobSpy, blocking the pipeline
+# for ~60s per query. Users with a working setup (residential proxy, etc.)
+# can re-enable them per-profile via the YAML's `job_boards` key.
+_DEFAULT_JOBSPY_BOARDS = ["google"]
 _LINKEDIN_JOBSPY_BOARD = "linkedin"
 _DESKTOP_SESSION_HEADER = "X-Launchboard-Session"
 
