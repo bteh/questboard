@@ -44,19 +44,31 @@ def search_cryptojobslist(
     )
 
     if data and isinstance(data, dict) and data.get("jobs"):
-        return _parse_cryptojobs_json(data["jobs"], roles, max_results)
+        return _parse_cryptojobs_json(
+            data["jobs"], roles, max_results,
+            match_mode=match_mode, include_founding=include_founding,
+        )
 
     if data and isinstance(data, list):
-        return _parse_cryptojobs_json(data, roles, max_results)
+        return _parse_cryptojobs_json(
+            data, roles, max_results,
+            match_mode=match_mode, include_founding=include_founding,
+        )
 
     logger.info("CryptoJobsList JSON API failed, trying RSS...")
-    return _parse_cryptojobs_rss(roles, max_results)
+    return _parse_cryptojobs_rss(
+        roles, max_results,
+        match_mode=match_mode, include_founding=include_founding,
+    )
 
 
 def _parse_cryptojobs_json(
     jobs: list[dict],
     roles: list[str] | None,
     max_results: int,
+    *,
+    match_mode: str = "all_significant",
+    include_founding: bool = True,
 ) -> list[dict]:
     """Parse CryptoJobsList JSON response."""
     results: list[dict] = []
@@ -101,6 +113,9 @@ def _parse_cryptojobs_json(
 def _parse_cryptojobs_rss(
     roles: list[str] | None,
     max_results: int,
+    *,
+    match_mode: str = "all_significant",
+    include_founding: bool = True,
 ) -> list[dict]:
     """Fallback RSS parser for CryptoJobsList."""
     try:
