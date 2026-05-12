@@ -43,12 +43,25 @@ locations:
   - "Los Angeles, CA"
   - "Remote"
 
-# Job boards to scrape via JobSpy
+# Job boards to scrape via JobSpy.
+#
+# Only Google by default. Indeed/Glassdoor/ZipRecruiter were dropped because
+# they fail consistently from a residential IP:
+#   - Glassdoor returns 400 "location not parsed" for remote searches.
+#   - ZipRecruiter returns 403 "forbidden aa" (Cloudflare) on every request.
+#   - Indeed returns sketchy/low-signal listings in our previous testing.
+# Each failure retries inside JobSpy and stalls the pipeline for ~60s per
+# query. Workspace mode also pins this to ["google"] in
+# backend/app/services/workspace_service.py — keep this YAML aligned so the
+# legacy-fallback source-list message ("searching N sources: …") doesn't
+# claim to be querying boards that aren't actually being hit.
+#
+# Re-enable any of the disabled boards manually if you have a workaround.
 job_boards:
-  - "indeed"
-  - "glassdoor"
-  - "zip_recruiter"
   - "google"
+  # - "indeed"
+  # - "glassdoor"
+  # - "zip_recruiter"
 
 # Additional sources (custom scrapers)
 additional_sources:
