@@ -1052,10 +1052,20 @@ class JobFinderPipeline:
         max_unique = max(100, settings.get("max_unique_jobs", 500))
         stop_early = threading.Event()
 
+        # Short-circuit the entire JobSpy phase when no boards are configured.
+        # Otherwise we'd call search_jobs() per role/location combo and the
+        # JobSpy library would silently fall back to its own _DEFAULT_BOARDS
+        # (Indeed/Glassdoor/ZipRecruiter/Google) — re-introducing the slow
+        # CAPTCHA-walled boards we just dropped, and burning minutes on
+        # retries that never succeed.
+        skip_jobspy = isinstance(jobspy_boards, list) and len(jobspy_boards) == 0
+
         def _search_one(task: tuple[str, str]) -> list[dict]:
             nonlocal unique_count
             # Skip if we already have enough unique jobs
             if stop_early.is_set():
+                return []
+            if skip_jobspy:
                 return []
             term, loc = task
             is_remote = True if loc.lower() == "remote" else None

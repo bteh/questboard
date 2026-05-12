@@ -50,13 +50,25 @@ from app.services.workspace_naming import allocate_workspace_slug
 logger = logging.getLogger(__name__)
 
 # JobSpy boards enabled by default for hosted/workspace searches.
-# Glassdoor and ZipRecruiter were dropped from the default set because they
-# fail consistently from a local IP: Glassdoor with "location not parsed"
-# when the request location is Remote, ZipRecruiter with Cloudflare 403 on
-# every request. Each failure retries inside JobSpy, blocking the pipeline
-# for ~60s per query. Users with a working setup (residential proxy, etc.)
-# can re-enable them per-profile via the YAML's `job_boards` key.
-_DEFAULT_JOBSPY_BOARDS = ["google"]
+#
+# Disabled boards (per residential-IP testing on 2026-05):
+#   - Glassdoor   — returns 400 "location not parsed" when location is Remote
+#   - ZipRecruiter — Cloudflare 403 "forbidden aa" on every request
+#   - Indeed      — sketchy/low-signal listings in prior testing
+#   - Google      — heavy 429 / CAPTCHA wall ("/sorry/index"); JobSpy
+#                   retries each query ~30× with backoff, burning minutes
+#                   per role × location combo. Catastrophic for end-to-end
+#                   search latency.
+#
+# All JobSpy boards are off by default. Pipeline short-circuits the whole
+# JobSpy phase when the list is empty (src/job_finder/pipeline.py
+# `skip_jobspy`). Plugin scrapers (Ashby, Greenhouse, Lever, BuiltIn,
+# Hacker News, Himalayas, Remotive, RemoteOK, WeWorkRemotely, YC, etc.)
+# carry the search load — they're API-based and don't hit CAPTCHAs.
+#
+# Re-enable any board manually if you have a workaround (residential
+# proxy, paid API key, etc.).
+_DEFAULT_JOBSPY_BOARDS: list[str] = []
 _LINKEDIN_JOBSPY_BOARD = "linkedin"
 _DESKTOP_SESSION_HEADER = "X-Launchboard-Session"
 
