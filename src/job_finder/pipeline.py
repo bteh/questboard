@@ -1252,9 +1252,16 @@ class JobFinderPipeline:
             and "linkedin.com" in j.get("url", "")
         ]
         if no_desc:
-            # Cap backfill to avoid spending minutes fetching descriptions.
-            # 50 jobs × 8 workers ≈ 7 rounds × ~3s = ~20s.
-            max_backfill = 50
+            # Cap backfill aggressively. Each LinkedIn description fetch
+            # round-trips through their job-detail page; under rate limiting
+            # it lands at ~3-5s per request, not the optimistic ~1s the
+            # original limit assumed. With 16 workers and a cap of 25 we
+            # bound the worst-case at ~10-15s instead of ~100s.
+            # Jobs that get filtered out by the location/role gates below
+            # never needed their description anyway; AI scoring only sees
+            # the top-60 shortlist and can request fuller text on-demand
+            # for those if needed.
+            max_backfill = 25
             if len(no_desc) > max_backfill:
                 logger.info(
                     "Capping LinkedIn backfill from %d to %d jobs",
@@ -1263,7 +1270,7 @@ class JobFinderPipeline:
                 no_desc = no_desc[:max_backfill]
             if progress:
                 progress(f"Fetching descriptions for {len(no_desc)} LinkedIn-only jobs...")
-            _backfill_linkedin_descriptions(no_desc, max_workers=8)
+            _backfill_linkedin_descriptions(no_desc, max_workers=16)
 
         # Classify work type and fix is_remote for every job
         if progress:
