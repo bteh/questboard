@@ -148,5 +148,135 @@ class PipelineServiceTimeTest(unittest.TestCase):
                 )
 
 
+class StartRunIdempotentTest(unittest.TestCase):
+    """A second start_run for a workspace that already has an active run must
+    return the existing run, not raise — so the user's re-click after a page
+    refresh lands on the in-progress search instead of getting a 409 toast.
+    """
+
+    def setUp(self) -> None:
+        backend_path = str(Path(__file__).resolve().parents[1] / "backend")
+        if backend_path not in sys.path:
+            sys.path.insert(0, backend_path)
+        import importlib
+
+        self.pipeline_service = importlib.import_module("app.services.pipeline_service")
+        # Save + restore the module-level _runs dict so we don't leak state.
+        self._original_runs = dict(self.pipeline_service._runs)
+        self.pipeline_service._runs.clear()
+
+    def tearDown(self) -> None:
+        self.pipeline_service._runs.clear()
+        self.pipeline_service._runs.update(self._original_runs)
+
+    def _seed_active_run(self, workspace_id: str, run_id: str = "existing-run"):
+        run = self.pipeline_service.PipelineRun(
+            run_id=run_id,
+            profile="workspace",
+            mode="search_score",
+            workspace_id=workspace_id,
+            status="running",
+            queue=None,
+            loop=None,
+        )
+        self.pipeline_service._runs[run_id] = run
+        return run
+
+    def test_start_run_returns_existing_run_when_workspace_has_active_run(self) -> None:
+        loop = asyncio.new_event_loop()
+        self.addCleanup(loop.close)
+        seeded = self._seed_active_run("ws_dup", "abc123")
+
+        settings = SimpleNamespace(
+            hosted_mode=False,
+            dev_hosted_auth_enabled=False,
+            resolved_app_release="test-release",
+        )
+        with patch("app.services.pipeline_service.get_settings", return_value=settings):
+            result = self.pipeline_service.start_run(
+                roles=["data engineer"],
+                locations=["Remote"],
+                keywords=[],
+                include_remote=True,
+                max_days_old=30,
+                use_ai=False,
+                profile="workspace",
+                mode="search_score",
+                loop=loop,
+                workspace_id="ws_dup",
+            )
+
+        # Must return the SAME run (no error, no new spawn) — that's how the
+        # frontend joins the in-progress search seamlessly.
+        self.assertIs(result, seeded)
+        self.assertEqual(result.run_id, "abc123")
+        # And the in-memory registry must not gain a second entry for this workspace.
+        ws_runs = [r for r in self.pipeline_service._runs.values() if r.workspace_id == "ws_dup"]
+        self.assertEqual(len(ws_runs), 1, "Idempotent start_run must not spawn a duplicate")
+
+    def test_start_run_creates_new_run_when_existing_one_completed(self) -> None:
+        """Completed/failed runs in _runs must not block a new search."""
+        loop = asyncio.new_event_loop()
+        self.addCleanup(loop.close)
+        seeded = self._seed_active_run("ws_done", "old-run")
+        seeded.status = "completed"
+
+        settings = SimpleNamespace(
+            hosted_mode=False,
+            dev_hosted_auth_enabled=False,
+            resolved_app_release="test-release",
+        )
+        # Mock the executor so we don't actually run the pipeline thread —
+        # we only care that start_run created a fresh PipelineRun and didn't
+        # reuse the completed one.
+        with patch("app.services.pipeline_service.get_settings", return_value=settings), \
+             patch.object(self.pipeline_service._executor, "submit"):
+            result = self.pipeline_service.start_run(
+                roles=["data engineer"],
+                locations=["Remote"],
+                keywords=[],
+                include_remote=True,
+                max_days_old=30,
+                use_ai=False,
+                profile="workspace",
+                mode="search_score",
+                loop=loop,
+                workspace_id="ws_done",
+            )
+
+        self.assertIsNot(result, seeded, "Completed run must not be reused")
+        self.assertEqual(result.status, "pending")
+        self.assertNotEqual(result.run_id, "old-run")
+
+    def test_start_run_does_not_collide_across_workspaces(self) -> None:
+        """An active run for workspace A must not block workspace B."""
+        loop = asyncio.new_event_loop()
+        self.addCleanup(loop.close)
+        self._seed_active_run("ws_a", "run-a")
+
+        settings = SimpleNamespace(
+            hosted_mode=False,
+            dev_hosted_auth_enabled=False,
+            resolved_app_release="test-release",
+        )
+        with patch("app.services.pipeline_service.get_settings", return_value=settings), \
+             patch.object(self.pipeline_service._executor, "submit"):
+            result = self.pipeline_service.start_run(
+                roles=["data engineer"],
+                locations=["Remote"],
+                keywords=[],
+                include_remote=True,
+                max_days_old=30,
+                use_ai=False,
+                profile="workspace",
+                mode="search_score",
+                loop=loop,
+                workspace_id="ws_b",
+            )
+        self.assertEqual(result.status, "pending")
+        self.assertEqual(result.workspace_id, "ws_b")
+        self.assertNotEqual(result.run_id, "run-a")
+
+
 if __name__ == "__main__":
     unittest.main()

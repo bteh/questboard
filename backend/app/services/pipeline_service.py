@@ -317,20 +317,29 @@ def start_run(
 ) -> PipelineRun:
     """Launch a pipeline run in a background thread. Returns immediately.
 
-    Raises ValueError if a run is already active for the same workspace
-    to prevent concurrent scraping (rate limits, duplicate results).
+    Idempotent for in-progress runs: if a search is already active for the
+    same workspace, return the existing PipelineRun instead of starting a
+    new one. The frontend's activate() flow picks up its run_id and shows
+    the in-progress search seamlessly — no scary "search already running"
+    toast on a page refresh + re-click.
+
+    Concurrent scrape prevention (rate limits, duplicate results) is
+    preserved: the second caller doesn't actually start a second worker.
     """
-    # Guard against concurrent runs for the same workspace
+    # Guard against concurrent runs for the same workspace — but return
+    # the existing run rather than raising. The user clicking Run a second
+    # time should land them on the in-progress search, not get an error.
     if workspace_id:
         for existing in _runs.values():
             if (
                 existing.workspace_id == workspace_id
                 and existing.status in ("pending", "running")
             ):
-                raise ValueError(
-                    f"A search is already running (run {existing.run_id}). "
-                    "Wait for it to finish before starting a new one."
+                logger.info(
+                    "Search already in progress for workspace %s; returning existing run %s",
+                    workspace_id, existing.run_id,
                 )
+                return existing
 
     run_id = uuid.uuid4().hex[:12]
     queue: asyncio.Queue | None = asyncio.Queue() if not get_settings().hosted_mode else None
