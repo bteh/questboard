@@ -89,6 +89,11 @@ export interface ApplicationResponse extends ApplicationBase {
   last_checked_at: string | null;
   user_feedback: string;
   feedback_notes: string;
+  // Run that last surfaced this job (overwritten on every rediscovery).
+  search_run_id: string | null;
+  // Run that originally found this job — set once, never overwritten. Used
+  // by the UI to mark truly-new jobs in the latest run vs re-discoveries.
+  first_seen_run_id: string | null;
   created_at: string | null;
   updated_at: string | null;
 }
@@ -143,4 +148,5 @@ export interface ApplicationFilters {
   page_size?: number;
   profile?: string;
   search_run_id?: string;
+  first_seen_run_id?: string;
 }

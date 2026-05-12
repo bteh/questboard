@@ -87,7 +87,12 @@ class ApplicationRecord(Base):
     # Application method and profile
     application_method = Column(String(100), default="")  # manual, greenhouse, lever
     profile = Column(String(100), default="default")  # which profile found this job
-    search_run_id = Column(String(12), nullable=True)  # links to the pipeline run that found this job
+    # search_run_id is updated to the most recent run that re-surfaced this job.
+    # first_seen_run_id is set ONCE on initial insert and never overwritten — it
+    # answers "which run originally found this job?" Used by the UI to mark
+    # truly-new jobs in the latest run vs re-discoveries.
+    search_run_id = Column(String(12), nullable=True)
+    first_seen_run_id = Column(String(12), nullable=True, index=True)
     workspace_id = Column(String(64), nullable=True, index=True)
 
     # Status tracking
@@ -202,6 +207,21 @@ def _migrate_db(engine) -> None:
             conn.execute(
                 text("ALTER TABLE applications ADD COLUMN search_run_id VARCHAR(12)")
             )
+        if "first_seen_run_id" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN first_seen_run_id VARCHAR(12)")
+            )
+        # Backfill on every startup — rows that already had a search_run_id keep
+        # it as the original-discovery run. The UPDATE only touches NULL values
+        # so it's idempotent and cheap on subsequent boots. Rows without any
+        # run_id stay null — they pre-date run tracking and can't be
+        # retroactively assigned.
+        conn.execute(
+            text(
+                "UPDATE applications SET first_seen_run_id = search_run_id "
+                "WHERE first_seen_run_id IS NULL AND search_run_id IS NOT NULL"
+            )
+        )
         if "workspace_id" not in existing_cols:
             conn.execute(
                 text("ALTER TABLE applications ADD COLUMN workspace_id VARCHAR(64)")
@@ -492,6 +512,10 @@ def save_application(
             work_type=work_type,
             notes=notes,
             search_run_id=search_run_id,
+            # Stamp the original-discovery run on first insert. Never touched
+            # again — this is the immutable answer to "which run found this
+            # job first?"
+            first_seen_run_id=search_run_id,
             workspace_id=workspace_id,
         )
         session.add(record)

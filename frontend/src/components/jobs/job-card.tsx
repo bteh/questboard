@@ -37,6 +37,9 @@ function getRecencyLabel(dateFound: string | null | undefined): string | null {
 interface JobCardProps {
   app: ApplicationResponse;
   sourceLabels?: Record<string, string>;
+  // Used to badge truly-new jobs in the latest run. When app.first_seen_run_id
+  // matches this, the card shows a "New" chip in the meta row.
+  latestRunId?: string | null;
 }
 
 /** Color classes for inline score breakdown bars. */
@@ -47,8 +50,10 @@ function scoreBgClass(value: number | null): string {
   return 'bg-red-500';
 }
 
-export function JobCard({ app, sourceLabels }: JobCardProps) {
+export function JobCard({ app, sourceLabels, latestRunId }: JobCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const isNewInLatestRun =
+    !!latestRunId && app.first_seen_run_id != null && app.first_seen_run_id === latestRunId;
   const [applyOpen, setApplyOpen] = useState(false);
   const deleteApp = useDeleteApplication();
   const updateFeedback = useUpdateFeedback();
@@ -218,6 +223,14 @@ export function JobCard({ app, sourceLabels }: JobCardProps) {
           {/* Meta footer — date, employees, link out. Source already shown
               in the badge row above to call out where the listing came from. */}
           <div className="mt-2 flex items-center gap-3 text-xs text-text-muted">
+            {isNewInLatestRun && (
+              <span
+                className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300"
+                title="First surfaced by your most recent search"
+              >
+                New
+              </span>
+            )}
             {recency && <span>{recency}</span>}
             {app.date_found && !recency && <span>{formatDate(app.date_found, 'relative')}</span>}
             {app.employee_count && <span>{app.employee_count} employees</span>}

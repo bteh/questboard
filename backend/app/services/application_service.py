@@ -31,6 +31,7 @@ def get_applications(
     profile: str | None = None,
     workspace_id: str | None = None,
     search_run_id: str | None = None,
+    first_seen_run_id: str | None = None,
     sort_by: str = "overall_score",
     sort_dir: str = "desc",
     page: int = 1,
@@ -60,6 +61,8 @@ def get_applications(
         query = query.filter(ApplicationRecord.profile == profile)
     if search_run_id:
         query = query.filter(ApplicationRecord.search_run_id == search_run_id)
+    if first_seen_run_id:
+        query = query.filter(ApplicationRecord.first_seen_run_id == first_seen_run_id)
     if search:
         pattern = f"%{search}%"
         query = query.filter(
