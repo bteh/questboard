@@ -1,14 +1,157 @@
-"""JobSpy-powered job search — plain function, no framework dependency."""
+"""JobSpy-powered job search — plain function, no framework dependency.
+
+This module also implements a per-board **circuit breaker** around JobSpy.
+The library's underlying scrapers (Indeed, Glassdoor, ZipRecruiter, Google,
+LinkedIn) each fail in their own ways — 429 / 403 / Cloudflare CAPTCHA /
+location parse errors. JobSpy doesn't ship a fail-fast mechanism: every
+query that hits a broken board burns ~30 retries with backoff before
+giving up, blocking the entire search for minutes.
+
+The breaker watches the ``JobSpy`` logger family (each scraper logs under
+``JobSpy:<Board>``) and counts ``ERROR``-level messages per board.
+After ``_FAILURE_THRESHOLD`` errors, the board is "circuit-open" for
+``_DISABLE_DURATION_S`` seconds — subsequent ``search_jobs`` calls skip it.
+A board that returns ≥1 result in the response DataFrame resets its
+failure counter (self-healing once the upstream service recovers).
+
+This is the production pattern that lets us re-enable Google as a default
+even though it currently CAPTCHA-walls residential IPs: when CAPTCHA
+clears, the breaker closes and Google comes back automatically. No human
+intervention, no permanent hard-disable.
+"""
 
 from __future__ import annotations
 
 import json
 import logging
+import threading
+import time
 from typing import Any
 
 import pandas as pd
 
 logger = logging.getLogger(__name__)
+
+
+# -- Per-board circuit breaker ---------------------------------------------
+
+_FAILURE_THRESHOLD = 3
+_DISABLE_DURATION_S = 600  # 10 minutes
+
+# Module-level state. Keyed by lowercase board name.
+# Each value: {"failures": int, "disabled_until": float (epoch seconds)}.
+_BOARD_CIRCUIT: dict[str, dict[str, Any]] = {}
+_BOARD_CIRCUIT_LOCK = threading.Lock()
+
+
+def _normalize_board(name: str) -> str:
+    return (name or "").strip().lower()
+
+
+def _is_board_disabled(name: str) -> bool:
+    """True if the board's circuit is currently open."""
+    with _BOARD_CIRCUIT_LOCK:
+        state = _BOARD_CIRCUIT.get(_normalize_board(name))
+        if not state:
+            return False
+        return time.time() < float(state.get("disabled_until", 0.0))
+
+
+def _filter_active_boards(boards: list[str]) -> tuple[list[str], list[str]]:
+    """Split a board list into (still-active, currently-disabled).
+
+    Used so callers can log which boards got skipped this turn.
+    """
+    active, skipped = [], []
+    for b in boards:
+        if _is_board_disabled(b):
+            skipped.append(b)
+        else:
+            active.append(b)
+    return active, skipped
+
+
+def _record_board_failure(board: str) -> None:
+    """Increment failure count for a board; open the circuit at threshold."""
+    key = _normalize_board(board)
+    if not key:
+        return
+    with _BOARD_CIRCUIT_LOCK:
+        state = _BOARD_CIRCUIT.setdefault(key, {"failures": 0, "disabled_until": 0.0})
+        state["failures"] = int(state.get("failures", 0)) + 1
+        if state["failures"] >= _FAILURE_THRESHOLD and time.time() >= state["disabled_until"]:
+            state["disabled_until"] = time.time() + _DISABLE_DURATION_S
+            logger.warning(
+                "JobSpy circuit open for %s after %d errors — disabled for %ds",
+                key, state["failures"], _DISABLE_DURATION_S,
+            )
+
+
+def _record_board_success(boards: list[str], df: pd.DataFrame | None) -> None:
+    """Reset failure counter for any board that returned ≥1 row.
+
+    Self-healing: as soon as a board recovers, the breaker closes.
+    """
+    if df is None or df.empty:
+        return
+    try:
+        sites_with_results = {
+            _normalize_board(s) for s in df["site"].dropna().astype(str).tolist()
+        }
+    except (KeyError, AttributeError):
+        return
+    with _BOARD_CIRCUIT_LOCK:
+        for board in boards:
+            key = _normalize_board(board)
+            if key in sites_with_results:
+                _BOARD_CIRCUIT.pop(key, None)
+
+
+def reset_circuit() -> None:
+    """Test helper — wipe all circuit state."""
+    with _BOARD_CIRCUIT_LOCK:
+        _BOARD_CIRCUIT.clear()
+
+
+class _JobSpyErrorHandler(logging.Handler):
+    """Hooks the ``JobSpy:<Board>`` loggers and feeds the circuit breaker.
+
+    JobSpy logs each scraper under ``JobSpy:Indeed``, ``JobSpy:Glassdoor``,
+    etc. An ERROR-level message from one of those is the cleanest signal
+    we get that a specific board is failing right now (429 / 403 / parse
+    error / timeout).
+    """
+
+    def emit(self, record: logging.LogRecord) -> None:  # pragma: no cover — exercised via tests
+        if record.levelno < logging.ERROR:
+            return
+        name = record.name or ""
+        if not name.startswith("JobSpy:"):
+            return
+        board = name.split(":", 1)[1].strip()
+        if board:
+            _record_board_failure(board)
+
+
+def _install_jobspy_error_handler() -> None:
+    """Attach the handler to the root logger.
+
+    JobSpy uses colon-separated logger names like ``JobSpy:Google``, which
+    are NOT children of ``JobSpy`` in Python's dot-hierarchy — so a handler
+    on ``logging.getLogger("JobSpy")`` would never see them. Attaching to
+    the root logger + filtering by ``record.name`` inside ``_JobSpyErrorHandler``
+    is the only reliable way to intercept these.
+
+    Idempotent across module reloads (uvicorn --reload).
+    """
+    root = logging.getLogger()
+    for h in root.handlers:
+        if isinstance(h, _JobSpyErrorHandler):
+            return
+    root.addHandler(_JobSpyErrorHandler())
+
+
+_install_jobspy_error_handler()
 
 
 # -- Safe type helpers (pandas NaN handling) --------------------------------
@@ -75,7 +218,19 @@ def search_jobs(
         logger.error("python-jobspy not installed. Run: pip install python-jobspy")
         return []
 
-    site_names = boards or _DEFAULT_BOARDS
+    requested_boards = list(boards or _DEFAULT_BOARDS)
+    active_boards, skipped_boards = _filter_active_boards(requested_boards)
+    if skipped_boards:
+        logger.info(
+            "JobSpy circuit-open boards skipped this call: %s",
+            ", ".join(skipped_boards),
+        )
+    if not active_boards:
+        # All requested boards are circuit-open. Returning [] saves the cost
+        # of a doomed scrape_jobs call (which JobSpy would retry ~30× before
+        # giving up).
+        return []
+    site_names = active_boards
 
     # Google Jobs interprets "jobs near <location>" literally. For remote
     # searches or empty/wildcard locations, "near Remote" returns ~nothing.
@@ -106,6 +261,11 @@ def search_jobs(
             scrape_kwargs["distance"] = distance
 
         jobs_df: pd.DataFrame = scrape_jobs(**scrape_kwargs)
+
+        # Self-healing: a board that returned ≥1 row in this call is clearly
+        # working again, so reset its failure counter even if it had been
+        # incrementing previously.
+        _record_board_success(active_boards, jobs_df)
 
         if jobs_df.empty:
             return []
