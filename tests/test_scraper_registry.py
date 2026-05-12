@@ -10,9 +10,14 @@ registry_module = importlib.import_module("job_finder.tools.scrapers._registry")
 
 
 class ScraperRegistryTest(unittest.TestCase):
-    def test_ats_scrapers_without_company_watchlist_are_skipped(self) -> None:
-        greenhouse = Mock(return_value=[{"title": "Should not run"}])
-        lever = Mock(return_value=[{"title": "Should not run"}])
+    def test_ats_scrapers_run_on_seed_list_when_no_user_watchlist(self) -> None:
+        """ATS scrapers (Greenhouse/Lever/Ashby) ship with curated seed lists
+        of 100+ high-signal companies. They were previously skipped entirely
+        when the user had no watchlist, which made all that seed data dead
+        code. Now they always run; the search_fn's own logic falls back to
+        the seed list when watchlist_companies is empty."""
+        greenhouse = Mock(return_value=[{"title": "Seeded greenhouse job"}])
+        lever = Mock(return_value=[{"title": "Seeded lever job"}])
         builtin = Mock(return_value=[{"title": "BuiltIn job"}])
         progress: list[str] = []
 
@@ -54,13 +59,18 @@ class ScraperRegistryTest(unittest.TestCase):
                 watchlist_by_ats={},
             )
 
-        self.assertEqual(jobs, [{"title": "BuiltIn job"}])
-        greenhouse.assert_not_called()
-        lever.assert_not_called()
+        # All three scrapers ran; seed-based jobs are returned.
+        self.assertEqual(len(jobs), 3)
+        greenhouse.assert_called_once()
+        lever.assert_called_once()
         builtin.assert_called_once()
-        self.assertTrue(any("Searching 1 additional sources" in msg for msg in progress))
-        self.assertTrue(any("Greenhouse: skipped" in msg for msg in progress))
-        self.assertTrue(any("Lever: skipped" in msg for msg in progress))
+        # ATS scrapers should NOT be passed watchlist_companies when empty —
+        # they fall back to their built-in seed list.
+        self.assertNotIn("watchlist_companies", greenhouse.call_args.kwargs)
+        self.assertNotIn("watchlist_companies", lever.call_args.kwargs)
+        self.assertTrue(any("Searching 3 additional sources" in msg for msg in progress))
+        # No "skipped" messages now — the previous gating is gone.
+        self.assertFalse(any("skipped — no companies" in msg for msg in progress))
 
     def test_ats_scrapers_run_when_company_watchlist_is_present(self) -> None:
         greenhouse = Mock(return_value=[{"title": "OpenAI job"}])
