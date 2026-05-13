@@ -1474,6 +1474,22 @@ class JobFinderPipeline:
         resolved = filters or _resolve_filter_settings(self.config)
         include_founding = bool(resolved.get("include_founding_titles", True))
         match_mode = str(resolved.get("role_match_mode", "all_significant"))
+        strictness = str(resolved.get("strictness", _DEFAULT_STRICTNESS))
+
+        def _per_job_mode(job: dict) -> str:
+            # Balanced strictness uses all_significant role matching, which
+            # disproportionately rejects place-based jobs: JobSpy's city-bound
+            # queries return smaller pools with more variant titles
+            # (e.g. "ML Platform Engineer") while remote-source firehose
+            # scrapers return huge pools of generic titles. Without the
+            # rescue, users who pick "Remote + Places" see almost nothing
+            # from their preferred cities. Strict and loose presets are
+            # intentional opt-ins — we only rescue 'balanced'.
+            if strictness != "balanced" or match_mode != "all_significant":
+                return match_mode
+            if job.get("is_remote"):
+                return match_mode
+            return "any_word"
 
         pre_count = len(jobs)
         filtered = [
@@ -1482,7 +1498,7 @@ class JobFinderPipeline:
                 j.get("title", ""),
                 target_roles,
                 include_founding=include_founding,
-                match_mode=match_mode,
+                match_mode=_per_job_mode(j),
             )
         ]
         dropped = pre_count - len(filtered)

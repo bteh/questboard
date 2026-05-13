@@ -164,6 +164,106 @@ class RoleFilterTest(unittest.TestCase):
         self.assertTrue(any("2" in msg for msg in progress_msgs))
 
 
+class BalancedStrictnessPlaceRescueTest(unittest.TestCase):
+    """Bug: balanced strictness disproportionately rejects place-based jobs.
+
+    ``match_mode="all_significant"`` (the balanced default) requires every
+    significant role word to appear in the title. Remote-source scrapers
+    return a firehose of generic titles, most of which pass; JobSpy's
+    location-bound queries return smaller pools with more variant titles
+    (e.g. "ML Platform Engineer", "Senior Engineer, Tools") which mostly
+    fail the strict word-set check. Net: users who pick "Remote + Places"
+    + balanced see almost no place-based jobs in results.
+
+    Fix contract: when a job is NOT remote AND match_mode is "all_significant",
+    the filter applies the looser "any_word" rule so place-based jobs reach
+    the LLM scorer. Remote jobs keep the strict rule.
+    """
+
+    def _make_pipeline(
+        self,
+        target_roles: list[str],
+        strictness: str = "balanced",
+    ) -> JobFinderPipeline:
+        pipe = JobFinderPipeline(llm=None, profile=None)
+        pipe.config = {
+            "target_roles": target_roles,
+            "filters": {"strictness": strictness},
+        }
+        return pipe
+
+    def test_balanced_keeps_place_based_partial_title_matches(self) -> None:
+        """Local jobs missing a role word should still pass under balanced."""
+        pipe = self._make_pipeline(["data engineer"])
+        jobs = [
+            # Local jobs — partial title match on "engineer" only.
+            # Under the buggy strict rule these all get dropped.
+            {"title": "ML Platform Engineer", "company": "A", "url": "http://a",
+             "is_remote": False, "location": "San Francisco, CA"},
+            {"title": "Senior Engineer, Tools", "company": "B", "url": "http://b",
+             "is_remote": False, "location": "Seattle, WA"},
+            # Local with full match — must pass under both rules.
+            {"title": "Senior Data Engineer", "company": "C", "url": "http://c",
+             "is_remote": False, "location": "Austin, TX"},
+        ]
+        filtered = pipe.filter_by_role(jobs)
+        titles = {j["title"] for j in filtered}
+        self.assertIn("ML Platform Engineer", titles)
+        self.assertIn("Senior Engineer, Tools", titles)
+        self.assertIn("Senior Data Engineer", titles)
+
+    def test_balanced_still_rejects_remote_partial_title_matches(self) -> None:
+        """Remote jobs missing a role word keep the strict rule (high pool volume)."""
+        pipe = self._make_pipeline(["data engineer"])
+        jobs = [
+            # Remote firehose — partial matches must still be filtered.
+            {"title": "Marketing Engineer", "company": "A", "url": "http://a",
+             "is_remote": True, "location": "Remote"},
+            {"title": "Sales Engineer", "company": "B", "url": "http://b",
+             "is_remote": True, "location": "Remote"},
+            # Remote with full match — passes.
+            {"title": "Senior Data Engineer", "company": "C", "url": "http://c",
+             "is_remote": True, "location": "Remote"},
+        ]
+        filtered = pipe.filter_by_role(jobs)
+        titles = {j["title"] for j in filtered}
+        self.assertNotIn("Marketing Engineer", titles)
+        self.assertNotIn("Sales Engineer", titles)
+        self.assertIn("Senior Data Engineer", titles)
+
+    def test_strict_strictness_unaffected_by_rescue(self) -> None:
+        """Strict mode also uses all_significant — explicit strict opt-in
+        should still apply uniformly even to local jobs. Users who chose
+        strict know what they want."""
+        pipe = self._make_pipeline(["data engineer"], strictness="strict")
+        jobs = [
+            {"title": "ML Platform Engineer", "company": "A", "url": "http://a",
+             "is_remote": False, "location": "San Francisco, CA"},
+            {"title": "Senior Data Engineer", "company": "B", "url": "http://b",
+             "is_remote": False, "location": "Austin, TX"},
+        ]
+        filtered = pipe.filter_by_role(jobs)
+        titles = {j["title"] for j in filtered}
+        # Strict keeps the strict rule even for local jobs.
+        self.assertNotIn("ML Platform Engineer", titles)
+        self.assertIn("Senior Data Engineer", titles)
+
+    def test_loose_strictness_unaffected_by_rescue(self) -> None:
+        """Loose was already any_word everywhere — the rescue is a no-op."""
+        pipe = self._make_pipeline(["data engineer"], strictness="loose")
+        jobs = [
+            {"title": "Marketing Engineer", "company": "A", "url": "http://a",
+             "is_remote": True, "location": "Remote"},
+            {"title": "ML Platform Engineer", "company": "B", "url": "http://b",
+             "is_remote": False, "location": "San Francisco, CA"},
+        ]
+        filtered = pipe.filter_by_role(jobs)
+        titles = {j["title"] for j in filtered}
+        # Loose mode keeps both partial matches.
+        self.assertIn("Marketing Engineer", titles)
+        self.assertIn("ML Platform Engineer", titles)
+
+
 class LevelFilterTest(unittest.TestCase):
     """Explicit current_level should affect pre-scoring job filtering."""
 

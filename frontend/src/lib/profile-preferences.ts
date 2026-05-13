@@ -38,7 +38,7 @@ export const LEVEL_OPTIONS = [
 ] as const;
 
 export const WORKPLACE_OPTIONS = [
-  { value: 'remote_friendly' as const, label: 'Remote + places' },
+  { value: 'remote_friendly' as const, label: 'Remote + Places' },
   { value: 'remote_only' as const, label: 'Remote only' },
   { value: 'location_only' as const, label: 'Places only' },
 ] as const;
