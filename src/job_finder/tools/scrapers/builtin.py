@@ -21,6 +21,39 @@ from job_finder.tools.scrapers._utils import _match_roles, _parse_salary
 logger = logging.getLogger(__name__)
 
 _BASE_URL = "https://builtin.com/jobs"
+
+# BuiltIn's per-city pages live at ``/jobs/<slug>``. Their ``?location=``
+# query param is treated as a soft hint and routinely returns unrelated
+# cities (verified live: ``?location=Los Angeles`` returns mostly Toronto
+# jobs). The path slug is the only filter that actually narrows by city.
+# Cities not in this map fall back to the (best-effort) query param.
+_CITY_SLUGS: dict[str, str] = {
+    "los angeles": "los-angeles",
+    "san francisco": "san-francisco",
+    "san francisco bay area": "san-francisco",
+    "sf": "san-francisco",
+    "bay area": "san-francisco",
+    "new york": "new-york",
+    "new york city": "new-york",
+    "nyc": "new-york",
+    "boston": "boston",
+    "seattle": "seattle",
+    "austin": "austin",
+    "chicago": "chicago",
+    "washington dc": "washington-dc",
+    "washington": "washington-dc",
+    "dc": "washington-dc",
+    "denver": "denver",
+    "atlanta": "atlanta",
+    "miami": "miami",
+    "san diego": "san-diego",
+    "dallas": "dallas",
+    "houston": "houston",
+    "philadelphia": "philadelphia",
+    "portland": "portland",
+    "minneapolis": "minneapolis",
+}
+
 _HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -192,7 +225,12 @@ def _build_search_url(
     page: int = 1,
     max_days_old: int = 14,
 ) -> str:
-    """Build BuiltIn search URL from parameters."""
+    """Build BuiltIn search URL from parameters.
+
+    City filtering uses the path-slug form (``/jobs/los-angeles``) because
+    BuiltIn's ``?location=`` query param is a soft hint that returns
+    unrelated cities. See ``_CITY_SLUGS`` for the covered metros.
+    """
     params: list[str] = []
 
     # Search term: use the first role as the keyword
@@ -200,17 +238,28 @@ def _build_search_url(
         search_term = roles[0]
         params.append(f"search={requests.utils.quote(search_term)}")
 
-    # Location
+    # Resolve location → either a path slug, a remote flag, or a
+    # best-effort query-param fallback for unknown cities.
+    path_slug: str | None = None
     if locations:
+        # Pass 1: prefer a known city slug if any location has one.
         for loc in locations:
-            loc_lower = loc.lower().strip()
-            if loc_lower in ("remote", "anywhere"):
-                params.append("working_option=2")
-            else:
-                # Strip state abbreviation for cleaner search
+            city = loc.split(",")[0].strip().lower()
+            slug = _CITY_SLUGS.get(city)
+            if slug:
+                path_slug = slug
+                break
+        if path_slug is None:
+            # Pass 2: no known city — use remote flag or query fallback.
+            for loc in locations:
+                loc_lower = loc.lower().strip()
+                if loc_lower in ("remote", "anywhere"):
+                    params.append("working_option=2")
+                    break
                 city = loc.split(",")[0].strip()
-                params.append(f"location={requests.utils.quote(city)}")
-                break  # BuiltIn only supports one location param
+                if city:
+                    params.append(f"location={requests.utils.quote(city)}")
+                    break
 
     # Days since posted
     if max_days_old <= 1:
@@ -225,8 +274,9 @@ def _build_search_url(
     if page > 1:
         params.append(f"page={page}")
 
+    base = f"{_BASE_URL}/{path_slug}" if path_slug else _BASE_URL
     query = "&".join(params)
-    return f"{_BASE_URL}?{query}" if query else _BASE_URL
+    return f"{base}?{query}" if query else base
 
 
 @register_scraper(
