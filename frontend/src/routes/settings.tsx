@@ -1856,6 +1856,36 @@ function SettingsPage() {
                               </p>
                             </div>
                           </div>
+                        ) : liveModels && liveModels.length > 0 ? (
+                          // Subscription proxy (claude-proxy, openai-proxy, ...) OR a
+                          // running Ollama: the endpoint exposes /v1/models, so render
+                          // the chip picker directly instead of generic install steps.
+                          <div className="space-y-2">
+                            <Label className="text-sm">Model</Label>
+                            <p className="text-[11px] text-text-muted">
+                              {selectedPreset?.label || 'Your endpoint'} exposes {liveModels.length} models — click to select:
+                            </p>
+                            <div className="flex flex-wrap gap-1">
+                              {liveModels.slice(0, 20).map((model) => (
+                                <button
+                                  key={model.id}
+                                  type="button"
+                                  onClick={() => setLlmForm((prev) => ({ ...prev, model: model.id }))}
+                                  className={cn(
+                                    'rounded-full border px-2 py-0.5 text-[11px] transition-colors',
+                                    llmForm.model === model.id
+                                      ? 'border-brand bg-brand-light/40 text-brand font-medium'
+                                      : 'border-border-default text-text-secondary hover:bg-bg-subtle hover:border-brand/40',
+                                  )}
+                                >
+                                  {model.id}
+                                </button>
+                              ))}
+                            </div>
+                            {isFetchingModels && (
+                              <p className="text-[11px] text-text-muted animate-pulse">Refreshing model list…</p>
+                            )}
+                          </div>
                         ) : (
                           <div className="space-y-3">
                             <div className="flex items-start gap-3">
