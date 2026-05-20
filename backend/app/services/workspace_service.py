@@ -345,11 +345,18 @@ _VALID_STRICTNESS = {"loose", "balanced", "strict"}
 
 
 def _clean_strictness(value: str | None) -> str:
-    """Normalize stored strictness; fall back to 'loose' for empty/legacy rows."""
+    """Normalize stored strictness; fall back to 'balanced' for empty/legacy rows.
+
+    Balanced is the default because it sits between 'loose' (high recall, low
+    precision — surfaces too many off-target roles) and 'strict' (high
+    precision, low recall — easy to miss legit matches with title variation).
+    Empty values from old workspace rows that predate this column also map
+    here so users don't get an unexpectedly wide net.
+    """
     if not value:
-        return "loose"
+        return "balanced"
     candidate = str(value).strip().lower()
-    return candidate if candidate in _VALID_STRICTNESS else "loose"
+    return candidate if candidate in _VALID_STRICTNESS else "balanced"
 
 
 def _resume_to_schema(resume: WorkspaceResume | None) -> WorkspaceResumeStatus:

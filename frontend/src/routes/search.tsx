@@ -239,7 +239,7 @@ function SearchPage() {
   const [maxDays, setMaxDays] = useState(30);
   const [includeLinkedInJobs, setIncludeLinkedInJobs] = useState(false);
   const [workplacePreference, setWorkplacePreference] = useState<WorkplacePreference>('remote_friendly');
-  const [matchStrictness, setMatchStrictness] = useState<MatchStrictness>('loose');
+  const [matchStrictness, setMatchStrictness] = useState<MatchStrictness>('balanced');
   const [selectedMode, setSelectedMode] = useState<SearchRequest['mode']>(mode);
   const [showFilters, setShowFilters] = useState(false);
   const [suggestedCompanies, setSuggestedCompanies] = useState<string[]>([]);
@@ -353,7 +353,7 @@ function SearchPage() {
           : null,
     maxDays !== 30 ? `${maxDays} day window` : null,
     includeLinkedInJobs ? 'LinkedIn enabled' : null,
-    matchStrictness !== 'loose' ? `${matchStrictness} matching` : null,
+    matchStrictness !== 'balanced' ? `${matchStrictness} matching` : null,
     suggestedCompanies.length > 0 ? `${suggestedCompanies.length} target companies` : null,
   ].filter(Boolean);
   const searchAreaOverridesSavedDefaults = hasSearchAreaOverride(
@@ -815,16 +815,22 @@ function SearchPage() {
                     <button
                       type="button"
                       onClick={() => setShowFilters(!filtersExpanded)}
-                      className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
+                      className={cn(
+                        'inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-all cursor-pointer',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2',
+                        filtersExpanded
+                          ? 'border-brand bg-brand-light/40 text-brand hover:bg-brand-light/60'
+                          : 'border-border-default bg-bg-card text-text-primary hover:border-brand/60 hover:bg-bg-subtle',
+                      )}
                     >
-                      <SlidersHorizontal className="h-3.5 w-3.5" />
-                      <span className="font-medium">Filters</span>
+                      <SlidersHorizontal className="h-4 w-4" />
+                      <span>Filters</span>
                       {!filtersExpanded && filterSummary.length > 0 && (
-                        <span className="text-[10px] bg-brand-light text-brand font-medium rounded-full px-1.5 py-0.5">
+                        <span className="ml-1 inline-flex items-center rounded-full bg-brand px-2 py-0.5 text-[11px] font-semibold text-white">
                           {filterSummary.join(', ')}
                         </span>
                       )}
-                      <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', filtersExpanded && 'rotate-180')} />
+                      <ChevronDown className={cn('h-4 w-4 transition-transform', filtersExpanded && 'rotate-180')} />
                     </button>
                     {filtersExpanded && (
                       <div className="grid grid-cols-1 sm:grid-cols-[1.2fr_0.8fr] gap-5 mt-4 pt-4 border-t border-border-default">
@@ -1254,7 +1260,7 @@ function SearchPage() {
                   <SnapshotField label="Workplace" value={getWorkplacePreferenceLabel(snapshot.workplace_preference)} />
                   <SnapshotField
                     label="Match strictness"
-                    value={titleCase(snapshot.match_strictness ?? 'loose')}
+                    value={titleCase(snapshot.match_strictness ?? 'balanced')}
                     hint="Loose pulls a wider net; Strict only surfaces tight matches"
                   />
                   <SnapshotField label="Currency" value={`${snapshot.compensation_currency} · ${snapshot.compensation_period}`} />

@@ -125,8 +125,9 @@ class WorkspacePreferences(Base):
     include_remote = Column(Boolean, default=True)
     # Filter-strictness preset: loose | balanced | strict.
     # See _FILTER_PRESETS in src/job_finder/pipeline.py for the exact thresholds
-    # each preset applies. Default "loose" pulls the widest net for new users.
-    match_strictness = Column(String(16), default="loose")
+    # each preset applies. Default "balanced" gives a sensible recall/precision
+    # mid-point. Existing rows with "loose" keep their explicit choice.
+    match_strictness = Column(String(16), default="balanced")
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 

@@ -669,7 +669,7 @@ _FILTER_PRESETS: dict[str, dict[str, Any]] = {
     },
 }
 
-_DEFAULT_STRICTNESS = "loose"
+_DEFAULT_STRICTNESS = "balanced"
 
 
 def _resolve_filter_settings(config: dict | None) -> dict[str, Any]:
