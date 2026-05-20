@@ -264,6 +264,86 @@ class BalancedStrictnessPlaceRescueTest(unittest.TestCase):
         self.assertIn("ML Platform Engineer", titles)
 
 
+class CryptoSourceRoleRescueTest(unittest.TestCase):
+    """Bug: crypto-source jobs were dropped by filter_by_role despite the scraper
+    passing them via _match_roles_crypto.
+
+    The cryptojobslist scraper applies _match_roles_crypto which lets through
+    any title containing crypto/web3/defi/solidity/zk terms even when the user's
+    target roles don't word-match. But after the scraper returns, the pipeline
+    runs filter_by_role using plain _match_roles which has no crypto-keyword
+    awareness. Under balanced strictness (all_significant) titles like "Defi
+    Associate" or "Web3 BD Manager" fail and every fetched crypto job gets
+    dropped.
+
+    Fix contract: filter_by_role uses the crypto-aware matcher (or a permissive
+    equivalent) for jobs sourced from cryptojobslist so the scraper's signal
+    isn't undone downstream.
+    """
+
+    def _make_pipeline(
+        self,
+        target_roles: list[str],
+        strictness: str = "balanced",
+    ) -> JobFinderPipeline:
+        pipe = JobFinderPipeline(llm=None, profile=None)
+        pipe.config = {
+            "target_roles": target_roles,
+            "filters": {"strictness": strictness},
+        }
+        return pipe
+
+    def test_balanced_keeps_crypto_titles_from_cryptojobslist(self) -> None:
+        """Crypto-flavored titles from CryptoJobsList must survive role filtering."""
+        pipe = self._make_pipeline(["data engineer"])
+        jobs = [
+            # Crypto signal but no "data" + "engineer" word match
+            {"title": "Defi Associate", "company": "Re7 Labs", "url": "http://a",
+             "is_remote": True, "source": "cryptojobslist"},
+            {"title": "Senior Solidity Engineer", "company": "X", "url": "http://b",
+             "is_remote": True, "source": "cryptojobslist"},
+            {"title": "ZK Circuit Researcher", "company": "Y", "url": "http://c",
+             "is_remote": True, "source": "cryptojobslist"},
+            # Direct role match — should pass anywhere
+            {"title": "Senior Data Engineer", "company": "Z", "url": "http://d",
+             "is_remote": True, "source": "cryptojobslist"},
+        ]
+        filtered = pipe.filter_by_role(jobs)
+        titles = {j["title"] for j in filtered}
+        self.assertIn("Defi Associate", titles)
+        self.assertIn("Senior Solidity Engineer", titles)
+        self.assertIn("ZK Circuit Researcher", titles)
+        self.assertIn("Senior Data Engineer", titles)
+
+    def test_non_crypto_remote_jobs_still_filtered_strictly(self) -> None:
+        """The rescue is crypto-source-scoped — generic remote firehose stays strict."""
+        pipe = self._make_pipeline(["data engineer"])
+        jobs = [
+            {"title": "Marketing Engineer", "company": "A", "url": "http://a",
+             "is_remote": True, "source": "remotive"},
+            {"title": "Senior Data Engineer", "company": "B", "url": "http://b",
+             "is_remote": True, "source": "remotive"},
+        ]
+        filtered = pipe.filter_by_role(jobs)
+        titles = {j["title"] for j in filtered}
+        self.assertNotIn("Marketing Engineer", titles)
+        self.assertIn("Senior Data Engineer", titles)
+
+    def test_strict_mode_still_filters_crypto_jobs(self) -> None:
+        """Strict opt-in remains strict for everything — including crypto."""
+        pipe = self._make_pipeline(["data engineer"], strictness="strict")
+        jobs = [
+            {"title": "Defi Associate", "company": "A", "url": "http://a",
+             "is_remote": True, "source": "cryptojobslist"},
+            {"title": "Senior Data Engineer", "company": "B", "url": "http://b",
+             "is_remote": True, "source": "cryptojobslist"},
+        ]
+        filtered = pipe.filter_by_role(jobs)
+        titles = {j["title"] for j in filtered}
+        self.assertNotIn("Defi Associate", titles)
+        self.assertIn("Senior Data Engineer", titles)
+
+
 class LevelFilterTest(unittest.TestCase):
     """Explicit current_level should affect pre-scoring job filtering."""
 
