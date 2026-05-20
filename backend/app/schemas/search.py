@@ -100,7 +100,7 @@ class SearchDefaults(BaseModel):
     compensation_currency: str = "USD"
     compensation_period: Literal["hourly", "monthly", "annual"] = "annual"
     exclude_staffing_agencies: bool = True
-    match_strictness: Literal["loose", "balanced", "strict"] = "loose"
+    match_strictness: Literal["loose", "balanced", "strict"] = "balanced"
 
 
 class SearchSuggestions(BaseModel):

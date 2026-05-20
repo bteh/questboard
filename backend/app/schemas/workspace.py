@@ -88,10 +88,10 @@ class WorkspacePreferences(BaseModel):
     current_level: str = ""
     compensation: CompensationPreference = Field(default_factory=CompensationPreference)
     exclude_staffing_agencies: bool = True
-    # Filter aggressiveness preset. "loose" pulls the widest net (new-user
-    # default); "strict" only surfaces tight matches. See _FILTER_PRESETS in
-    # src/job_finder/pipeline.py for the exact thresholds each preset uses.
-    match_strictness: Literal["loose", "balanced", "strict"] = "loose"
+    # Filter aggressiveness preset. "balanced" is the new-user default;
+    # "loose" widens to maximum recall, "strict" tightens to maximum precision.
+    # See _FILTER_PRESETS in src/job_finder/pipeline.py for the exact thresholds.
+    match_strictness: Literal["loose", "balanced", "strict"] = "balanced"
 
 
 class WorkspaceResumeStatus(BaseModel):
@@ -148,7 +148,7 @@ class SearchSnapshot(BaseModel):
     current_level: str = ""
     compensation: CompensationPreference = Field(default_factory=CompensationPreference)
     exclude_staffing_agencies: bool = True
-    match_strictness: Literal["loose", "balanced", "strict"] = "loose"
+    match_strictness: Literal["loose", "balanced", "strict"] = "balanced"
 
 
 class GeneratedProfileResponse(BaseModel):

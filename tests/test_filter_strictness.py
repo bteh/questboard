@@ -35,17 +35,15 @@ class FilterPresetResolutionTest(unittest.TestCase):
 
         self.resolve = _resolve_filter_settings
 
-    def test_empty_config_defaults_to_loose(self) -> None:
+    def test_empty_config_defaults_to_balanced(self) -> None:
         result = self.resolve({})
-        self.assertEqual(result["strictness"], "loose")
-        self.assertEqual(result["salary_flex"], 0.70)
-        self.assertEqual(result["level_tolerance_senior"], 2.5)
-        self.assertEqual(result["level_tolerance_junior"], 3.0)
+        self.assertEqual(result["strictness"], "balanced")
+        self.assertEqual(result["salary_flex"], 0.85)
+        self.assertEqual(result["role_match_mode"], "all_significant")
         self.assertTrue(result["include_founding_titles"])
-        self.assertEqual(result["role_match_mode"], "any_word")
 
-    def test_none_config_defaults_to_loose(self) -> None:
-        self.assertEqual(self.resolve(None)["strictness"], "loose")
+    def test_none_config_defaults_to_balanced(self) -> None:
+        self.assertEqual(self.resolve(None)["strictness"], "balanced")
 
     def test_strict_preset_applies(self) -> None:
         result = self.resolve({"filters": {"strictness": "strict"}})
@@ -67,11 +65,11 @@ class FilterPresetResolutionTest(unittest.TestCase):
         # Other strict-preset values still apply
         self.assertEqual(result["role_match_mode"], "exact")
 
-    def test_unknown_strictness_falls_back_to_loose(self) -> None:
+    def test_unknown_strictness_falls_back_to_balanced(self) -> None:
         # Typo in YAML must never silently disable filtering
         result = self.resolve({"filters": {"strictness": "lol"}})
-        self.assertEqual(result["strictness"], "loose")
-        self.assertEqual(result["salary_flex"], 0.70)
+        self.assertEqual(result["strictness"], "balanced")
+        self.assertEqual(result["salary_flex"], 0.85)
 
 
 class MatchRolesModeTest(unittest.TestCase):
@@ -154,7 +152,7 @@ class LevelToleranceTest(unittest.TestCase):
         jobs = self._jobs("Junior Engineer")
         career = {"current_title": "Senior Engineer", "current_level": "senior"}
 
-        loose = self.filter(jobs, career, filters=self.resolve({}))
+        loose = self.filter(jobs, career, filters=self.resolve({"filters": {"strictness": "loose"}}))
         strict = self.filter(jobs, career, filters=self.resolve({"filters": {"strictness": "strict"}}))
 
         self.assertEqual(len(loose), 1, "Loose should keep the junior-level job")
@@ -179,7 +177,7 @@ class SalaryFlexTest(unittest.TestCase):
     def test_loose_70pct_floor_passes_a_75pct_job(self) -> None:
         # User floor = 100k. Loose multiplier 0.70 → hard_floor = 70k.
         # Job paying 75k → passes.
-        settings = self.resolve({})
+        settings = self.resolve({"filters": {"strictness": "loose"}})
         hard_floor = 100_000 * settings["salary_flex"]
         self.assertTrue(self.passes({"salary_max": 75_000}, hard_floor))
 

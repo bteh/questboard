@@ -78,7 +78,7 @@ export function buildSearchFormSeed(searchDefaults: SearchDefaults | null | unde
       ?? (searchDefaults.include_remote ? 'remote_friendly' : 'location_only'),
     maxDaysOld: searchDefaults.max_days_old ?? 30,
     includeLinkedInJobs: !!searchDefaults.include_linkedin_jobs,
-    matchStrictness: searchDefaults.match_strictness ?? 'loose',
+    matchStrictness: searchDefaults.match_strictness ?? 'balanced',
   };
 }
 
@@ -97,7 +97,7 @@ export function resolveSavedSearchAreaDefaults(
       ?? 'remote_friendly',
     maxDaysOld: searchDefaults?.max_days_old ?? preferences?.max_days_old ?? 30,
     includeLinkedInJobs: searchDefaults?.include_linkedin_jobs ?? preferences?.include_linkedin_jobs ?? false,
-    matchStrictness: searchDefaults?.match_strictness ?? preferences?.match_strictness ?? 'loose',
+    matchStrictness: searchDefaults?.match_strictness ?? preferences?.match_strictness ?? 'balanced',
   };
 }
 
