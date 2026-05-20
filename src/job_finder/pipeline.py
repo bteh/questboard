@@ -1469,7 +1469,7 @@ class JobFinderPipeline:
         if not target_roles:
             return jobs  # no roles configured → pass everything
 
-        from job_finder.tools.scrapers._utils import _match_roles
+        from job_finder.tools.scrapers._utils import _match_roles, _match_roles_crypto
 
         resolved = filters or _resolve_filter_settings(self.config)
         include_founding = bool(resolved.get("include_founding_titles", True))
@@ -1491,16 +1491,30 @@ class JobFinderPipeline:
                 return match_mode
             return "any_word"
 
-        pre_count = len(jobs)
-        filtered = [
-            j for j in jobs
-            if _match_roles(
-                j.get("title", ""),
-                target_roles,
-                include_founding=include_founding,
-                match_mode=_per_job_mode(j),
+        def _passes_role_filter(job: dict) -> bool:
+            # Crypto-source jobs go through _match_roles_crypto (the same
+            # matcher the scraper uses) so titles containing web3/blockchain/
+            # solidity/zk/defi/etc. terms survive even when they don't word-
+            # match the user's target roles. Without this, the pipeline filter
+            # silently undoes the scraper's signal and drops every crypto
+            # listing. Strict mode opts out — explicit user choice.
+            title = job.get("title", "")
+            mode = _per_job_mode(job)
+            if (
+                strictness != "strict"
+                and (job.get("source") or "").lower() == "cryptojobslist"
+            ):
+                return _match_roles_crypto(
+                    title, target_roles,
+                    match_mode=mode, include_founding=include_founding,
+                )
+            return _match_roles(
+                title, target_roles,
+                match_mode=mode, include_founding=include_founding,
             )
-        ]
+
+        pre_count = len(jobs)
+        filtered = [j for j in jobs if _passes_role_filter(j)]
         dropped = pre_count - len(filtered)
         if dropped:
             logger.info("Role filter: removed %d/%d jobs not matching target roles", dropped, pre_count)
