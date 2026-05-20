@@ -1,4 +1,4 @@
-.PHONY: help setup dev dev-hosted stop-dev backend frontend search clean docker doctor doctor-env dev-hosted-reset desktop-dev desktop-build desktop-install desktop-smoke
+.PHONY: help setup dev dev-hosted stop-dev backend frontend search clean docker doctor doctor-env dev-hosted-reset desktop-dev desktop-build desktop-install desktop-smoke reauth-claude
 
 # ── Venv detection ────────────────────────────────────────────────────
 # All Python commands run through the venv. `make setup` creates it.
@@ -36,6 +36,9 @@ install: ## Install all dependencies (Python + Node)
 	$(PIP) install -e .
 	$(PIP) install -e ./backend
 	cd frontend && npm install
+
+reauth-claude: ## Re-authenticate cliproxyapi when Launchboard shows "AI disconnected"
+	@bash scripts/reauth-claude-proxy.sh
 
 setup-ai: ## Set up AI (install Ollama + download model)
 	@bash scripts/setup-ai.sh
