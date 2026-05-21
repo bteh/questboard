@@ -43,6 +43,91 @@ interface JobCardProps {
 }
 
 /** Color classes for inline score breakdown bars. */
+/**
+ * Compact, expandable narrative for the "Why this score" paragraph.
+ * AI output is often paragraph-length; default to a 2-line clamp so the
+ * card stays scannable. Click anywhere on the text to reveal the full text.
+ */
+function ScoreReasoning({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  // Looks long when there's more than ~180 chars or any newlines — anything
+  // shorter probably fits in 2 lines anyway.
+  const isLong = text.length > 180 || text.includes('\n');
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <p className="text-xs font-medium text-text-secondary">Why this score</p>
+        {isLong && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v); }}
+            className="text-[11px] text-text-tertiary hover:text-text-secondary underline-offset-2 hover:underline"
+          >
+            {expanded ? 'Show less' : 'Show all'}
+          </button>
+        )}
+      </div>
+      <p
+        className={cn(
+          'text-xs text-text-secondary leading-relaxed whitespace-pre-line',
+          isLong && !expanded && 'line-clamp-2',
+        )}
+        title={isLong && !expanded ? text : undefined}
+      >
+        {text}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Bullet list of strengths or gaps. Caps to 3 items by default with a
+ * "+N more" toggle, and clamps each bullet to 2 lines so verbose AI
+ * outputs don't dominate the card.
+ */
+function ScoreBulletList({
+  label,
+  labelClass,
+  prefix,
+  items,
+}: {
+  label: string;
+  labelClass: string;
+  prefix: string;
+  items: string[];
+}) {
+  const [showAll, setShowAll] = useState(false);
+  const visible = showAll ? items : items.slice(0, 3);
+  const hidden = items.length - visible.length;
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <p className={cn('text-xs font-medium', labelClass)}>{label}</p>
+        {(hidden > 0 || showAll) && items.length > 3 && (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setShowAll((v) => !v); }}
+            className="text-[11px] text-text-tertiary hover:text-text-secondary underline-offset-2 hover:underline"
+          >
+            {showAll ? 'Show less' : `+${hidden} more`}
+          </button>
+        )}
+      </div>
+      <ul className="space-y-1">
+        {visible.map((item, i) => (
+          <li
+            key={i}
+            className="text-xs text-text-secondary leading-relaxed line-clamp-2"
+            title={item}
+          >
+            <span className="mr-1 text-text-tertiary">{prefix}</span>{item}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function scoreBgClass(value: number | null): string {
   if (value == null) return 'bg-bg-muted';
   if (value > 60) return 'bg-emerald-500';
@@ -260,34 +345,25 @@ export function JobCard({ app, sourceLabels, latestRunId }: JobCardProps) {
       {expanded && app.overall_score != null && (
         <div className="border-t border-border-default bg-bg-subtle px-5 py-4 space-y-4" onClick={(e) => e.stopPropagation()}>
           {app.score_reasoning && (
-            <div>
-              <p className="text-xs font-medium text-text-secondary mb-1.5">Why this score</p>
-              <p className="text-xs text-text-secondary leading-relaxed whitespace-pre-line">
-                {app.score_reasoning}
-              </p>
-            </div>
+            <ScoreReasoning text={app.score_reasoning} />
           )}
           {(app.key_strengths?.length || app.key_gaps?.length) ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {app.key_strengths?.length ? (
-                <div>
-                  <p className="text-xs font-medium text-success mb-1.5">Strengths</p>
-                  <ul className="space-y-0.5">
-                    {app.key_strengths.map((s, i) => (
-                      <li key={i} className="text-xs text-text-secondary leading-relaxed">+ {s}</li>
-                    ))}
-                  </ul>
-                </div>
+                <ScoreBulletList
+                  label="Strengths"
+                  labelClass="text-success"
+                  prefix="+"
+                  items={app.key_strengths}
+                />
               ) : null}
               {app.key_gaps?.length ? (
-                <div>
-                  <p className="text-xs font-medium text-warning mb-1.5">Room to grow</p>
-                  <ul className="space-y-0.5">
-                    {app.key_gaps.map((g, i) => (
-                      <li key={i} className="text-xs text-text-secondary leading-relaxed">\u2212 {g}</li>
-                    ))}
-                  </ul>
-                </div>
+                <ScoreBulletList
+                  label="Room to grow"
+                  labelClass="text-warning"
+                  prefix={'\u2212'}
+                  items={app.key_gaps}
+                />
               ) : null}
             </div>
           ) : null}
