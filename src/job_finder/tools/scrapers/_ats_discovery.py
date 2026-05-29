@@ -171,15 +171,36 @@ def save_discovered_slugs(host: str, slugs: set[str]) -> None:
     tmp_path.replace(path)
 
 
-def discover_slugs(host: str, roles: list[str], max_per_role: int = 10) -> set[str]:
+# Cap how many roles each host fans out to DuckDuckGo. The AI role expansion
+# produces 10-20 roles; querying all of them ×3 ATS hosts means ~60 serial DDG
+# calls on a cold cache before any ATS scraper returns. The first few
+# (most-relevant) roles already harvest plenty of slugs, and results union with
+# the 7-day cache across runs, so a tight cap mainly bounds cold-start latency.
+_MAX_DISCOVERY_ROLES = 6
+
+
+def discover_slugs(
+    host: str,
+    roles: list[str],
+    max_per_role: int = 10,
+    max_roles: int = _MAX_DISCOVERY_ROLES,
+) -> set[str]:
     """Query DuckDuckGo for ATS company URLs matching each role and harvest slugs.
 
+    Only the first ``max_roles`` roles are searched (cold-start latency cap).
     Returns the union of all extracted slugs. Catches every exception so a
     DDG outage never blocks the caller; the partial harvest is returned.
     """
     cfg = ATS_HOSTS.get(host)
     if not cfg or not roles:
         return set()
+
+    search_roles = roles[:max_roles]
+    if len(roles) > len(search_roles):
+        logger.info(
+            "ATS discovery (%s): searching %d of %d roles (cold-start cap)",
+            host, len(search_roles), len(roles),
+        )
 
     domain = cfg["domain"]
     found: set[str] = set()
@@ -189,7 +210,7 @@ def discover_slugs(host: str, roles: list[str], max_per_role: int = 10) -> set[s
         logger.warning("ddgs library missing — ATS discovery disabled: %s", exc)
         return set()
 
-    for role in roles:
+    for role in search_roles:
         role_clean = (role or "").strip()
         if not role_clean:
             continue
