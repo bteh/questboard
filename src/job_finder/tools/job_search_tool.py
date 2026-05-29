@@ -263,31 +263,37 @@ def search_jobs(
 
         # Bound the scrape with a wall-clock deadline when requested. JobSpy
         # has no fail-fast knob, so a slow/hung board (google CAPTCHA, Indeed
-        # 429-with-backoff) blocks a worker for minutes. We run scrape_jobs in
-        # a throwaway worker and stop waiting after ``scrape_timeout`` seconds,
-        # feeding the breaker so the board is skipped on subsequent calls. The
-        # orphaned thread drains itself in the background (shutdown(wait=False))
-        # — same trade-off as the additional-scrapers 120s join.
+        # 429-with-backoff) blocks for minutes. We run scrape_jobs on a DAEMON
+        # thread and stop waiting after ``scrape_timeout`` seconds, feeding the
+        # breaker so the board is skipped on subsequent calls. The thread must
+        # be a daemon (not a ThreadPoolExecutor worker) so an abandoned hung
+        # scrape dies with the process instead of blocking interpreter exit via
+        # CPython's atexit join — otherwise the multi-minute stall would just be
+        # deferred to shutdown (a real hazard on the one-shot CLI path).
         if scrape_timeout is not None and scrape_timeout > 0:
-            from concurrent.futures import (
-                ThreadPoolExecutor,
-                TimeoutError as _FuturesTimeout,
-            )
-            _ex = ThreadPoolExecutor(max_workers=1)
-            _fut = _ex.submit(scrape_jobs, **scrape_kwargs)
-            try:
-                jobs_df = _fut.result(timeout=scrape_timeout)
-            except _FuturesTimeout:
+            _scrape_result: dict[str, Any] = {}
+
+            def _bounded_scrape() -> None:
+                try:
+                    _scrape_result["df"] = scrape_jobs(**scrape_kwargs)
+                except Exception as exc:  # surfaced to the outer handler below
+                    _scrape_result["exc"] = exc
+
+            _t = threading.Thread(target=_bounded_scrape, name="jobspy-scrape", daemon=True)
+            _t.start()
+            _t.join(timeout=scrape_timeout)
+            if _t.is_alive():
                 logger.warning(
                     "JobSpy scrape exceeded %.0fs for %s — abandoning; "
-                    "opening breaker (orphaned scrape drains in background)",
+                    "opening breaker (orphaned daemon scrape drains in background)",
                     scrape_timeout, ", ".join(site_names),
                 )
                 for b in active_boards:
                     _record_board_failure(b)
-                _ex.shutdown(wait=False)
                 return []
-            _ex.shutdown(wait=False)
+            if "exc" in _scrape_result:
+                raise _scrape_result["exc"]  # let the outer except log + return []
+            jobs_df = _scrape_result["df"]
         else:
             jobs_df = scrape_jobs(**scrape_kwargs)
 

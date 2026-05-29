@@ -47,15 +47,8 @@ def _fetch_company_postings(
     for posting in data:
         title = posting.get("text", "")
 
-        categories = posting.get("categories", {})
-        location = categories.get("location", "")
-        workplace = posting.get("workplaceType", "")
-
-        desc_plain = posting.get("descriptionPlain", "")
-        if not desc_plain:
-            desc_plain = _strip_html(posting.get("description", ""))
-        desc_plain = desc_plain[:3000]
-
+        # Gate on the title BEFORE building the (possibly HTML-stripped)
+        # description, so it's only computed for postings that pass the filter.
         if crypto:
             matched = _match_roles_crypto(
                 title, roles, match_mode=match_mode,
@@ -67,6 +60,15 @@ def _fetch_company_postings(
             )
         if not matched:
             continue
+
+        categories = posting.get("categories", {})
+        location = categories.get("location", "")
+        workplace = posting.get("workplaceType", "")
+
+        desc_plain = posting.get("descriptionPlain", "")
+        if not desc_plain:
+            desc_plain = _strip_html(posting.get("description", ""))
+        desc_plain = desc_plain[:3000]
 
         results.append({
             "title": title,

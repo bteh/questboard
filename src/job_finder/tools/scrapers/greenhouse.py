@@ -48,13 +48,8 @@ def _fetch_company_jobs(
     for job in data["jobs"]:
         title = job.get("title", "")
 
-        loc = job.get("location", {})
-        location = loc.get("name", "") if isinstance(loc, dict) else str(loc)
-
-        # Extract description from HTML content
-        content = job.get("content", "")
-        description = _strip_html(content) if content else ""
-
+        # Gate on the title BEFORE the costly HTML strip, so descriptions are
+        # only parsed for postings that survive the role filter.
         if crypto:
             matched = _match_roles_crypto(
                 title, roles, match_mode=match_mode,
@@ -66,6 +61,13 @@ def _fetch_company_jobs(
             )
         if not matched:
             continue
+
+        loc = job.get("location", {})
+        location = loc.get("name", "") if isinstance(loc, dict) else str(loc)
+
+        # Extract description from HTML content
+        content = job.get("content", "")
+        description = _strip_html(content) if content else ""
 
         jobs.append({
             "title": title,

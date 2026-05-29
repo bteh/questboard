@@ -131,6 +131,25 @@ def test_parity_balanced_nonremote_anyword_rescue():
     )
 
 
+def test_jobspy_namesake_company_not_crypto_rescued():
+    # A non-crypto JobSpy job whose company NAME collides with a crypto base
+    # slug (e.g. "Polygon" the games site) must NOT get crypto matching — the
+    # company-name fallback is for ATS sources (curated slugs) only. Otherwise
+    # crypto-titled off-role jobs leak into non-crypto searches.
+    j = _job(title="Blockchain Marketing Lead", source="indeed", company="Polygon", is_remote=True)
+    assert not _passes(j)
+
+
+def test_crypto_company_slug_name_roundtrip_parity():
+    # Guardrail: the scrape-time crypto flag is set from the SLUG, but the DB
+    # purge re-derives crypto-domain from the cleaned display NAME. They must
+    # agree for every crypto slug or the purge could delete a kept ATS job.
+    from job_finder.tools.scrapers._utils import _clean_company_name
+
+    for slug in crypto_company_slugs():
+        assert is_crypto_company(_clean_company_name(slug)) == is_crypto_company(slug), slug
+
+
 # ── ATS scrapers apply crypto matching at scrape time for crypto companies ────
 def test_ashby_crypto_company_keeps_crypto_titles(monkeypatch):
     from job_finder.tools.scrapers import ashby

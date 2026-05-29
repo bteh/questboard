@@ -363,6 +363,15 @@ def _match_roles_crypto(
     return _has_crypto_terms(title)
 
 
+# ATS scrapers emit a clean, slug-derived company name and set the ``crypto``
+# flag from the authoritative slug. Other sources (JobSpy boards, remote-job
+# firehoses) carry arbitrary free-text company names, so we must NOT infer
+# crypto-domain from those — a non-crypto employer that happens to be named
+# "Polygon"/"Circle"/"Gemini" would otherwise get crypto-rescued and leak
+# off-role crypto-titled jobs into a generic search.
+_ATS_SOURCES: frozenset[str] = frozenset({"ashby", "greenhouse", "lever", "workday"})
+
+
 def job_is_crypto_domain(job: dict) -> bool:
     """True if a job dict belongs to a crypto/web3 source or company.
 
@@ -370,11 +379,18 @@ def job_is_crypto_domain(job: dict) -> bool:
     are deliberately source/company-scoped (not title-based) so a generic
     search doesn't get crypto results mixed in.
     """
-    if (job.get("source") or "").lower() == "cryptojobslist":
+    source = (job.get("source") or "").lower()
+    if source == "cryptojobslist":
         return True
     if job.get("crypto"):
         return True
-    return is_crypto_company(job.get("company"))
+    # Company-name fallback only for ATS sources, where ``company`` is a curated
+    # slug-derived name. This lets the DB purge — which can't see the in-memory
+    # ``crypto`` flag — still treat persisted ATS crypto-company records as
+    # crypto-domain, without crypto-tagging a JobSpy namesake company.
+    if source in _ATS_SOURCES:
+        return is_crypto_company(job.get("company"))
+    return False
 
 
 def job_passes_role_filter(

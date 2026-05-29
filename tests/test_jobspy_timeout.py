@@ -67,6 +67,23 @@ class JobSpyTimeoutTest(unittest.TestCase):
             )
         self.assertGreaterEqual(len(results), 1)
 
+    def test_timed_out_scrape_runs_on_daemon_thread(self) -> None:
+        # The orphaned scrape must run on a DAEMON thread so a hung board can't
+        # block interpreter exit (CPython's atexit joins non-daemon executor
+        # workers unconditionally — that would defer the stall to process exit).
+        import threading
+
+        def slow_scrape_jobs(**kwargs):
+            time.sleep(2.0)
+            return pd.DataFrame()
+
+        with patch.dict(sys.modules, {"jobspy": MagicMock(scrape_jobs=slow_scrape_jobs)}):
+            self.mod.search_jobs(search_term="data engineer", boards=["google"], scrape_timeout=0.3)
+
+        alive = [t for t in threading.enumerate() if t.name == "jobspy-scrape"]
+        self.assertTrue(alive, "expected an orphaned jobspy-scrape thread still running")
+        self.assertTrue(all(t.daemon for t in alive), "orphaned scrape thread must be a daemon")
+
     def test_no_timeout_argument_preserves_legacy_behavior(self) -> None:
         def fast_scrape_jobs(**kwargs):
             return pd.DataFrame([

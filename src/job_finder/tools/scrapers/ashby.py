@@ -53,7 +53,6 @@ def _fetch_company_jobs(
     jobs: list[dict] = []
     for job in data["jobs"]:
         title = job.get("title", "")
-        description = (job.get("descriptionPlain", "") or "")[:3000]
         if crypto:
             matched = _match_roles_crypto(
                 title, roles, match_mode=match_mode,
@@ -66,6 +65,7 @@ def _fetch_company_jobs(
         if not matched:
             continue
 
+        description = (job.get("descriptionPlain", "") or "")[:3000]
         location = job.get("location", "")
         is_remote = job.get("isRemote", False) or job.get("workplaceType", "").lower() == "remote"
 
