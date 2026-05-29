@@ -11,7 +11,9 @@ from job_finder.tools.scrapers._utils import (
     _get_json,
     _load_seed_slugs,
     _match_roles,
+    _match_roles_crypto,
     _strip_html,
+    is_crypto_company,
 )
 
 logger = logging.getLogger(__name__)
@@ -39,11 +41,12 @@ def _fetch_company_jobs(
     if not data or "jobs" not in data:
         return []
 
+    # Crypto/web3 companies use crypto-aware role matching (see ashby.py).
+    crypto = is_crypto_company(slug)
+
     jobs: list[dict] = []
     for job in data["jobs"]:
         title = job.get("title", "")
-        if not _match_roles(title, roles, match_mode=match_mode, include_founding=include_founding):
-            continue
 
         loc = job.get("location", {})
         location = loc.get("name", "") if isinstance(loc, dict) else str(loc)
@@ -51,6 +54,18 @@ def _fetch_company_jobs(
         # Extract description from HTML content
         content = job.get("content", "")
         description = _strip_html(content) if content else ""
+
+        if crypto:
+            matched = _match_roles_crypto(
+                title, roles, match_mode=match_mode,
+                include_founding=include_founding,
+            )
+        else:
+            matched = _match_roles(
+                title, roles, match_mode=match_mode, include_founding=include_founding,
+            )
+        if not matched:
+            continue
 
         jobs.append({
             "title": title,
@@ -64,6 +79,7 @@ def _fetch_company_jobs(
             "date_posted": job.get("updated_at", ""),
             "is_remote": "remote" in location.lower(),
             "company_size": "",
+            "crypto": crypto,
         })
 
     return jobs

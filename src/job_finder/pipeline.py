@@ -1469,64 +1469,44 @@ class JobFinderPipeline:
         if not target_roles:
             return jobs  # no roles configured → pass everything
 
-        from job_finder.tools.scrapers._utils import _match_roles, _match_roles_crypto
+        from job_finder.tools.scrapers._utils import job_passes_role_filter
 
         resolved = filters or _resolve_filter_settings(self.config)
         include_founding = bool(resolved.get("include_founding_titles", True))
         match_mode = str(resolved.get("role_match_mode", "all_significant"))
         strictness = str(resolved.get("strictness", _DEFAULT_STRICTNESS))
 
-        def _per_job_mode(job: dict) -> str:
-            # Balanced strictness uses all_significant role matching, which
-            # disproportionately rejects place-based jobs: JobSpy's city-bound
-            # queries return smaller pools with more variant titles
-            # (e.g. "ML Platform Engineer") while remote-source firehose
-            # scrapers return huge pools of generic titles. Without the
-            # rescue, users who pick "Remote + Places" see almost nothing
-            # from their preferred cities. Strict and loose presets are
-            # intentional opt-ins — we only rescue 'balanced'.
-            if strictness != "balanced" or match_mode != "all_significant":
-                return match_mode
-            if job.get("is_remote"):
-                return match_mode
-            return "any_word"
-
-        def _passes_role_filter(job: dict) -> bool:
-            # Crypto-source jobs go through _match_roles_crypto (the same
-            # matcher the scraper uses) so titles containing web3/blockchain/
-            # solidity/zk/defi/etc. terms survive even when they don't word-
-            # match the user's target roles. Without this, the pipeline filter
-            # silently undoes the scraper's signal and drops every crypto
-            # listing. Strict mode opts out — explicit user choice.
-            title = job.get("title", "")
-            mode = _per_job_mode(job)
-            if (
-                strictness != "strict"
-                and (job.get("source") or "").lower() == "cryptojobslist"
-            ):
-                return _match_roles_crypto(
-                    title, target_roles,
-                    match_mode=mode, include_founding=include_founding,
-                )
-            return _match_roles(
-                title, target_roles,
-                match_mode=mode, include_founding=include_founding,
-            )
-
+        # job_passes_role_filter is the single source of truth shared with the
+        # DB purge below — it applies the balanced non-remote any_word rescue
+        # and crypto-aware matching for crypto-domain jobs. Keeping the in-memory
+        # filter and the purge on the same predicate ensures the pipeline never
+        # surfaces a job this run while deleting that same record from the DB.
         pre_count = len(jobs)
-        filtered = [j for j in jobs if _passes_role_filter(j)]
+        filtered = [
+            j for j in jobs
+            if job_passes_role_filter(
+                j, target_roles,
+                match_mode=match_mode,
+                include_founding=include_founding,
+                strictness=strictness,
+            )
+        ]
         dropped = pre_count - len(filtered)
         if dropped:
             logger.info("Role filter: removed %d/%d jobs not matching target roles", dropped, pre_count)
             if progress:
                 progress(f"Role filter: removed {dropped} jobs not matching target roles")
 
-        # Also purge existing DB records that don't match roles
+        # Also purge existing DB records that don't match roles — using the SAME
+        # matching settings so it can't delete a job filter_by_role just kept.
         try:
             from job_finder.models.database import purge_non_matching_roles
             purged = purge_non_matching_roles(
                 target_roles=target_roles,
                 profile=self.profile_name,
+                match_mode=match_mode,
+                include_founding=include_founding,
+                strictness=strictness,
             )
             if purged and progress:
                 progress(f"Purged {purged} existing jobs not matching target roles")
