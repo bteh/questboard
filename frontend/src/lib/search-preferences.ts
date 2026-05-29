@@ -227,7 +227,7 @@ export function buildSearchRunSnapshot({
     max_days_old: request.max_days_old,
     include_linkedin_jobs: request.include_linkedin_jobs,
     use_ai: request.use_ai,
-    match_strictness: request.match_strictness ?? 'loose',
+    match_strictness: request.match_strictness ?? 'balanced',
     current_title: metadata.currentTitle,
     current_level: metadata.currentLevel,
     current_tc: metadata.currentTc,

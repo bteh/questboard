@@ -131,7 +131,7 @@ search_settings:
 # | balanced  | 0.85        | 1.5 / 2.0                 | all_significant   | on              |
 # | strict    | 1.00        | 1.0 / 1.0                 | exact             | off             |
 filters:
-  strictness: "loose"
+  strictness: "balanced"             # loose | balanced | strict — balanced is the default
   # salary_flex: 0.70                  # Accept jobs paying down to this fraction of your salary floor
   # level_tolerance_senior: 2.5        # For senior+ users — accept jobs N levels below
   # level_tolerance_junior: 3.0        # For junior/mid users — accept jobs N levels above
