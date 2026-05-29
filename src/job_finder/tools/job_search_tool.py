@@ -195,6 +195,7 @@ def search_jobs(
     linkedin_fetch_description: bool = True,
     boards: list[str] | None = None,
     distance: int | None = None,
+    scrape_timeout: float | None = None,
 ) -> list[dict]:
     """Search multiple job boards via JobSpy and return normalised dicts.
 
@@ -260,7 +261,35 @@ def search_jobs(
         if distance is not None:
             scrape_kwargs["distance"] = distance
 
-        jobs_df: pd.DataFrame = scrape_jobs(**scrape_kwargs)
+        # Bound the scrape with a wall-clock deadline when requested. JobSpy
+        # has no fail-fast knob, so a slow/hung board (google CAPTCHA, Indeed
+        # 429-with-backoff) blocks a worker for minutes. We run scrape_jobs in
+        # a throwaway worker and stop waiting after ``scrape_timeout`` seconds,
+        # feeding the breaker so the board is skipped on subsequent calls. The
+        # orphaned thread drains itself in the background (shutdown(wait=False))
+        # — same trade-off as the additional-scrapers 120s join.
+        if scrape_timeout is not None and scrape_timeout > 0:
+            from concurrent.futures import (
+                ThreadPoolExecutor,
+                TimeoutError as _FuturesTimeout,
+            )
+            _ex = ThreadPoolExecutor(max_workers=1)
+            _fut = _ex.submit(scrape_jobs, **scrape_kwargs)
+            try:
+                jobs_df = _fut.result(timeout=scrape_timeout)
+            except _FuturesTimeout:
+                logger.warning(
+                    "JobSpy scrape exceeded %.0fs for %s — abandoning; "
+                    "opening breaker (orphaned scrape drains in background)",
+                    scrape_timeout, ", ".join(site_names),
+                )
+                for b in active_boards:
+                    _record_board_failure(b)
+                _ex.shutdown(wait=False)
+                return []
+            _ex.shutdown(wait=False)
+        else:
+            jobs_df = scrape_jobs(**scrape_kwargs)
 
         # Self-healing: a board that returned ≥1 row in this call is clearly
         # working again, so reset its failure counter even if it had been

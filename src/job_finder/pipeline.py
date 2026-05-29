@@ -1063,6 +1063,11 @@ class JobFinderPipeline:
         # retries that never succeed.
         skip_jobspy = isinstance(jobspy_boards, list) and len(jobspy_boards) == 0
 
+        # Per-board scrape deadline (seconds). Generous enough for a healthy
+        # board returning a full page, tight enough that a hung/CAPTCHA board
+        # can't stall the search for minutes. Configurable via search_settings.
+        jobspy_task_timeout = float(settings.get("jobspy_task_timeout_seconds", 45) or 45)
+
         def _search_one(task: tuple[str, str]) -> list[dict]:
             nonlocal unique_count
             # Skip if we already have enough unique jobs
@@ -1085,6 +1090,10 @@ class JobFinderPipeline:
                 # LinkedIn results keep title/company/location/salary/URL.
                 linkedin_fetch_description=False,
                 distance=search_distance,
+                # Cap each board scrape so one hung/CAPTCHA-walled board can't
+                # stall a worker for minutes. After a few timeouts the per-board
+                # circuit breaker opens and the board is skipped outright.
+                scrape_timeout=jobspy_task_timeout,
             )
             with lock:
                 if stop_early.is_set():
