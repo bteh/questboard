@@ -20,7 +20,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from job_finder.tools.scrapers._registry import register_scraper
-from job_finder.tools.scrapers._utils import _match_roles
+from job_finder.tools.scrapers._utils import _match_roles, _parse_salary
 
 logger = logging.getLogger(__name__)
 
@@ -179,12 +179,23 @@ def _try_parse_embedded_json(html: str) -> list[dict]:
 
 def _normalize_json_job(item: dict) -> dict:
     """Normalize a JSON job object from embedded data to our standard format."""
+    # Read companyName/company_name unconditionally, then fall back to a
+    # nested ``company`` object or plain string. The live YC data-page shape
+    # carries ``companyName``/``companySlug`` and NO ``company`` key, so the
+    # previous `(a or b or c) if isinstance(company, dict) else company`
+    # precedence discarded the present companyName on every real job.
+    company_obj = item.get("company")
+    if isinstance(company_obj, dict):
+        nested_name = company_obj.get("name", "")
+    elif isinstance(company_obj, str):
+        nested_name = company_obj
+    else:
+        nested_name = ""
     company_name = (
-        item.get("company_name", "")
-        or item.get("companyName", "")
-        or item.get("company", {}).get("name", "")
-        if isinstance(item.get("company"), dict)
-        else item.get("company", "")
+        item.get("company_name")
+        or item.get("companyName")
+        or nested_name
+        or ""
     )
 
     location = item.get("location", "") or item.get("pretty_location", "")
@@ -199,6 +210,13 @@ def _normalize_json_job(item: dict) -> dict:
 
     salary_min = item.get("salary_min") or item.get("salaryMin")
     salary_max = item.get("salary_max") or item.get("salaryMax")
+    # YC's data-page uses a single string ``salary`` field (e.g.
+    # "$200K - $250K") rather than min/max keys — parse it so salary
+    # scoring and the salary filter have real numbers to work with.
+    if salary_min is None and salary_max is None:
+        parsed_min, parsed_max = _parse_salary(item.get("salary"))
+        salary_min = salary_min if salary_min is not None else parsed_min
+        salary_max = salary_max if salary_max is not None else parsed_max
 
     return {
         "title": item.get("title", "") or item.get("job_title", ""),
