@@ -32,6 +32,7 @@ def get_applications(
     workspace_id: str | None = None,
     search_run_id: str | None = None,
     first_seen_run_id: str | None = None,
+    exclude_dead: bool = False,
     sort_by: str = "overall_score",
     sort_dir: str = "desc",
     page: int = 1,
@@ -63,6 +64,9 @@ def get_applications(
         query = query.filter(ApplicationRecord.search_run_id == search_run_id)
     if first_seen_run_id:
         query = query.filter(ApplicationRecord.first_seen_run_id == first_seen_run_id)
+    if exclude_dead:
+        # Hide only CONFIRMED-dead postings; unknown/alive/never-checked stay.
+        query = query.filter(ApplicationRecord.url_status != "dead")
     if search:
         pattern = f"%{search}%"
         query = query.filter(
@@ -158,23 +162,44 @@ def check_urls(
         query = query.order_by(ApplicationRecord.last_checked_at.asc().nullsfirst())
     records = query.limit(limit).all()
 
-    alive, dead, errors = 0, 0, 0
-    for rec in records:
+    # Classify ONE url. Only a definitive 404/410 means the posting is gone.
+    # 403/405/429/5xx are usually bot-blocks or HEAD-not-supported, and
+    # timeouts/connection errors are transient — none of those should mark a
+    # live job dead (that would hide good postings). Those map to "unknown".
+    def _classify(url: str) -> str:
         try:
-            r = req.head(rec.job_url, timeout=8, allow_redirects=True)
-            if r.status_code < 400:
-                rec.url_status = "alive"
-                alive += 1
-            else:
-                rec.url_status = "dead"
-                dead += 1
+            r = req.head(url, timeout=8, allow_redirects=True)
+            code = r.status_code
+            if code < 400:
+                return "alive"
+            if code in (404, 410):
+                return "dead"
+            return "unknown"
         except Exception:
-            rec.url_status = "dead"
-            errors += 1
-        rec.last_checked_at = _utcnow()
+            return "unknown"
+
+    now = _utcnow()
+    statuses: dict[int, str] = {}
+    if records:
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=min(len(records), 8)) as pool:
+            for rec, status in zip(records, pool.map(lambda r: _classify(r.job_url), records)):
+                statuses[rec.id] = status
+
+    alive = dead = unknown = 0
+    for rec in records:
+        status = statuses.get(rec.id, "unknown")
+        rec.url_status = status
+        rec.last_checked_at = now
+        if status == "alive":
+            alive += 1
+        elif status == "dead":
+            dead += 1
+        else:
+            unknown += 1
 
     db.commit()
-    return {"checked": len(records), "alive": alive, "dead": dead + errors}
+    return {"checked": len(records), "alive": alive, "dead": dead, "unknown": unknown}
 
 
 def delete_application(db: Session, app_id: int, workspace_id: str | None = None) -> bool:

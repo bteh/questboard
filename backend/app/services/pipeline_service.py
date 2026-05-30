@@ -643,7 +643,9 @@ def _execute_pipeline(
             try:
                 _send_event(run, "progress", "Checking which job postings are still active...")
                 from app.services.application_service import check_urls as _check_urls
-                _with_db(lambda db: _check_urls(db, limit=50))
+                # Cover this run's jobs (capped); parallelized inside check_urls.
+                _limit = min(max(len(jobs), 50), 200)
+                _with_db(lambda db: _check_urls(db, limit=_limit, workspace_id=workspace_id))
             except Exception as exc:
                 logger.debug("Auto URL check failed (non-fatal): %s", exc)
 
