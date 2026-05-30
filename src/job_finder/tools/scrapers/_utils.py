@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import re
+from datetime import datetime, timezone
 from html import unescape
 from pathlib import Path
 
@@ -130,6 +131,48 @@ def _parse_salary(text: str | None) -> tuple[float | None, float | None]:
             val *= 1000
         return val, None
     return None, None
+
+
+def _parse_posted_date(raw: object) -> datetime | None:
+    """Parse a job's posting date into a tz-aware UTC datetime, or None.
+
+    Handles ISO8601 (with/without 'Z'), 'YYYY-MM-DD', and unix epoch
+    seconds/milliseconds (RemoteOK/HN use epochs). Returns None on anything
+    unparseable so callers can keep unknown-date jobs rather than drop them.
+    """
+    if raw is None:
+        return None
+    if isinstance(raw, (int, float)):
+        try:
+            val = float(raw)
+            if val > 1e11:  # milliseconds
+                val /= 1000.0
+            return datetime.fromtimestamp(val, tz=timezone.utc)
+        except (ValueError, OverflowError, OSError):
+            return None
+    s = str(raw).strip()
+    if not s:
+        return None
+    if re.fullmatch(r"\d{9,13}", s):  # all-digit epoch
+        try:
+            val = float(s)
+            if val > 1e11:
+                val /= 1000.0
+            return datetime.fromtimestamp(val, tz=timezone.utc)
+        except (ValueError, OverflowError, OSError):
+            return None
+    try:
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    except ValueError:
+        pass
+    m = re.match(r"(\d{4})-(\d{1,2})-(\d{1,2})", s)
+    if m:
+        try:
+            return datetime(int(m[1]), int(m[2]), int(m[3]), tzinfo=timezone.utc)
+        except ValueError:
+            return None
+    return None
 
 
 def _strip_html(html: str) -> str:

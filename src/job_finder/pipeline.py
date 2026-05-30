@@ -15,6 +15,7 @@ import threading
 import time
 import unicodedata
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timedelta, timezone
 from difflib import SequenceMatcher
 from typing import Any, Callable
 
@@ -638,6 +639,38 @@ def _resolve_location_filter_preferences(
         include_remote,
         _derive_countries(pref_locations),
     )
+
+
+def _filter_jobs_by_freshness(
+    jobs: list[dict],
+    max_days_old: int,
+    *,
+    now: datetime | None = None,
+) -> list[dict]:
+    """Drop postings older than ``max_days_old`` by their real post date.
+
+    max_days_old is otherwise only an upstream hint most boards ignore, so a
+    months-old reposting can slip through. Jobs whose date is missing or
+    unparseable are KEPT (we don't drop on uncertainty). A 1-day skew buffer
+    absorbs timezone/repost differences. ``max_days_old <= 0`` disables it.
+    """
+    if not max_days_old or max_days_old <= 0:
+        return jobs
+    from job_finder.tools.scrapers._utils import _parse_posted_date
+
+    now = now or datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=max_days_old + 1)
+    kept: list[dict] = []
+    for job in jobs:
+        dt = _parse_posted_date(job.get("date_posted"))
+        if dt is None:
+            kept.append(job)  # unknown date → keep
+            continue
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        if dt >= cutoff:
+            kept.append(job)
+    return kept
 
 
 def _resolve_salary_floor(config: dict | None) -> float:
@@ -1463,6 +1496,20 @@ class JobFinderPipeline:
         else:
             self._record_funnel_stage(
                 "salary", "Salary floor", len(deduped), len(deduped), active=False,
+            )
+
+        # --- Freshness filter: drop postings older than max_days_old ---
+        # (keeps jobs with unknown/unparseable dates so we don't over-drop).
+        if max_days_old and max_days_old > 0:
+            pre_fresh = len(deduped)
+            deduped = _filter_jobs_by_freshness(deduped, max_days_old)
+            dropped = pre_fresh - len(deduped)
+            self._record_funnel_stage("freshness", "Freshness filter", pre_fresh, len(deduped))
+            if dropped and progress:
+                progress(f"Freshness filter: removed {dropped} postings older than {max_days_old} days")
+        else:
+            self._record_funnel_stage(
+                "freshness", "Freshness filter", len(deduped), len(deduped), active=False,
             )
 
         # --- Level filter: remove jobs too far above or below current level ---
