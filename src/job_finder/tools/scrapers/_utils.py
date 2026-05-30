@@ -37,6 +37,33 @@ def _load_seed_slugs(filename: str) -> list[str]:
             slugs.append(line)
     return slugs
 
+
+def _load_seed_section(filename: str, section_keyword: str) -> list[str]:
+    """Load slugs from the ``# --- <section> ---`` block(s) matching a keyword.
+
+    Seed files group slugs under section headers (e.g. ``# --- Crypto / web3 ---``).
+    Returns the active (non-comment) slugs that fall under any header whose text
+    contains ``section_keyword`` (case-insensitive), until the next header.
+    Used to identify domain-specific companies (currently crypto/web3) so their
+    jobs get domain-aware role matching.
+    """
+    path = _SEED_DIR / filename
+    if not path.exists():
+        return []
+    slugs: list[str] = []
+    in_section = False
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if line.startswith("# ---"):
+            in_section = section_keyword.lower() in line.lower()
+            continue
+        if not line or line.startswith("#"):
+            continue
+        if in_section:
+            slugs.append(line)
+    return slugs
+
+
 _HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -151,6 +178,48 @@ def _clean_company_name(slug: str) -> str:
     return _COMPANY_NAME_CORRECTIONS.get(name, name)
 
 
+# Well-known crypto/web3 employers that may arrive via watchlist or dynamic
+# ATS discovery (i.e. not necessarily in the curated seed crypto sections).
+# Jobs from any of these — or from a seed-file "Crypto / web3" section — get
+# crypto-aware role matching so titles like "Smart Contract Engineer" survive
+# even when they don't word-match the user's target roles.
+_CRYPTO_COMPANY_BASE: frozenset[str] = frozenset({
+    "alchemy", "magiceden", "phantom", "coinbase", "kraken", "circle",
+    "consensys", "chainalysis", "anchorage", "fireblocks", "uniswap",
+    "opensea", "ledger", "0x", "paradigm", "ripple", "polygon", "aptoslabs",
+    "matterlabs", "offchainlabs", "blockchaincom", "gemini", "dydx",
+})
+
+
+def _norm_company_key(value: str | None) -> str:
+    """Normalize a slug or display name to a comparable key (alnum, lowercase).
+
+    ``magiceden`` and ``Magic Eden`` both normalize to ``magiceden`` so a job's
+    cleaned company name matches the crypto slug it came from.
+    """
+    return re.sub(r"[^a-z0-9]", "", (value or "").lower())
+
+
+def crypto_company_slugs() -> set[str]:
+    """Curated crypto/web3 company slugs (seed crypto sections + base set)."""
+    slugs: set[str] = set(_CRYPTO_COMPANY_BASE)
+    for seed_file in ("ashby_seed.txt", "greenhouse_seed.txt", "lever_seed.txt"):
+        slugs.update(s.lower() for s in _load_seed_section(seed_file, "crypto"))
+    return slugs
+
+
+# Computed once at import — small, read-only.
+_CRYPTO_COMPANY_KEYS: frozenset[str] = frozenset(
+    _norm_company_key(s) for s in crypto_company_slugs()
+)
+
+
+def is_crypto_company(name_or_slug: str | None) -> bool:
+    """True if a company slug or display name is a known crypto/web3 employer."""
+    key = _norm_company_key(name_or_slug)
+    return bool(key) and key in _CRYPTO_COMPANY_KEYS
+
+
 # Founding-role aliases bypass the role-matching gate by default.
 # These titles ("Founding Engineer", "Member of Technical Staff") rarely
 # word-overlap with a user's normal target roles, so strict matching drops
@@ -241,6 +310,33 @@ def _match_roles(
     return False
 
 
+# High-precision crypto/web3 signals — matched as substrings. These rarely
+# appear in non-crypto job titles, so substring matching is safe.
+_CRYPTO_SUBSTRING_TERMS: tuple[str, ...] = (
+    "blockchain", "web3", "web 3", "solidity", "smart contract", "defi",
+    "crypto", "evm", "zero knowledge", "zero-knowledge", "ethereum", "solana",
+    "bitcoin", "nft", "dao", "dapp", "tokenomics", "stablecoin", "onchain",
+    "on-chain", "staking", "validator", "layer 2", "rollup", "zksync",
+)
+# Crypto-leaning but ambiguous terms — matched as whole words only so we don't
+# fire on unrelated substrings. The broadest offenders ('rust', 'node') are
+# intentionally omitted: they tag far more non-crypto roles than crypto ones.
+_CRYPTO_WORD_TERMS: tuple[str, ...] = (
+    "protocol", "token", "consensus", "zk", "l2", "wallet",
+)
+
+
+def _has_crypto_terms(text: str | None) -> bool:
+    """True if ``text`` carries a crypto/web3/blockchain signal."""
+    if not text:
+        return False
+    low = text.lower()
+    if any(term in low for term in _CRYPTO_SUBSTRING_TERMS):
+        return True
+    words = set(re.findall(r"[a-z0-9]+", low))
+    return any(term in words for term in _CRYPTO_WORD_TERMS)
+
+
 def _match_roles_crypto(
     title: str,
     roles: list[str] | None,
@@ -248,7 +344,15 @@ def _match_roles_crypto(
     include_founding: bool = True,
     match_mode: str = "all_significant",
 ) -> bool:
-    """Extended role matching that includes crypto/web3/blockchain terms."""
+    """Role matching that also passes crypto/web3 roles.
+
+    After the normal role match, a job whose *title* carries a crypto signal
+    passes even when the title doesn't word-match the target roles. Used only
+    for jobs from crypto-domain sources/companies so non-crypto searches don't
+    pick up cross-domain noise. Matching is title-only on purpose: board/tag
+    metadata (e.g. cryptojobslist's category tags) is too noisy — it would let
+    every listing through and turn role filtering into a no-op.
+    """
     if _match_roles(
         title,
         roles,
@@ -256,10 +360,64 @@ def _match_roles_crypto(
         match_mode=match_mode,
     ):
         return True
-    title_lower = title.lower()
-    crypto_terms = [
-        "blockchain", "web3", "solidity", "smart contract", "defi",
-        "crypto", "token", "protocol", "rust", "consensus",
-        "zk", "zero knowledge", "evm", "l2", "layer 2",
-    ]
-    return any(kw in title_lower for kw in crypto_terms)
+    return _has_crypto_terms(title)
+
+
+# ATS scrapers emit a clean, slug-derived company name and set the ``crypto``
+# flag from the authoritative slug. Other sources (JobSpy boards, remote-job
+# firehoses) carry arbitrary free-text company names, so we must NOT infer
+# crypto-domain from those — a non-crypto employer that happens to be named
+# "Polygon"/"Circle"/"Gemini" would otherwise get crypto-rescued and leak
+# off-role crypto-titled jobs into a generic search.
+_ATS_SOURCES: frozenset[str] = frozenset({"ashby", "greenhouse", "lever", "workday"})
+
+
+def job_is_crypto_domain(job: dict) -> bool:
+    """True if a job dict belongs to a crypto/web3 source or company.
+
+    Used to decide whether crypto-aware role matching applies. The criteria
+    are deliberately source/company-scoped (not title-based) so a generic
+    search doesn't get crypto results mixed in.
+    """
+    source = (job.get("source") or "").lower()
+    if source == "cryptojobslist":
+        return True
+    if job.get("crypto"):
+        return True
+    # Company-name fallback only for ATS sources, where ``company`` is a curated
+    # slug-derived name. This lets the DB purge — which can't see the in-memory
+    # ``crypto`` flag — still treat persisted ATS crypto-company records as
+    # crypto-domain, without crypto-tagging a JobSpy namesake company.
+    if source in _ATS_SOURCES:
+        return is_crypto_company(job.get("company"))
+    return False
+
+
+def job_passes_role_filter(
+    job: dict,
+    roles: list[str] | None,
+    *,
+    match_mode: str = "all_significant",
+    include_founding: bool = True,
+    strictness: str = "balanced",
+) -> bool:
+    """Single source of truth for "does this job survive the role filter".
+
+    Shared by the in-memory pipeline filter and the DB record purge so the two
+    can never disagree (the purge previously used a stricter matcher and
+    deleted crypto/founding/place jobs the pipeline kept). Applies:
+      - the balanced non-remote ``any_word`` rescue (place-bound jobs),
+      - crypto-aware matching for crypto-domain jobs in non-strict modes.
+    """
+    title = job.get("title", "") or ""
+    mode = match_mode
+    if strictness == "balanced" and match_mode == "all_significant" and not job.get("is_remote"):
+        mode = "any_word"
+    if strictness != "strict" and job_is_crypto_domain(job):
+        return _match_roles_crypto(
+            title, roles,
+            match_mode=mode, include_founding=include_founding,
+        )
+    return _match_roles(
+        title, roles, match_mode=mode, include_founding=include_founding,
+    )

@@ -26,7 +26,12 @@ from job_finder.tools.scrapers._registry import register_scraper
 
 logger = logging.getLogger(__name__)
 
-_TIMEOUT = 20
+# Tight per-request timeout to match the other ATS scrapers (Ashby/Lever/
+# Greenhouse use 5s). Workday's API is a touch heavier, so 8s — but well under
+# the old 20s, which let one hung enterprise tenant blow past run_scrapers'
+# 60s per-scraper cap (serial detail GETs × the per-posting loop) and starve
+# the shared scraper pool of time better spent on startup/crypto sources.
+_TIMEOUT = 8
 _UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"

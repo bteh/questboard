@@ -468,7 +468,7 @@ async def get_search_defaults(
         compensation_period=cfg.get("compensation", {}).get("pay_period", "annual"),
         exclude_staffing_agencies=cfg.get("search_settings", {}).get("exclude_staffing_agencies", True),
         match_strictness=str(
-            cfg.get("filters", {}).get("strictness", "loose") or "loose"
+            cfg.get("filters", {}).get("strictness", "balanced") or "balanced"
         ).lower(),
     )
 

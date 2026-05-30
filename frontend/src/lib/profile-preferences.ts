@@ -430,7 +430,7 @@ export function buildDefaultWorkspacePreferences(): WorkspacePreferences {
       include_equity: true,
     },
     exclude_staffing_agencies: true,
-    match_strictness: 'loose',
+    match_strictness: 'balanced',
   };
 }
 

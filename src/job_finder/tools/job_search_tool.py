@@ -195,6 +195,7 @@ def search_jobs(
     linkedin_fetch_description: bool = True,
     boards: list[str] | None = None,
     distance: int | None = None,
+    scrape_timeout: float | None = None,
 ) -> list[dict]:
     """Search multiple job boards via JobSpy and return normalised dicts.
 
@@ -260,7 +261,41 @@ def search_jobs(
         if distance is not None:
             scrape_kwargs["distance"] = distance
 
-        jobs_df: pd.DataFrame = scrape_jobs(**scrape_kwargs)
+        # Bound the scrape with a wall-clock deadline when requested. JobSpy
+        # has no fail-fast knob, so a slow/hung board (google CAPTCHA, Indeed
+        # 429-with-backoff) blocks for minutes. We run scrape_jobs on a DAEMON
+        # thread and stop waiting after ``scrape_timeout`` seconds, feeding the
+        # breaker so the board is skipped on subsequent calls. The thread must
+        # be a daemon (not a ThreadPoolExecutor worker) so an abandoned hung
+        # scrape dies with the process instead of blocking interpreter exit via
+        # CPython's atexit join — otherwise the multi-minute stall would just be
+        # deferred to shutdown (a real hazard on the one-shot CLI path).
+        if scrape_timeout is not None and scrape_timeout > 0:
+            _scrape_result: dict[str, Any] = {}
+
+            def _bounded_scrape() -> None:
+                try:
+                    _scrape_result["df"] = scrape_jobs(**scrape_kwargs)
+                except Exception as exc:  # surfaced to the outer handler below
+                    _scrape_result["exc"] = exc
+
+            _t = threading.Thread(target=_bounded_scrape, name="jobspy-scrape", daemon=True)
+            _t.start()
+            _t.join(timeout=scrape_timeout)
+            if _t.is_alive():
+                logger.warning(
+                    "JobSpy scrape exceeded %.0fs for %s — abandoning; "
+                    "opening breaker (orphaned daemon scrape drains in background)",
+                    scrape_timeout, ", ".join(site_names),
+                )
+                for b in active_boards:
+                    _record_board_failure(b)
+                return []
+            if "exc" in _scrape_result:
+                raise _scrape_result["exc"]  # let the outer except log + return []
+            jobs_df = _scrape_result["df"]
+        else:
+            jobs_df = scrape_jobs(**scrape_kwargs)
 
         # Self-healing: a board that returned ≥1 row in this call is clearly
         # working again, so reset its failure counter even if it had been

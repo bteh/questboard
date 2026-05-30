@@ -665,17 +665,24 @@ def purge_non_matching_roles(
     target_roles: list[str],
     profile: str | None = None,
     workspace_id: str | None = None,
+    *,
+    match_mode: str = "all_significant",
+    include_founding: bool = True,
+    strictness: str = "balanced",
 ) -> int:
     """Delete existing records whose titles don't match any target role.
 
-    Uses the same ``_match_roles()`` logic as the scrapers so filtering is
-    consistent between new searches and existing DB records.
+    Uses ``job_passes_role_filter`` — the SAME predicate the in-memory pipeline
+    filter (``JobFinderPipeline.filter_by_role``) uses — so the purge can never
+    delete a crypto/founding/place-bound record the live search just kept.
+    Pass the resolved filter settings (match_mode/include_founding/strictness)
+    from the caller; the defaults mirror the 'balanced' preset.
     Returns the number of deleted records.
     """
     if not target_roles:
         return 0
 
-    from job_finder.tools.scrapers._utils import _match_roles
+    from job_finder.tools.scrapers._utils import job_passes_role_filter
 
     session = get_session()
     try:
@@ -687,7 +694,19 @@ def purge_non_matching_roles(
         records = query.all()
         deleted = 0
         for rec in records:
-            if not _match_roles(rec.job_title or "", target_roles):
+            job = {
+                "title": rec.job_title or "",
+                "source": rec.source or "",
+                "company": rec.company or "",
+                "is_remote": bool(rec.is_remote),
+                "description": rec.description or "",
+            }
+            if not job_passes_role_filter(
+                job, target_roles,
+                match_mode=match_mode,
+                include_founding=include_founding,
+                strictness=strictness,
+            ):
                 session.delete(rec)
                 deleted += 1
         session.commit()

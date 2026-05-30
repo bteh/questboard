@@ -11,6 +11,8 @@ from job_finder.tools.scrapers._utils import (
     _get_json,
     _load_seed_slugs,
     _match_roles,
+    _match_roles_crypto,
+    is_crypto_company,
 )
 
 logger = logging.getLogger(__name__)
@@ -42,12 +44,28 @@ def _fetch_company_jobs(
     if not data or "jobs" not in data:
         return []
 
+    # Crypto/web3 companies (e.g. Alchemy, Magic Eden) use crypto-aware role
+    # matching so titles like "Smart Contract Engineer" survive even when they
+    # don't word-match the user's target roles — otherwise the scraper drops
+    # them here, before the pipeline's crypto rescue can ever see them.
+    crypto = is_crypto_company(slug)
+
     jobs: list[dict] = []
     for job in data["jobs"]:
         title = job.get("title", "")
-        if not _match_roles(title, roles, match_mode=match_mode, include_founding=include_founding):
+        if crypto:
+            matched = _match_roles_crypto(
+                title, roles, match_mode=match_mode,
+                include_founding=include_founding,
+            )
+        else:
+            matched = _match_roles(
+                title, roles, match_mode=match_mode, include_founding=include_founding,
+            )
+        if not matched:
             continue
 
+        description = (job.get("descriptionPlain", "") or "")[:3000]
         location = job.get("location", "")
         is_remote = job.get("isRemote", False) or job.get("workplaceType", "").lower() == "remote"
 
@@ -71,12 +89,13 @@ def _fetch_company_jobs(
             "location": location,
             "url": job.get("jobUrl", ""),
             "source": "ashby",
-            "description": (job.get("descriptionPlain", "") or "")[:3000],
+            "description": description,
             "salary_min": salary_min,
             "salary_max": salary_max,
             "date_posted": job.get("publishedAt", ""),
             "is_remote": is_remote,
             "company_size": "",
+            "crypto": crypto,
         })
 
     return jobs

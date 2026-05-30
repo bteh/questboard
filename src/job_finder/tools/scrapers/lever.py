@@ -11,7 +11,9 @@ from job_finder.tools.scrapers._utils import (
     _get_json,
     _load_seed_slugs,
     _match_roles,
+    _match_roles_crypto,
     _strip_html,
+    is_crypto_company,
 )
 
 logger = logging.getLogger(__name__)
@@ -38,10 +40,25 @@ def _fetch_company_postings(
     if not data or not isinstance(data, list):
         return []
 
+    # Crypto/web3 companies use crypto-aware role matching (see ashby.py).
+    crypto = is_crypto_company(slug)
+
     results: list[dict] = []
     for posting in data:
         title = posting.get("text", "")
-        if not _match_roles(title, roles, match_mode=match_mode, include_founding=include_founding):
+
+        # Gate on the title BEFORE building the (possibly HTML-stripped)
+        # description, so it's only computed for postings that pass the filter.
+        if crypto:
+            matched = _match_roles_crypto(
+                title, roles, match_mode=match_mode,
+                include_founding=include_founding,
+            )
+        else:
+            matched = _match_roles(
+                title, roles, match_mode=match_mode, include_founding=include_founding,
+            )
+        if not matched:
             continue
 
         categories = posting.get("categories", {})
@@ -51,6 +68,7 @@ def _fetch_company_postings(
         desc_plain = posting.get("descriptionPlain", "")
         if not desc_plain:
             desc_plain = _strip_html(posting.get("description", ""))
+        desc_plain = desc_plain[:3000]
 
         results.append({
             "title": title,
@@ -58,12 +76,13 @@ def _fetch_company_postings(
             "location": location,
             "url": posting.get("hostedUrl", ""),
             "source": "lever",
-            "description": desc_plain[:3000],
+            "description": desc_plain,
             "salary_min": None,
             "salary_max": None,
             "date_posted": "",
             "is_remote": workplace == "remote" or "remote" in location.lower(),
             "company_size": "",
+            "crypto": crypto,
         })
 
     return results
