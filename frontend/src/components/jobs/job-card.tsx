@@ -262,12 +262,13 @@ export function JobCard({ app, sourceLabels, latestRunId }: JobCardProps) {
                 onClick={(e) => { e.stopPropagation(); sendFeedback('up'); }}
                 disabled={updateFeedback.isPending}
                 className={cn(
-                  'inline-flex items-center justify-center h-7 w-7 rounded-md transition-colors cursor-pointer',
+                  'inline-flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-md transition-colors cursor-pointer focus-ring',
                   feedback === 'up'
                     ? 'text-success bg-success/10'
                     : 'text-text-muted hover:text-success hover:bg-success/10',
                 )}
                 title={feedback === 'up' ? 'You liked this — click to clear' : 'Good match'}
+                aria-label={feedback === 'up' ? 'Liked — clear feedback' : 'Mark as a good match'}
                 aria-pressed={feedback === 'up'}
               >
                 <ThumbsUp className="h-3.5 w-3.5" />
@@ -277,12 +278,13 @@ export function JobCard({ app, sourceLabels, latestRunId }: JobCardProps) {
                 onClick={(e) => { e.stopPropagation(); sendFeedback('down'); }}
                 disabled={updateFeedback.isPending}
                 className={cn(
-                  'inline-flex items-center justify-center h-7 w-7 rounded-md transition-colors cursor-pointer',
+                  'inline-flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-md transition-colors cursor-pointer focus-ring',
                   feedback === 'down'
                     ? 'text-danger bg-danger/10'
                     : 'text-text-muted hover:text-danger hover:bg-danger/10',
                 )}
                 title={feedback === 'down' ? 'You disliked this — click to clear' : 'Not a match'}
+                aria-label={feedback === 'down' ? 'Disliked — clear feedback' : 'Mark as not a match'}
                 aria-pressed={feedback === 'down'}
               >
                 <ThumbsDown className="h-3.5 w-3.5" />
@@ -298,8 +300,9 @@ export function JobCard({ app, sourceLabels, latestRunId }: JobCardProps) {
                 });
               }}
               disabled={deleteApp.isPending}
-              className="ml-auto inline-flex items-center justify-center h-7 w-7 rounded-md text-text-muted hover:text-danger hover:bg-danger/10 transition-colors opacity-0 group-hover:opacity-100 cursor-pointer"
+              className="ml-auto inline-flex items-center justify-center h-8 w-8 min-h-[44px] min-w-[44px] rounded-md text-text-muted hover:text-danger hover:bg-danger/10 transition-colors opacity-60 group-hover:opacity-100 focus-visible:opacity-100 cursor-pointer focus-ring"
               title="Remove job"
+              aria-label={`Remove ${app.job_title}`}
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>

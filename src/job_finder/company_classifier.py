@@ -332,6 +332,17 @@ _COUNTRY_ALIASES = {
     "uae": "united arab emirates",
 }
 
+# US-inclusive indicators in a remote-scope string (keep for a US user).
+_US_REGION_TOKENS = (
+    "usa only", "us only", "u.s. only", "united states", "us-based", "us based",
+    "us remote", "remote us", "north america", "americas",
+)
+# Clearly-foreign multi-country regions (no specific country, but not US).
+_FOREIGN_REGION_TOKENS = (
+    "emea", "apac", "latam", "europe", "european", "asia pacific", "asia",
+    "africa", "middle east", "latin america",
+)
+
 _REMOTE_KEYWORDS = {"remote", "work from home", "wfh", "anywhere", "distributed"}
 _HYBRID_KEYWORDS = {"hybrid", "in-office", "in office", "on-site", "onsite", "days in office", "office days"}
 _ONSITE_KEYWORDS = {"on-site only", "onsite only", "in-person", "in person", "no remote"}
@@ -705,8 +716,23 @@ def _matches_preferred_places(
     return False
 
 
+# Region/country/scope qualifiers that make a REMOTE listing look like it has a
+# physical location ("USA Only", "Worldwide", "Europe Only") when it doesn't.
+# Stripping these before the city check keeps board-metadata-remote region
+# strings classified as remote instead of being downgraded to hybrid.
+_REMOTE_SCOPE_NOISE = (
+    {"only", "worldwide", "global", "north america", "americas"}
+    | set(_FOREIGN_REGION_TOKENS)
+    | set(_NON_US_COUNTRIES)
+)
+
+
 def _has_physical_location(location: str) -> bool:
-    """Check if the location string contains a real city/state (not just 'Remote')."""
+    """Check if the location string contains a real city/state (not just 'Remote').
+
+    A bare country/region scope ("USA Only", "Worldwide", "Europe Only") is NOT
+    a physical location — only a concrete city/state (e.g. "Durham, NC") is.
+    """
     if not location:
         return False
     cleaned = re.sub(
@@ -714,6 +740,10 @@ def _has_physical_location(location: str) -> bool:
         "", location, flags=re.IGNORECASE,
     )
     cleaned = re.sub(r",?\s*\b(United States|US|USA|U\.S\.)\b", "", cleaned, flags=re.IGNORECASE)
+    # Strip region/country scope qualifiers so a country/region-only remote
+    # string doesn't read as a physical city.
+    for token in sorted(_REMOTE_SCOPE_NOISE, key=len, reverse=True):
+        cleaned = re.sub(r"\b" + re.escape(token) + r"\b", "", cleaned, flags=re.IGNORECASE)
     cleaned = cleaned.strip(" ,-()/")
     # Has a city/state if there's meaningful text left (e.g. "Durham, NC")
     return bool(re.search(r"[A-Za-z]{2,}", cleaned))
@@ -797,6 +827,31 @@ def classify_work_type(
     return "onsite"
 
 
+def _remote_region_scope(raw_location: str) -> str:
+    """Best-effort country scope of a REMOTE job from its location string.
+
+    Returns 'united states' when US-inclusive, a specific foreign country name
+    when one is named, 'non-us' for a clearly-foreign multi-country region, or
+    '' when ambiguous/unspecified (bare 'Remote', 'Worldwide', 'Anywhere').
+    Only EXPLICIT signals produce a non-empty scope so ambiguous remote is kept.
+    """
+    if not raw_location:
+        return ""
+    low = raw_location.lower()
+    # Check US first so a multi-region string that INCLUDES the US is kept
+    # (keep-if-any-match, e.g. "Remote (US/EU)").
+    if any(tok in low for tok in _US_REGION_TOKENS):
+        return "united states"
+    if re.search(r"(?:^|[\s,\-/(])(usa?|u\.s\.?)(?:[\s,\-/).]|$)", low):
+        return "united states"
+    for country in sorted(_NON_US_COUNTRIES, key=len, reverse=True):
+        if re.search(r"(?:^|[\s,\-/(])" + re.escape(country) + r"(?:[\s,\-/).]|$)", low):
+            return _COUNTRY_ALIASES.get(country, country)
+    if any(tok in low for tok in _FOREIGN_REGION_TOKENS):
+        return "non-us"
+    return ""
+
+
 def location_matches_preferences(
     job_location: str,
     is_remote: bool,
@@ -807,6 +862,7 @@ def location_matches_preferences(
     include_remote: bool = True,
     work_type: str = "",
     preferred_places: list[dict[str, Any]] | None = None,
+    preferred_countries: list[str] | None = None,
 ) -> bool:
     """Check if a job location matches user preferences.
 
@@ -818,7 +874,11 @@ def location_matches_preferences(
     4. If no preferences configured -> pass (no filtering).
     """
     # No preferences = no filtering
-    if not preferred_states and not preferred_cities and not preferred_locations and not preferred_places and not remote_only and include_remote:
+    if (
+        not preferred_states and not preferred_cities and not preferred_locations
+        and not preferred_places and not preferred_countries
+        and not remote_only and include_remote
+    ):
         return True
 
     # Use work_type if provided, otherwise fall back to basic detection
@@ -832,8 +892,18 @@ def location_matches_preferences(
     if wt == "remote" and not include_remote:
         return False
 
-    # Rule 3: Fully remote passes (but NOT hybrid)
+    # Rule 3: Fully remote passes (but NOT hybrid) — optionally scoped to the
+    # user's country. When preferred_countries is set (e.g. derived from US
+    # locations), drop remote jobs EXPLICITLY scoped to a different country/
+    # region (e.g. "Remote - India", "Europe Only") while keeping US-scoped,
+    # worldwide, and bare "Remote" listings.
     if wt == "remote":
+        if preferred_countries:
+            scope = _remote_region_scope(job_location)
+            if scope:
+                wants = {c.strip().lower() for c in preferred_countries}
+                if scope.lower() not in wants:
+                    return False
         return True
 
     if preferred_places:

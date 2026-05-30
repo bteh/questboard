@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Slider } from '@/components/ui/slider';
 import { JobCard } from '@/components/jobs/job-card';
 import { JobTable } from '@/components/jobs/job-table';
+import { EmptyState } from '@/components/shared/empty-state';
 import { useQuery } from '@tanstack/react-query';
 import { useApplications } from '@/hooks/use-applications';
 import { pickLatestCompletedRun, useSearchRuns } from '@/hooks/use-search';
@@ -495,22 +496,15 @@ function ApplicationsPage() {
             ))}
           </div>
         ) : items.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-24 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-light mb-5">
-              {hasActiveFilters ? (
-                <SearchX className="h-7 w-7 text-brand" />
-              ) : (
-                <Inbox className="h-7 w-7 text-brand" />
-              )}
-            </div>
-            <h3 className="text-lg font-semibold text-text-primary mb-1.5">
-              {hasActiveFilters ? 'No matching jobs' : 'No applications yet'}
-            </h3>
-            <p className="text-sm text-text-tertiary max-w-md mb-5">
-              {hasActiveFilters
+          <EmptyState
+            icon={hasActiveFilters ? SearchX : Inbox}
+            title={hasActiveFilters ? 'No matching jobs' : 'No applications yet'}
+            description={
+              hasActiveFilters
                 ? 'Try adjusting your filters or broadening your search criteria.'
-                : 'Run a search to discover and track job opportunities.'}
-            </p>
+                : 'Run a search to discover and track job opportunities.'
+            }
+          >
             {hasActiveFilters ? (
               <Button variant="outline" onClick={clearAllFilters} className="gap-1.5">
                 <X className="h-3.5 w-3.5" />
@@ -522,7 +516,7 @@ function ApplicationsPage() {
                 Run your first search
               </Button>
             )}
-          </div>
+          </EmptyState>
         ) : view === 'cards' ? (
           <div className="space-y-4">
             {items.map((app) => (

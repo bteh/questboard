@@ -16,7 +16,7 @@ export function PageHeader({ title, description, children }: PageHeaderProps) {
       <div>
         <h1 className="text-2xl font-semibold text-text-primary tracking-tight">{title}</h1>
         {description && <p className="mt-1 text-sm text-text-tertiary">{description}</p>}
-        {!hostedMode && profile !== 'default' && (
+        {hostedMode && profile !== 'default' && (
           <p className="mt-0.5 text-xs text-text-muted">Profile: {profile}</p>
         )}
       </div>

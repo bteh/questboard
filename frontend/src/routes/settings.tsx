@@ -387,6 +387,23 @@ function SettingsPage() {
     { id: 'auto-apply', label: 'Auto-apply', icon: Rocket },
   ];
 
+  // Roving tabindex for ArrowLeft/ArrowRight keyboard navigation between tabs.
+  const tabButtonRefs = useRef<Record<SettingsTab, HTMLButtonElement | null>>({
+    resume: null,
+    search: null,
+    ai: null,
+    'auto-apply': null,
+  });
+  const handleTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, currentIndex: number) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    const delta = event.key === 'ArrowRight' ? 1 : -1;
+    const nextIndex = (currentIndex + delta + TAB_DEFS.length) % TAB_DEFS.length;
+    const nextTab = TAB_DEFS[nextIndex].id;
+    setActiveTab(nextTab);
+    tabButtonRefs.current[nextTab]?.focus();
+  };
+
   return (
     <div>
       <PageHeader title="Settings" />
@@ -396,15 +413,22 @@ function SettingsPage() {
           1500-line scroll. */}
       <div className="mb-6 border-b border-border-default">
         <nav className="flex gap-1 overflow-x-auto" role="tablist" aria-label="Settings sections">
-          {TAB_DEFS.map(({ id, label, icon: Icon }) => {
+          {TAB_DEFS.map(({ id, label, icon: Icon }, index) => {
             const isActive = activeTab === id;
             return (
               <button
                 key={id}
                 type="button"
                 role="tab"
+                id={`settings-tab-${id}`}
+                aria-controls={`settings-panel-${id}`}
                 aria-selected={isActive}
+                tabIndex={isActive ? 0 : -1}
+                ref={(node) => {
+                  tabButtonRefs.current[id] = node;
+                }}
                 onClick={() => setActiveTab(id)}
+                onKeyDown={(event) => handleTabKeyDown(event, index)}
                 className={cn(
                   'group inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors -mb-px',
                   isActive
@@ -420,7 +444,13 @@ function SettingsPage() {
         </nav>
       </div>
 
-      <div className="max-w-3xl space-y-6">
+      <div
+        className="max-w-3xl space-y-6"
+        role="tabpanel"
+        id={`settings-panel-${activeTab}`}
+        aria-labelledby={`settings-tab-${activeTab}`}
+        tabIndex={0}
+      >
         {/* ── Resume ──────────────────────────────────────────── */}
         {activeTab === 'resume' && (
         <Card>

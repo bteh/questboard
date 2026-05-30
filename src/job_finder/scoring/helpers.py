@@ -9,6 +9,8 @@ from job_finder.scoring.signals import HIGH_COMP_SIGNALS
 
 PAY_PERIOD_FACTORS: dict[str, float] = {
     "hourly": 2080.0,
+    "daily": 260.0,
+    "weekly": 52.0,
     "monthly": 12.0,
     "annual": 1.0,
     "yearly": 1.0,

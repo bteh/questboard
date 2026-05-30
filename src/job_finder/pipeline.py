@@ -15,6 +15,7 @@ import threading
 import time
 import unicodedata
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timedelta, timezone
 from difflib import SequenceMatcher
 from typing import Any, Callable
 
@@ -527,10 +528,30 @@ def _deduplicate(jobs: list[dict]) -> list[dict]:
 def _resolve_location_filter_preferences(
     locations: list[str],
     loc_prefs: dict[str, Any] | None,
-) -> tuple[list[str], list[str], list[str], list[dict[str, Any]], bool, bool]:
-    """Resolve post-search location filtering from explicit prefs or raw locations."""
+) -> tuple[list[str], list[str], list[str], list[dict[str, Any]], bool, bool, list[str]]:
+    """Resolve post-search location filtering from explicit prefs or raw locations.
+
+    The 7th element is ``preferred_countries`` — derived from the preferred
+    locations so a US-based search scopes remote jobs to the US ("if cities are
+    in the US, remote has to be in the US"). Empty when no country signal is
+    present (e.g. a Remote-only search), so ambiguous remote is never dropped.
+    """
     loc_prefs = loc_prefs or {}
     from job_finder.company_classifier import parse_location as _parse_loc
+
+    def _derive_countries(values: list[str]) -> list[str]:
+        countries: list[str] = []
+        for value in values:
+            parsed = _parse_loc(value)
+            if parsed.get("country") == "non-us":
+                name = parsed.get("country_name") or "non-us"
+            elif parsed.get("country") == "US" or parsed.get("state"):
+                name = "united states"
+            else:
+                continue
+            if name not in countries:
+                countries.append(name)
+        return countries
 
     def _derive_state_city_lists(values: list[str]) -> tuple[list[str], list[str]]:
         states: list[str] = []
@@ -576,6 +597,10 @@ def _resolve_location_filter_preferences(
             preferred_cities = derived_cities
         if preferred_locations and not preferred_places:
             preferred_places = _derive_place_payloads(preferred_locations)
+        preferred_countries = (
+            list(loc_prefs.get("preferred_countries", []))
+            or _derive_countries(preferred_locations)
+        )
         return (
             preferred_locations,
             preferred_states,
@@ -583,6 +608,7 @@ def _resolve_location_filter_preferences(
             preferred_places,
             bool(loc_prefs.get("remote_only", False)),
             bool(loc_prefs.get("include_remote", True)),
+            preferred_countries,
         )
 
     pref_locations = [
@@ -604,7 +630,70 @@ def _resolve_location_filter_preferences(
     pref_states.extend([state for state in derived_states if state not in pref_states])
     pref_cities.extend([city for city in derived_cities if city not in pref_cities])
 
-    return pref_locations, pref_states, pref_cities, _derive_place_payloads(pref_locations), remote_only, include_remote
+    return (
+        pref_locations,
+        pref_states,
+        pref_cities,
+        _derive_place_payloads(pref_locations),
+        remote_only,
+        include_remote,
+        _derive_countries(pref_locations),
+    )
+
+
+def _filter_jobs_by_freshness(
+    jobs: list[dict],
+    max_days_old: int,
+    *,
+    now: datetime | None = None,
+) -> list[dict]:
+    """Drop postings older than ``max_days_old`` by their real post date.
+
+    max_days_old is otherwise only an upstream hint most boards ignore, so a
+    months-old reposting can slip through. Jobs whose date is missing or
+    unparseable are KEPT (we don't drop on uncertainty). A 1-day skew buffer
+    absorbs timezone/repost differences. ``max_days_old <= 0`` disables it.
+    """
+    if not max_days_old or max_days_old <= 0:
+        return jobs
+    from job_finder.tools.scrapers._utils import _parse_posted_date
+
+    now = now or datetime.now(timezone.utc)
+    cutoff = now - timedelta(days=max_days_old + 1)
+    kept: list[dict] = []
+    for job in jobs:
+        dt = _parse_posted_date(job.get("date_posted"))
+        if dt is None:
+            kept.append(job)  # unknown date → keep
+            continue
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        if dt >= cutoff:
+            kept.append(job)
+    return kept
+
+
+def _resolve_salary_floor(config: dict | None) -> float:
+    """Annualized salary floor (before strictness flex) from the user's config.
+
+    Reads ``min_acceptable_tc`` / ``min_base`` from BOTH ``compensation`` and
+    ``career_baseline``: the Settings UI persists the hard floor under
+    ``career_baseline`` while older config/templates use ``compensation``, so
+    the filter must honor either — otherwise the UI control silently does
+    nothing (the dead-key bug). Returns 0 when no floor is configured.
+    """
+    config = config or {}
+    comp_cfg = config.get("compensation", {}) or {}
+    career_cfg = config.get("career_baseline", {}) or {}
+    pay_period = comp_cfg.get("pay_period", "annual")
+    raw = (
+        comp_cfg.get("min_acceptable_tc")
+        or career_cfg.get("min_acceptable_tc")
+        or comp_cfg.get("min_base")
+        or career_cfg.get("min_base")
+        or 0
+    )
+    return annualize_amount(raw, pay_period) or 0
 
 
 def _job_salary_passes(job: dict, hard_floor: float) -> bool:
@@ -1328,16 +1417,20 @@ class JobFinderPipeline:
         # Use explicit location_preferences if configured, otherwise auto-derive
         # from the search locations so filtering always works.
         loc_prefs = self.config.get("location_preferences", {})
-        pref_locations, pref_states, pref_cities, pref_places, remote_only, include_remote = _resolve_location_filter_preferences(
+        (
+            pref_locations, pref_states, pref_cities, pref_places,
+            remote_only, include_remote, pref_countries,
+        ) = _resolve_location_filter_preferences(
             locations,
             loc_prefs,
         )
 
         logger.info(
             "Location filter config: filter_enabled=%s, pref_locations=%s, "
-            "pref_states=%s, pref_cities=%s, pref_places=%s, remote_only=%s, include_remote=%s",
+            "pref_states=%s, pref_cities=%s, pref_places=%s, remote_only=%s, "
+            "include_remote=%s, pref_countries=%s",
             loc_prefs.get("filter_enabled"), pref_locations, pref_states,
-            pref_cities, pref_places, remote_only, include_remote,
+            pref_cities, pref_places, remote_only, include_remote, pref_countries,
         )
         if pref_locations or pref_states or pref_cities or pref_places or remote_only or not include_remote:
             pre_count = len(deduped)
@@ -1353,6 +1446,7 @@ class JobFinderPipeline:
                     include_remote=include_remote,
                     work_type=j.get("work_type", ""),
                     preferred_places=pref_places,
+                    preferred_countries=pref_countries,
                 )
             ]
             self._record_funnel_stage("location", "Location filter", pre_count, len(deduped))
@@ -1370,6 +1464,7 @@ class JobFinderPipeline:
                     preferred_places=pref_places,
                     include_remote=include_remote,
                     remote_only=remote_only,
+                    preferred_countries=pref_countries,
                     profile=self.profile_name,
                 )
                 if purged and progress:
@@ -1386,13 +1481,7 @@ class JobFinderPipeline:
         # Use min_acceptable_tc if set (the user's real floor), otherwise
         # fall back to min_base. Only a small flex (15%) to account for
         # equity/bonus that aren't in the listed base range.
-        comp_cfg = self.config.get("compensation", {})
-        pay_period = comp_cfg.get("pay_period", "annual")
-        salary_floor_raw = (
-            comp_cfg.get("min_acceptable_tc")
-            or comp_cfg.get("min_base", 0)
-        )
-        salary_floor = annualize_amount(salary_floor_raw, pay_period) or 0
+        salary_floor = _resolve_salary_floor(self.config)
         if salary_floor and salary_floor > 0:
             hard_floor = salary_floor * float(filter_settings["salary_flex"])
             pre_count = len(deduped)
@@ -1407,6 +1496,20 @@ class JobFinderPipeline:
         else:
             self._record_funnel_stage(
                 "salary", "Salary floor", len(deduped), len(deduped), active=False,
+            )
+
+        # --- Freshness filter: drop postings older than max_days_old ---
+        # (keeps jobs with unknown/unparseable dates so we don't over-drop).
+        if max_days_old and max_days_old > 0:
+            pre_fresh = len(deduped)
+            deduped = _filter_jobs_by_freshness(deduped, max_days_old)
+            dropped = pre_fresh - len(deduped)
+            self._record_funnel_stage("freshness", "Freshness filter", pre_fresh, len(deduped))
+            if dropped and progress:
+                progress(f"Freshness filter: removed {dropped} postings older than {max_days_old} days")
+        else:
+            self._record_funnel_stage(
+                "freshness", "Freshness filter", len(deduped), len(deduped), active=False,
             )
 
         # --- Level filter: remove jobs too far above or below current level ---
@@ -1728,7 +1831,10 @@ class JobFinderPipeline:
         leak back into the final saved results.
         """
         loc_prefs = self.config.get("location_preferences", {})
-        pref_locations, pref_states, pref_cities, pref_places, remote_only, include_remote = _resolve_location_filter_preferences(
+        (
+            pref_locations, pref_states, pref_cities, pref_places,
+            remote_only, include_remote, pref_countries,
+        ) = _resolve_location_filter_preferences(
             self.config.get("locations", []),
             loc_prefs,
         )
@@ -1747,6 +1853,7 @@ class JobFinderPipeline:
                 include_remote=include_remote,
                 work_type=job.get("work_type", ""),
                 preferred_places=pref_places,
+                preferred_countries=pref_countries,
             )
         ]
         dropped = len(jobs) - len(filtered)

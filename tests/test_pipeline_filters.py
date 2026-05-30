@@ -374,7 +374,7 @@ class LevelFilterTest(unittest.TestCase):
 
 class LocationPreferenceResolutionTest(unittest.TestCase):
     def test_empty_locations_skip_filter_and_keep_remote_enabled(self) -> None:
-        pref_locations, pref_states, pref_cities, pref_places, remote_only, include_remote = _resolve_location_filter_preferences(
+        (pref_locations, pref_states, pref_cities, pref_places, remote_only, include_remote, _pref_countries) = _resolve_location_filter_preferences(
             [],
             {"filter_enabled": False, "include_remote": True, "remote_only": False},
         )
@@ -387,7 +387,7 @@ class LocationPreferenceResolutionTest(unittest.TestCase):
         self.assertTrue(include_remote)
 
     def test_specific_locations_without_remote_marker_exclude_remote(self) -> None:
-        pref_locations, pref_states, pref_cities, pref_places, remote_only, include_remote = _resolve_location_filter_preferences(
+        (pref_locations, pref_states, pref_cities, pref_places, remote_only, include_remote, _pref_countries) = _resolve_location_filter_preferences(
             ["San Francisco, CA"],
             {},
         )
@@ -401,7 +401,7 @@ class LocationPreferenceResolutionTest(unittest.TestCase):
         self.assertFalse(include_remote)
 
     def test_filter_enabled_derives_state_and_city_from_preferred_locations(self) -> None:
-        pref_locations, pref_states, pref_cities, pref_places, remote_only, include_remote = _resolve_location_filter_preferences(
+        (pref_locations, pref_states, pref_cities, pref_places, remote_only, include_remote, _pref_countries) = _resolve_location_filter_preferences(
             [],
             {
                 "filter_enabled": True,
