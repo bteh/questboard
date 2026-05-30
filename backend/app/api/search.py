@@ -269,6 +269,27 @@ async def stream_run_progress(
     )
 
 
+def _persisted_runstatus(db: Session, workspace_id: str, run) -> RunStatus:
+    """Map a persisted WorkspaceSearchRun row to a RunStatus.
+
+    Used so local (non-hosted) run history survives an in-memory wipe — the
+    in-process ``_runs`` dict is cleared on every uvicorn --reload, but the run
+    rows are persisted to workspace_search_runs.
+    """
+    return RunStatus(
+        run_id=run.run_id,
+        status=run.status,
+        started_at=run.started_at,
+        completed_at=run.completed_at,
+        progress_messages=workspace_service.get_progress_messages(
+            db, workspace_id, run.run_id, limit=20,
+        ),
+        jobs_found=run.jobs_found,
+        jobs_scored=run.jobs_scored,
+        error=run.error or None,
+    )
+
+
 @router.get("/runs/{run_id}/status", response_model=RunStatus)
 async def get_run_status(
     run_id: str,
@@ -296,19 +317,24 @@ async def get_run_status(
         )
 
     run = pipeline_service.get_run(run_id)
-    if not run:
-        raise HTTPException(404, f"Run {run_id} not found")
-    _authorize_run_access(run, workspace)
-    return RunStatus(
-        run_id=run.run_id,
-        status=run.status,
-        started_at=run.started_at,
-        completed_at=run.completed_at,
-        progress_messages=run.progress_messages,
-        jobs_found=run.jobs_found,
-        jobs_scored=run.jobs_scored,
-        error=run.error,
-    )
+    if run:
+        _authorize_run_access(run, workspace)
+        return RunStatus(
+            run_id=run.run_id,
+            status=run.status,
+            started_at=run.started_at,
+            completed_at=run.completed_at,
+            progress_messages=run.progress_messages,
+            jobs_found=run.jobs_found,
+            jobs_scored=run.jobs_scored,
+            error=run.error,
+        )
+    # In-memory run gone (e.g. after a --reload/restart) — read the persisted row.
+    if workspace:
+        persisted = workspace_service.get_search_run(db, workspace.workspace.id, run_id)
+        if persisted:
+            return _persisted_runstatus(db, workspace.workspace.id, persisted)
+    raise HTTPException(404, f"Run {run_id} not found")
 
 
 @router.get("/runs", response_model=list[RunStatus])
@@ -343,8 +369,11 @@ async def list_runs(
             for r in runs
         ]
 
-    runs = pipeline_service.list_runs(limit=limit, workspace_id=workspace.workspace.id if workspace else None)
-    return [
+    ws_id = workspace.workspace.id if workspace else None
+    # Live in-memory runs first (source of active progress), then persisted
+    # rows the in-memory state has lost (post-reload), deduped by run_id. This
+    # keeps the UI's "latest run" anchor stable across backend reloads.
+    results: list[RunStatus] = [
         RunStatus(
             run_id=r.run_id,
             status=r.status,
@@ -355,8 +384,15 @@ async def list_runs(
             jobs_scored=r.jobs_scored,
             error=r.error,
         )
-        for r in runs
+        for r in pipeline_service.list_runs(limit=limit, workspace_id=ws_id)
     ]
+    seen = {r.run_id for r in results}
+    if workspace:
+        for r in workspace_service.list_search_runs(db, ws_id, limit=limit):
+            if r.run_id not in seen:
+                results.append(_persisted_runstatus(db, ws_id, r))
+                seen.add(r.run_id)
+    return results[:limit]
 
 
 def _funnel_from_run(run) -> FunnelSummary:
@@ -397,13 +433,18 @@ async def get_latest_funnel(
 async def get_run_funnel(
     run_id: str,
     workspace = Depends(get_active_workspace_context),
+    db: Session = Depends(get_db),
 ):
     """Return the funnel for a specific run."""
     run = pipeline_service.get_run(run_id)
-    if not run:
-        raise HTTPException(404, f"Run {run_id} not found")
-    _authorize_run_access(run, workspace)
-    return _funnel_from_run(run)
+    if run:
+        _authorize_run_access(run, workspace)
+        return _funnel_from_run(run)
+    # Persisted run whose in-memory funnel was wiped by a reload — the per-stage
+    # funnel isn't persisted yet, so degrade to empty stages rather than 404.
+    if workspace and workspace_service.get_search_run(db, workspace.workspace.id, run_id):
+        return FunnelSummary(stages=[])
+    raise HTTPException(404, f"Run {run_id} not found")
 
 
 @router.get("/defaults", response_model=SearchDefaults)
