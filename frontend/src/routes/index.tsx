@@ -8,6 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { PageHeader } from '@/components/layout/page-header';
 import { JobCard } from '@/components/jobs/job-card';
 import { ActivityItem } from '@/components/shared/activity-item';
+import { EmptyState } from '@/components/shared/empty-state';
 import { FirstRunHero } from '@/components/onboarding/first-run-hero';
 import { ReadyToLaunchHero } from '@/components/onboarding/ready-to-launch-hero';
 import { useDashboardStats } from '@/hooks/use-analytics';
@@ -77,9 +78,9 @@ function DashboardPage() {
 
   const metrics = [
     { label: 'Total found', value: stats?.total_jobs ?? 0, icon: Briefcase, bg: 'bg-brand-light', fg: 'text-brand' },
-    { label: 'Strong matches', value: stats?.strong_apply_count ?? 0, icon: Star, bg: 'bg-brand-light', fg: 'text-brand' },
+    { label: 'Strong matches', value: stats?.strong_apply_count ?? 0, icon: Star, bg: 'bg-success/10', fg: 'text-success' },
     { label: 'Applied', value: stats?.applied_count ?? 0, icon: Send, bg: 'bg-brand-light', fg: 'text-brand' },
-    { label: 'Interviewing', value: stats?.interviewing_count ?? 0, icon: Phone, bg: 'bg-brand-light', fg: 'text-brand' },
+    { label: 'Interviewing', value: stats?.interviewing_count ?? 0, icon: Phone, bg: 'bg-warning/10', fg: 'text-warning' },
   ];
 
   return (
@@ -103,7 +104,13 @@ function DashboardPage() {
           <Card key={m.label} className="card-interactive">
             <CardContent className="flex items-center gap-4 p-5">
               {statsLoading ? (
-                <Skeleton className="h-12 w-full" />
+                <>
+                  <Skeleton className="h-9 w-9 rounded-lg shrink-0" />
+                  <div className="space-y-1.5">
+                    <Skeleton className="h-6 w-10" />
+                    <Skeleton className="h-3 w-20" />
+                  </div>
+                </>
               ) : (
                 <>
                   <div className={`flex h-9 w-9 items-center justify-center rounded-lg shrink-0 ${m.bg}`}>
@@ -140,34 +147,29 @@ function DashboardPage() {
               ))}
             </div>
           ) : topJobs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-light mb-5">
-                <Inbox className="h-7 w-7 text-brand" />
-              </div>
-              {latestRunId ? (
-                <>
-                  <h3 className="text-base font-semibold text-text-primary mb-1.5">No matches in your latest search</h3>
-                  <p className="text-sm text-text-tertiary mb-5 max-w-sm leading-relaxed">
-                    Your most recent run did not keep any jobs after filtering. You can adjust your search criteria or browse older tracked jobs.
-                  </p>
-                  <div className="flex items-center gap-3">
-                    <Button onClick={() => navigate({ to: '/search' })} size="sm">
-                      <Search className="h-4 w-4 mr-2" /> Refine search
-                    </Button>
-                    <Button onClick={() => navigate({ to: '/applications', search: { scope: 'all', run: undefined } })} variant="outline" size="sm">
-                      Browse history
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <h3 className="text-base font-semibold text-text-primary mb-5">Start your first search</h3>
+            latestRunId ? (
+              <EmptyState
+                icon={Inbox}
+                size="sm"
+                title="No matches in your latest search"
+                description="Your most recent run did not keep any jobs after filtering. You can adjust your search criteria or browse older tracked jobs."
+              >
+                <div className="flex items-center gap-3">
                   <Button onClick={() => navigate({ to: '/search' })} size="sm">
-                    <Search className="h-4 w-4 mr-2" /> New search
+                    <Search className="h-4 w-4 mr-2" /> Refine search
                   </Button>
-                </>
-              )}
-            </div>
+                  <Button onClick={() => navigate({ to: '/applications', search: { scope: 'all', run: undefined } })} variant="outline" size="sm">
+                    Browse history
+                  </Button>
+                </div>
+              </EmptyState>
+            ) : (
+              <EmptyState icon={Inbox} size="sm" title="Start your first search">
+                <Button onClick={() => navigate({ to: '/search' })} size="sm">
+                  <Search className="h-4 w-4 mr-2" /> New search
+                </Button>
+              </EmptyState>
+            )
           ) : (
             <div className="space-y-4">
               {topJobs.map((app) => (
