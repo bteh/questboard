@@ -1,4 +1,4 @@
-.PHONY: help setup dev dev-hosted stop-dev backend frontend search clean docker doctor doctor-env dev-hosted-reset desktop-dev desktop-build desktop-install desktop-smoke reauth-claude
+.PHONY: help start setup dev dev-hosted stop-dev backend frontend search clean clean-data docker doctor doctor-env dev-hosted-reset desktop-dev desktop-build desktop-install desktop-smoke reauth-claude
 
 # ── Venv detection ────────────────────────────────────────────────────
 # All Python commands run through the venv. `make setup` creates it.
@@ -45,34 +45,21 @@ setup-ai: ## Set up AI (install Ollama + download model)
 
 # ── Development ────────────────────────────────────────────────────────
 
-dev: .venv ## Start backend + frontend for development
-	@echo "\n  Starting Launchboard...\n"
-	@echo "  Backend:  http://localhost:8000"
-	@echo "  Frontend: http://localhost:5173"
-	@echo "  Press Ctrl+C to stop\n"
-	@normalize_pids() { printf '%s\n' "$$*" | tr ' ' '\n' | sed '/^$$/d' | sort -u | xargs 2>/dev/null || true; }; \
-	describe_pids() { for pid in $$*; do cmd=$$(ps -o command= -p "$$pid" 2>/dev/null | head -n 1); [ -n "$$cmd" ] || cmd="(process exited)"; echo "    $$pid $$cmd"; done; }; \
-	backend_pid=$$(normalize_pids "$$(lsof -tiTCP:8000 -sTCP:LISTEN 2>/dev/null || true)"); \
-	frontend_pid=$$(normalize_pids "$$(lsof -tiTCP:5173 -sTCP:LISTEN 2>/dev/null || true)"); \
-	if [ -n "$$backend_pid" ] || [ -n "$$frontend_pid" ]; then \
-		echo "  Existing dev server detected."; \
-		if [ -n "$$backend_pid" ]; then \
-			echo "  Port 8000 in use by:"; \
-			describe_pids $$backend_pid; \
-		fi; \
-		if [ -n "$$frontend_pid" ]; then \
-			echo "  Port 5173 in use by:"; \
-			describe_pids $$frontend_pid; \
-		fi; \
-		echo ""; \
-		echo "  Run 'make stop-dev' first, or kill those processes manually."; \
-		echo ""; \
-		exit 1; \
-	fi
+start: .venv ## Start Launchboard — local, one command (http://localhost:5173)
+	@echo ""
+	@echo "  Starting Launchboard (local)"
+	@echo "  App:  http://localhost:5173"
+	@echo "  API:  http://localhost:8000"
+	@echo "  (Ctrl+C to stop)"
+	@echo ""
+	@$(MAKE) --no-print-directory stop-dev >/dev/null 2>&1 || true
 	@trap 'kill 0' EXIT; \
 		cd backend && PYTHONPATH=../src $(CURDIR)/$(PYTHON) -m uvicorn app.main:app --reload --reload-dir . --reload-dir ../src --host 127.0.0.1 --port 8000 & \
 		cd frontend && npm run dev & \
 		wait
+
+dev: .venv ## Alias for `start`
+	@$(MAKE) --no-print-directory start
 
 dev-hosted: .venv ## Start the hosted-like local sandbox with persona auth + worker
 	@echo "\n  Starting Launchboard hosted sandbox...\n"
@@ -359,14 +346,16 @@ doctor-env: ## Check your dev environment for common install/setup issues
 
 # ── Utilities ──────────────────────────────────────────────────────────
 
-clean: ## Remove generated files (DB, caches, node_modules)
-	rm -rf data/*.db
-	rm -rf data/dev-hosted
+clean: ## Remove caches + build artifacts (keeps your local job data)
 	rm -rf .desktop-build
 	rm -f frontend/src-tauri/resources/sidecars/launchboard-runtime frontend/src-tauri/resources/sidecars/launchboard-runtime.exe
 	rm -f .desktop-build/tauri-sidecars/launchboard-runtime .desktop-build/tauri-sidecars/launchboard-runtime.exe
 	rm -rf src/job_finder/output/*
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+
+clean-data: ## DESTRUCTIVE: delete local job database + hosted sandbox data
+	rm -rf data/*.db
+	rm -rf data/dev-hosted
 
 reset: ## Full reset (removes venv + node_modules, then re-runs setup)
 	rm -rf .venv frontend/node_modules
