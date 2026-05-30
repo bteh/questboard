@@ -606,15 +606,22 @@ def purge_non_matching_locations(
     preferred_places: list[dict] | None = None,
     include_remote: bool = True,
     remote_only: bool = False,
+    preferred_countries: list[str] | None = None,
     profile: str | None = None,
     workspace_id: str | None = None,
 ) -> int:
     """Delete existing records that don't match location preferences.
 
-    Remote jobs are always kept. When ``profile`` is provided, only records
-    for that profile are considered. Returns the number of deleted records.
+    Remote jobs are kept unless ``preferred_countries`` scopes them to a
+    country (then explicitly-foreign remote is dropped, matching the live
+    filter). When ``profile`` is provided, only records for that profile are
+    considered. Returns the number of deleted records.
     """
-    if not preferred_states and not preferred_cities and not preferred_locations and not preferred_places and include_remote and not remote_only:
+    if (
+        not preferred_states and not preferred_cities and not preferred_locations
+        and not preferred_places and not preferred_countries
+        and include_remote and not remote_only
+    ):
         return 0
 
     from job_finder.company_classifier import (
@@ -649,6 +656,7 @@ def purge_non_matching_locations(
                 include_remote=include_remote,
                 work_type=wt,
                 preferred_places=preferred_places,
+                preferred_countries=preferred_countries,
             ):
                 session.delete(rec)
                 deleted += 1

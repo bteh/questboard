@@ -527,10 +527,30 @@ def _deduplicate(jobs: list[dict]) -> list[dict]:
 def _resolve_location_filter_preferences(
     locations: list[str],
     loc_prefs: dict[str, Any] | None,
-) -> tuple[list[str], list[str], list[str], list[dict[str, Any]], bool, bool]:
-    """Resolve post-search location filtering from explicit prefs or raw locations."""
+) -> tuple[list[str], list[str], list[str], list[dict[str, Any]], bool, bool, list[str]]:
+    """Resolve post-search location filtering from explicit prefs or raw locations.
+
+    The 7th element is ``preferred_countries`` — derived from the preferred
+    locations so a US-based search scopes remote jobs to the US ("if cities are
+    in the US, remote has to be in the US"). Empty when no country signal is
+    present (e.g. a Remote-only search), so ambiguous remote is never dropped.
+    """
     loc_prefs = loc_prefs or {}
     from job_finder.company_classifier import parse_location as _parse_loc
+
+    def _derive_countries(values: list[str]) -> list[str]:
+        countries: list[str] = []
+        for value in values:
+            parsed = _parse_loc(value)
+            if parsed.get("country") == "non-us":
+                name = parsed.get("country_name") or "non-us"
+            elif parsed.get("country") == "US" or parsed.get("state"):
+                name = "united states"
+            else:
+                continue
+            if name not in countries:
+                countries.append(name)
+        return countries
 
     def _derive_state_city_lists(values: list[str]) -> tuple[list[str], list[str]]:
         states: list[str] = []
@@ -576,6 +596,10 @@ def _resolve_location_filter_preferences(
             preferred_cities = derived_cities
         if preferred_locations and not preferred_places:
             preferred_places = _derive_place_payloads(preferred_locations)
+        preferred_countries = (
+            list(loc_prefs.get("preferred_countries", []))
+            or _derive_countries(preferred_locations)
+        )
         return (
             preferred_locations,
             preferred_states,
@@ -583,6 +607,7 @@ def _resolve_location_filter_preferences(
             preferred_places,
             bool(loc_prefs.get("remote_only", False)),
             bool(loc_prefs.get("include_remote", True)),
+            preferred_countries,
         )
 
     pref_locations = [
@@ -604,7 +629,15 @@ def _resolve_location_filter_preferences(
     pref_states.extend([state for state in derived_states if state not in pref_states])
     pref_cities.extend([city for city in derived_cities if city not in pref_cities])
 
-    return pref_locations, pref_states, pref_cities, _derive_place_payloads(pref_locations), remote_only, include_remote
+    return (
+        pref_locations,
+        pref_states,
+        pref_cities,
+        _derive_place_payloads(pref_locations),
+        remote_only,
+        include_remote,
+        _derive_countries(pref_locations),
+    )
 
 
 def _job_salary_passes(job: dict, hard_floor: float) -> bool:
@@ -1328,16 +1361,20 @@ class JobFinderPipeline:
         # Use explicit location_preferences if configured, otherwise auto-derive
         # from the search locations so filtering always works.
         loc_prefs = self.config.get("location_preferences", {})
-        pref_locations, pref_states, pref_cities, pref_places, remote_only, include_remote = _resolve_location_filter_preferences(
+        (
+            pref_locations, pref_states, pref_cities, pref_places,
+            remote_only, include_remote, pref_countries,
+        ) = _resolve_location_filter_preferences(
             locations,
             loc_prefs,
         )
 
         logger.info(
             "Location filter config: filter_enabled=%s, pref_locations=%s, "
-            "pref_states=%s, pref_cities=%s, pref_places=%s, remote_only=%s, include_remote=%s",
+            "pref_states=%s, pref_cities=%s, pref_places=%s, remote_only=%s, "
+            "include_remote=%s, pref_countries=%s",
             loc_prefs.get("filter_enabled"), pref_locations, pref_states,
-            pref_cities, pref_places, remote_only, include_remote,
+            pref_cities, pref_places, remote_only, include_remote, pref_countries,
         )
         if pref_locations or pref_states or pref_cities or pref_places or remote_only or not include_remote:
             pre_count = len(deduped)
@@ -1353,6 +1390,7 @@ class JobFinderPipeline:
                     include_remote=include_remote,
                     work_type=j.get("work_type", ""),
                     preferred_places=pref_places,
+                    preferred_countries=pref_countries,
                 )
             ]
             self._record_funnel_stage("location", "Location filter", pre_count, len(deduped))
@@ -1370,6 +1408,7 @@ class JobFinderPipeline:
                     preferred_places=pref_places,
                     include_remote=include_remote,
                     remote_only=remote_only,
+                    preferred_countries=pref_countries,
                     profile=self.profile_name,
                 )
                 if purged and progress:
@@ -1728,7 +1767,10 @@ class JobFinderPipeline:
         leak back into the final saved results.
         """
         loc_prefs = self.config.get("location_preferences", {})
-        pref_locations, pref_states, pref_cities, pref_places, remote_only, include_remote = _resolve_location_filter_preferences(
+        (
+            pref_locations, pref_states, pref_cities, pref_places,
+            remote_only, include_remote, pref_countries,
+        ) = _resolve_location_filter_preferences(
             self.config.get("locations", []),
             loc_prefs,
         )
@@ -1747,6 +1789,7 @@ class JobFinderPipeline:
                 include_remote=include_remote,
                 work_type=job.get("work_type", ""),
                 preferred_places=pref_places,
+                preferred_countries=pref_countries,
             )
         ]
         dropped = len(jobs) - len(filtered)
