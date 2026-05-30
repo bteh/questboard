@@ -215,6 +215,55 @@ def _dedup_key(company: str, title: str, location: str = "") -> str:
     ))
 
 
+def _loc_is_remote(job: dict) -> bool:
+    if job.get("is_remote"):
+        return True
+    loc = (job.get("location") or "").lower()
+    return any(k in loc for k in ("remote", "anywhere", "worldwide", "distributed"))
+
+
+def _short_or_empty_description(text: str) -> bool:
+    """True when a description is too thin to disprove a cross-board duplicate."""
+    return len(_normalize_description(text or "")) < 120
+
+
+def _locations_compatible(a: dict, b: dict) -> bool:
+    """Could two same-company/title jobs be the same posting, by location?
+
+    Remote↔remote and same-concrete-location (or one unknown) are compatible;
+    remote↔onsite and two DIFFERENT concrete cities are distinct openings.
+    """
+    a_rem, b_rem = _loc_is_remote(a), _loc_is_remote(b)
+    if a_rem and b_rem:
+        return True
+    if a_rem != b_rem:
+        return False
+    loc_a = _normalize_location(a.get("location", ""))
+    loc_b = _normalize_location(b.get("location", ""))
+    if not loc_a or not loc_b:
+        return True
+    return loc_a == loc_b
+
+
+def _same_posting(a: dict, b: dict) -> bool:
+    """Cross-board duplicate detection: the same opening from different sources.
+
+    Merges when locations are compatible AND either the descriptions look like
+    the same posting OR one side's description is too thin to disprove it.
+    Two substantial-but-different descriptions at a compatible location are
+    treated as distinct roles (no over-merge).
+    """
+    if not _locations_compatible(a, b):
+        return False
+    desc_a = a.get("description", "")
+    desc_b = b.get("description", "")
+    if _descriptions_look_duplicate(desc_a, desc_b):
+        return True
+    if _short_or_empty_description(desc_a) or _short_or_empty_description(desc_b):
+        return True
+    return False
+
+
 # -- Seniority / management prefixes used for search-term consolidation ------
 
 _SENIORITY_PREFIXES = [
@@ -492,9 +541,12 @@ def _deduplicate(jobs: list[dict]) -> list[dict]:
     for job in collapsed:
         company = job.get("company", "")
         title = job.get("title", "")
-        location = job.get("location", "")
-        if company and title and _normalize_location(location):
-            key = _dedup_key(company, title, location)
+        # Key on company+title only (no location) so cross-board duplicates that
+        # differ in location text — or have no location on one source — still
+        # land in the same group. _same_posting then separates distinct openings
+        # (different cities, remote-vs-onsite, or both-substantial-different).
+        if company and title:
+            key = _dedup_key(company, title)
             groups.setdefault(key, []).append(job)
         else:
             no_key.append(job)
@@ -508,10 +560,7 @@ def _deduplicate(jobs: list[dict]) -> list[dict]:
         for job in group:
             placed = False
             for cluster in clusters:
-                if _descriptions_look_duplicate(
-                    job.get("description", ""),
-                    cluster[0].get("description", ""),
-                ):
+                if _same_posting(job, cluster[0]):
                     cluster.append(job)
                     placed = True
                     break
