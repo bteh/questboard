@@ -161,6 +161,7 @@ def score_career_progression(
     salary_min: float | None,
     salary_max: float | None,
     config: dict,
+    salary_period: str = "",
 ) -> float:
     """Score whether this job represents a career upgrade (0\u2013100)."""
     baseline = config.get("career_baseline", {})
@@ -169,6 +170,11 @@ def score_career_progression(
     user_period = compensation_cfg.get("pay_period", "annual")
     current_tc = annualize_amount(baseline.get("current_tc", 100_000), user_period) or 100_000
     job_level = _extract_level(job_title)
+    # Annualize the job's salary so an hourly/monthly listing isn't mistaken for
+    # a catastrophic step-down vs the annualized current_tc (score_comp already
+    # annualizes; this keeps the two dimensions consistent).
+    if salary_period:
+        salary_max = annualize_amount(salary_max, salary_period) or salary_max
 
     score = 50.0  # neutral
 

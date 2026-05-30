@@ -341,6 +341,16 @@ def search_jobs(
                     row.get("company_num_employees", "")
                 ),
             }
+            # Capture JobSpy's pay interval (yearly/monthly/weekly/daily/hourly)
+            # so salary scoring + the salary floor filter can annualize instead
+            # of treating an $80/hr listing as an $80 salary.
+            interval = _safe_str(row.get("interval", "")).strip().lower()
+            job["salary_period"] = interval
+            job["salary_currency"] = _safe_str(row.get("currency", ""))
+            if interval:
+                from job_finder.scoring.helpers import annualize_amount
+                job["salary_min_annualized"] = annualize_amount(job["salary_min"], interval)
+                job["salary_max_annualized"] = annualize_amount(job["salary_max"], interval)
             jobs_list.append(job)
 
         return jobs_list

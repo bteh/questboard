@@ -144,6 +144,7 @@ def score_job_basic(
 
     progression = score_career_progression(
         job_title, job_description, salary_min, salary_max, cfg,
+        salary_period=salary_period,
     )
 
     overall = (

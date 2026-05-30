@@ -640,6 +640,29 @@ def _resolve_location_filter_preferences(
     )
 
 
+def _resolve_salary_floor(config: dict | None) -> float:
+    """Annualized salary floor (before strictness flex) from the user's config.
+
+    Reads ``min_acceptable_tc`` / ``min_base`` from BOTH ``compensation`` and
+    ``career_baseline``: the Settings UI persists the hard floor under
+    ``career_baseline`` while older config/templates use ``compensation``, so
+    the filter must honor either — otherwise the UI control silently does
+    nothing (the dead-key bug). Returns 0 when no floor is configured.
+    """
+    config = config or {}
+    comp_cfg = config.get("compensation", {}) or {}
+    career_cfg = config.get("career_baseline", {}) or {}
+    pay_period = comp_cfg.get("pay_period", "annual")
+    raw = (
+        comp_cfg.get("min_acceptable_tc")
+        or career_cfg.get("min_acceptable_tc")
+        or comp_cfg.get("min_base")
+        or career_cfg.get("min_base")
+        or 0
+    )
+    return annualize_amount(raw, pay_period) or 0
+
+
 def _job_salary_passes(job: dict, hard_floor: float) -> bool:
     """Return True if the job's salary meets the hard floor, or is unknown.
 
@@ -1425,13 +1448,7 @@ class JobFinderPipeline:
         # Use min_acceptable_tc if set (the user's real floor), otherwise
         # fall back to min_base. Only a small flex (15%) to account for
         # equity/bonus that aren't in the listed base range.
-        comp_cfg = self.config.get("compensation", {})
-        pay_period = comp_cfg.get("pay_period", "annual")
-        salary_floor_raw = (
-            comp_cfg.get("min_acceptable_tc")
-            or comp_cfg.get("min_base", 0)
-        )
-        salary_floor = annualize_amount(salary_floor_raw, pay_period) or 0
+        salary_floor = _resolve_salary_floor(self.config)
         if salary_floor and salary_floor > 0:
             hard_floor = salary_floor * float(filter_settings["salary_flex"])
             pre_count = len(deduped)
