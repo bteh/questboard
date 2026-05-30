@@ -1,20 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createRoute, useNavigate } from '@tanstack/react-router';
 import { Route as rootRoute } from './__root';
-import { Search as SearchIcon, CheckCircle2, XCircle, FileText, Loader2, Sparkles, ArrowRight, Circle, SlidersHorizontal, ChevronDown, ChevronRight, BarChart3, Bot, Zap, Globe } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { SearchAreaSection } from '@/components/shared/search-area-section';
-import { JobBoardOptionsSection } from '@/components/shared/job-board-options-section';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Slider } from '@/components/ui/slider';
-import { Progress } from '@/components/ui/progress';
-import { Skeleton } from '@/components/ui/skeleton';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { PageHeader } from '@/components/layout/page-header';
-import { PipelineSteps } from '@/components/shared/pipeline-steps';
-import { ConnectAiPopover } from '@/components/onboarding/connect-ai-popover';
+import { Search as SearchIcon, BarChart3, Bot } from 'lucide-react';
 import { useStartSearch, useSearchDefaults, useSuggestSearch } from '@/hooks/use-search';
 import { toast } from 'sonner';
 import { useLLMStatus } from '@/hooks/use-settings';
@@ -22,15 +9,12 @@ import { useOnboardingState, useSaveWorkspacePreferences } from '@/hooks/use-wor
 import { useWorkspace } from '@/contexts/workspace-context';
 import { useProfile } from '@/contexts/profile-context';
 import { useSearchContext } from '@/contexts/search-context';
-import { cn } from '@/lib/utils';
 import type { FunnelSummary as FunnelSummaryData, MatchStrictness, SearchRequest, SearchRunSnapshot } from '@/types/search';
 import { getRunFunnel } from '@/api/search';
-import { FunnelSummary } from '@/components/jobs/funnel-summary';
 import type { PlaceSelection } from '@/types/workspace';
-import { useScraperSources, buildSourceLabels, resolveSourceLabel } from '@/hooks/use-scrapers';
+import { useScraperSources, buildSourceLabels } from '@/hooks/use-scrapers';
 import {
   createManualPlace,
-  getWorkplacePreferenceLabel,
   normalizePlaceList,
   type WorkplacePreference,
 } from '@/lib/profile-preferences';
@@ -48,174 +32,15 @@ import {
   resolveSavedSearchAreaDefaults,
   resolveSearchSnapshotMetadata,
 } from '@/lib/search-preferences';
+import { SearchConfigForm } from '@/components/search/SearchConfigForm';
+import { SearchRunView } from '@/components/search/SearchRunView';
+import { getStagesForMode } from '@/components/search/search-leaf';
 
 export const Route = createRoute({
   getParentRoute: () => rootRoute,
   path: '/search',
   component: SearchPage,
 });
-
-const MODE_LABELS: Record<string, string> = {
-  search_only: 'Find Jobs', search_score: 'Find & Rank', full_pipeline: 'Find, Rank & Prepare',
-};
-
-function formatCurrency(value: number | null | undefined, currency = 'USD'): string {
-  if (value == null) return 'Not set';
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function compactList(values: string[], limit = 8): { visible: string[]; hidden: number } {
-  return {
-    visible: values.slice(0, limit),
-    hidden: Math.max(values.length - limit, 0),
-  };
-}
-
-const STRICTNESS_OPTIONS: { value: MatchStrictness; label: string; hint: string }[] = [
-  { value: 'loose', label: 'Loose', hint: 'Wider net — more results, looser matches' },
-  { value: 'balanced', label: 'Balanced', hint: 'Default behavior — matches most users' },
-  { value: 'strict', label: 'Strict', hint: 'Tight matches only — fewer, more relevant results' },
-];
-
-function MatchStrictnessControl({
-  value,
-  onChange,
-}: {
-  value: MatchStrictness;
-  onChange: (value: MatchStrictness) => void;
-}) {
-  return (
-    <div
-      role="radiogroup"
-      aria-label="Match strictness"
-      className="grid grid-cols-3 gap-1 rounded-lg border border-border-default bg-bg-card p-1"
-    >
-      {STRICTNESS_OPTIONS.map((opt) => {
-        const selected = opt.value === value;
-        return (
-          <button
-            key={opt.value}
-            type="button"
-            role="radio"
-            aria-checked={selected}
-            title={opt.hint}
-            onClick={() => onChange(opt.value)}
-            className={cn(
-              'rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
-              selected
-                ? 'bg-brand-light/60 text-brand'
-                : 'text-text-tertiary hover:text-text-secondary',
-            )}
-          >
-            {opt.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function SnapshotField({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-}) {
-  return (
-    <div className="rounded-lg border border-border-default bg-bg-card/70 px-3 py-2">
-      <p
-        className="text-[11px] font-medium text-text-muted"
-        title={hint}
-      >
-        {label}
-      </p>
-      <p className="mt-0.5 text-sm text-text-primary tabular-nums">{value}</p>
-    </div>
-  );
-}
-
-function titleCase(value: string): string {
-  if (!value) return value;
-  return value
-    .split(/\s+/)
-    .map((word) => (word.length === 0 ? word : word[0].toUpperCase() + word.slice(1).toLowerCase()))
-    .join(' ');
-}
-
-function SnapshotList({
-  label,
-  values,
-  emptyLabel = 'Not set',
-  hint,
-}: {
-  label: string;
-  values: string[];
-  emptyLabel?: string;
-  hint?: string;
-}) {
-  const filtered = values.filter(Boolean);
-  const { visible, hidden } = compactList(filtered);
-
-  return (
-    <div className="space-y-1.5">
-      <p className="text-[11px] font-medium text-text-muted" title={hint}>
-        {label}
-      </p>
-      {visible.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5">
-          {visible.map((value) => (
-            <span
-              key={value}
-              className="inline-flex items-center rounded-full bg-bg-card px-2.5 py-1 text-[11px] text-text-secondary ring-1 ring-border-default"
-            >
-              {value}
-            </span>
-          ))}
-          {hidden > 0 && (
-            <span className="inline-flex items-center rounded-full bg-bg-subtle px-2.5 py-1 text-[11px] text-text-muted ring-1 ring-border-default">
-              +{hidden} more
-            </span>
-          )}
-        </div>
-      ) : (
-        <p className="text-xs text-text-muted">{emptyLabel}</p>
-      )}
-    </div>
-  );
-}
-
-function SuggestLoadingState() {
-  const [elapsed, setElapsed] = useState(0);
-  useEffect(() => {
-    const t = setInterval(() => setElapsed((prev) => prev + 1), 1000);
-    return () => clearInterval(t);
-  }, []);
-  const hint = elapsed < 10
-    ? 'Reading your resume...'
-    : elapsed < 25
-      ? 'Identifying roles, keywords, and target companies...'
-      : elapsed < 60
-        ? 'Generating suggestions — speed depends on your AI provider...'
-        : 'Still working — slower models may take a couple minutes...';
-  return (
-    <div className="w-full rounded-xl border-2 border-dashed border-brand/25 bg-gradient-to-br from-brand-light/40 to-brand-light/20 p-6 text-center">
-      <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-brand/10">
-        <Loader2 className="h-5 w-5 text-brand animate-spin" />
-      </div>
-      <p className="text-sm font-semibold text-brand">Analyzing your resume...</p>
-      <p className="text-xs text-text-muted mt-1">{hint}</p>
-      <p className="text-[11px] text-text-muted/60 mt-2 tabular-nums">{elapsed}s</p>
-    </div>
-  );
-}
 
 function SearchPage() {
   const SUGGEST_TOAST_ID = 'search-suggest';
@@ -536,26 +361,6 @@ function SearchPage() {
 
   const [showSources, setShowSources] = useState(false);
 
-  // Category color mapping — applied dynamically from whatever categories the API returns
-  const CATEGORY_COLORS: Record<string, string> = {
-    jobspy: 'text-blue-600 dark:text-blue-400',
-    remote: 'text-emerald-600 dark:text-emerald-400',
-    startup: 'text-violet-600 dark:text-violet-400',
-    ats: 'text-sky-600 dark:text-sky-400',
-    community: 'text-amber-600 dark:text-amber-400',
-    crypto: 'text-orange-600 dark:text-orange-400',
-    general: 'text-slate-600 dark:text-slate-400',
-  };
-  const CATEGORY_DOTS: Record<string, string> = {
-    jobspy: 'bg-blue-500',
-    remote: 'bg-emerald-500',
-    startup: 'bg-violet-500',
-    ats: 'bg-sky-500',
-    community: 'bg-amber-500',
-    crypto: 'bg-orange-500',
-    general: 'bg-slate-400',
-  };
-
   // Group sources by category for display
   const sourcesByCategory = useMemo(() => {
     const sources = scraperSources ?? [];
@@ -621,689 +426,84 @@ function SearchPage() {
     : selectedMode === 'search_score' ? (resumeDrivenRun ? (llmAvailable ? 'Rank from Resume' : 'Start Resume Ranking') : (llmAvailable ? 'Search & Rank' : 'Start Basic Ranking'))
     : 'Search & Prepare';
 
-  // Progress bar helpers — must be inside the component (uses activeMode)
-  const formatElapsed = (seconds: number): string => {
-    const m = Math.floor(seconds / 60);
-    const s = Math.floor(seconds % 60);
-    return m > 0 ? `${m}m ${s}s` : `${s}s`;
-  };
-
-  type StageInfo = { key: string; label: string };
-  const STAGE_MAP: Record<string, StageInfo[]> = {
-    search_only: [
-      { key: 'searching', label: 'Searching' },
-      { key: 'saving', label: 'Saving' },
-    ],
-    search_score: [
-      { key: 'searching', label: 'Searching' },
-      { key: 'scoring', label: 'Ranking' },
-      { key: 'ai_scoring', label: 'Analyzing' },
-      { key: 'saving', label: 'Saving' },
-    ],
-    full_pipeline: [
-      { key: 'searching', label: 'Searching' },
-      { key: 'scoring', label: 'Ranking' },
-      { key: 'ai_scoring', label: 'Analyzing' },
-      { key: 'enhancing', label: 'Preparing' },
-      { key: 'saving', label: 'Saving' },
-    ],
-  };
-
-  const getStagesForMode = (m: string): StageInfo[] => STAGE_MAP[m] || STAGE_MAP.search_score;
   const stageForDisplay = progress?.stage === 'queued'
     ? getStagesForMode(activeMode)[0]?.key
     : progress?.stage;
 
-  const isStageComplete = (stageKey: string, currentStage: string | undefined, m: string): boolean => {
-    if (!currentStage) return false;
-    const stages = getStagesForMode(m);
-    const stageIdx = stages.findIndex((s) => s.key === stageKey);
-    const currentIdx = stages.findIndex((s) => s.key === currentStage);
-    return stageIdx >= 0 && currentIdx >= 0 && stageIdx < currentIdx;
-  };
-
   // ── Idle view: config form ──────────────────────────────────────────
   if (state === 'idle') {
     return (
-      <div>
-        <PageHeader title="Search" description={sourceCount > 0 ? `${sourceCount} sources, ranked by fit` : 'Multi-source search, ranked by fit'} />
-
-        <div className="mb-6">
-          <PipelineSteps llmAvailable={llmAvailable} activeStep={undefined} sourceCount={sourceCount} />
-        </div>
-
-        <div className="max-w-3xl mx-auto space-y-5">
-          {!llmAvailable && (
-            <div className="rounded-xl border border-brand/20 bg-brand-light/20 p-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm font-medium text-text-primary">Launchboard works best with AI connected.</p>
-                  <p className="mt-1 text-xs text-text-muted">
-                    Start with basic search now. Connect AI when you want resume-fit ranking, search suggestions, target-company autofill, and tailored draft materials.
-                  </p>
-                </div>
-                <ConnectAiPopover side="bottom" align="end">
-                  <Button variant="outline" size="sm" className="shrink-0">
-                    <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-                    Connect AI
-                  </Button>
-                </ConnectAiPopover>
-              </div>
-            </div>
-          )}
-
-          {/* Source transparency */}
-          {sourceCount > 0 && (
-            <div className="px-1">
-              <button
-                type="button"
-                onClick={() => setShowSources(!showSources)}
-                className="flex w-full items-center gap-2 text-xs text-text-muted hover:text-text-secondary transition-colors cursor-pointer group"
-              >
-                <Globe className="h-3.5 w-3.5 shrink-0" />
-                <span>
-                  Searching{' '}
-                  <span className="font-medium text-text-secondary">{sourceCount} sources</span>
-                  <span className="mx-1.5 text-border-default">|</span>
-                  {/* Pick first from each category for variety */}
-                  {sourcesByCategory.slice(0, 4).map((g) => g.sources[0].display_name).join(', ')}
-                  {sourceCount > 4 && ` + ${sourceCount - 4} more`}
-                </span>
-                <ChevronRight className={cn('h-3 w-3 shrink-0 transition-transform', showSources && 'rotate-90')} />
-              </button>
-              {showSources && (
-                <div className="mt-3 rounded-xl border border-border-default bg-bg-card px-4 py-4">
-                  <div className="space-y-2.5">
-                    {sourcesByCategory.map((group) => (
-                      <div key={group.label} className="flex items-center gap-2.5">
-                        <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', CATEGORY_DOTS[group.cat] || 'bg-slate-400')} />
-                        <span className={cn('text-[11px] font-semibold whitespace-nowrap w-24 shrink-0', CATEGORY_COLORS[group.cat] || 'text-text-tertiary')}>
-                          {group.label}
-                        </span>
-                        <span className="text-xs text-text-secondary leading-relaxed">
-                          {group.sources.map((s, i) => (
-                            <span key={s.name}>
-                              {i > 0 && <span className="text-text-muted"> · </span>}
-                              {s.display_name}
-                            </span>
-                          ))}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          <Card>
-            <CardHeader className="pb-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand/10">
-                    <SearchIcon className="h-4.5 w-4.5 text-brand" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-base">Search configuration</CardTitle>
-                    <p className="text-xs text-text-tertiary mt-0.5">Define what you're looking for</p>
-                  </div>
-                </div>
-                {canSuggest && roles && (
-                  <Button variant="outline" size="sm" onClick={handleSuggest} disabled={suggest.isPending} className="text-xs">
-                    {suggest.isPending ? (
-                      <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Analyzing...</>
-                    ) : (
-                      <><Sparkles className="h-3.5 w-3.5 mr-1.5" /> Re-fill from resume</>
-                    )}
-                  </Button>
-                )}
-              </div>
-            </CardHeader>
-            <CardContent>
-              {configLoading ? (
-                <div className="space-y-4">
-                  {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-20 w-full" />)}
-                </div>
-              ) : (
-                <div className="space-y-5">
-                  {/* Suggest CTA when fields are empty or sparse (1 role = fallback from resume title).
-                      The keyword extractor gives ~15 terms even without AI, so we can't just check
-                      emptiness — we check if the roles look like a minimal fallback. */}
-                  {((!roles && !keywords) || (roles && roles.length <= 1 && canSuggest)) && (suggest.isPending ? (
-                    <SuggestLoadingState />
-                  ) : canSuggest ? (
-                    <button
-                      type="button"
-                      onClick={handleSuggest}
-                      className="group w-full rounded-xl border-2 border-dashed border-brand/25 bg-gradient-to-br from-brand-light/40 to-brand-light/20 p-6 text-center transition-all hover:border-brand/50 hover:from-brand-light/60 hover:to-brand-light/30 hover:shadow-lg hover:shadow-brand/5 cursor-pointer"
-                    >
-                      <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-brand/10 group-hover:bg-brand/15 transition-colors">
-                        <Sparkles className="h-5 w-5 text-brand" />
-                      </div>
-                      <p className="text-sm font-semibold text-brand">Auto-fill from your resume</p>
-                      <p className="text-xs text-text-muted mt-1">AI analyzes your resume and suggests roles, keywords, and locations</p>
-                    </button>
-                  ) : !llmAvailable && (
-                    <div className="w-full rounded-xl border border-border-default bg-bg-subtle/50 p-5 text-center">
-                      <p className="text-sm font-medium text-text-primary">
-                        {canUseResumeFallback ? 'You can start from your uploaded resume, or add roles and keywords below' : 'Type your target roles and keywords below to get started'}
-                      </p>
-                      <p className="text-xs text-text-muted mt-1">
-                        {onboarding?.resume.exists
-                          ? 'Launchboard can derive a first search from your resume right away. Connect AI from the sidebar if you want auto-fill, deeper fit ranking, and drafting.'
-                          : 'This gets you basic search right away. Upload a resume and connect AI later if you want auto-fill and deeper ranking.'}
-                      </p>
-                    </div>
-                  ))}
-
-                  {/* 2-col form fields */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Target Roles</Label>
-                      <Textarea value={roles} onChange={(e) => setRoles(e.target.value)} rows={4} placeholder="e.g. Marketing Manager&#10;Product Designer&#10;Nurse Practitioner" />
-                      <p className="text-xs text-text-muted">One role per line</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="text-sm font-medium">Keywords</Label>
-                      <Textarea value={keywords} onChange={(e) => setKeywords(e.target.value)} rows={4} placeholder="e.g. Project Management&#10;Patient Care&#10;Data Analysis" />
-                      <p className="text-xs text-text-muted">One keyword per line</p>
-                    </div>
-                  </div>
-
-                  {/* Collapsible filters */}
-                  <div>
-                    <button
-                      type="button"
-                      onClick={() => setShowFilters(!filtersExpanded)}
-                      className={cn(
-                        'inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-all cursor-pointer',
-                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2',
-                        filtersExpanded
-                          ? 'border-brand bg-brand-light/40 text-brand hover:bg-brand-light/60'
-                          : 'border-border-default bg-bg-card text-text-primary hover:border-brand/60 hover:bg-bg-subtle',
-                      )}
-                    >
-                      <SlidersHorizontal className="h-4 w-4" />
-                      <span>Filters</span>
-                      {!filtersExpanded && filterSummary.length > 0 && (
-                        <span className="ml-1 inline-flex items-center rounded-full bg-brand px-2 py-0.5 text-[11px] font-semibold text-white">
-                          {filterSummary.join(', ')}
-                        </span>
-                      )}
-                      <ChevronDown className={cn('h-4 w-4 transition-transform', filtersExpanded && 'rotate-180')} />
-                    </button>
-                    {filtersExpanded && (
-                      <div className="grid grid-cols-1 sm:grid-cols-[1.2fr_0.8fr] gap-5 mt-4 pt-4 border-t border-border-default">
-                        <div className="space-y-4">
-                          <SearchAreaSection
-                            preferredPlaces={locations}
-                            onPreferredPlacesChange={setLocations}
-                            workplacePreference={workplacePreference}
-                            onWorkplacePreferenceChange={setWorkplacePreference}
-                            context="search"
-                          />
-
-                          <JobBoardOptionsSection
-                            includeLinkedInJobs={includeLinkedInJobs}
-                            onIncludeLinkedInJobsChange={setIncludeLinkedInJobs}
-                            context="search"
-                          />
-                        </div>
-
-                        <div className="space-y-4">
-                          <div className="space-y-1.5">
-                            <Label className="text-sm font-medium">Match strictness</Label>
-                            <MatchStrictnessControl value={matchStrictness} onChange={setMatchStrictness} />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label className="text-sm font-medium">Posted within: <span className="text-brand tabular-nums">{maxDays} days</span></Label>
-                            <Slider value={[maxDays]} onValueChange={(v) => setMaxDays(Array.isArray(v) ? v[0] : v)} min={1} max={60} step={1} />
-                          </div>
-
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {searchAreaOverridesSavedDefaults && (
-                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-text-muted px-1">
-                      <span>Overriding saved defaults</span>
-                      <div className="flex gap-3">
-                        <button type="button" className="text-text-secondary hover:text-text-primary underline-offset-2 hover:underline" onClick={applySavedSearchArea}>
-                          Reset
-                        </button>
-                        <button
-                          type="button"
-                          className="text-brand underline-offset-2 hover:underline disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
-                          onClick={handleSaveSearchAreaDefaults}
-                          disabled={savePreferences.isPending}
-                        >
-                          {savePreferences.isPending ? 'Saving…' : 'Save as default'}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Resume status */}
-                  <div className={cn(
-                    'flex items-center gap-2.5 text-xs rounded-lg px-3.5 py-2.5 border',
-                    onboarding?.resume.exists
-                      ? 'bg-success/5 border-success/20'
-                      : 'bg-bg-muted border-border-default',
-                  )}>
-                    {onboarding?.resume.exists ? (
-                      <>
-                        <div className="flex h-7 w-7 items-center justify-center rounded bg-red-500/10 shrink-0">
-                          <FileText className="h-3.5 w-3.5 text-red-500" />
-                        </div>
-                        <span className="text-text-secondary truncate" title={onboarding.resume.filename}>{onboarding.resume.filename}</span>
-                        {onboarding.resume.file_size > 0 && (
-                          <span className="text-text-muted shrink-0">
-                            {onboarding.resume.file_size >= 1_048_576
-                              ? `${(onboarding.resume.file_size / 1_048_576).toFixed(1)} MB`
-                              : `${Math.round(onboarding.resume.file_size / 1024)} KB`}
-                          </span>
-                        )}
-                        {onboarding.resume.parse_warning && (
-                          <span className="truncate text-amber-700 dark:text-amber-300">
-                            {onboarding.resume.parse_warning}
-                          </span>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <FileText className="h-4 w-4 shrink-0 text-text-muted" />
-                        <span className="text-text-muted">No resume uploaded — <a href="/settings" className="text-brand hover:underline">upload in Settings</a></span>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Target companies (AI suggested + user-added) */}
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Label
-                        className="text-sm font-medium"
-                        title="Searches these companies' ATS career pages (Greenhouse, Lever, Ashby, Workday) directly. AI suggests from your resume."
-                      >
-                        Target companies
-                      </Label>
-                      {suggestedCompanies.length > 0 && (
-                        <span className="text-[10px] bg-brand-light text-brand font-medium rounded-full px-1.5 py-0.5">
-                          {suggestedCompanies.length}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        placeholder="Add a company — press Enter"
-                        className="flex-1 h-8 rounded-md border border-border-default bg-bg-card px-2.5 text-xs placeholder:text-text-muted focus:outline-none focus:ring-1 focus:ring-brand"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            const value = (e.target as HTMLInputElement).value.trim();
-                            if (value && !suggestedCompanies.some((c) => c.toLowerCase() === value.toLowerCase())) {
-                              setSuggestedCompanies((prev) => [...prev, value]);
-                              (e.target as HTMLInputElement).value = '';
-                            }
-                          }
-                        }}
-                      />
-                    </div>
-                    {suggestedCompanies.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5">
-                        {suggestedCompanies.map((company) => (
-                          <span
-                            key={company}
-                            className="inline-flex items-center gap-1 text-xs bg-bg-muted rounded-md px-2 py-1 text-text-secondary"
-                          >
-                            {company}
-                            <button
-                              type="button"
-                              onClick={() => setSuggestedCompanies((prev) => prev.filter((c) => c !== company))}
-                              className="text-text-tertiary hover:text-text-primary transition-colors ml-0.5"
-                              aria-label={`Remove ${company}`}
-                            >
-                              <XCircle className="h-3 w-3" />
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    <p className="text-xs text-text-muted">
-                      {suggestedCompanies.length > 0
-                        ? 'Career pages will be searched directly on Greenhouse, Lever, and Ashby. All other jobs come from 14+ job boards regardless.'
-                        : 'Optionally add companies to search their career pages directly. AI will auto-fill these when you upload a resume.'}
-                    </p>
-                  </div>
-
-                  {/* Mode selector */}
-                  <div className="space-y-3">
-                    <Label className="text-sm font-medium">What should we do?</Label>
-                    <div className="grid grid-cols-3 gap-3" role="radiogroup" aria-label="Search mode">
-                      {(['search_only', 'search_score', 'full_pipeline'] as const).map((m) => {
-                        const info = modeLabels[m];
-                        const Icon = info.icon;
-                        const isSelected = selectedMode === m;
-                        return (
-                          <button
-                            key={m}
-                            type="button"
-                            role="radio"
-                            aria-checked={isSelected}
-                            onClick={() => setSelectedMode(m)}
-                            disabled={m === 'full_pipeline' && !llmAvailable}
-                            className={cn(
-                              'relative rounded-xl border-2 px-3 py-4 text-center transition-all cursor-pointer',
-                              'disabled:opacity-40 disabled:cursor-not-allowed',
-                              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2',
-                              isSelected
-                                ? `${info.selectedBorder} ${info.selectedBg} shadow-sm`
-                                : 'border-border-default bg-bg-card hover:border-border-hover hover:bg-bg-muted',
-                            )}
-                          >
-                            <div className={cn(
-                              'mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-xl transition-colors',
-                              isSelected ? info.iconBg : 'bg-bg-muted',
-                            )}>
-                              <Icon className={cn('h-4.5 w-4.5', isSelected ? info.color : 'text-text-muted')} />
-                            </div>
-                            <div className={cn('text-sm font-semibold', isSelected ? info.color : 'text-text-primary')}>{info.label}</div>
-                            <div className="text-[11px] text-text-muted mt-0.5 leading-tight">{info.desc}</div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <p className="text-xs text-text-tertiary leading-relaxed">
-                      {modeLabels[selectedMode].detail}
-                    </p>
-                    {!llmAvailable && selectedMode === 'search_score' && (
-                      <p className="text-xs text-text-muted leading-relaxed">
-                        This run will still rank jobs, but it will use keyword and filter matching until you connect AI in Settings.
-                      </p>
-                    )}
-                    {!llmAvailable && selectedMode === 'full_pipeline' && (
-                      <p className="text-xs text-text-muted leading-relaxed">
-                        Full prepare mode is disabled until AI is connected.
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Start */}
-                  <div className="pt-1">
-                    <Button onClick={handleStart} disabled={startSearch.isPending || suggest.isPending || missingSearchTerms || missingLocations} size="lg" className="w-full text-sm h-12 text-[15px] font-semibold shadow-lg shadow-brand/20 hover:shadow-xl hover:shadow-brand/25 transition-shadow">
-                      {startSearch.isPending ? (
-                        <><Loader2 className="h-4.5 w-4.5 mr-2 animate-spin" /> Starting...</>
-                      ) : suggest.isPending ? (
-                        <><Loader2 className="h-4.5 w-4.5 mr-2 animate-spin" /> Analyzing resume...</>
-                      ) : (
-                        <><Zap className="h-4.5 w-4.5 mr-2" /> {startLabel}</>
-                      )}
-                    </Button>
-                    {missingSearchTerms && (
-                      <p className="text-xs text-text-muted text-center mt-2">Add at least one role or keyword above to start</p>
-                    )}
-                    {!missingSearchTerms && missingLocations && (
-                      <div className="mt-2 space-y-2 text-center">
-                        <p className="text-xs text-text-muted">Add a preferred location, or switch this run to a mode that does not require one.</p>
-                        <div className="flex flex-wrap items-center justify-center gap-2">
-                          <Button type="button" variant="outline" size="sm" onClick={() => setWorkplacePreference('remote_friendly')}>
-                            Use Remote + selected places
-                          </Button>
-                          <Button type="button" variant="outline" size="sm" onClick={() => setWorkplacePreference('remote_only')}>
-                            Use Remote only
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                    {!missingSearchTerms && !missingLocations && parsedRoles.length === 0 && parsedKeywords.length === 0 && canUseResumeFallback && (
-                      <p className="text-xs text-text-muted text-center mt-2">No roles or keywords entered. Launchboard will derive them from your uploaded resume for this run.</p>
-                    )}
-                    {!missingSearchTerms && !missingLocations && usesRemoteFallback && (
-                      <p className="text-xs text-text-muted text-center mt-2">No place selected yet, so this run will keep remote jobs everywhere until you add one.</p>
-                    )}
-                    {suggestedCompanies.length > 0 && !missingSearchTerms && !missingLocations && (
-                      <p className="text-xs text-text-muted text-center mt-2">
-                        <Bot className="h-3 w-3 inline mr-1" />
-                        Targeting {suggestedCompanies.length} companies from resume analysis
-                      </p>
-                    )}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-        </div>
-      </div>
+      <SearchConfigForm
+        sourceCount={sourceCount}
+        llmAvailable={llmAvailable}
+        showSources={showSources}
+        setShowSources={setShowSources}
+        sourcesByCategory={sourcesByCategory}
+        canSuggest={canSuggest}
+        roles={roles}
+        setRoles={setRoles}
+        keywords={keywords}
+        setKeywords={setKeywords}
+        handleSuggest={handleSuggest}
+        suggestPending={suggest.isPending}
+        configLoading={configLoading}
+        filtersExpanded={filtersExpanded}
+        setShowFilters={setShowFilters}
+        filterSummary={filterSummary}
+        locations={locations}
+        setLocations={setLocations}
+        workplacePreference={workplacePreference}
+        setWorkplacePreference={setWorkplacePreference}
+        includeLinkedInJobs={includeLinkedInJobs}
+        setIncludeLinkedInJobs={setIncludeLinkedInJobs}
+        matchStrictness={matchStrictness}
+        setMatchStrictness={setMatchStrictness}
+        maxDays={maxDays}
+        setMaxDays={setMaxDays}
+        searchAreaOverridesSavedDefaults={searchAreaOverridesSavedDefaults}
+        applySavedSearchArea={applySavedSearchArea}
+        handleSaveSearchAreaDefaults={handleSaveSearchAreaDefaults}
+        savePreferencesPending={savePreferences.isPending}
+        onboarding={onboarding}
+        canUseResumeFallback={canUseResumeFallback}
+        suggestedCompanies={suggestedCompanies}
+        setSuggestedCompanies={setSuggestedCompanies}
+        selectedMode={selectedMode}
+        setSelectedMode={setSelectedMode}
+        modeLabels={modeLabels}
+        handleStart={handleStart}
+        startSearchPending={startSearch.isPending}
+        missingSearchTerms={missingSearchTerms}
+        missingLocations={missingLocations}
+        parsedRoles={parsedRoles}
+        parsedKeywords={parsedKeywords}
+        usesRemoteFallback={usesRemoteFallback}
+        startLabel={startLabel}
+      />
     );
   }
 
   // ── Running / Completed / Failed: full-width execution view ────────
   return (
-    <div className="flex flex-col" style={{ minHeight: 'calc(100vh - 6rem)' }}>
-      <PageHeader title="Run search" description="Search for jobs across multiple sources" />
-
-      <div className="mb-6">
-        <PipelineSteps
-          llmAvailable={llmAvailable}
-          activeStep={state === 'running' ? activeStep : state === 'completed' ? 3 : undefined}
-          sourceCount={sourceCount}
-        />
-      </div>
-
-      {/* Progress bar + stage dots */}
-      {state === 'running' && (
-        <div className="space-y-3 mb-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-brand" />
-              <span className="text-sm font-medium text-text-primary">
-                {progress?.stage_label || 'Starting...'}
-              </span>
-            </div>
-            <div className="flex items-center gap-4 text-xs text-text-muted tabular-nums">
-              <span>{progress?.percent ?? 0}%</span>
-              <span>{formatElapsed(progress?.elapsed ?? 0)}</span>
-              <Button onClick={handleReset} variant="ghost" size="sm" className="text-xs h-7 text-text-muted hover:text-danger">
-                <XCircle className="h-3 w-3 mr-1" /> Cancel
-              </Button>
-            </div>
-          </div>
-          <Progress value={progress?.percent ?? 0} className="h-2" />
-          <div className="flex items-center justify-between px-1">
-            {getStagesForMode(activeMode).map((s) => {
-              const isCurrent = stageForDisplay === s.key;
-              const isDone = isStageComplete(s.key, stageForDisplay, activeMode);
-              return (
-                <div
-                  key={s.key}
-                  className={cn(
-                    'flex items-center gap-1 text-[10px] transition-colors',
-                    isCurrent ? 'text-brand font-medium' : isDone ? 'text-success' : 'text-text-muted',
-                  )}
-                >
-                  {isDone ? <CheckCircle2 className="h-3 w-3" /> : isCurrent ? <Loader2 className="h-3 w-3 animate-spin" /> : <Circle className="h-3 w-3" />}
-                  {s.label}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Result summary */}
-      {result && (
-        <div className="rounded-lg border border-success/30 bg-success/10 p-4 mb-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-success">Search Complete</p>
-              <p className="text-xs text-text-secondary">
-                Found {result.jobs_found} jobs · Scored {result.jobs_scored} · {result.strong_matches} strong matches · {(result.duration_seconds ?? 0).toFixed(1)}s
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button onClick={handleReset} variant="outline" size="sm">New search</Button>
-              <Button size="sm" onClick={() => navigate({ to: '/applications', search: { run: runId ?? undefined, scope: undefined } })}>
-                View {result.jobs_found} Jobs <ArrowRight className="h-3.5 w-3.5 ml-1.5" />
-              </Button>
-            </div>
-          </div>
-          {result.sources && Object.keys(result.sources).length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {Object.entries(result.sources)
-                .sort(([, a], [, b]) => b - a)
-                .map(([source, count]) => (
-                  <span key={source} className="inline-flex items-center rounded-md bg-bg-card/70 px-2 py-0.5 text-[11px] text-text-secondary ring-1 ring-border-default">
-                    {resolveSourceLabel(source, sourceLabels)}
-                    <span className="ml-1 font-semibold tabular-nums">{count}</span>
-                  </span>
-                ))}
-            </div>
-          )}
-          {funnel && !funnelDismissed && funnel.stages.length > 0 && (
-            <FunnelSummary
-              data={funnel}
-              onDismiss={() => setFunnelDismissed(true)}
-            />
-          )}
-          {snapshot && !snapshot.use_ai && (
-            <div className="flex flex-col gap-3 rounded-lg border border-brand/20 bg-bg-card/70 p-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm font-medium text-text-primary">This run used basic ranking only.</p>
-                <p className="mt-1 text-xs text-text-muted">
-                  Connect AI to rerank by resume fit and unlock cover letters, company notes, and application prep.
-                </p>
-              </div>
-              <ConnectAiPopover side="bottom" align="end">
-                <Button variant="outline" size="sm" className="shrink-0">
-                  <Sparkles className="mr-1.5 h-3.5 w-3.5" />
-                  Connect AI
-                </Button>
-              </ConnectAiPopover>
-            </div>
-          )}
-        </div>
-      )}
-
-      {error && (
-        <div className="rounded-lg border border-danger/30 bg-danger/10 p-4 mb-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-danger">Search Failed</p>
-              <p className="text-xs text-text-secondary mt-1">
-                {error.toLowerCase().includes('timeout')
-                  ? 'The search took too long. Try searching with fewer locations or broader keywords.'
-                  : error.toLowerCase().includes('fetch') || error.toLowerCase().includes('network')
-                  ? 'We couldn\'t connect to the server. Please try again in a moment.'
-                  : error}
-              </p>
-            </div>
-            <Button onClick={handleReset} variant="outline" size="sm">Try Again</Button>
-          </div>
-        </div>
-      )}
-
-      {/* Full-width log — fills remaining viewport */}
-      <div className="flex-1 min-h-[300px] rounded-lg border border-border-default bg-bg-card overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between px-4 py-2 border-b border-border-default bg-bg-subtle">
-          <span className="text-[11px] font-medium text-text-muted">Output log</span>
-          <span className="text-[11px] text-text-muted tabular-nums">{messages.length} messages</span>
-        </div>
-        {snapshot && (
-          <div className="border-b border-border-default bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.08),transparent_45%),linear-gradient(to_bottom,rgba(148,163,184,0.08),transparent)] px-4 py-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-medium text-text-muted">Run settings</p>
-                <p className="mt-1 text-sm font-medium text-text-primary">
-                  {MODE_LABELS[snapshot.mode]} on profile <span className="text-brand">{snapshot.profile}</span>
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                <span className="inline-flex items-center rounded-full bg-bg-card px-2.5 py-1 text-[11px] text-text-secondary ring-1 ring-border-default">
-                  {snapshot.use_ai ? 'AI enabled' : 'Keyword only'}
-                </span>
-                <span className="inline-flex items-center rounded-full bg-bg-card px-2.5 py-1 text-[11px] text-text-secondary ring-1 ring-border-default">
-                  {getWorkplacePreferenceLabel(snapshot.workplace_preference)}
-                </span>
-                <span className="inline-flex items-center rounded-full bg-bg-card px-2.5 py-1 text-[11px] text-text-secondary ring-1 ring-border-default">
-                  {snapshot.max_days_old} day window
-                </span>
-                <span className="inline-flex items-center rounded-full bg-bg-card px-2.5 py-1 text-[11px] text-text-secondary ring-1 ring-border-default">
-                  LinkedIn {snapshot.include_linkedin_jobs ? 'enabled' : 'disabled'}
-                </span>
-              </div>
-            </div>
-
-            <div className="mt-4 grid gap-4 xl:grid-cols-[1.25fr_1fr]">
-              <div className="space-y-3">
-                <SnapshotList label="Roles" values={snapshot.roles} emptyLabel="None" />
-                <SnapshotList label="Keywords" values={snapshot.keywords} emptyLabel="None" />
-                <SnapshotList
-                  label="Target companies"
-                  values={snapshot.companies ?? []}
-                  emptyLabel="None — searching job boards only"
-                  hint="Searches these companies' ATS career pages (Greenhouse, Lever, Ashby, Workday) directly"
-                />
-                <SnapshotList
-                  label="Locations"
-                  values={snapshot.locations}
-                  emptyLabel={snapshot.workplace_preference === 'remote_only' ? 'Remote only' : 'None'}
-                />
-              </div>
-
-              <div className="space-y-3">
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <SnapshotField label="Current title" value={snapshot.current_title || 'Not set'} />
-                  <SnapshotField label="Current level" value={snapshot.current_level ? titleCase(snapshot.current_level) : 'Not set'} />
-                  <SnapshotField label="Workplace" value={getWorkplacePreferenceLabel(snapshot.workplace_preference)} />
-                  <SnapshotField
-                    label="Match strictness"
-                    value={titleCase(snapshot.match_strictness ?? 'balanced')}
-                    hint="Loose pulls a wider net; Strict only surfaces tight matches"
-                  />
-                  <SnapshotField label="Currency" value={`${snapshot.compensation_currency} · ${snapshot.compensation_period}`} />
-                  <SnapshotField label="Current TC" value={formatCurrency(snapshot.current_tc, snapshot.compensation_currency)} />
-                  <SnapshotField label="Target TC" value={formatCurrency(snapshot.target_total_comp, snapshot.compensation_currency)} />
-                  <SnapshotField
-                    label="Min base"
-                    value={formatCurrency(snapshot.min_base, snapshot.compensation_currency)}
-                    hint="Floor on base salary (excludes bonus/equity)"
-                  />
-                  <SnapshotField
-                    label="Min TC"
-                    value={formatCurrency(snapshot.min_acceptable_tc, snapshot.compensation_currency)}
-                    hint="Auto-skips jobs paying total comp below this"
-                  />
-                </div>
-
-                <div className="flex flex-wrap gap-1.5">
-                  <span className="inline-flex items-center rounded-full bg-bg-card px-2.5 py-1 text-[11px] text-text-secondary ring-1 ring-border-default">
-                    Equity {snapshot.include_equity == null ? 'not set' : snapshot.include_equity ? 'included' : 'excluded'}
-                  </span>
-                  <span className="inline-flex items-center rounded-full bg-bg-card px-2.5 py-1 text-[11px] text-text-secondary ring-1 ring-border-default">
-                    Staffing agencies {snapshot.exclude_staffing_agencies == null ? 'not set' : snapshot.exclude_staffing_agencies ? 'excluded' : 'allowed'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-        <ScrollArea className="flex-1">
-          <div ref={logRef} className="p-4 space-y-0.5 font-mono text-xs">
-            {messages.map((msg, i) => (
-              <div key={i} className="text-text-secondary py-0.5 leading-relaxed">
-                <span className="text-text-muted mr-2 tabular-nums select-none">[{String(i + 1).padStart(2, '0')}]</span>
-                {msg}
-              </div>
-            ))}
-            {state === 'running' && (
-              <div className="text-brand animate-pulse py-0.5">Waiting for updates...</div>
-            )}
-          </div>
-        </ScrollArea>
-      </div>
-    </div>
+    <SearchRunView
+      state={state}
+      activeStep={activeStep}
+      activeMode={activeMode}
+      llmAvailable={llmAvailable}
+      sourceCount={sourceCount}
+      progress={progress}
+      stageForDisplay={stageForDisplay}
+      result={result}
+      error={error}
+      snapshot={snapshot}
+      messages={messages}
+      funnel={funnel}
+      funnelDismissed={funnelDismissed}
+      setFunnelDismissed={setFunnelDismissed}
+      sourceLabels={sourceLabels}
+      logRef={logRef}
+      handleReset={handleReset}
+      onViewJobs={() => navigate({ to: '/applications', search: { run: runId ?? undefined, scope: undefined } })}
+    />
   );
 }
