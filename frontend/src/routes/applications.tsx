@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { createRoute, Link, useNavigate } from '@tanstack/react-router';
 import { Route as rootRoute } from './__root';
 import {
-  LayoutGrid, List, Search, X, SlidersHorizontal, Inbox, SearchX,
+  LayoutGrid, List, Search, X, Inbox, SearchX,
   ArrowUpDown, ChevronLeft, ChevronRight, Rocket, LinkIcon, Loader2, Trash2,
   Sparkles,
 } from 'lucide-react';
@@ -14,6 +14,8 @@ import { Slider } from '@/components/ui/slider';
 import { JobCard } from '@/components/jobs/job-card';
 import { JobTable } from '@/components/jobs/job-table';
 import { EmptyState } from '@/components/shared/empty-state';
+import { FilterToggleButton } from '@/components/shared/FilterToggleButton';
+import { FilterChips } from '@/components/shared/FilterChips';
 import { useQuery } from '@tanstack/react-query';
 import { useApplications } from '@/hooks/use-applications';
 import { pickLatestCompletedRun, useSearchRuns } from '@/hooks/use-search';
@@ -308,20 +310,11 @@ function ApplicationsPage() {
         </div>
 
         {/* Filters toggle */}
-        <Button
-          variant={showFilters ? 'secondary' : 'outline'}
-          size="default"
+        <FilterToggleButton
+          open={showFilters}
+          count={activeFilters.length}
           onClick={() => setShowFilters((p) => !p)}
-          className="gap-1.5"
-        >
-          <SlidersHorizontal className="h-4 w-4" />
-          Filters
-          {activeFilters.length > 0 && (
-            <span className="flex items-center justify-center h-5 w-5 rounded-full bg-brand text-white text-[10px] font-semibold ml-0.5">
-              {activeFilters.length}
-            </span>
-          )}
-        </Button>
+        />
 
         {/* Sort */}
         <Select value={filters.sort_by || 'overall_score'} onValueChange={(v) => updateFilter('sort_by', v)}>
@@ -465,27 +458,12 @@ function ApplicationsPage() {
       )}
 
       {/* Active filter chips */}
-      {activeFilters.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 py-2.5">
-          {activeFilters.map((f) => (
-            <button
-              key={f.key}
-              onClick={() => updateFilter(f.key, undefined)}
-              className="group inline-flex items-center gap-1 rounded-md bg-bg-muted hover:bg-danger/10 border border-transparent hover:border-danger/30 px-2 py-0.5 text-xs font-medium text-text-secondary hover:text-danger transition-all"
-            >
-              <span className="text-text-muted group-hover:text-red-400">{f.label}:</span>
-              {f.display}
-              <X className="h-3 w-3 ml-0.5 opacity-40 group-hover:opacity-100 transition-opacity" />
-            </button>
-          ))}
-          <button
-            onClick={clearAllFilters}
-            className="text-xs text-text-muted hover:text-brand font-medium ml-1 transition-colors"
-          >
-            Clear all
-          </button>
-        </div>
-      )}
+      <FilterChips
+        items={activeFilters}
+        onRemove={(key) => updateFilter(key as keyof ApplicationFilters, undefined)}
+        onClearAll={clearAllFilters}
+        className="py-2.5"
+      />
 
       {/* Content */}
       <div className="mt-2">

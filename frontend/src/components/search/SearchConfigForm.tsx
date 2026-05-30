@@ -1,8 +1,10 @@
-import { Search as SearchIcon, XCircle, FileText, Loader2, Sparkles, SlidersHorizontal, ChevronDown, ChevronRight, Bot, Zap, Globe } from 'lucide-react';
+import { Search as SearchIcon, XCircle, FileText, Loader2, Sparkles, ChevronRight, Bot, Zap, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SearchAreaSection } from '@/components/shared/search-area-section';
 import { JobBoardOptionsSection } from '@/components/shared/job-board-options-section';
+import { FilterToggleButton } from '@/components/shared/FilterToggleButton';
+import { FilterChips } from '@/components/shared/FilterChips';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
@@ -272,26 +274,20 @@ export function SearchConfigForm({
 
                 {/* Collapsible filters */}
                 <div>
-                  <button
-                    type="button"
-                    onClick={() => setShowFilters(!filtersExpanded)}
-                    className={cn(
-                      'inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-all cursor-pointer',
-                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2',
-                      filtersExpanded
-                        ? 'border-brand bg-brand-light/40 text-brand hover:bg-brand-light/60'
-                        : 'border-border-default bg-bg-card text-text-primary hover:border-brand/60 hover:bg-bg-subtle',
-                    )}
-                  >
-                    <SlidersHorizontal className="h-4 w-4" />
-                    <span>Filters</span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <FilterToggleButton
+                      open={filtersExpanded}
+                      count={filterSummary.length}
+                      onClick={() => setShowFilters(!filtersExpanded)}
+                    />
                     {!filtersExpanded && filterSummary.length > 0 && (
-                      <span className="ml-1 inline-flex items-center rounded-full bg-brand px-2 py-0.5 text-[11px] font-semibold text-white">
-                        {filterSummary.join(', ')}
-                      </span>
+                      <FilterChips
+                        items={filterSummary
+                          .filter((s): s is string => Boolean(s))
+                          .map((s) => ({ key: s, label: '', display: s }))}
+                      />
                     )}
-                    <ChevronDown className={cn('h-4 w-4 transition-transform', filtersExpanded && 'rotate-180')} />
-                  </button>
+                  </div>
                   {filtersExpanded && (
                     <div className="grid grid-cols-1 sm:grid-cols-[1.2fr_0.8fr] gap-5 mt-4 pt-4 border-t border-border-default">
                       <div className="space-y-4">
