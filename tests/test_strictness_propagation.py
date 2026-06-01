@@ -104,10 +104,15 @@ class ScraperHonorsMatchModeTest(unittest.TestCase):
     def test_remoteok_honors_match_mode(self) -> None:
         from job_finder.tools.scrapers import remoteok
 
+        # Title shares the DOMAIN word "platform" with role "ai platform
+        # engineer" but lacks "ai". all_significant needs all domain words
+        # ({ai, platform}) → drops it; any_word matches on a single shared
+        # domain word → keeps it. (A generic-only overlap like "engineer" is
+        # no longer enough in any_word — that was the false-positive bug.)
         fake_data = [
             {"legal": "..."},  # first item is always a legal notice — skipped
             {
-                "position": "Research Engineer",
+                "position": "Platform Engineer",
                 "company": "Acme",
                 "location": "Remote",
                 "url": "https://example.com/1",
@@ -117,22 +122,25 @@ class ScraperHonorsMatchModeTest(unittest.TestCase):
         ]
         with patch.object(remoteok, "_get_json", return_value=fake_data):
             strict = remoteok.search_remoteok(
-                roles=["ai engineer"],
+                roles=["ai platform engineer"],
                 match_mode="all_significant",
                 include_founding=False,
             )
             loose = remoteok.search_remoteok(
-                roles=["ai engineer"],
+                roles=["ai platform engineer"],
                 match_mode="any_word",
                 include_founding=False,
             )
-        self.assertEqual(len(strict), 0, "Strict mode should drop 'Research Engineer'")
-        self.assertEqual(len(loose), 1, "Loose any_word should accept 'Research Engineer'")
-        self.assertEqual(loose[0]["title"], "Research Engineer")
+        self.assertEqual(len(strict), 0, "Strict mode should drop 'Platform Engineer'")
+        self.assertEqual(len(loose), 1, "Loose any_word should accept 'Platform Engineer'")
+        self.assertEqual(loose[0]["title"], "Platform Engineer")
 
     def test_himalayas_honors_match_mode(self) -> None:
         from job_finder.tools.scrapers import himalayas
 
+        # Title shares the DOMAIN word "platform" with role "ai platform
+        # engineer" but lacks "ai": all_significant drops it (needs all domain
+        # words), any_word keeps it (single shared domain word).
         fake_page = {
             "jobs": [
                 {
@@ -149,7 +157,7 @@ class ScraperHonorsMatchModeTest(unittest.TestCase):
         # Himalayas paginates; first call returns the canned page, second is empty.
         with patch.object(himalayas, "_get_json", side_effect=[fake_page, empty_page]):
             strict = himalayas.search_himalayas(
-                roles=["ai engineer"],
+                roles=["ai platform engineer"],
                 max_results=20,
                 match_mode="all_significant",
                 include_founding=False,
@@ -157,7 +165,7 @@ class ScraperHonorsMatchModeTest(unittest.TestCase):
 
         with patch.object(himalayas, "_get_json", side_effect=[fake_page, empty_page]):
             loose = himalayas.search_himalayas(
-                roles=["ai engineer"],
+                roles=["ai platform engineer"],
                 max_results=20,
                 match_mode="any_word",
                 include_founding=False,

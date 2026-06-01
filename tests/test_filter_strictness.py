@@ -89,9 +89,24 @@ class MatchRolesModeTest(unittest.TestCase):
                 )
 
     def test_any_word_matches_single_overlap(self) -> None:
-        # "Senior Coordinator" shares only "coordinator" with "Marketing Coordinator"
+        # any_word matches on a single shared DOMAIN word: "Marketing Lead"
+        # shares "marketing" with role "Marketing Coordinator". (A shared
+        # *generic* word like "coordinator" alone is no longer enough — that
+        # was the false-positive bug.)
         self.assertTrue(
-            self.match("Senior Coordinator", ["Marketing Coordinator"], match_mode="any_word"),
+            self.match("Marketing Lead", ["Marketing Coordinator"], match_mode="any_word"),
+        )
+
+    def test_any_word_rejects_generic_only_overlap(self) -> None:
+        # "Senior Coordinator" shares only the generic word "coordinator" with
+        # "Marketing Coordinator" — no domain word, so any_word rejects it.
+        self.assertFalse(
+            self.match(
+                "Senior Coordinator",
+                ["Marketing Coordinator"],
+                match_mode="any_word",
+                include_founding=False,
+            ),
         )
 
     def test_all_significant_rejects_single_overlap(self) -> None:

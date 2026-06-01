@@ -125,8 +125,14 @@ def test_parity_strict_drops_crypto():
 
 
 def test_parity_balanced_nonremote_anyword_rescue():
-    # Non-remote + balanced → any_word rescue keeps a variant title via 'engineer'.
+    # Non-remote + balanced → domain-aware any_word rescue keeps a place-bound
+    # within-domain variant title via the shared DOMAIN word 'data'. A title
+    # sharing only a generic word ('engineer') is NOT rescued (that was the
+    # false-positive bug); the rescue keys on domain words only.
     assert _passes(
+        _job(title="Data Platform Engineer", source="greenhouse", company="Acme", is_remote=False)
+    )
+    assert not _passes(
         _job(title="ML Platform Engineer", source="greenhouse", company="Acme", is_remote=False)
     )
 

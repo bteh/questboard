@@ -193,24 +193,35 @@ class BalancedStrictnessPlaceRescueTest(unittest.TestCase):
         return pipe
 
     def test_balanced_keeps_place_based_partial_title_matches(self) -> None:
-        """Local jobs missing a role word should still pass under balanced."""
+        """Local within-domain variant titles should still pass under balanced.
+
+        The rescue is domain-aware: a place-bound title sharing the role's
+        DOMAIN word ("data") survives even without the full role word-set. A
+        title sharing only a *generic* word ("engineer") does NOT — that was
+        the false-positive bug this fix removes.
+        """
         pipe = self._make_pipeline(["data engineer"])
         jobs = [
-            # Local jobs — partial title match on "engineer" only.
-            # Under the buggy strict rule these all get dropped.
-            {"title": "ML Platform Engineer", "company": "A", "url": "http://a",
+            # Local within-domain variants — share the domain word "data" but
+            # aren't a full word-subset match. Under the buggy strict rule
+            # these get dropped; the domain-aware rescue keeps them.
+            {"title": "Data Platform Engineer", "company": "A", "url": "http://a",
              "is_remote": False, "location": "San Francisco, CA"},
-            {"title": "Senior Engineer, Tools", "company": "B", "url": "http://b",
+            {"title": "Senior Data Architect, Tools", "company": "B", "url": "http://b",
              "is_remote": False, "location": "Seattle, WA"},
             # Local with full match — must pass under both rules.
             {"title": "Senior Data Engineer", "company": "C", "url": "http://c",
              "is_remote": False, "location": "Austin, TX"},
+            # Local off-domain (generic "engineer" only) — must NOT be rescued.
+            {"title": "ML Platform Engineer", "company": "D", "url": "http://d",
+             "is_remote": False, "location": "Denver, CO"},
         ]
         filtered = pipe.filter_by_role(jobs)
         titles = {j["title"] for j in filtered}
-        self.assertIn("ML Platform Engineer", titles)
-        self.assertIn("Senior Engineer, Tools", titles)
+        self.assertIn("Data Platform Engineer", titles)
+        self.assertIn("Senior Data Architect, Tools", titles)
         self.assertIn("Senior Data Engineer", titles)
+        self.assertNotIn("ML Platform Engineer", titles)
 
     def test_balanced_still_rejects_remote_partial_title_matches(self) -> None:
         """Remote jobs missing a role word keep the strict rule (high pool volume)."""
@@ -249,19 +260,28 @@ class BalancedStrictnessPlaceRescueTest(unittest.TestCase):
         self.assertIn("Senior Data Engineer", titles)
 
     def test_loose_strictness_unaffected_by_rescue(self) -> None:
-        """Loose was already any_word everywhere — the rescue is a no-op."""
+        """Loose is any_word everywhere — the rescue is a no-op.
+
+        any_word is domain-aware: it keeps within-domain partial matches
+        (sharing "data") regardless of remote/place, but a generic-only
+        overlap ("engineer") is not enough.
+        """
         pipe = self._make_pipeline(["data engineer"], strictness="loose")
         jobs = [
-            {"title": "Marketing Engineer", "company": "A", "url": "http://a",
+            {"title": "Data Quality Analyst", "company": "A", "url": "http://a",
              "is_remote": True, "location": "Remote"},
-            {"title": "ML Platform Engineer", "company": "B", "url": "http://b",
+            {"title": "Data Platform Lead", "company": "B", "url": "http://b",
              "is_remote": False, "location": "San Francisco, CA"},
+            # Generic-only overlap ("engineer") — not within-domain, dropped.
+            {"title": "Marketing Engineer", "company": "C", "url": "http://c",
+             "is_remote": True, "location": "Remote"},
         ]
         filtered = pipe.filter_by_role(jobs)
         titles = {j["title"] for j in filtered}
-        # Loose mode keeps both partial matches.
-        self.assertIn("Marketing Engineer", titles)
-        self.assertIn("ML Platform Engineer", titles)
+        # Loose mode keeps both within-domain partial matches, remote or place.
+        self.assertIn("Data Quality Analyst", titles)
+        self.assertIn("Data Platform Lead", titles)
+        self.assertNotIn("Marketing Engineer", titles)
 
 
 class CryptoSourceRoleRescueTest(unittest.TestCase):
