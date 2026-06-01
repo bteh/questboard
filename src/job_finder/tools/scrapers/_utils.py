@@ -297,6 +297,59 @@ def _is_founding_title(title_lower: str, title_words: set[str]) -> bool:
     return any(t in title_words for t in _FOUNDING_TOKEN_PATTERNS)
 
 
+# Articles / conjunctions / prepositions — true noise, dropped before any
+# word-level comparison.
+_NOISE: frozenset[str] = frozenset({
+    "a", "an", "the", "and", "or", "of", "for", "in", "at", "to", "with", "&",
+})
+
+# Generic, DOMAIN-AGNOSTIC title words: seniority levels, role-type words, and
+# structural fillers that appear across virtually every profession. A title
+# matching a role on ONLY these words is meaningless ("Marketing Manager" vs
+# "Nurse Manager" both have "manager"), so domain-aware matching ignores them
+# and keys on a role's remaining *domain* words instead.
+_GENERIC_TITLE_WORDS: frozenset[str] = frozenset({
+    # seniority
+    "senior", "sr", "jr", "junior", "mid", "staff", "principal", "lead",
+    "leads", "head", "vp", "svp", "evp", "chief", "director", "manager",
+    "mgr", "associate", "intern", "fellow", "distinguished", "executive",
+    # role-type
+    "engineer", "engineering", "developer", "dev", "technician", "consultant",
+    "consulting", "specialist", "coordinator", "administrator", "analyst",
+    "architect", "sme", "expert", "professional", "contractor", "contract",
+    # roman-numeral / ordinal level markers
+    "i", "ii", "iii", "iv", "v",
+    # structural fillers
+    "role", "position", "team", "full", "time", "fulltime", "part",
+    "remote", "hybrid", "onsite", "new", "grad", "of",
+})
+
+# Words ignored when deriving a role's domain signature.
+_NON_DOMAIN_WORDS: frozenset[str] = _NOISE | _GENERIC_TITLE_WORDS
+
+_WORD_RE = re.compile(r"[a-z0-9]+")
+
+
+def _normalize_word(word: str) -> str:
+    """Light plural folding: strip a single trailing 's' (len>3) for tolerance.
+
+    Lets "platforms" match "platform" and keeps "analytics"/"analytic" aligned.
+    The length guard avoids mangling short tokens (e.g. "is", "os") and the
+    roman-numeral/level markers, where a trailing 's' carries meaning.
+    """
+    if len(word) > 3 and word.endswith("s"):
+        return word[:-1]
+    return word
+
+
+def _domain_words(words: set[str]) -> set[str]:
+    """A role's domain signature: its words minus generic + noise words,
+    plural-normalized. e.g. "Head of Data Platform" -> {data, platform}."""
+    return {
+        _normalize_word(w) for w in words if w not in _NON_DOMAIN_WORDS
+    }
+
+
 def _match_roles(
     title: str,
     roles: list[str] | None,
@@ -304,51 +357,61 @@ def _match_roles(
     include_founding: bool = True,
     match_mode: str = "all_significant",
 ) -> bool:
-    """Check if a job title matches any of the target roles.
+    """Check if a job title matches any of the target roles (domain-aware).
+
+    Matching keys on each role's *domain* words — its significant words minus
+    generic seniority/role-type/filler words (:data:`_GENERIC_TITLE_WORDS`) and
+    noise. So "Head of Data Platform" carries domain {data, platform}; an
+    off-domain title that only shares a generic word ("Service Desk Manager")
+    never matches. Words are plural-normalized so "Platforms" matches "Platform".
 
     ``match_mode`` controls the matching strategy:
 
     - ``"exact"``     — substring tier only. Strictest. "data engineer" must
                         appear contiguously in the title.
-    - ``"all_significant"`` (default) — substring OR every significant role
-                        word appears in the title (any order). "Platform
-                        Engineer, Data" matches role "data platform engineer".
-    - ``"any_word"``  — substring OR any single significant role word appears
-                        in the title. Wide net for the ``loose`` strictness
-                        preset. "Senior Coordinator" matches "Marketing
-                        Coordinator" because both share "coordinator".
+    - ``"all_significant"`` (default) — substring OR a role has ≥1 domain word
+                        and ALL of its domain words appear in the title (any
+                        order). "Senior Data Platform Engineer" matches role
+                        "Head of Data Platform" via domain {data, platform}.
+    - ``"any_word"``  — substring OR role and title share at least one *domain*
+                        word. Wide net within the domain for the ``loose``
+                        preset / balanced place-bound rescue. A shared generic
+                        word ("engineer", "manager") is NOT enough.
 
     Founding-role bypass — "Founding Engineer", "Member of Technical Staff",
     "MTS", etc. always pass when ``include_founding=True``. These titles
     rarely word-overlap with normal target roles, but they're high-signal
     startup positions users almost always want to see.
 
+    A role whose domain-word set is empty after stripping (e.g. a role literally
+    "Manager") can only match via the exact substring tier — never via the
+    domain rules.
+
     Returns False if no role matches under the chosen mode.
     """
     if not roles:
         return True
     title_lower = title.lower()
-    # Noise words to ignore during word-level matching
-    _NOISE = {"a", "an", "the", "and", "or", "of", "for", "in", "at", "to", "with", "&"}
-    # Strip punctuation for word-level matching
-    title_words = set(re.findall(r"[a-z0-9]+", title_lower))
-    if include_founding and _is_founding_title(title_lower, title_words):
+    raw_title_words = set(_WORD_RE.findall(title_lower))
+    if include_founding and _is_founding_title(title_lower, raw_title_words):
         return True
+    # Plural-normalized title words for domain comparison.
+    norm_title_words = {_normalize_word(w) for w in raw_title_words}
     for r in roles:
         role_lower = r.lower()
-        # Exact substring tier — fires in every mode
+        # Exact substring tier — fires in every mode.
         if role_lower in title_lower:
             return True
         if match_mode == "exact":
             continue
-        role_words = set(re.findall(r"[a-z0-9]+", role_lower)) - _NOISE
-        if not role_words:
-            continue
+        role_domain = _domain_words(set(_WORD_RE.findall(role_lower)))
+        if not role_domain:
+            continue  # purely-generic role — only the substring tier applies
         if match_mode == "any_word":
-            if role_words & title_words:
+            if role_domain & norm_title_words:
                 return True
         else:  # "all_significant" (default)
-            if role_words.issubset(title_words):
+            if role_domain.issubset(norm_title_words):
                 return True
     return False
 
