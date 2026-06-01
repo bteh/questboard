@@ -327,6 +327,26 @@ _GENERIC_TITLE_WORDS: frozenset[str] = frozenset({
 # Words ignored when deriving a role's domain signature.
 _NON_DOMAIN_WORDS: frozenset[str] = _NOISE | _GENERIC_TITLE_WORDS
 
+# Distinct job-FAMILY signal words. A title carrying one of these almost always
+# belongs to a different occupation than a data/eng/infra role, even when it
+# shares a single generic domain word ("data", "analytics", "ai platform"):
+#   - "Lead Data Center/Hyperscale Sales Development"  -> a SALES role
+#   - "Senior Product Designer, AI Platform"           -> a DESIGNER
+#   - "Finance Analytics Manager (Product & Eng)"      -> a FINANCE function
+# The guard built on this set is SELF-ADJUSTING (see ``_match_roles``): any word
+# that appears in the user's own ``roles`` is removed from the effective set, so
+# a sales/marketing/design user is never penalised for their own family.
+#
+# Kept deliberately TIGHT — broad, cross-functional words that legitimately
+# appear in data/platform titles (revenue, governance, compliance, identity,
+# analytics, data, platform, infrastructure, financial, product, engineering)
+# are intentionally EXCLUDED. Note "finance" (not "financial"): plural folding
+# keeps them distinct so "Financial Infrastructure" is not treated as finance.
+_OFF_FAMILY_WORDS: frozenset[str] = frozenset({
+    "sales", "seller", "designer", "design", "marketing", "merchandising",
+    "recruiter", "recruiting", "sourcer", "security", "cyber", "finance",
+})
+
 _WORD_RE = re.compile(r"[a-z0-9]+")
 
 
@@ -348,6 +368,28 @@ def _domain_words(words: set[str]) -> set[str]:
     return {
         _normalize_word(w) for w in words if w not in _NON_DOMAIN_WORDS
     }
+
+
+def _is_off_family_title(norm_title_words: set[str], roles: list[str]) -> bool:
+    """True if the title belongs to a different job family than the user's roles.
+
+    The off-family set (:data:`_OFF_FAMILY_WORDS`) is made SELF-ADJUSTING by
+    removing any word the user's own ``roles`` use (plural-normalized), so a
+    sales/marketing/design user is never penalised for their own family. All
+    comparisons are plural-normalized so "sales"->"sale" still matches a title's
+    "sale", while "finance" stays distinct from "financial".
+
+    ``norm_title_words`` must already be the plural-normalized set of the
+    title's words (as produced for domain matching in :func:`_match_roles`).
+    """
+    role_words: set[str] = set()
+    for r in roles:
+        role_words.update(_normalize_word(w) for w in _WORD_RE.findall(r.lower()))
+    effective_off_family = {
+        _normalize_word(w) for w in _OFF_FAMILY_WORDS
+        if _normalize_word(w) not in role_words
+    }
+    return bool(effective_off_family & norm_title_words)
 
 
 def _match_roles(
@@ -387,6 +429,15 @@ def _match_roles(
     "Manager") can only match via the exact substring tier — never via the
     domain rules.
 
+    Off-family guard — a title carrying a distinct job-family word
+    (:data:`_OFF_FAMILY_WORDS`: sales / designer / marketing / security /
+    finance / …) is rejected as a different occupation, *even if* it shares a
+    domain word like "data" or "analytics". The guard is self-adjusting: any
+    off-family word that appears in the user's own ``roles`` is dropped from the
+    effective set, so e.g. a sales user is never penalised for sales titles. An
+    explicit full-role substring match (the tier below) still wins over the
+    guard.
+
     Returns False if no role matches under the chosen mode.
     """
     if not roles:
@@ -397,11 +448,21 @@ def _match_roles(
         return True
     # Plural-normalized title words for domain comparison.
     norm_title_words = {_normalize_word(w) for w in raw_title_words}
+
+    # Exact substring tier FIRST: an explicit full-role match always wins, even
+    # over the off-family guard below.
+    for r in roles:
+        if r.lower() in title_lower:
+            return True
+
+    # Off-family guard: a title from a different job family (e.g. a sales or
+    # designer role that merely shares the word "data") is rejected here, after
+    # the exact-substring tier but before domain matching.
+    if _is_off_family_title(norm_title_words, roles):
+        return False
+
     for r in roles:
         role_lower = r.lower()
-        # Exact substring tier — fires in every mode.
-        if role_lower in title_lower:
-            return True
         if match_mode == "exact":
             continue
         role_domain = _domain_words(set(_WORD_RE.findall(role_lower)))
@@ -458,6 +519,12 @@ def _match_roles_crypto(
     pick up cross-domain noise. Matching is title-only on purpose: board/tag
     metadata (e.g. cryptojobslist's category tags) is too noisy — it would let
     every listing through and turn role filtering into a no-op.
+
+    The crypto rescue is scoped to eng/data/infra breadth, NOT sales/design:
+    the off-family guard still applies, so a crypto SALES or DESIGNER title
+    ("Blockchain Sales Rep", "Web3 Product Designer") is rejected even though
+    it carries a crypto signal. Genuine crypto eng/data roles ("Solidity
+    Engineer", "Crypto Data Engineer") are unaffected.
     """
     if _match_roles(
         title,
@@ -466,7 +533,16 @@ def _match_roles_crypto(
         match_mode=match_mode,
     ):
         return True
-    return _has_crypto_terms(title)
+    if not _has_crypto_terms(title):
+        return False
+    # Crypto rescue, but never into a different job family (sales/design/etc.).
+    if roles:
+        norm_title_words = {
+            _normalize_word(w) for w in _WORD_RE.findall(title.lower())
+        }
+        if _is_off_family_title(norm_title_words, roles):
+            return False
+    return True
 
 
 # ATS scrapers emit a clean, slug-derived company name and set the ``crypto``
