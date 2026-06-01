@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -15,8 +16,39 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Detect which areas changed so PRs only run the relevant jobs.
+  # Pushes to main/tags always run everything (full validation post-merge).
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      python: ${{ steps.filter.outputs.python }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            python:
+              - 'src/**'
+              - 'backend/**'
+              - 'tests/**'
+              - 'scripts/**'
+              - 'pyproject.toml'
+              - 'setup.py'
+              - 'setup.cfg'
+              - 'Makefile'
+              - '.github/workflows/ci.yml'
+            frontend:
+              - 'frontend/**'
+              - '.github/workflows/ci.yml'
+
   lint-python:
     name: Validate Python
+    needs: changes
+    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.python == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -34,12 +66,16 @@ jobs:
 
   test-python:
     name: Test Python (${{ matrix.python-version }})
+    needs: changes
+    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.python == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
       fail-fast: false
+      # PRs test only the primary version for fast feedback; main/tags
+      # validate the full supported matrix.
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ${{ github.event_name == 'pull_request' && fromJSON('["3.12"]') || fromJSON('["3.11","3.12"]') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -57,6 +93,8 @@ jobs:
 
   frontend:
     name: Frontend
+    needs: changes
+    if: ${{ github.event_name != 'pull_request' || needs.changes.outputs.frontend == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -165,9 +203,11 @@ jobs:
 
   desktop-macos:
     name: Desktop macOS Bundle
-    # See note on desktop-smoke. Bundle build needs an Apple Developer
-    # account for signing/notarization to be useful end-to-end anyway.
-    if: github.event_name != 'pull_request'
+    # macOS runners bill at 10x — building a bundle on every main push can
+    # burn the whole monthly Actions quota. The bundle is only useful for
+    # releases (and needs an Apple Developer account for signing anyway), so
+    # build it on version tags or manual dispatch only, not every push.
+    if: ${{ startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' }}
     runs-on: macos-latest
     timeout-minutes: 60
     steps:
