@@ -17,16 +17,15 @@ import type {
   SearchRequest,
   SearchRunSnapshot,
 } from '@/types/search';
+import { SnapshotField, SnapshotList } from './search-leaf';
 import {
   MODE_LABELS,
-  SnapshotField,
-  SnapshotList,
   formatCurrency,
   formatElapsed,
   getStagesForMode,
   isStageComplete,
   titleCase,
-} from './search-leaf';
+} from './search-leaf-helpers';
 
 interface SearchRunViewProps {
   state: 'idle' | 'running' | 'completed' | 'failed';

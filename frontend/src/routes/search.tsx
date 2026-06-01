@@ -34,7 +34,7 @@ import {
 } from '@/lib/search-preferences';
 import { SearchConfigForm } from '@/components/search/SearchConfigForm';
 import { SearchRunView } from '@/components/search/SearchRunView';
-import { getStagesForMode } from '@/components/search/search-leaf';
+import { getStagesForMode } from '@/components/search/search-leaf-helpers';
 
 export const Route = createRoute({
   getParentRoute: () => rootRoute,

@@ -17,12 +17,8 @@ import type { MatchStrictness, SearchRequest } from '@/types/search';
 import type { OnboardingState, PlaceSelection } from '@/types/workspace';
 import type { WorkplacePreference } from '@/lib/profile-preferences';
 import type { ScraperSource } from '@/api/scrapers';
-import {
-  MatchStrictnessControl,
-  SuggestLoadingState,
-  CATEGORY_COLORS,
-  CATEGORY_DOTS,
-} from './search-leaf';
+import { MatchStrictnessControl, SuggestLoadingState } from './search-leaf';
+import { CATEGORY_COLORS, CATEGORY_DOTS } from './search-leaf-helpers';
 
 type ModeInfo = {
   label: string; desc: string; detail: string; icon: typeof SearchIcon;
