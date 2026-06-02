@@ -368,8 +368,20 @@ def save_application(
                 session.query(ApplicationRecord).filter(ApplicationRecord.job_url == job_url)
             ).first()
             if existing:
+                changed = False
                 if search_run_id and existing.search_run_id != search_run_id:
                     existing.search_run_id = search_run_id
+                    changed = True
+                # Refresh classification on re-scrape so improved tagging (e.g.
+                # source-based startup detection) replaces a stale value. Never
+                # downgrade a known tier back to "Unknown".
+                if (
+                    company_type and company_type != "Unknown"
+                    and existing.company_type != company_type
+                ):
+                    existing.company_type = company_type
+                    changed = True
+                if changed:
                     existing.updated_at = _utcnow()
                     session.commit()
                 session.refresh(existing)
