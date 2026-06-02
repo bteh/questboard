@@ -399,10 +399,14 @@ def start_run(
             _emit_stage_event(run, stage="queued", percent=1)
             return run
 
-    # Merge keywords into roles for search (pipeline treats them similarly)
+    # Merge keywords into roles for SEARCH, but only title-shaped keywords —
+    # pure skills ("rbac", "dbt", "sox compliance", "pii masking") return noise
+    # as board job-title queries and burn the board's limited query budget.
+    # The full keyword list still drives scoring (passed via the run payload).
+    from job_finder.pipeline import _is_searchable_title
     all_roles = list(roles)
     if keywords:
-        all_roles.extend(keywords)
+        all_roles.extend(k for k in keywords if _is_searchable_title(k))
 
     effective_locations = list(locations)
     if workplace_preference == "remote_only":
@@ -949,9 +953,10 @@ def process_next_hosted_run(worker_id: str | None = None) -> bool:
         llm = workspace_service.get_workspace_llm(db, record.workspace_id, fallback_to_global=True)
         config_override = workspace_service.build_pipeline_config_override(prefs, record.workspace_id)
 
+        from job_finder.pipeline import _is_searchable_title
         _execute_pipeline(
             run,
-            roles=payload_roles + payload_keywords,
+            roles=payload_roles + [k for k in payload_keywords if _is_searchable_title(k)],
             locations=[str(item) for item in payload.get("locations") or []],
             use_ai=bool(payload.get("use_ai")),
             mode=run.mode,
