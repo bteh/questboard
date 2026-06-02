@@ -810,6 +810,23 @@ _FILTER_PRESETS: dict[str, dict[str, Any]] = {
 _DEFAULT_STRICTNESS = "balanced"
 
 
+def _source_category(source: str | None) -> str | None:
+    """Scraper category ("startup"|"ats"|"crypto"|...) for a job's source.
+
+    Used so an otherwise-Unknown company from a startup-leaning board can be
+    tagged as a startup tier (see ``classify_company``). Returns None for
+    JobSpy/remote/general sources that aren't startup-specific.
+    """
+    if not source:
+        return None
+    try:
+        from job_finder.tools.scrapers._registry import get_registry
+        meta = get_registry().get(source)
+        return meta.category if meta else None
+    except Exception:
+        return None
+
+
 def _resolve_filter_settings(config: dict | None) -> dict[str, Any]:
     """Materialize the active filter settings.
 
@@ -1820,6 +1837,7 @@ class JobFinderPipeline:
                     job.get("funding_stage"),
                     job.get("total_funding"),
                     job.get("employee_count"),
+                    source_category=_source_category(job.get("source")),
                 )
 
         ai_available = use_ai and self.llm and self.llm.is_configured
@@ -2509,6 +2527,7 @@ class JobFinderPipeline:
                 job.get("funding_stage"),
                 job.get("total_funding"),
                 job.get("employee_count"),
+                source_category=_source_category(job.get("source")),
             )
 
             rec = save_application(

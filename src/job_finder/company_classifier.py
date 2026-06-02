@@ -164,16 +164,33 @@ COMPANY_TYPES = [
     "Early Startup", "Midsize", "Enterprise", "Unknown",
 ]
 
+# Last-resort tier inferred from the SOURCE a job was scraped from. Boards in
+# these categories are dominated by startups/scaleups, so a company we can't
+# otherwise identify (no curated entry, no funding/employee data) is far more
+# likely a startup than a true "Unknown". Only consulted after every stronger
+# signal has been exhausted. Remote/general/jobspy boards are intentionally
+# absent — they're not startup-specific.
+_SOURCE_CATEGORY_TIER: dict[str, str] = {
+    "startup": "Early Startup",    # BuiltIn, YC / WorkAtAStartup
+    "crypto": "Early Startup",     # CryptoJobsList
+    "community": "Early Startup",  # Hacker News "Who is hiring"
+    "ats": "Growth Stage",         # Greenhouse, Lever, Ashby, Workday
+}
+
 
 def classify_company(
     company_name: str,
     funding_stage: str | None = None,
     total_funding: str | None = None,
     employee_count: str | None = None,
+    source_category: str | None = None,
 ) -> str:
     """Classify a company into a type tier.
 
-    Priority: known-list > funding heuristic > employee count > Unknown.
+    Priority: known-list > funding heuristic > employee count > source
+    category > Unknown. ``source_category`` is the scraper category of the
+    board the job came from (see :data:`_SOURCE_CATEGORY_TIER`); it only
+    influences the result when no stronger signal identified the company.
     """
     normalized = _normalize_company_name(company_name)
 
@@ -242,6 +259,11 @@ def classify_company(
         if funding_amt >= 10_000_000:
             return "Growth Stage"
         return "Early Startup"
+
+    # 5. Source-category fallback — a startup-leaning board is a strong hint
+    #    that an otherwise-unidentifiable company is a startup.
+    if source_category and source_category in _SOURCE_CATEGORY_TIER:
+        return _SOURCE_CATEGORY_TIER[source_category]
 
     return "Unknown"
 
