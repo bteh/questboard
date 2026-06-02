@@ -733,7 +733,14 @@ def _matches_preferred_places(
                 return True
             if scope == "metro" and _metro_matches_place(candidate, parsed_candidate, place):
                 return True
-            if scope == "city" and _city_matches_place(candidate, parsed_candidate, place):
+            # A city preference accepts its metro / commute zone too — a user who
+            # picks "Los Angeles" expects Santa Monica, Pasadena, Marina del Rey,
+            # etc. Metro expansion is bounded to the commute zone (METRO_AREAS),
+            # so a different metro in the same state (San Diego) is still rejected.
+            if scope == "city" and (
+                _city_matches_place(candidate, parsed_candidate, place)
+                or _metro_matches_place(candidate, parsed_candidate, place)
+            ):
                 return True
     return False
 

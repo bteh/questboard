@@ -185,18 +185,25 @@ class StructuredPlaceFilterTest(unittest.TestCase):
             }],
         ))
 
-    def test_city_scope_does_not_expand_to_metro(self) -> None:
+    def test_city_scope_expands_to_metro(self) -> None:
+        # A city preference now accepts its metro / commute zone: picking
+        # "Los Angeles" surfaces Santa Monica, Pasadena, Marina del Rey, etc.
+        # (job seekers expect the commute area, not the literal city limits).
+        la_place = [{
+            "label": "Los Angeles, CA",
+            "kind": "city",
+            "match_scope": "city",
+            "city": "Los Angeles",
+            "region": "CA",
+            "country": "United States",
+        }]
+        self.assertTrue(location_matches_preferences(
+            "Santa Monica, CA", False, preferred_places=la_place,
+        ))
+        # ...but a DIFFERENT metro in the same state is still rejected — metro
+        # expansion is bounded to the commute zone, not the whole state.
         self.assertFalse(location_matches_preferences(
-            "Santa Monica, CA",
-            False,
-            preferred_places=[{
-                "label": "Los Angeles, CA",
-                "kind": "city",
-                "match_scope": "city",
-                "city": "Los Angeles",
-                "region": "CA",
-                "country": "United States",
-            }],
+            "San Diego, CA", False, preferred_places=la_place,
         ))
 
     def test_metro_scope_matches_nearby_city(self) -> None:
