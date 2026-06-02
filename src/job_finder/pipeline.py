@@ -304,6 +304,62 @@ _DEFAULT_SPECIALTY_KEYWORDS = {
 }
 
 
+# Tokens that make a term look like a JOB TITLE worth searching boards for.
+# A keyword carrying none of these (e.g. "rbac", "mcp", "sox compliance",
+# "pii masking", "federated query", "semantic layer", "apache iceberg") is a
+# SKILL — it belongs in scoring/ranking, NOT as a board job-title query, where
+# it just returns noise and burns the board's limited query budget.
+_ROLE_TYPE_TOKENS = frozenset({
+    "engineer", "engineering", "developer", "dev", "manager", "director",
+    "analyst", "scientist", "architect", "lead", "head", "vp", "principal",
+    "staff", "officer", "president", "founder", "administrator", "specialist",
+    "consultant", "designer", "coordinator", "strategist", "practitioner",
+    "nurse", "accountant", "recruiter", "researcher",
+})
+_DOMAIN_TITLE_TOKENS = frozenset({
+    "data", "platform", "analytics", "infrastructure", "ml", "ai", "software",
+    "security", "devops", "cloud", "backend", "frontend", "fullstack",
+    "product", "marketing", "sales", "design", "finance", "operations",
+    "research", "mobile", "web", "machine", "learning", "systems", "network",
+    "database", "reliability", "sre",
+})
+
+
+def _is_searchable_title(term: str) -> bool:
+    """True if a term is shaped like a job title worth searching boards for.
+
+    Role titles ("Lead Data Engineer") and title-shaped domain phrases ("data
+    platform", "data mesh", "analytics engineering") qualify. Pure skills,
+    tools, and acronyms ("rbac", "mcp", "dbt", "sox compliance", "pii masking",
+    "federated query", "semantic layer", "apache iceberg", "trino") do NOT —
+    searching those as job TITLES returns noise; they belong in scoring.
+    """
+    if not term or not term.strip():
+        return False
+    words = set(re.findall(r"[a-z0-9]+", term.lower()))
+    return bool(words & _ROLE_TYPE_TOKENS or words & _DOMAIN_TITLE_TOKENS)
+
+
+def _search_query_priority(term: str, specialty_kw: set[str]) -> int:
+    """Ordering key for board search queries (lower runs first).
+
+    Real job TITLES run before niche/skill terms so the user's core role
+    searches aren't starved when a board's circuit breaker trips (rate limit /
+    CAPTCHA) partway through a run.
+    """
+    t = term.lower()
+    words = set(re.findall(r"[a-z0-9]+", t))
+    if words & _ROLE_TYPE_TOKENS:
+        return 0  # actual job titles first ("data engineer", "lead data platform")
+    if _HIGH_VALUE_PATTERNS.search(term):
+        return 1  # founding / head-of niche roles
+    if words & _DOMAIN_TITLE_TOKENS:
+        return 2  # domain title phrases ("data platform", "data mesh")
+    if t in specialty_kw or len(t) <= 4:
+        return 3  # short tech keywords
+    return 4  # everything else last
+
+
 def _get_specialty_keywords(config: dict | None = None) -> set[str]:
     """Build specialty keyword set from profile config + defaults.
 
@@ -810,6 +866,23 @@ _FILTER_PRESETS: dict[str, dict[str, Any]] = {
 _DEFAULT_STRICTNESS = "balanced"
 
 
+def _source_category(source: str | None) -> str | None:
+    """Scraper category ("startup"|"ats"|"crypto"|...) for a job's source.
+
+    Used so an otherwise-Unknown company from a startup-leaning board can be
+    tagged as a startup tier (see ``classify_company``). Returns None for
+    JobSpy/remote/general sources that aren't startup-specific.
+    """
+    if not source:
+        return None
+    try:
+        from job_finder.tools.scrapers._registry import get_registry
+        meta = get_registry().get(source)
+        return meta.category if meta else None
+    except Exception:
+        return None
+
+
 def _resolve_filter_settings(config: dict | None) -> dict[str, Any]:
     """Materialize the active filter settings.
 
@@ -1123,7 +1196,12 @@ class JobFinderPipeline:
             keywords_raw: list[str] = []
         else:
             roles_raw = self.config.get("target_roles", [])
-            keywords_raw = self.config.get("keyword_searches", [])
+            # Only search title-shaped keywords as board queries; pure skills
+            # ("rbac", "dbt", "sox compliance") stay for scoring, not title search.
+            keywords_raw = [
+                k for k in self.config.get("keyword_searches", [])
+                if _is_searchable_title(k)
+            ]
 
         # Consolidate similar search terms to reduce redundant JobSpy queries
         consolidated = _consolidate_search_terms(roles_raw, keywords_raw, config=self.config)
@@ -1151,19 +1229,10 @@ class JobFinderPipeline:
         # This ensures high-value targeted searches (technology keywords,
         # founding roles) always execute before early stopping kicks in.
         # Broad base-role queries that return mostly duplicates run last.
+        # Run real job TITLES first so the user's core role searches aren't
+        # starved when a board's circuit breaker trips (rate limit) mid-run.
         specialty_kw = _get_specialty_keywords(self.config)
-        def _query_priority(term: str) -> int:
-            """Lower = runs first.  Niche keywords before broad roles."""
-            t = term.lower()
-            if t in specialty_kw or len(t) <= 4:
-                return 0  # tech keywords first ("dbt", "SQL")
-            if _HIGH_VALUE_PATTERNS.search(term):
-                return 1  # founding/niche roles next
-            if " " in t:
-                return 2  # multi-word role queries ("data engineer")
-            return 3  # single-word broad queries last
-
-        prioritized = sorted(consolidated, key=_query_priority)
+        prioritized = sorted(consolidated, key=lambda t: _search_query_priority(t, specialty_kw))
         search_tasks: list[tuple[str, str]] = []
         for term in prioritized:
             for loc in locations:
@@ -1820,6 +1889,7 @@ class JobFinderPipeline:
                     job.get("funding_stage"),
                     job.get("total_funding"),
                     job.get("employee_count"),
+                    source_category=_source_category(job.get("source")),
                 )
 
         ai_available = use_ai and self.llm and self.llm.is_configured
@@ -2509,6 +2579,7 @@ class JobFinderPipeline:
                 job.get("funding_stage"),
                 job.get("total_funding"),
                 job.get("employee_count"),
+                source_category=_source_category(job.get("source")),
             )
 
             rec = save_application(
