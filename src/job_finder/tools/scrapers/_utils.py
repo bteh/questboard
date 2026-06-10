@@ -347,6 +347,82 @@ def finalize_scraper_jobs(jobs: list[dict]) -> list[dict]:
     return jobs
 
 
+# Query params that only track where a click came from — never identity.
+_TRACKING_PARAM_PREFIXES = ("utm_",)
+_TRACKING_PARAMS = frozenset({
+    "ref", "refid", "ref_id", "referer", "referrer", "src", "source",
+    "gh_src", "lever-source", "lever-origin", "ashby_jid_src",
+    "fbclid", "gclid", "msclkid", "mc_cid", "mc_eid",
+    "trackingid", "tracking_id", "trk", "campaign", "vq_campaign",
+})
+
+_GREENHOUSE_HOSTS = frozenset({
+    "boards.greenhouse.io", "job-boards.greenhouse.io",
+    "boards.eu.greenhouse.io", "job-boards.eu.greenhouse.io",
+})
+_LEVER_HOSTS = frozenset({"jobs.lever.co", "jobs.eu.lever.co"})
+
+_GH_JOB_PATH_RE = re.compile(r"^/([^/]+)/jobs/(\d+)")
+_LEVER_JOB_PATH_RE = re.compile(r"^/([^/]+)/([0-9a-fA-F-]{36})")
+
+
+def _is_tracking_param(name: str) -> bool:
+    low = name.lower()
+    return low in _TRACKING_PARAMS or low.startswith(_TRACKING_PARAM_PREFIXES)
+
+
+def canonicalize_job_url(url: str | None) -> str:
+    """Canonical dedup key for a job URL ('' when there is no URL).
+
+    The same posting arrives from different boards with different tracking
+    decorations (utm_*, ref, gh_src, lever-source) or URL shapes (Greenhouse
+    boards. vs job-boards. hosts, the /embed/job_app?for=&token= form, Lever
+    /apply suffixes), defeating exact-URL dedup. This strips tracking params
+    and fragments, lowercases scheme/host, drops trailing slashes, and maps
+    Greenhouse/Lever URLs onto their stable company+job-id form. Meaningful
+    params (e.g. ``gh_jid`` on embedded career pages) are preserved. Never
+    raises — unparseable input is returned trimmed so callers can still key
+    on it.
+    """
+    if not url:
+        return ""
+    from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
+    try:
+        parts = urlsplit(url.strip())
+    except ValueError:
+        return url.strip()
+    host = parts.netloc.lower()
+    path = parts.path or ""
+    query = parse_qsl(parts.query, keep_blank_values=True)
+
+    if host in _GREENHOUSE_HOSTS or host == "greenhouse.io":
+        m = _GH_JOB_PATH_RE.match(path)
+        if m:
+            return f"https://boards.greenhouse.io/{m[1].lower()}/jobs/{m[2]}"
+        if path.rstrip("/").endswith("/job_app"):
+            q = {k.lower(): v for k, v in query}
+            company, token = q.get("for"), q.get("token")
+            if company and token:
+                return f"https://boards.greenhouse.io/{company.lower()}/jobs/{token}"
+
+    if host in _LEVER_HOSTS:
+        m = _LEVER_JOB_PATH_RE.match(path)
+        if m:
+            return f"https://jobs.lever.co/{m[1].lower()}/{m[2].lower()}"
+
+    kept_query = [(k, v) for k, v in query if not _is_tracking_param(k)]
+    if len(path) > 1:
+        path = path.rstrip("/")
+    return urlunsplit((
+        parts.scheme.lower(),
+        host,
+        path,
+        urlencode(sorted(kept_query)),
+        "",  # fragment never identifies a different job
+    ))
+
+
 def _strip_html(html: str) -> str:
     """Crude HTML tag stripper for description fields."""
     text = re.sub(r"<[^>]+>", " ", html)

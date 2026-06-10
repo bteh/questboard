@@ -56,6 +56,8 @@ class ApplicationRecord(Base):
     salary_period = Column(String(20), default="")
     salary_min_annualized = Column(Float, nullable=True)
     salary_max_annualized = Column(Float, nullable=True)
+    # Provenance: 'reported' | 'parsed_from_description' | NULL (unknown)
+    salary_source = Column(String(40), nullable=True)
     estimated_total_comp = Column(String(200), default="")
 
     # Scoring
@@ -254,6 +256,10 @@ def _migrate_db(engine) -> None:
             conn.execute(
                 text("ALTER TABLE applications ADD COLUMN salary_max_annualized FLOAT")
             )
+        if "salary_source" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN salary_source VARCHAR(40)")
+            )
         if "evaluation_report_json" not in existing_cols:
             conn.execute(
                 text("ALTER TABLE applications ADD COLUMN evaluation_report_json TEXT DEFAULT ''")
@@ -367,6 +373,7 @@ def save_application(
     workspace_id: str | None = None,
     *,
     score_evidence: dict | str | None = None,
+    salary_source: str | None = None,
 ) -> ApplicationRecord | None:
     """Save a new application record to the database. Returns None if duplicate URL."""
     # Store empty URLs as None so SQLite unique constraint allows multiples
@@ -457,6 +464,9 @@ def save_application(
                         if not cand.salary_max_annualized and salary_max_annualized:
                             cand.salary_max_annualized = salary_max_annualized
                             updated = True
+                        if salary_source and not cand.salary_source:
+                            cand.salary_source = salary_source
+                            updated = True
                         if overall_score and (not cand.overall_score or overall_score > cand.overall_score):
                             cand.overall_score = overall_score
                             cand.technical_score = technical_score
@@ -525,6 +535,7 @@ def save_application(
             salary_period=salary_period,
             salary_min_annualized=salary_min_annualized,
             salary_max_annualized=salary_max_annualized,
+            salary_source=salary_source,
             overall_score=overall_score,
             technical_score=technical_score,
             leadership_score=leadership_score,
