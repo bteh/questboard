@@ -138,6 +138,22 @@ def test_migration_adds_score_evidence_column(tmp_path):
 
 # ── API schema exposure ───────────────────────────────────────────────────
 
+def test_to_response_serializer_includes_score_evidence(db):
+    rec = db.save_application(
+        job_title="Data Engineer",
+        company="Acme",
+        job_url="https://example.com/jobs/4",
+        overall_score=70.0,
+        score_evidence=_EVIDENCE,
+    )
+
+    from app.api.applications import _to_response
+
+    resp = _to_response(rec)
+    assert resp.score_evidence == _EVIDENCE
+    assert resp.model_dump()["score_evidence"] == _EVIDENCE
+
+
 def test_application_response_schema_exposes_score_evidence(db):
     rec = db.save_application(
         job_title="Data Engineer",
@@ -158,3 +174,62 @@ def test_application_response_schema_exposes_score_evidence(db):
     )
     assert resp.score_evidence == _EVIDENCE
     assert resp.model_dump()["score_evidence"] == _EVIDENCE
+
+
+# ── API endpoint round trip ───────────────────────────────────────────────
+
+@pytest.fixture()
+def api_client(tmp_path, monkeypatch):
+    import importlib
+
+    from fastapi.testclient import TestClient
+
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    db_path = data_dir / "job_tracker.db"
+    monkeypatch.setenv("DATA_DIR", str(data_dir))
+    monkeypatch.setenv("WORKSPACE_STORAGE_DIR", str(tmp_path / "workspaces"))
+    monkeypatch.setenv("HOSTED_MODE", "false")
+    monkeypatch.setenv("MANAGE_SCHEMA_ON_STARTUP", "true")
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path}")
+
+    for module_name in list(sys.modules):
+        if (
+            module_name == "app"
+            or module_name.startswith("app.")
+            or module_name == "job_finder.models"
+            or module_name.startswith("job_finder.models.")
+        ):
+            sys.modules.pop(module_name, None)
+
+    backend_db = importlib.import_module("app.models.database")
+    backend_db.init_db(str(db_path))
+    jf_db = importlib.import_module("job_finder.models.database")
+    jf_db.init_db(str(db_path))
+    app_main = importlib.import_module("app.main")
+
+    with TestClient(app_main.app) as client:
+        yield client, jf_db
+    if jf_db._SessionLocal is not None:
+        jf_db._SessionLocal.remove()
+
+
+def test_applications_api_returns_score_evidence(api_client):
+    """Producer (save_application) -> API serializer -> JSON the frontend reads."""
+    client, jf_db = api_client
+    rec = jf_db.save_application(
+        job_title="Data Engineer",
+        company="Acme",
+        job_url="https://example.com/jobs/5",
+        overall_score=70.0,
+        score_evidence=_EVIDENCE,
+    )
+
+    detail = client.get(f"/api/v1/applications/{rec.id}")
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["score_evidence"] == _EVIDENCE
+
+    listing = client.get("/api/v1/applications")
+    assert listing.status_code == 200, listing.text
+    items = listing.json()["items"]
+    assert items and items[0]["score_evidence"] == _EVIDENCE

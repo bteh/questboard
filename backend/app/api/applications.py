@@ -77,6 +77,7 @@ def _to_response(record) -> ApplicationResponse:
         score_reasoning=record.score_reasoning or "",
         key_strengths=strengths,
         key_gaps=gaps,
+        score_evidence=getattr(record, "score_evidence", None),
         funding_stage=record.funding_stage,
         total_funding=record.total_funding,
         employee_count=record.employee_count,
