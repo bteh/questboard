@@ -1,11 +1,15 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import type { useNavigate } from '@tanstack/react-router';
 import { FileText, Loader2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { ResumeAnalysisPanel } from '@/components/settings/resume-analysis-panel';
+import { ResumeAnalysisBanner } from '@/components/shared/resume-analysis-banner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useUploadWorkspaceResume } from '@/hooks/use-workspace';
+import { normalizeWorkspaceUpload, type NormalizedResumeUpload } from '@/lib/resume-analysis';
+import { buildDefaultWorkspacePreferences } from '@/lib/profile-preferences';
 import type { OnboardingState } from '@/types/workspace';
 
 interface ResumeTabProps {
@@ -17,6 +21,9 @@ interface ResumeTabProps {
 export function ResumeTab({ onboarding, navigate, markOnboardingIncomplete }: ResumeTabProps) {
   const uploadResume = useUploadWorkspaceResume();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [lastUpload, setLastUpload] = useState<NormalizedResumeUpload | null>(null);
+  // Re-mounts the analysis panel with fresh chip state on every new upload.
+  const [uploadCount, setUploadCount] = useState(0);
 
   const handleRestartOnboarding = () => {
     markOnboardingIncomplete();
@@ -30,10 +37,25 @@ export function ResumeTab({ onboarding, navigate, markOnboardingIncomplete }: Re
     if (!file) return;
     uploadResume.mutate(file, {
       onSuccess: (result) => {
-        toast.success(result.resume.parse_status === 'parsed' ? 'Resume uploaded' : 'Resume uploaded with warnings');
+        const normalized = normalizeWorkspaceUpload(result, {
+          llmAvailable: onboarding?.llm_available ?? false,
+        });
+        setLastUpload(normalized);
+        setUploadCount((count) => count + 1);
+        if (normalized.parseCode === 'SCANNED_PDF') {
+          toast.error('Resume saved, but no text could be read from it');
+        } else if (normalized.analysisStatus === 'completed') {
+          toast.success('Resume uploaded and analyzed');
+        } else if (normalized.analysisStatus === 'failed') {
+          toast.warning('Resume uploaded, but analysis failed');
+        } else {
+          toast.success('Resume uploaded');
+        }
       },
       onError: (error) => toast.error(error instanceof Error ? error.message : 'Upload failed'),
     });
+    // Allow re-selecting the same file after a failed/scanned upload.
+    event.target.value = '';
   };
 
   return (
@@ -56,7 +78,7 @@ export function ResumeTab({ onboarding, navigate, markOnboardingIncomplete }: Re
                 <p className="text-xs text-text-muted">
                   {Math.max(1, Math.round(onboarding.resume.file_size / 1024))} KB · {onboarding.resume.parse_status}
                 </p>
-                {onboarding.resume.parse_warning && (
+                {onboarding.resume.parse_warning && !lastUpload && (
                   <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">{onboarding.resume.parse_warning}</p>
                 )}
               </div>
@@ -65,6 +87,31 @@ export function ResumeTab({ onboarding, navigate, markOnboardingIncomplete }: Re
             <p className="text-sm text-text-tertiary">No resume uploaded yet. Upload one to unlock resume-matched scoring.</p>
           )}
         </div>
+
+        {lastUpload && (
+          <ResumeAnalysisBanner
+            upload={lastUpload}
+            action={
+              lastUpload.analysisStatus === 'skipped_no_llm' ? (
+                <button
+                  type="button"
+                  onClick={() => navigate({ to: '/settings', search: { tab: 'ai' } })}
+                  className="font-medium underline underline-offset-2"
+                >
+                  Connect an AI provider
+                </button>
+              ) : undefined
+            }
+          />
+        )}
+
+        {lastUpload?.analysisStatus === 'completed' && lastUpload.analysis && (
+          <ResumeAnalysisPanel
+            key={uploadCount}
+            analysis={lastUpload.analysis}
+            preferences={onboarding?.preferences ?? buildDefaultWorkspacePreferences()}
+          />
+        )}
 
         <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploadResume.isPending}>
           {uploadResume.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}

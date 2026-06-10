@@ -41,6 +41,15 @@ export interface ResumeOptimization {
   ats_compatibility_notes?: string[];
 }
 
+/** Per-dimension keyword evidence backing a score. */
+export interface ScoreEvidenceEntry {
+  matched: string[];
+  missing_top: string[];
+}
+
+/** Keyed by scoring dimension (technical_skills, leadership_signal, ...). */
+export type ScoreEvidence = Record<string, ScoreEvidenceEntry>;
+
 export interface ApplicationBase {
   job_title: string;
   company: string;
@@ -52,6 +61,10 @@ export interface ApplicationBase {
   work_type: string;
   salary_min: number | null;
   salary_max: number | null;
+  // Additive provenance fields — absent on records scored before they shipped.
+  salary_source?: 'reported' | 'parsed_from_description' | null;
+  work_type_confidence?: 'reported' | 'inferred' | null;
+  date_confidence?: 'exact' | 'fuzzy' | 'missing' | null;
 }
 
 export interface ApplicationResponse extends ApplicationBase {
@@ -68,6 +81,8 @@ export interface ApplicationResponse extends ApplicationBase {
   score_reasoning: string;
   key_strengths: string[];
   key_gaps: string[];
+  // Per-dimension matched/missing keywords. Null/absent for older records.
+  score_evidence?: ScoreEvidence | null;
   funding_stage: string | null;
   total_funding: string | null;
   employee_count: string | null;

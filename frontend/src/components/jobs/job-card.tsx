@@ -200,8 +200,18 @@ export function JobCard({ app, sourceLabels, latestRunId }: JobCardProps) {
             </div>
             <div className="flex items-center gap-3 shrink-0">
               {salaryText && (
-                <span className="text-sm font-semibold text-success tabular-nums whitespace-nowrap">
-                  {salaryText}
+                <span className="flex flex-col items-end">
+                  <span className="text-sm font-semibold text-success tabular-nums whitespace-nowrap">
+                    {salaryText}
+                  </span>
+                  {app.salary_source === 'parsed_from_description' && (
+                    <span
+                      title="This range was parsed from the job description text, not reported by the employer."
+                      className="text-[10px] leading-tight text-text-muted whitespace-nowrap"
+                    >
+                      estimated from description
+                    </span>
+                  )}
                 </span>
               )}
               <ScoreCircle score={app.overall_score} />
