@@ -124,6 +124,47 @@ class TestMatchRolesDataEngineerProfile:
         assert _match_roles("Dental Hygienist", DATA_ENGINEER_ROLES) is False
 
 
+# -- Generic-only target roles (empty domain signature) -----------------------
+
+class TestMatchRolesGenericOnlyRoles:
+    """Roles built entirely from generic title words ("engineering manager",
+    "senior engineer") have an empty domain signature. They must still match
+    non-contiguous title forms via the significant-word subset fallback —
+    not be limited to exact substrings (recall regression)."""
+
+    def test_non_contiguous_title_matches(self):
+        assert _match_roles("Manager of Engineering", ["engineering manager"]) is True
+
+    def test_punctuated_title_matches(self):
+        assert _match_roles("Director, Engineering", ["engineering director"]) is True
+
+    def test_parenthesized_seniority_matches(self):
+        assert _match_roles("Engineer (Senior)", ["senior engineer"]) is True
+
+    def test_exact_substring_still_matches(self):
+        assert _match_roles("Senior Engineering Manager", ["engineering manager"]) is True
+
+    def test_single_shared_generic_word_is_not_enough(self):
+        assert _match_roles("Marketing Manager", ["engineering manager"]) is False
+        assert _match_roles("Office Manager", ["engineering manager"]) is False
+        assert _match_roles("Engineering Intern", ["engineering manager"]) is False
+
+    def test_off_family_guard_still_applies(self):
+        assert _match_roles("Senior Sales Engineer", ["senior engineer"]) is False
+
+    def test_any_word_mode_uses_subset_fallback(self):
+        from job_finder.tools.scrapers._utils import job_passes_role_filter
+
+        job = {"title": "Manager of Engineering", "is_remote": False}
+        assert job_passes_role_filter(
+            job, ["engineering manager"], strictness="balanced"
+        ) is True
+        noise = {"title": "Office Manager", "is_remote": False}
+        assert job_passes_role_filter(
+            noise, ["engineering manager"], strictness="balanced"
+        ) is False
+
+
 # -- No roles = accept everything (backward compat) --------------------------
 
 class TestMatchRolesNoFilter:

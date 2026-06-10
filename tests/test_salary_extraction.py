@@ -57,10 +57,52 @@ from job_finder.tools.scrapers._utils import (  # noqa: E402
         ("serving 100-150k users", None, None),
         ("", None, None),
         (None, None, None),
+        # ── company money, not pay: budgets / revenue / funding ──────────
+        ("You will own a $140,000 to $170,000 cloud infrastructure budget.", None, None),
+        ("We manage a $140k-$170k marketing budget", None, None),
+        ("reach $25k-$50k MRR by Q4", None, None),
+        ("grow from $300k to $900k ARR", None, None),
+        ("raised a $140k-$170k pre-seed", None, None),
+        ("we raised $500k to $700k in funding", None, None),
+        ("closing a $140k-$170k seed round", None, None),
+        ("processing $25k-$50k in transactions daily", None, None),
+        ("a $1,200,000-$1,800,000 valuation", None, None),
+        ("scale revenue up to $170k", None, None),
     ],
 )
 def test_extract_salary_range(text, expected_min, expected_max):
     assert extract_salary_range(text) == (expected_min, expected_max)
+
+
+@pytest.mark.parametrize(
+    "text, expected_min, expected_max",
+    [
+        # Sentence/clause boundaries protect real salaries near budget talk.
+        ("Salary: $140k-$170k. You will manage the marketing budget.", 140000.0, 170000.0),
+        ("Compensation: $140k-$170k, equity, and a generous learning budget", 140000.0, 170000.0),
+        # 'budget'/'raised' before the amount but not as funding context.
+        ("Our budget for this role is $140,000 to $170,000.", 140000.0, 170000.0),
+        ("We recently raised our salary bands to $140,000 to $170,000.", 140000.0, 170000.0),
+    ],
+)
+def test_extract_salary_range_keeps_real_salaries_near_company_money_words(
+    text, expected_min, expected_max
+):
+    assert extract_salary_range(text) == (expected_min, expected_max)
+
+
+def test_finalize_does_not_stamp_salary_from_budget_figures():
+    """End-to-end: a budget range must not become salary_source='parsed_from_description'."""
+    job = {
+        "title": "Platform Engineer",
+        "description": "You will own a $140,000 to $170,000 cloud infrastructure budget.",
+        "salary_min": None,
+        "salary_max": None,
+    }
+    out = finalize_scraper_jobs([job])[0]
+    assert out["salary_min"] is None
+    assert out["salary_max"] is None
+    assert out["salary_source"] is None
 
 
 # ── Shared post-processing applies the extractor + stamps salary_source ──────

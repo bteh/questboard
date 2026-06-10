@@ -21,6 +21,13 @@ class ApplicationBase(BaseModel):
     salary_period: str = ""
     salary_min_annualized: float | None = None
     salary_max_annualized: float | None = None
+    # Provenance/confidence contract fields (mirrored by the frontend types):
+    # salary_source: 'reported' | 'parsed_from_description' | None
+    # date_confidence: 'exact' | 'fuzzy' | 'missing' | None
+    # work_type_confidence: 'reported' | 'inferred' | None
+    salary_source: str | None = None
+    date_confidence: str | None = None
+    work_type_confidence: str | None = None
 
 
 class ApplicationResponse(ApplicationBase):

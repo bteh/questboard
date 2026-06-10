@@ -222,6 +222,26 @@ _SAL_BAD_TRAIL_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Money the COMPANY handles — budgets, revenue, funding rounds, valuations,
+# transaction volume — not pay. A candidate range followed by one of these in
+# the SAME clause is rejected ("a $140k-$170k marketing budget").
+_SAL_BAD_CLAUSE_NOUN_RE = re.compile(
+    r"\b(?:budgets?|revenues?|valuations?|funding|fundrais\w*|pre-?seed|"
+    r"round|mrr|arr|gmv|transactions?)\b",
+    re.IGNORECASE,
+)
+_SAL_CLAUSE_END_RE = re.compile(r"[.!?\n;:,]")
+
+# Funding/revenue context directly BEFORE the amount ("raised a $500k…",
+# "revenue up to $170k"). Anchored adjacent on purpose: "raised our salary
+# bands to $140k" must still parse.
+_SAL_BAD_LEAD_RE = re.compile(
+    r"\b(?:rais(?:e[sd]?|ing)|valued\s+at|valuations?(?:\s+of)?|"
+    r"budgets?\s+of|revenues?(?:\s+of)?|funding(?:\s+of)?|"
+    r"mrr|arr|gmv)\s+(?:an?\s+)?$",
+    re.IGNORECASE,
+)
+
 _SAL_ANNUAL_MIN = 20_000.0
 _SAL_ANNUAL_MAX = 2_000_000.0
 _SAL_HOURLY_MIN = 7.0
@@ -240,9 +260,14 @@ def _sal_value(num_str: str, has_k: bool, *, other_has_k: bool = False) -> float
     return val
 
 
-def _sal_trail_ok(text: str, end: int) -> bool:
-    """True if the text following a match doesn't disqualify it as a salary."""
-    return not _SAL_BAD_TRAIL_RE.match(text[end:end + 40])
+def _sal_context_ok(text: str, start: int, end: int) -> bool:
+    """True unless nearby context marks the match as company money, not pay."""
+    if _SAL_BAD_TRAIL_RE.match(text[end:end + 40]):
+        return False
+    trail_clause = _SAL_CLAUSE_END_RE.split(text[end:end + 60], 1)[0]
+    if _SAL_BAD_CLAUSE_NOUN_RE.search(trail_clause):
+        return False
+    return not _SAL_BAD_LEAD_RE.search(text[max(0, start - 32):start])
 
 
 def extract_salary_range(text: str | None) -> tuple[float | None, float | None]:
@@ -251,9 +276,11 @@ def extract_salary_range(text: str | None) -> tuple[float | None, float | None]:
     Deterministic, regex-based, deliberately conservative: a match must carry
     a '$' or a 'k' suffix and survive plausibility bounds, so years of
     experience, percentages, 401(k) mentions, and headcounts never parse as
-    salaries. Handles '$140k-$170k', '$140,000 to $170,000', '140-170k',
-    'between $X and $Y', hourly rates ('$45/hr', '$45 per hour' — annualized
-    x2080), and 'up to $X' (max only).
+    salaries. Company-money figures — budgets, revenue/MRR/ARR, funding
+    rounds, valuations, transaction volume — are rejected via same-clause
+    context (:func:`_sal_context_ok`). Handles '$140k-$170k', '$140,000 to
+    $170,000', '140-170k', 'between $X and $Y', hourly rates ('$45/hr',
+    '$45 per hour' — annualized x2080), and 'up to $X' (max only).
     """
     if not text:
         return None, None
@@ -276,7 +303,7 @@ def extract_salary_range(text: str | None) -> tuple[float | None, float | None]:
             d1, n1, k1, d2, n2, k2 = m.groups()
             if not (d1 or d2 or k1 or k2):
                 continue  # no $ and no k — years, page ranges, dates, ...
-            if not _sal_trail_ok(text, m.end()):
+            if not _sal_context_ok(text, m.start(), m.end()):
                 continue
             lo = _sal_value(n1, bool(k1), other_has_k=bool(k2))
             hi = _sal_value(n2, bool(k2), other_has_k=bool(k1))
@@ -300,7 +327,7 @@ def extract_salary_range(text: str | None) -> tuple[float | None, float | None]:
         d, n, k = m.groups()
         if not (d or k):
             continue
-        if not _sal_trail_ok(text, m.end()):
+        if not _sal_context_ok(text, m.start(), m.end()):
             continue
         val = _sal_value(n, bool(k))
         if _SAL_ANNUAL_MIN <= val <= _SAL_ANNUAL_MAX:
@@ -673,9 +700,11 @@ def _match_roles(
     rarely word-overlap with normal target roles, but they're high-signal
     startup positions users almost always want to see.
 
-    A role whose domain-word set is empty after stripping (e.g. a role literally
-    "Manager") can only match via the exact substring tier — never via the
-    domain rules.
+    A role whose domain-word set is empty after stripping (e.g. "engineering
+    manager", "senior engineer") falls back to the significant-word subset
+    rule: ALL of its non-noise words must appear in the title, so "Manager of
+    Engineering" matches "engineering manager" but a single shared generic
+    word ("manager" alone) never does.
 
     Off-family guard — a title carrying a distinct job-family word
     (:data:`_OFF_FAMILY_WORDS`: sales / designer / marketing / security /
@@ -713,9 +742,20 @@ def _match_roles(
         role_lower = r.lower()
         if match_mode == "exact":
             continue
-        role_domain = _domain_words(set(_WORD_RE.findall(role_lower)))
+        role_words = set(_WORD_RE.findall(role_lower))
+        role_domain = _domain_words(role_words)
         if not role_domain:
-            continue  # purely-generic role — only the substring tier applies
+            # Purely-generic role ("engineering manager", "senior engineer"):
+            # no domain signature to key on. Fall back to the significant-word
+            # subset rule (words minus noise) so non-contiguous forms like
+            # "Manager of Engineering" still match — a single shared generic
+            # word is still not enough.
+            significant = {
+                _normalize_word(w) for w in role_words if w not in _NOISE
+            }
+            if significant and significant.issubset(norm_title_words):
+                return True
+            continue
         if match_mode == "any_word":
             if role_domain & norm_title_words:
                 return True
