@@ -21,6 +21,7 @@ class KeywordsConfig(BaseModel):
     leadership: list[str] = Field(default_factory=list)
     platform_building: list[str] = Field(default_factory=list)
     high_comp_signals: list[str] = Field(default_factory=list)
+    company_tier_signals: list[str] = Field(default_factory=list)
 
 
 class CareerBaselineConfig(BaseModel):
@@ -95,6 +96,16 @@ class ProfileInfo(BaseModel):
     resume_path: str = ""
 
 
+class EducationEntry(BaseModel):
+    """A single education entry extracted from the resume."""
+
+    degree: str = ""
+    field: str = ""
+    institution: str = ""
+
+    model_config = {"extra": "allow"}
+
+
 class ResumeAnalysis(BaseModel):
     """Cached resume analysis metadata."""
 
@@ -122,6 +133,8 @@ class ProfileConfig(BaseModel):
     career_baseline: CareerBaselineConfig | None = None
     compensation: CompensationConfig | None = None
     scoring: ScoringConfig | None = None
+    certifications: list[str] | None = None
+    education: list[EducationEntry] | None = None
     locations: list[str] | None = None
     watchlist: list[WatchlistEntry] | None = None
     profile: ProfileInfo | None = None

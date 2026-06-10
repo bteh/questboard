@@ -68,7 +68,16 @@ export function JobTable({ data, onRowClick, selectedId }: JobTableProps) {
       cell: (info) => {
         const salary = formatSalary(info.getValue(), info.row.original.salary_max);
         if (!salary) return <span className="text-text-muted">&mdash;</span>;
-        return <span className="text-xs text-text-secondary whitespace-nowrap">{salary}</span>;
+        const estimated = info.row.original.salary_source === 'parsed_from_description';
+        return (
+          <span
+            className="text-xs text-text-secondary whitespace-nowrap"
+            title={estimated ? 'Estimated from the job description text, not employer-reported.' : undefined}
+          >
+            {salary}
+            {estimated && <span className="ml-1 text-[10px] text-text-muted">(est.)</span>}
+          </span>
+        );
       },
     }),
     columnHelper.accessor('source', {

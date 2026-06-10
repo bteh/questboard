@@ -791,10 +791,28 @@ def _desc_has_hybrid_pattern(desc_lower: str) -> bool:
     return False
 
 
+# Explicit remote confirmations in description text. Any of these overrides
+# the "city in location -> probably hybrid" skepticism below.
+_EXPLICIT_REMOTE_DESC_RE = re.compile(
+    r"\b(?:"
+    r"fully\s+remote"
+    r"|100%?\s*remote"
+    r"|remote.first"
+    r"|permanently\s+remote"
+    r"|all.remote"
+    r"|work\s+from\s+anywhere"
+    r"|fully\s+distributed"
+    r"|(?:this\s+)?(?:role|position|job)\s+is\s+(?:fully\s+|100%?\s*)?remote"
+    r")\b"
+)
+
+
 def classify_work_type(
     location: str,
     description: str = "",
     is_remote_hint: bool = False,
+    *,
+    remote_flag_reported: bool = False,
 ) -> str:
     """Classify a job as 'remote', 'hybrid', or 'onsite'.
 
@@ -807,6 +825,12 @@ def classify_work_type(
     scan the description more aggressively for hybrid/office patterns
     since job boards frequently mislabel hybrid jobs as remote.
 
+    ``remote_flag_reported`` (keyword-only) marks is_remote_hint as a
+    definitive ATS-reported flag (e.g. Ashby's ``isRemote``, Lever's
+    ``workplaceType``) rather than board-metadata guesswork — the
+    text-heuristic downgrade is skipped for those jobs. Explicit hybrid/
+    onsite keywords in the location string still win.
+
     Returns
     -------
     'remote' | 'hybrid' | 'onsite'
@@ -814,27 +838,35 @@ def classify_work_type(
     loc_lower = location.lower() if location else ""
     desc_lower = description.lower()[:4000] if description else ""
 
+    trusted_remote = is_remote_hint and remote_flag_reported
+
     remote_in_location = any(kw in loc_lower for kw in _REMOTE_KEYWORDS)
     has_remote = is_remote_hint or remote_in_location
     has_hybrid = any(kw in loc_lower for kw in _HYBRID_KEYWORDS)
     has_onsite = any(kw in loc_lower for kw in _ONSITE_KEYWORDS)
 
-    # Always scan description for hybrid/office signals
-    if not has_hybrid and not has_onsite:
+    # Always scan description for hybrid/office signals — unless the ATS
+    # reported a definitive remote flag, which outranks office chatter in
+    # the description ("optional office", relocation blurbs, etc.).
+    if not has_hybrid and not has_onsite and not trusted_remote:
         has_hybrid = _desc_has_hybrid_pattern(desc_lower)
 
-    # Look for explicit "fully remote" confirmation in description
-    confirmed_remote_in_desc = bool(
-        re.search(r"\b(fully\s+remote|100%?\s*remote|remote.first|permanently\s+remote|all.remote)\b", desc_lower)
-    )
+    # Look for explicit remote confirmation in description
+    confirmed_remote_in_desc = bool(_EXPLICIT_REMOTE_DESC_RE.search(desc_lower))
     if confirmed_remote_in_desc:
         has_remote = True
 
     # KEY FIX: When the only remote signal is from the job board's metadata
     # (is_remote_hint) and there's a physical location like "Durham, NC",
     # be skeptical. Job boards frequently mislabel hybrid jobs as remote.
-    # Require confirmation from the description or location text itself.
-    hint_only_remote = is_remote_hint and not remote_in_location and not confirmed_remote_in_desc
+    # Require confirmation from the description or location text itself —
+    # unless the flag is ATS-reported (remote_flag_reported), which we trust.
+    hint_only_remote = (
+        is_remote_hint
+        and not remote_flag_reported
+        and not remote_in_location
+        and not confirmed_remote_in_desc
+    )
     if hint_only_remote and _has_physical_location(location):
         # The board says remote but the posting has a specific city —
         # downgrade to hybrid unless description explicitly says remote.
@@ -854,6 +886,25 @@ def classify_work_type(
         return "remote"
 
     return "onsite"
+
+
+def classify_job_work_type(job: dict) -> tuple[str, str]:
+    """Classify a job dict's work type. Returns (work_type, confidence).
+
+    Confidence follows the shared contract: 'reported' when the scraper
+    carried a definitive remote flag (``remote_flag_reported``, stamped by
+    ATS scrapers from e.g. Ashby's ``isRemote``), else 'inferred'. Reported
+    jobs skip the text-heuristic hybrid downgrade in
+    :func:`classify_work_type`.
+    """
+    reported = bool(job.get("remote_flag_reported"))
+    work_type = classify_work_type(
+        job.get("location", "") or "",
+        job.get("description", "") or "",
+        bool(job.get("is_remote", False)),
+        remote_flag_reported=reported,
+    )
+    return work_type, ("reported" if reported else "inferred")
 
 
 def _remote_region_scope(raw_location: str) -> str:

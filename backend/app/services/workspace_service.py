@@ -43,6 +43,7 @@ from app.schemas.workspace import (
     SearchSnapshot,
     WorkspacePreferences as WorkspacePreferencesSchema,
     WorkspaceResumeStatus,
+    WorkspaceResumeUploadResponse,
     WorkspaceSessionResponse,
 )
 from app.services.workspace_naming import allocate_workspace_slug
@@ -921,7 +922,7 @@ def save_workspace_resume(
     workspace_id: str,
     original_filename: str,
     content: bytes,
-) -> tuple[WorkspaceResumeStatus, dict[str, Any] | None]:
+) -> WorkspaceResumeUploadResponse:
     if not original_filename.lower().endswith(".pdf"):
         raise HTTPException(status_code=400, detail="Only PDF files are accepted")
     if len(content) > 10 * 1024 * 1024:
@@ -1019,10 +1020,14 @@ def save_workspace_resume(
     record.extracted_text = extracted_text
 
     analysis: dict[str, Any] | None = None
+    analysis_status = "failed"
     if extracted_text:
         llm = get_workspace_llm(db, workspace_id, fallback_to_global=True)
+        if not getattr(llm, "is_configured", False):
+            analysis_status = "skipped_no_llm"
         analysis = analyze_resume(extracted_text, llm)
         if analysis:
+            analysis_status = "completed"
             prefs = get_workspace_preferences(db, workspace_id)
             updated = WorkspacePreferencesSchema.model_validate(
                 {
@@ -1049,7 +1054,13 @@ def save_workspace_resume(
         file_path.unlink(missing_ok=True)
     except Exception:
         pass
-    return _resume_to_schema(record), analysis
+    scanned = parse_status != "parsed" and "no text was extracted" in parse_warning
+    return WorkspaceResumeUploadResponse(
+        resume=_resume_to_schema(record),
+        analysis=analysis,
+        parse_code="SCANNED_PDF" if scanned else None,
+        analysis_status=analysis_status,
+    )
 
 
 def get_onboarding_state(db: Session, workspace_id: str) -> OnboardingState:

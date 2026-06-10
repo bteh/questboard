@@ -50,10 +50,11 @@ PLATFORM_BUILDING_KEYWORDS = [
 ]
 
 # ── High comp signals ─────────────────────────────────────────────────────
+#
+# Compensation TERMS only — company names live in COMPANY_TIER_SIGNALS so a
+# JD mentioning "Apple Valley, MN" can't masquerade as a high-comp signal.
 
 HIGH_COMP_SIGNALS = [
-    "netflix", "nvidia", "airbnb", "stripe", "databricks", "snowflake",
-    "confluent", "meta", "google", "apple", "amazon", "microsoft",
     "staff", "principal", "senior staff", "l6", "l7", "e6", "e7",
     "cto", "vp", "director",
     # Big-tech level ladders
@@ -62,6 +63,75 @@ HIGH_COMP_SIGNALS = [
     "equity", "rsu", "stock options", "competitive compensation",
     "total compensation", "signing bonus",
 ]
+
+# ── Company tier signals ──────────────────────────────────────────────────
+#
+# Brand-name signals of a high-paying company tier. Kept separate from
+# HIGH_COMP_SIGNALS — tier prestige already feeds scoring via TIER_BASELINES.
+
+COMPANY_TIER_SIGNALS = [
+    "netflix", "nvidia", "airbnb", "stripe", "databricks", "snowflake",
+    "confluent", "meta", "google", "apple", "amazon", "microsoft",
+]
+
+# ── Keyword aliases ───────────────────────────────────────────────────────
+#
+# Bidirectional alias groups: a configured keyword matches the JD when ANY
+# form in its group appears. Short forms (<=3 alphanumeric chars) are
+# word-boundary matched in helpers.keyword_matches so "ML" never matches
+# inside "HTML" and "RN" never matches inside "turning".
+
+KEYWORD_ALIASES: list[list[str]] = [
+    ["ml", "machine learning"],
+    ["ai", "artificial intelligence"],
+    ["js", "javascript"],
+    ["ts", "typescript"],
+    ["k8s", "kubernetes"],
+    ["gcp", "google cloud"],
+    ["aws", "amazon web services"],
+    ["rn", "registered nurse"],
+    ["np", "nurse practitioner"],
+    ["pm", "product manager"],
+    ["postgres", "postgresql"],
+    ["react.js", "react"],
+    ["node", "node.js"],
+]
+
+_ALIAS_LOOKUP: dict[str, list[str]] = {
+    form: group for group in KEYWORD_ALIASES for form in group
+}
+
+
+def expand_aliases(terms: list[str]) -> dict[str, list[str]]:
+    """Map each term to every alias form it should match (the term itself first)."""
+    expanded: dict[str, list[str]] = {}
+    for term in terms:
+        normalized = term.strip().lower()
+        group = _ALIAS_LOOKUP.get(normalized)
+        if group:
+            expanded[term] = [term] + [f for f in group if f != normalized]
+        else:
+            expanded[term] = [term]
+    return expanded
+
+
+# ── Industry trajectory extras ────────────────────────────────────────────
+#
+# When _resume_analysis.industry is known and the profile doesn't override
+# trajectory keywords, these domain-specific growth signals are appended to
+# the generic startup/enterprise defaults.
+
+INDUSTRY_TRAJECTORY_KEYWORDS: dict[str, list[str]] = {
+    "technology": ["arr", "product-market fit", "unicorn", "ipo"],
+    "healthcare": [
+        "magnet designation", "new facility", "patient volume",
+        "health system expansion",
+    ],
+    "finance": ["assets under management", "aum growth", "new fund", "ipo"],
+    "education": ["enrollment growth", "new campus", "accreditation"],
+    "retail": ["new stores", "same-store sales", "omnichannel"],
+    "manufacturing": ["new plant", "capacity expansion", "automation investment"],
+}
 
 # ── Company trajectory (startup + enterprise) ─────────────────────────────
 

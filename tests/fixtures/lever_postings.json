@@ -1,0 +1,17 @@
+[
+  {
+    "text": "Senior Data Engineer",
+    "categories": {"location": "New York, NY"},
+    "workplaceType": "hybrid",
+    "hostedUrl": "https://jobs.lever.co/acme/1",
+    "descriptionPlain": "Build data pipelines at scale.",
+    "createdAt": 1749340800000
+  },
+  {
+    "text": "Data Engineer",
+    "categories": {"location": "Remote"},
+    "workplaceType": "remote",
+    "hostedUrl": "https://jobs.lever.co/acme/2",
+    "descriptionPlain": "No createdAt on this posting."
+  }
+]

@@ -56,6 +56,8 @@ class ApplicationRecord(Base):
     salary_period = Column(String(20), default="")
     salary_min_annualized = Column(Float, nullable=True)
     salary_max_annualized = Column(Float, nullable=True)
+    # Provenance: 'reported' | 'parsed_from_description' | NULL (unknown)
+    salary_source = Column(String(40), nullable=True)
     estimated_total_comp = Column(String(200), default="")
 
     # Scoring
@@ -71,6 +73,8 @@ class ApplicationRecord(Base):
     score_reasoning = Column(Text, default="")
     key_strengths = Column(Text, default="")  # JSON array
     key_gaps = Column(Text, default="")  # JSON array
+    # JSON object: {<dimension>: {"matched": [...], "missing_top": [...]}}
+    score_evidence_json = Column(Text, default="")
 
     # Company intel
     funding_stage = Column(String(100), nullable=True)
@@ -140,6 +144,16 @@ class ApplicationRecord(Base):
             except json.JSONDecodeError:
                 return []
         return []
+
+    @property
+    def score_evidence(self) -> dict | None:
+        if self.score_evidence_json:
+            try:
+                data = json.loads(self.score_evidence_json)
+            except json.JSONDecodeError:
+                return None
+            return data if isinstance(data, dict) else None
+        return None
 
 
 # Database connection management
@@ -242,6 +256,10 @@ def _migrate_db(engine) -> None:
             conn.execute(
                 text("ALTER TABLE applications ADD COLUMN salary_max_annualized FLOAT")
             )
+        if "salary_source" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN salary_source VARCHAR(40)")
+            )
         if "evaluation_report_json" not in existing_cols:
             conn.execute(
                 text("ALTER TABLE applications ADD COLUMN evaluation_report_json TEXT DEFAULT ''")
@@ -253,6 +271,10 @@ def _migrate_db(engine) -> None:
         if "feedback_notes" not in existing_cols:
             conn.execute(
                 text("ALTER TABLE applications ADD COLUMN feedback_notes TEXT DEFAULT ''")
+            )
+        if "score_evidence_json" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN score_evidence_json TEXT DEFAULT ''")
             )
         # Convert empty job_url strings to NULL (allows multiple NULLs in unique column)
         conn.execute(text("UPDATE applications SET job_url = NULL WHERE job_url = ''"))
@@ -349,11 +371,21 @@ def save_application(
     notes: str = "",
     search_run_id: str | None = None,
     workspace_id: str | None = None,
+    *,
+    score_evidence: dict | str | None = None,
+    salary_source: str | None = None,
 ) -> ApplicationRecord | None:
     """Save a new application record to the database. Returns None if duplicate URL."""
     # Store empty URLs as None so SQLite unique constraint allows multiples
     if not job_url:
         job_url = None
+
+    if isinstance(score_evidence, dict):
+        score_evidence_json = json.dumps(score_evidence)
+    elif isinstance(score_evidence, str):
+        score_evidence_json = score_evidence
+    else:
+        score_evidence_json = ""
 
     session = get_session()
     try:
@@ -432,6 +464,9 @@ def save_application(
                         if not cand.salary_max_annualized and salary_max_annualized:
                             cand.salary_max_annualized = salary_max_annualized
                             updated = True
+                        if salary_source and not cand.salary_source:
+                            cand.salary_source = salary_source
+                            updated = True
                         if overall_score and (not cand.overall_score or overall_score > cand.overall_score):
                             cand.overall_score = overall_score
                             cand.technical_score = technical_score
@@ -445,6 +480,7 @@ def save_application(
                             cand.score_reasoning = score_reasoning
                             cand.key_strengths = key_strengths if isinstance(key_strengths, str) else json.dumps(key_strengths or [])
                             cand.key_gaps = key_gaps if isinstance(key_gaps, str) else json.dumps(key_gaps or [])
+                            cand.score_evidence_json = score_evidence_json
                             updated = True
                         if len(description) > len(cand.description or ""):
                             cand.description = description
@@ -499,6 +535,7 @@ def save_application(
             salary_period=salary_period,
             salary_min_annualized=salary_min_annualized,
             salary_max_annualized=salary_max_annualized,
+            salary_source=salary_source,
             overall_score=overall_score,
             technical_score=technical_score,
             leadership_score=leadership_score,
@@ -511,6 +548,7 @@ def save_application(
             score_reasoning=score_reasoning,
             key_strengths=key_strengths,
             key_gaps=key_gaps,
+            score_evidence_json=score_evidence_json,
             funding_stage=funding_stage,
             total_funding=total_funding,
             employee_count=employee_count,
@@ -842,6 +880,8 @@ def backfill_scores(
                 rec.score_reasoning = score_data.get("score_reasoning", "")
                 rec.key_strengths = json.dumps(score_data.get("key_strengths", []))
                 rec.key_gaps = json.dumps(score_data.get("key_gaps", []))
+                evidence = score_data.get("score_evidence")
+                rec.score_evidence_json = json.dumps(evidence) if evidence else ""
                 rec.updated_at = _utcnow()
                 scored += 1
 

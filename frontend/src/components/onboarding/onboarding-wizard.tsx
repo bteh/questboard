@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 
 import { SimpleLocationInput } from '@/components/onboarding/simple-location-input';
+import { ResumeAnalysisBanner } from '@/components/shared/resume-analysis-banner';
 import { TagListInput } from '@/components/shared/tag-list-input';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
@@ -26,6 +27,7 @@ import {
   createManualPlace,
   normalizePlaceList,
 } from '@/lib/profile-preferences';
+import { normalizeWorkspaceUpload, type NormalizedResumeUpload } from '@/lib/resume-analysis';
 import { getSearchReadiness } from '@/lib/search-readiness';
 import { cn } from '@/lib/utils';
 import type { WorkspacePreferences } from '@/types/workspace';
@@ -95,6 +97,8 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
   const resumeUploaded = data?.resume.exists === true;
   const prefilledFromResume = form.roles.length > 0;
   const [aiFailed, setAiFailed] = useState(false);
+  // Outcome of the most recent upload — drives the scanned-PDF / no-AI banner.
+  const [uploadNotice, setUploadNotice] = useState<NormalizedResumeUpload | null>(null);
 
   // Skip directly to step 2 if a resume is already on disk when the wizard
   // mounts (e.g. after a restart mid-flow). Live transitions after a fresh
@@ -149,6 +153,14 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
     if (!file) return;
     uploadResume.mutate(file, {
       onSuccess: (result) => {
+        const normalized = normalizeWorkspaceUpload(result);
+        setUploadNotice(normalized);
+        if (normalized.parseCode === 'SCANNED_PDF') {
+          // Stay on the resume step — the banner explains how to fix the file,
+          // and the skip path is still available for keyword-only searching.
+          toast.error('Resume saved, but no text could be read from it');
+          return;
+        }
         toast.success(
           result.resume.parse_status === 'parsed'
             ? 'Resume uploaded'
@@ -291,7 +303,7 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
                     </div>
                     <CheckCircle2 className="h-5 w-5 text-success" />
                   </div>
-                  {data?.resume.parse_warning && (
+                  {data?.resume.parse_warning && !uploadNotice && (
                     <p className="mt-3 text-xs text-amber-700 dark:text-amber-300">
                       {data.resume.parse_warning}
                     </p>
@@ -321,6 +333,8 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
                   <p className="mt-1 text-xs text-text-muted">PDF up to 10MB</p>
                 </button>
               )}
+
+              {uploadNotice && <ResumeAnalysisBanner upload={uploadNotice} />}
 
               <div className="flex gap-3">
                 <Button
@@ -361,6 +375,8 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
                       : "Tell us a target role and where. You can fine-tune everything later in Settings."}
                 </p>
               </div>
+
+              {uploadNotice && <ResumeAnalysisBanner upload={uploadNotice} className="text-left" />}
 
               <div className="space-y-4 text-left">
                 <div className="space-y-1.5">

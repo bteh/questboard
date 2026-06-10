@@ -113,6 +113,10 @@ class JobScore(BaseModel):
     reasoning: str = Field(
         description="2-3 sentence explanation of the score and recommendation"
     )
+    score_evidence: dict[str, dict] | None = Field(
+        default=None,
+        description="Per-dimension keyword evidence: {dimension: {matched, missing_top}}",
+    )
 
 
 class BulletTweak(BaseModel):

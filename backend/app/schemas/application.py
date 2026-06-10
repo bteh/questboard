@@ -21,6 +21,13 @@ class ApplicationBase(BaseModel):
     salary_period: str = ""
     salary_min_annualized: float | None = None
     salary_max_annualized: float | None = None
+    # Provenance/confidence contract fields (mirrored by the frontend types):
+    # salary_source: 'reported' | 'parsed_from_description' | None
+    # date_confidence: 'exact' | 'fuzzy' | 'missing' | None
+    # work_type_confidence: 'reported' | 'inferred' | None
+    salary_source: str | None = None
+    date_confidence: str | None = None
+    work_type_confidence: str | None = None
 
 
 class ApplicationResponse(ApplicationBase):
@@ -37,6 +44,9 @@ class ApplicationResponse(ApplicationBase):
     score_reasoning: str = ""
     key_strengths: list[str] = []
     key_gaps: list[str] = []
+    # Per-dimension keyword evidence:
+    # {<dimension>: {"matched": [...], "missing_top": [...]}}
+    score_evidence: dict[str, dict] | None = None
     funding_stage: str | None = None
     total_funding: str | None = None
     employee_count: str | None = None

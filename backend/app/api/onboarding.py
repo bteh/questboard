@@ -81,13 +81,12 @@ async def upload_workspace_resume(
         raise HTTPException(status_code=400, detail="Empty file")
     if len(content) > max_bytes:
         raise HTTPException(status_code=413, detail="File too large. Maximum size is 10 MB.")
-    resume, analysis = workspace_service.save_workspace_resume(
+    return workspace_service.save_workspace_resume(
         db,
         context.workspace.id,
         file.filename or "resume.pdf",
         content,
     )
-    return WorkspaceResumeUploadResponse(resume=resume, analysis=analysis)
 
 
 @router.post("/preferences", response_model=WorkspacePreferences)

@@ -212,4 +212,9 @@ def run_scrapers(
             if progress:
                 progress("Warning: some scrapers timed out, using partial results")
 
-    return all_jobs
+    # Shared post-processing: guarantee the contract fields (date_confidence,
+    # salary_source, work_type_confidence) on every job from every plugin.
+    # Lazy import keeps this module free of sibling imports at import time.
+    from job_finder.tools.scrapers._utils import finalize_scraper_jobs
+
+    return finalize_scraper_jobs(all_jobs)

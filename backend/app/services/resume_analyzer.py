@@ -28,6 +28,8 @@ _AUTO_PROFILE_KEYS = (
     "keyword_searches",
     "keywords",
     "career_baseline",
+    "certifications",
+    "education",
     "_resume_analysis",
 )
 
@@ -66,18 +68,41 @@ Return **valid JSON** (no markdown fences):
     ...
   ],
 
-  "high_comp_signals": [
-    "<company names, level indicators, or comp signals from their background>",
+  "high_comp_keywords": [
+    "<compensation-related TERM only, e.g. 'equity', 'RSU', 'bonus', 'top of market'>",
+    ...
+  ],
+
+  "company_tier_signals": [
+    "<prestige company name or tier signal from their background, e.g. 'Google', 'FAANG', 'Fortune 500'>",
+    ...
+  ],
+
+  "certifications": [
+    "<professional certification or license, e.g. 'RN', 'FNP-C', 'PMP', 'AWS Solutions Architect'>",
+    ...
+  ],
+
+  "education": [
+    {"degree": "<e.g. 'BSN', 'MBA', 'BS'>", "field": "<field of study>", "institution": "<school name>"},
     ...
   ]
 }
 
 Rules:
 - Extract skills AS THEY APPEAR on the resume (preserve domain language)
-- Include both hard skills (tools, technologies, certifications) and domain skills
+- Include both hard skills (tools, technologies) and domain skills
+- Licenses and credentials like 'RN', 'FNP-C', 'PMP' are certifications — put them
+  in certifications, NOT in skills
+- education lists each degree as an object with degree, field, and institution
+- high_comp_keywords must contain compensation TERMS only (equity, RSU, bonus,
+  'top of market' phrases) — never company names
+- company_tier_signals is where prestige company names and tier labels go
 - suggested_target_roles should include current-level AND next-level-up roles
-- suggested_keywords should be industry-specific terms that would find relevant jobs
-- Keep each list to 15-20 items max, prioritized by relevance
+  (up to 25 items)
+- suggested_keywords should be industry-specific terms that would find relevant
+  jobs (up to 20 items)
+- Keep other lists to 15-20 items max, prioritized by relevance
 - leadership_signals should be phrases/patterns to look for in job descriptions
 """
 
@@ -151,6 +176,33 @@ def _clean_list(values: Any, limit: int) -> list[str]:
     return cleaned
 
 
+def _clean_education(values: Any, limit: int = 10) -> list[dict]:
+    """Normalize LLM education entries into plain {degree, field, institution} dicts."""
+    if not isinstance(values, list):
+        return []
+
+    cleaned: list[dict] = []
+    seen: set[tuple[str, str, str]] = set()
+    for value in values:
+        if not isinstance(value, dict):
+            continue
+        entry = {
+            "degree": str(value.get("degree") or "").strip(),
+            "field": str(value.get("field") or "").strip(),
+            "institution": str(value.get("institution") or "").strip(),
+        }
+        if not any(entry.values()):
+            continue
+        key = (entry["degree"].lower(), entry["field"].lower(), entry["institution"].lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        cleaned.append(entry)
+        if len(cleaned) >= limit:
+            break
+    return cleaned
+
+
 def _normalize_level(value: Any) -> str:
     """Coerce legacy list-based level values into a single level string."""
     if isinstance(value, list):
@@ -192,11 +244,18 @@ def apply_analysis_to_profile(
 
     cfg = copy.deepcopy(profile_config or {})
 
-    suggested_roles = _clean_list(analysis.get("suggested_target_roles"), 15)
-    suggested_keywords = _clean_list(analysis.get("suggested_keywords"), 10)
+    suggested_roles = _clean_list(analysis.get("suggested_target_roles"), 25)
+    suggested_keywords = _clean_list(analysis.get("suggested_keywords"), 20)
     extracted_skills = _clean_list(analysis.get("skills"), 20)
     leadership_signals = _clean_list(analysis.get("leadership_signals"), 10)
-    high_comp_signals = _clean_list(analysis.get("high_comp_signals"), 10)
+    # New-style extractions split comp terms from company-tier names; old-style
+    # LLM responses only provide the combined "high_comp_signals" list.
+    high_comp_signals = _clean_list(analysis.get("high_comp_keywords"), 10)
+    if not high_comp_signals:
+        high_comp_signals = _clean_list(analysis.get("high_comp_signals"), 10)
+    company_tier_signals = _clean_list(analysis.get("company_tier_signals"), 15)
+    certifications = _clean_list(analysis.get("certifications"), 15)
+    education = _clean_education(analysis.get("education"))
     current_title = str(analysis.get("current_title", "")).strip()
     seniority = str(analysis.get("seniority", "")).strip()
 
@@ -236,7 +295,28 @@ def apply_analysis_to_profile(
     elif not current_comp and high_comp_signals:
         keywords["high_comp_signals"] = high_comp_signals
 
+    current_tier = _clean_list(keywords.get("company_tier_signals"), 100)
+    if force_overwrite:
+        if company_tier_signals:
+            keywords["company_tier_signals"] = company_tier_signals
+    elif not current_tier and company_tier_signals:
+        keywords["company_tier_signals"] = company_tier_signals
+
     cfg["keywords"] = keywords
+
+    current_certs = _clean_list(cfg.get("certifications"), 100)
+    if force_overwrite:
+        if certifications:
+            cfg["certifications"] = certifications
+    elif not current_certs and certifications:
+        cfg["certifications"] = certifications
+
+    current_edu = cfg.get("education") if isinstance(cfg.get("education"), list) else []
+    if force_overwrite:
+        if education:
+            cfg["education"] = education
+    elif not current_edu and education:
+        cfg["education"] = education
 
     baseline = dict(cfg.get("career_baseline") or {})
     baseline_level = _normalize_level(baseline.get("current_level"))

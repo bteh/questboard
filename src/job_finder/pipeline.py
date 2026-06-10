@@ -45,7 +45,8 @@ from job_finder.prompts import (
 )
 from job_finder.company_classifier import (
     classify_company,
-    classify_work_type,
+    classify_job_work_type,
+    classify_work_type,  # noqa: F401 — re-export for existing consumers
     location_matches_preferences,
 )
 from job_finder.scoring import score_job_basic, get_company_baselines, normalize_company_key
@@ -325,7 +326,7 @@ _DOMAIN_TITLE_TOKENS = frozenset({
 })
 
 
-def _is_searchable_title(term: str) -> bool:
+def _is_searchable_title(term: str, *, extra_tokens: frozenset[str] | set[str] = frozenset()) -> bool:
     """True if a term is shaped like a job title worth searching boards for.
 
     Role titles ("Lead Data Engineer") and title-shaped domain phrases ("data
@@ -333,11 +334,92 @@ def _is_searchable_title(term: str) -> bool:
     tools, and acronyms ("rbac", "mcp", "dbt", "sox compliance", "pii masking",
     "federated query", "semantic layer", "apache iceberg", "trino") do NOT —
     searching those as job TITLES returns noise; they belong in scoring.
+
+    The hardcoded token sets are tech-biased, so callers can pass
+    ``extra_tokens`` harvested from the user's own profile (see
+    :func:`_profile_title_tokens`) — a nurse's "APRN" must not be dropped
+    just because nursing vocabulary isn't in the builtin sets. Every dropped
+    term is logged at INFO so silent misses are visible in the run log.
     """
     if not term or not term.strip():
         return False
     words = set(re.findall(r"[a-z0-9]+", term.lower()))
-    return bool(words & _ROLE_TYPE_TOKENS or words & _DOMAIN_TITLE_TOKENS)
+    if words & _ROLE_TYPE_TOKENS or words & _DOMAIN_TITLE_TOKENS:
+        return True
+    if extra_tokens and words & extra_tokens:
+        return True
+    logger.info(
+        "Search term %r dropped: not title-shaped (skills drive scoring, not board queries)",
+        term,
+    )
+    return False
+
+
+def _profile_title_tokens(config: dict | None) -> frozenset[str]:
+    """Title vocabulary harvested from the user's own profile.
+
+    ``target_roles`` are titles by definition, so their tokens always count.
+    When those roles hit none of the hardcoded domain tokens, the profile's
+    field is one the builtin (tech-biased) sets don't know — the skill-vs-
+    title split can't be trusted there, so tokens from the user's own
+    ``keyword_searches`` and resume-extracted ``keywords.technical`` count
+    as title vocabulary too (permissive). Tech-domain profiles keep the
+    strict split so "rbac"/"dbt" never become board queries.
+    """
+    if not config:
+        return frozenset()
+    tokens: set[str] = set()
+    for term in config.get("target_roles", []) or []:
+        tokens.update(re.findall(r"[a-z0-9]+", str(term).lower()))
+    if not tokens & _DOMAIN_TITLE_TOKENS:
+        keywords_cfg = config.get("keywords") or {}
+        harvest = list(config.get("keyword_searches", []) or [])
+        harvest.extend(keywords_cfg.get("technical", []) or [])
+        for term in harvest:
+            tokens.update(re.findall(r"[a-z0-9]+", str(term).lower()))
+    return frozenset(tokens)
+
+
+def _build_search_terms(
+    config: dict | None,
+    roles: list[str] | None = None,
+) -> tuple[list[str], list[str], list[str]]:
+    """Assemble the consolidated board-query list for a profile.
+
+    Returns ``(consolidated_terms, roles_raw, keywords_raw)``. When *roles*
+    is passed explicitly (the API path — keywords already merged into it),
+    ``keyword_searches`` is NOT re-read (double-count), but title-shaped
+    resume skills from ``keywords.technical`` still merge in: they were
+    previously used only for scoring and never reached search queries.
+    """
+    config = config or {}
+    profile_tokens = _profile_title_tokens(config)
+    if roles:
+        roles_raw = list(roles)
+        keywords_raw: list[str] = []
+    else:
+        roles_raw = list(config.get("target_roles", []) or [])
+        # Only search title-shaped keywords as board queries; pure skills
+        # ("rbac", "dbt", "sox compliance") stay for scoring, not title search.
+        keywords_raw = [
+            k for k in config.get("keyword_searches", []) or []
+            if _is_searchable_title(k, extra_tokens=profile_tokens)
+        ]
+
+    # Merge title-shaped resume skills (dedup case-insensitively against
+    # terms already present).
+    seen = {str(t).strip().lower() for t in roles_raw + keywords_raw if str(t).strip()}
+    keywords_cfg = config.get("keywords") or {}
+    for skill in keywords_cfg.get("technical", []) or []:
+        s = str(skill).strip()
+        if not s or s.lower() in seen:
+            continue
+        if _is_searchable_title(s, extra_tokens=profile_tokens):
+            keywords_raw.append(s)
+            seen.add(s.lower())
+
+    consolidated = _consolidate_search_terms(roles_raw, keywords_raw, config=config)
+    return consolidated, roles_raw, keywords_raw
 
 
 def _search_query_priority(term: str, specialty_kw: set[str]) -> int:
@@ -563,6 +645,21 @@ def _pick_best_job(group: list[dict]) -> dict:
             if j is not best and (j.get("salary_min") or j.get("salary_max")):
                 best["salary_min"] = j.get("salary_min")
                 best["salary_max"] = j.get("salary_max")
+                if j.get("salary_source"):
+                    best["salary_source"] = j.get("salary_source")
+                break
+
+    # Likewise borrow a verifiable posting date so the strict freshness
+    # filter doesn't drop a merged job whose keeper-copy had no date.
+    if (best.get("date_confidence") or "missing") == "missing":
+        for j in group:
+            if (
+                j is not best
+                and j.get("date_posted")
+                and j.get("date_confidence") in ("exact", "fuzzy")
+            ):
+                best["date_posted"] = j.get("date_posted")
+                best["date_confidence"] = j.get("date_confidence")
                 break
 
     return best
@@ -576,6 +673,8 @@ def _deduplicate(jobs: list[dict]) -> list[dict]:
     info from siblings. Fuzzy merges only happen when company, title, and
     location all match and the descriptions look materially identical.
     """
+    from job_finder.tools.scrapers._utils import canonicalize_job_url
+
     url_groups: dict[str, list[dict]] = {}
     groups: dict[str, list[dict]] = {}
     unique: list[dict] = []
@@ -583,7 +682,10 @@ def _deduplicate(jobs: list[dict]) -> list[dict]:
     for job in jobs:
         url = job.get("url", "")
         if url:
-            url_groups.setdefault(url, []).append(job)
+            # Key on the canonical URL so tracking-param variants (utm_*,
+            # ref, gh_src) and Greenhouse/Lever URL shapes of the SAME
+            # posting land in one group.
+            url_groups.setdefault(canonicalize_job_url(url) or url, []).append(job)
         else:
             unique.append(job)
 
@@ -751,13 +853,17 @@ def _filter_jobs_by_freshness(
     max_days_old: int,
     *,
     now: datetime | None = None,
+    drop_missing_dates: bool = False,
 ) -> list[dict]:
     """Drop postings older than ``max_days_old`` by their real post date.
 
     max_days_old is otherwise only an upstream hint most boards ignore, so a
-    months-old reposting can slip through. Jobs whose date is missing or
-    unparseable are KEPT (we don't drop on uncertainty). A 1-day skew buffer
-    absorbs timezone/repost differences. ``max_days_old <= 0`` disables it.
+    months-old reposting can slip through. By default, jobs whose date is
+    missing or unparseable are KEPT (we don't drop on uncertainty); under the
+    strict preset ``drop_missing_dates=True`` drops jobs whose
+    ``date_confidence`` is 'missing' — no verifiable date means the posting
+    can't be proven fresh. A 1-day skew buffer absorbs timezone/repost
+    differences. ``max_days_old <= 0`` disables it.
     """
     if not max_days_old or max_days_old <= 0:
         return jobs
@@ -769,7 +875,11 @@ def _filter_jobs_by_freshness(
     for job in jobs:
         dt = _parse_posted_date(job.get("date_posted"))
         if dt is None:
-            kept.append(job)  # unknown date → keep
+            # Unstamped jobs with an unparseable date are 'missing' too.
+            confidence = job.get("date_confidence") or "missing"
+            if drop_missing_dates and confidence == "missing":
+                continue
+            kept.append(job)  # unknown date → keep (default presets)
             continue
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
@@ -846,6 +956,7 @@ _FILTER_PRESETS: dict[str, dict[str, Any]] = {
         "level_tolerance_junior": 3.0,
         "include_founding_titles": True,
         "role_match_mode": "any_word",
+        "drop_missing_dates": False,
     },
     "balanced": {
         "salary_flex": 0.85,
@@ -853,6 +964,7 @@ _FILTER_PRESETS: dict[str, dict[str, Any]] = {
         "level_tolerance_junior": 2.0,
         "include_founding_titles": True,
         "role_match_mode": "all_significant",
+        "drop_missing_dates": False,
     },
     "strict": {
         "salary_flex": 1.00,
@@ -860,6 +972,8 @@ _FILTER_PRESETS: dict[str, dict[str, Any]] = {
         "level_tolerance_junior": 1.0,
         "include_founding_titles": False,
         "role_match_mode": "exact",
+        # No verifiable posting date → can't prove freshness → drop.
+        "drop_missing_dates": True,
     },
 }
 
@@ -901,6 +1015,7 @@ def _resolve_filter_settings(config: dict | None) -> dict[str, Any]:
         "level_tolerance_junior",
         "include_founding_titles",
         "role_match_mode",
+        "drop_missing_dates",
     ):
         if key in raw:
             resolved[key] = raw[key]
@@ -1188,23 +1303,12 @@ class JobFinderPipeline:
         search_distance = settings.get("search_radius_miles")  # None = JobSpy default (50 miles)
         jobspy_boards = self.config.get("job_boards") or None  # None → default boards
 
+        # Build the consolidated query list: target_roles + title-shaped
+        # keyword_searches + title-shaped resume skills (keywords.technical).
         # When roles are passed explicitly (e.g. from the API, which already
-        # merges keywords into the roles list), don't re-read keyword_searches
-        # from config — that would double-count them.
-        if roles:
-            roles_raw = roles
-            keywords_raw: list[str] = []
-        else:
-            roles_raw = self.config.get("target_roles", [])
-            # Only search title-shaped keywords as board queries; pure skills
-            # ("rbac", "dbt", "sox compliance") stay for scoring, not title search.
-            keywords_raw = [
-                k for k in self.config.get("keyword_searches", [])
-                if _is_searchable_title(k)
-            ]
-
-        # Consolidate similar search terms to reduce redundant JobSpy queries
-        consolidated = _consolidate_search_terms(roles_raw, keywords_raw, config=self.config)
+        # merges keywords into the roles list), keyword_searches is not
+        # re-read — that would double-count it.
+        consolidated, roles_raw, keywords_raw = _build_search_terms(self.config, roles)
 
         # Broader queries → more results per query to compensate
         original_count = len(roles_raw) + len(keywords_raw)
@@ -1460,6 +1564,14 @@ class JobFinderPipeline:
                     progress("Warning: some scrapers timed out, using partial results")
             all_jobs.extend(extra_jobs_result)
 
+        # Guarantee the contract fields (date_confidence, salary_source,
+        # work_type_confidence) on EVERY job. Plugin scrapers already pass
+        # through run_scrapers' finalize step, but JobSpy results don't —
+        # without this, description-parsed salaries never reach the salary
+        # filter and the strict freshness preset can't trust date_confidence.
+        from job_finder.tools.scrapers._utils import finalize_scraper_jobs
+        finalize_scraper_jobs(all_jobs)
+
         # Reset funnel for this run
         self._last_funnel = []
         raw_count = len(all_jobs)
@@ -1498,27 +1610,35 @@ class JobFinderPipeline:
             # never needed their description anyway; AI scoring only sees
             # the top-60 shortlist and can request fuller text on-demand
             # for those if needed.
-            max_backfill = 25
+            # Tunable per profile via search_settings.max_description_backfill.
+            try:
+                max_backfill = max(0, int(settings.get("max_description_backfill", 25)))
+            except (TypeError, ValueError):
+                max_backfill = 25
             if len(no_desc) > max_backfill:
                 logger.info(
                     "Capping LinkedIn backfill from %d to %d jobs",
                     len(no_desc), max_backfill,
                 )
                 no_desc = no_desc[:max_backfill]
+        if no_desc:
             if progress:
                 progress(f"Fetching descriptions for {len(no_desc)} LinkedIn-only jobs...")
             _backfill_linkedin_descriptions(no_desc, max_workers=16)
+            # Re-run salary extraction on the freshly fetched descriptions:
+            # these jobs had salary_source=None at finalize time.
+            finalize_scraper_jobs(no_desc)
 
         # Classify work type and fix is_remote for every job
         if progress:
             progress("Classifying remote/hybrid/onsite...")
         for job in deduped:
-            wt = classify_work_type(
-                job.get("location", ""),
-                job.get("description", ""),
-                job.get("is_remote", False),
-            )
+            # classify_job_work_type honors ATS-reported remote flags
+            # (remote_flag_reported) instead of overriding them with the
+            # text heuristic, and yields the confidence contract field.
+            wt, wt_confidence = classify_job_work_type(job)
             job["work_type"] = wt
+            job["work_type_confidence"] = wt_confidence
             job["is_remote"] = wt == "remote"
 
         hybrid_count = sum(1 for j in deduped if j["work_type"] == "hybrid")
@@ -1620,7 +1740,11 @@ class JobFinderPipeline:
         # (keeps jobs with unknown/unparseable dates so we don't over-drop).
         if max_days_old and max_days_old > 0:
             pre_fresh = len(deduped)
-            deduped = _filter_jobs_by_freshness(deduped, max_days_old)
+            deduped = _filter_jobs_by_freshness(
+                deduped,
+                max_days_old,
+                drop_missing_dates=bool(filter_settings.get("drop_missing_dates", False)),
+            )
             dropped = pre_fresh - len(deduped)
             self._record_funnel_stage("freshness", "Freshness filter", pre_fresh, len(deduped))
             if dropped and progress:
@@ -2596,6 +2720,7 @@ class JobFinderPipeline:
                 salary_period=job.get("salary_period", ""),
                 salary_min_annualized=job.get("salary_min_annualized"),
                 salary_max_annualized=job.get("salary_max_annualized"),
+                salary_source=job.get("salary_source"),
                 overall_score=job.get("overall_score"),
                 technical_score=job.get("technical_score"),
                 leadership_score=job.get("leadership_score"),
@@ -2606,6 +2731,7 @@ class JobFinderPipeline:
                 career_progression_score=job.get("career_progression_score"),
                 recommendation=job.get("recommendation"),
                 score_reasoning=job.get("score_reasoning"),
+                score_evidence=job.get("score_evidence"),
                 key_strengths=json.dumps(job.get("key_strengths", [])),
                 key_gaps=json.dumps(job.get("key_gaps", [])),
                 funding_stage=job.get("funding_stage"),
