@@ -106,7 +106,14 @@ class ScraperRegistryTest(unittest.TestCase):
                 watchlist_by_ats={"greenhouse": ["openai"]},
             )
 
-        self.assertEqual(jobs, [{"title": "OpenAI job"}])
+        # run_scrapers post-processing adds the contract fields
+        # (date_confidence / salary_source / work_type_confidence) on top of
+        # whatever the scraper returned.
+        self.assertEqual(len(jobs), 1)
+        self.assertEqual(jobs[0]["title"], "OpenAI job")
+        self.assertEqual(jobs[0]["date_confidence"], "missing")
+        self.assertIsNone(jobs[0]["salary_source"])
+        self.assertEqual(jobs[0]["work_type_confidence"], "inferred")
         greenhouse.assert_called_once()
         self.assertEqual(greenhouse.call_args.kwargs["watchlist_companies"], ["openai"])
         self.assertTrue(any("Searching 1 additional sources" in msg for msg in progress))

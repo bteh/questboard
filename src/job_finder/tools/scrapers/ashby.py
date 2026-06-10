@@ -12,6 +12,7 @@ from job_finder.tools.scrapers._utils import (
     _load_seed_slugs,
     _match_roles,
     _match_roles_crypto,
+    date_confidence_for,
     is_crypto_company,
 )
 
@@ -83,6 +84,8 @@ def _fetch_company_jobs(
                         salary_max = c.get("maxValue")
                         break
 
+        published_at = job.get("publishedAt", "")
+
         jobs.append({
             "title": title,
             "company": _clean_company_name(slug),
@@ -92,8 +95,12 @@ def _fetch_company_jobs(
             "description": description,
             "salary_min": salary_min,
             "salary_max": salary_max,
-            "date_posted": job.get("publishedAt", ""),
+            "date_posted": published_at,
+            "date_confidence": date_confidence_for(published_at),
             "is_remote": is_remote,
+            # Ashby's isRemote/workplaceType is a definitive ATS flag — the
+            # work-type classifier trusts it over text heuristics.
+            "remote_flag_reported": bool(is_remote),
             "company_size": "",
             "crypto": crypto,
         })

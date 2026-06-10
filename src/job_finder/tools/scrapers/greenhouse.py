@@ -13,6 +13,7 @@ from job_finder.tools.scrapers._utils import (
     _match_roles,
     _match_roles_crypto,
     _strip_html,
+    date_confidence_for,
     is_crypto_company,
 )
 
@@ -69,6 +70,11 @@ def _fetch_company_jobs(
         content = job.get("content", "")
         description = _strip_html(content) if content else ""
 
+        # Prefer first_published (the real posting date) over updated_at —
+        # a year-old job edited yesterday must not look freshly posted.
+        first_published = job.get("first_published", "")
+        date_posted = first_published or job.get("updated_at", "")
+
         jobs.append({
             "title": title,
             "company": _clean_company_name(slug),
@@ -78,7 +84,10 @@ def _fetch_company_jobs(
             "description": description,
             "salary_min": None,
             "salary_max": None,
-            "date_posted": job.get("updated_at", ""),
+            "date_posted": date_posted,
+            "date_confidence": date_confidence_for(
+                date_posted, fuzzy=not first_published,
+            ),
             "is_remote": "remote" in location.lower(),
             "company_size": "",
             "crypto": crypto,

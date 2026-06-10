@@ -1,0 +1,25 @@
+{
+  "jobs": [
+    {
+      "title": "Data Engineer",
+      "location": {"name": "New York, NY"},
+      "absolute_url": "https://boards.greenhouse.io/acme/jobs/1",
+      "content": "&lt;p&gt;Build pipelines.&lt;/p&gt;",
+      "first_published": "2026-05-20T12:00:00-04:00",
+      "updated_at": "2026-06-09T08:00:00-04:00"
+    },
+    {
+      "title": "Data Platform Engineer",
+      "location": {"name": "Remote"},
+      "absolute_url": "https://boards.greenhouse.io/acme/jobs/2",
+      "content": "&lt;p&gt;Platform work.&lt;/p&gt;",
+      "updated_at": "2026-06-09T08:00:00-04:00"
+    },
+    {
+      "title": "Senior Data Engineer",
+      "location": {"name": "Remote"},
+      "absolute_url": "https://boards.greenhouse.io/acme/jobs/3",
+      "content": "&lt;p&gt;Senior pipelines.&lt;/p&gt;"
+    }
+  ]
+}

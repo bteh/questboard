@@ -13,6 +13,7 @@ from job_finder.tools.scrapers._utils import (
     _match_roles,
     _match_roles_crypto,
     _strip_html,
+    date_confidence_for,
     is_crypto_company,
 )
 
@@ -70,6 +71,11 @@ def _fetch_company_postings(
             desc_plain = _strip_html(posting.get("description", ""))
         desc_plain = desc_plain[:3000]
 
+        # Lever's postings API returns createdAt as epoch ms — the pipeline's
+        # _parse_posted_date handles it, so stale jobs no longer bypass the
+        # freshness filter via a hardcoded empty date.
+        created_at = posting.get("createdAt", "")
+
         results.append({
             "title": title,
             "company": _clean_company_name(slug),
@@ -79,8 +85,12 @@ def _fetch_company_postings(
             "description": desc_plain,
             "salary_min": None,
             "salary_max": None,
-            "date_posted": "",
+            "date_posted": created_at,
+            "date_confidence": date_confidence_for(created_at),
             "is_remote": workplace == "remote" or "remote" in location.lower(),
+            # workplaceType is a definitive ATS flag; 'remote' appearing in
+            # free-text location is only a heuristic.
+            "remote_flag_reported": workplace == "remote",
             "company_size": "",
             "crypto": crypto,
         })

@@ -175,6 +175,178 @@ def _parse_posted_date(raw: object) -> datetime | None:
     return None
 
 
+def date_confidence_for(raw: object, *, fuzzy: bool = False) -> str:
+    """Confidence label for a scraper-provided posting date.
+
+    Returns 'exact' when ``raw`` parses as a real posting date, 'fuzzy' when
+    the caller only has an updated/approximate date (pass ``fuzzy=True``),
+    and 'missing' when the value is absent or unparseable.
+    """
+    if _parse_posted_date(raw) is None:
+        return "missing"
+    return "fuzzy" if fuzzy else "exact"
+
+
+_HOURS_PER_YEAR = 2080  # 40h x 52 weeks — standard annualization factor
+
+# Number like 140000, 140,000, 140.5 — comma-grouped or plain.
+_SAL_NUM = r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?"
+_SAL_SEP = r"\s*(?:-|–|—|to)\s*"
+_SAL_HOURLY_SUFFIX = r"\s*(?:/\s*(?:hr|hour)\b|per\s+hour\b|an\s+hour\b|hourly\b)"
+
+# One salary amount: optional $, the number, optional k suffix. The leading
+# lookbehind keeps us from matching inside a larger token ("v2.140-170k").
+_SAL_AMOUNT = rf"(?<![A-Za-z0-9,.])(\$)?\s*({_SAL_NUM})\s*([kK])?"
+
+_SAL_RANGE_RE = re.compile(rf"{_SAL_AMOUNT}{_SAL_SEP}(\$)?\s*({_SAL_NUM})\s*([kK])?")
+_SAL_BETWEEN_RE = re.compile(
+    rf"between\s+{_SAL_AMOUNT}\s+and\s+(\$)?\s*({_SAL_NUM})\s*([kK])?",
+    re.IGNORECASE,
+)
+_SAL_HOURLY_RANGE_RE = re.compile(
+    rf"{_SAL_AMOUNT}{_SAL_SEP}(\$)?\s*({_SAL_NUM})\s*([kK])?{_SAL_HOURLY_SUFFIX}",
+    re.IGNORECASE,
+)
+_SAL_HOURLY_SINGLE_RE = re.compile(
+    rf"{_SAL_AMOUNT}{_SAL_HOURLY_SUFFIX}", re.IGNORECASE,
+)
+_SAL_UP_TO_RE = re.compile(rf"up\s+to\s+{_SAL_AMOUNT}", re.IGNORECASE)
+
+# Text right after a candidate match that marks it as NOT a salary:
+# percentages, durations, headcounts/traffic figures, 401(k) plans.
+_SAL_BAD_TRAIL_RE = re.compile(
+    r"^\s*(?:%|percent\b|years?\b|yrs?\b|\(?k\)|"
+    r"bonus\b|stipend\b|sign[- ]?on\b|signing\b|"
+    r"\+?\s*(?:users|customers|clients|employees|engineers|people|members|"
+    r"hires|downloads|installs|requests|visitors|followers|subscribers)\b)",
+    re.IGNORECASE,
+)
+
+_SAL_ANNUAL_MIN = 20_000.0
+_SAL_ANNUAL_MAX = 2_000_000.0
+_SAL_HOURLY_MIN = 7.0
+_SAL_HOURLY_MAX = 500.0
+
+
+def _sal_value(num_str: str, has_k: bool, *, other_has_k: bool = False) -> float:
+    """Normalize one captured amount to dollars ('140'+k -> 140000).
+
+    ``other_has_k`` handles the '140-170k' shorthand where only the upper
+    bound carries the k suffix.
+    """
+    val = float(num_str.replace(",", ""))
+    if has_k or (other_has_k and val < 1000):
+        val *= 1000
+    return val
+
+
+def _sal_trail_ok(text: str, end: int) -> bool:
+    """True if the text following a match doesn't disqualify it as a salary."""
+    return not _SAL_BAD_TRAIL_RE.match(text[end:end + 40])
+
+
+def extract_salary_range(text: str | None) -> tuple[float | None, float | None]:
+    """Extract an annual (salary_min, salary_max) from free text, or (None, None).
+
+    Deterministic, regex-based, deliberately conservative: a match must carry
+    a '$' or a 'k' suffix and survive plausibility bounds, so years of
+    experience, percentages, 401(k) mentions, and headcounts never parse as
+    salaries. Handles '$140k-$170k', '$140,000 to $170,000', '140-170k',
+    'between $X and $Y', hourly rates ('$45/hr', '$45 per hour' — annualized
+    x2080), and 'up to $X' (max only).
+    """
+    if not text:
+        return None, None
+    # Cap the scan — salary lines live near the top or bottom of postings and
+    # descriptions are already truncated by the scrapers.
+    text = text[:6000]
+
+    # Hourly range first, so '$40 - $50 per hour' isn't read as an annual range.
+    for m in _SAL_HOURLY_RANGE_RE.finditer(text):
+        d1, n1, k1, d2, n2, k2 = m.groups()
+        if not (d1 or d2) or k1 or k2:
+            continue
+        lo, hi = _sal_value(n1, False), _sal_value(n2, False)
+        if _SAL_HOURLY_MIN <= lo <= hi <= _SAL_HOURLY_MAX:
+            return lo * _HOURS_PER_YEAR, hi * _HOURS_PER_YEAR
+
+    # Annual ranges: 'between $X and $Y' plus the plain separator forms.
+    for pattern in (_SAL_BETWEEN_RE, _SAL_RANGE_RE):
+        for m in pattern.finditer(text):
+            d1, n1, k1, d2, n2, k2 = m.groups()
+            if not (d1 or d2 or k1 or k2):
+                continue  # no $ and no k — years, page ranges, dates, ...
+            if not _sal_trail_ok(text, m.end()):
+                continue
+            lo = _sal_value(n1, bool(k1), other_has_k=bool(k2))
+            hi = _sal_value(n2, bool(k2), other_has_k=bool(k1))
+            if _SAL_ANNUAL_MIN <= lo <= hi <= _SAL_ANNUAL_MAX:
+                return lo, hi
+
+    # Single hourly rate — the hourly marker itself is strong salary context.
+    for m in _SAL_HOURLY_SINGLE_RE.finditer(text):
+        _d, n, k = m.groups()
+        if k:
+            continue
+        val = _sal_value(n, False)
+        if _SAL_HOURLY_MIN <= val <= _SAL_HOURLY_MAX:
+            annual = val * _HOURS_PER_YEAR
+            if re.search(r"up\s+to\s*$", text[:m.start()], re.IGNORECASE):
+                return None, annual
+            return annual, None
+
+    # 'up to $X' — max only.
+    for m in _SAL_UP_TO_RE.finditer(text):
+        d, n, k = m.groups()
+        if not (d or k):
+            continue
+        if not _sal_trail_ok(text, m.end()):
+            continue
+        val = _sal_value(n, bool(k))
+        if _SAL_ANNUAL_MIN <= val <= _SAL_ANNUAL_MAX:
+            return None, val
+
+    return None, None
+
+
+def finalize_scraper_jobs(jobs: list[dict]) -> list[dict]:
+    """Shared post-processing for scraper job dicts (mutates in place).
+
+    Guarantees the cross-agent contract fields on every job:
+
+    - ``date_confidence``: 'exact' | 'fuzzy' | 'missing'. Scraper-stamped
+      values win; otherwise derived from ``date_posted`` (parseable date ->
+      'exact', absent/unparseable -> 'missing').
+    - ``salary_source``: 'reported' when the scraper provided structured
+      salary, 'parsed_from_description' when :func:`extract_salary_range`
+      recovers a range from the description (also fills salary_min/max),
+      else None.
+    - ``work_type_confidence``: 'reported' when the scraper carried a
+      definitive remote flag (``remote_flag_reported``), else 'inferred'.
+    """
+    for job in jobs:
+        if not isinstance(job, dict):
+            continue
+        if "date_confidence" not in job:
+            job["date_confidence"] = date_confidence_for(job.get("date_posted"))
+        if job.get("salary_min") is not None or job.get("salary_max") is not None:
+            if not job.get("salary_source"):
+                job["salary_source"] = "reported"
+        elif not job.get("salary_source"):
+            lo, hi = extract_salary_range(job.get("description") or "")
+            if lo is not None or hi is not None:
+                job["salary_min"] = lo
+                job["salary_max"] = hi
+                job["salary_source"] = "parsed_from_description"
+            else:
+                job["salary_source"] = None
+        if "work_type_confidence" not in job:
+            job["work_type_confidence"] = (
+                "reported" if job.get("remote_flag_reported") else "inferred"
+            )
+    return jobs
+
+
 def _strip_html(html: str) -> str:
     """Crude HTML tag stripper for description fields."""
     text = re.sub(r"<[^>]+>", " ", html)
