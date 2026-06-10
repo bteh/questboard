@@ -68,7 +68,13 @@ logger = logging.getLogger(__name__)
 #
 # Re-enable any board manually if you have a workaround (residential
 # proxy, paid API key, etc.).
-_DEFAULT_JOBSPY_BOARDS: list[str] = []
+#
+# Indeed is enabled by default: verified live to return LA-metro local
+# listings (El Segundo, Santa Monica, Long Beach, Hawthorne) where the plugin
+# scrapers are remote-only. The per-board circuit breaker skips it if it ever
+# CAPTCHA-walls, so it can't slow a run down. Glassdoor stays off — it returns
+# HTTP 400 "location not parsed" for "City, ST" inputs.
+_DEFAULT_JOBSPY_BOARDS: list[str] = ["indeed"]
 _LINKEDIN_JOBSPY_BOARD = "linkedin"
 _DESKTOP_SESSION_HEADER = "X-Launchboard-Session"
 
