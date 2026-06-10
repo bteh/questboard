@@ -201,6 +201,81 @@ class HostedWorkspaceApiTest(unittest.TestCase):
         self.assertIsNotNone(asset)
         self.assertEqual(asset.kind, "resume")
 
+    def _upload_resume(self, headers: dict[str, str]):
+        return self.client.post(
+            "/api/v1/onboarding/resume",
+            headers=headers,
+            files={"file": ("resume.pdf", b"%PDF-1.4\nmock pdf payload", "application/pdf")},
+        )
+
+    def test_resume_upload_reports_completed_analysis_status(self) -> None:
+        headers = self._auth_headers()
+        with patch(
+            "job_finder.tools.resume_parser_tool.parse_resume",
+            return_value="Experienced nurse practitioner",
+        ), patch(
+            "app.services.resume_analyzer.analyze_resume",
+            return_value={"suggested_target_roles": ["Nurse Practitioner"]},
+        ):
+            response = self._upload_resume(headers)
+
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload["analysis_status"], "completed")
+        self.assertIsNone(payload["parse_code"])
+
+    def test_resume_upload_reports_scanned_pdf_parse_code(self) -> None:
+        headers = self._auth_headers()
+        warning = (
+            "WARNING: PDF was read but no text was extracted. "
+            "The PDF might be image-based."
+        )
+        with patch("job_finder.tools.resume_parser_tool.parse_resume", return_value=warning):
+            response = self._upload_resume(headers)
+
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload["parse_code"], "SCANNED_PDF")
+        self.assertEqual(payload["analysis_status"], "failed")
+        self.assertIsNone(payload["analysis"])
+        self.assertEqual(payload["resume"]["parse_status"], "warning")
+
+    def test_resume_upload_reports_skipped_no_llm(self) -> None:
+        headers = self._auth_headers()
+        with patch(
+            "job_finder.tools.resume_parser_tool.parse_resume",
+            return_value="Experienced nurse practitioner",
+        ), patch.object(
+            self.workspace_service,
+            "get_workspace_llm",
+            return_value=SimpleNamespace(is_configured=False),
+        ):
+            response = self._upload_resume(headers)
+
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload["analysis_status"], "skipped_no_llm")
+        self.assertIsNone(payload["parse_code"])
+        self.assertIsNone(payload["analysis"])
+
+    def test_resume_upload_reports_failed_when_analysis_returns_nothing(self) -> None:
+        headers = self._auth_headers()
+        with patch(
+            "job_finder.tools.resume_parser_tool.parse_resume",
+            return_value="Experienced nurse practitioner",
+        ), patch.object(
+            self.workspace_service,
+            "get_workspace_llm",
+            return_value=SimpleNamespace(is_configured=True),
+        ), patch(
+            "app.services.resume_analyzer.analyze_resume",
+            return_value=None,
+        ):
+            response = self._upload_resume(headers)
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["analysis_status"], "failed")
+
     def test_search_defaults_reflect_workspace_preferences(self) -> None:
         headers = self._auth_headers()
         me = self.client.get("/api/v1/me", headers=headers).json()

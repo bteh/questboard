@@ -153,9 +153,7 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
     if (!file) return;
     uploadResume.mutate(file, {
       onSuccess: (result) => {
-        const normalized = normalizeWorkspaceUpload(result, {
-          llmAvailable: llm?.available ?? false,
-        });
+        const normalized = normalizeWorkspaceUpload(result);
         setUploadNotice(normalized);
         if (normalized.parseCode === 'SCANNED_PDF') {
           // Stay on the resume step — the banner explains how to fix the file,

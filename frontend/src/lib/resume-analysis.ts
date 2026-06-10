@@ -8,13 +8,10 @@ import type {
 import type { WorkspaceResumeUploadResponse } from '@/types/workspace';
 
 /**
- * Upload outcome normalized across the two resume upload routes:
- *
- * - `/resume/{profile}/upload` (legacy/local) returns the full contract:
- *   `parse_status`, `parse_code`, `analysis_status`, `analysis` summary.
- * - `/onboarding/resume` (workspace — the route the UI currently uses)
- *   returns only `resume.parse_status` + `parse_warning` and the raw
- *   analyzer dict (or null). Status fields are derived here.
+ * Upload outcome normalized across the two resume upload routes. Both
+ * `/resume/{profile}/upload` (legacy/local) and `/onboarding/resume`
+ * (workspace — the route the UI uses) report structured `parse_code` and
+ * `analysis_status` fields; this just maps them onto one shape.
  */
 export interface NormalizedResumeUpload {
   analysisStatus: ResumeAnalysisStatus;
@@ -70,16 +67,6 @@ export function normalizeAnalysisSummary(raw: unknown): ResumeAnalysisSummary | 
   return hasContent ? summary : null;
 }
 
-/**
- * Detect the scanned/image-based PDF parser warning. The workspace route
- * has no structured `parse_code`, so we match the parser's warning text
- * ("PDF was read but no text was extracted. The PDF might be image-based.").
- */
-export function isScannedPdfWarning(warning: string | null | undefined): boolean {
-  if (!warning) return false;
-  return /image[- ]based|no text (was|could be) extracted|appears to be\s+scanned/i.test(warning);
-}
-
 /** Normalize the legacy `/resume/{profile}/upload` response. */
 export function normalizeLegacyUpload(response: ResumeUploadResponse): NormalizedResumeUpload {
   return {
@@ -91,37 +78,13 @@ export function normalizeLegacyUpload(response: ResumeUploadResponse): Normalize
   };
 }
 
-/**
- * Normalize the workspace `/onboarding/resume` response, deriving the
- * status fields the route does not report:
- * - analysis present        -> 'completed'
- * - parse error / scanned   -> 'failed' (analysis cannot run without text)
- * - parse ok, no LLM        -> 'skipped_no_llm'
- * - parse ok, LLM available -> 'failed' (the LLM call returned nothing)
- */
-export function normalizeWorkspaceUpload(
-  response: WorkspaceResumeUploadResponse,
-  options: { llmAvailable: boolean },
-): NormalizedResumeUpload {
-  const analysis = normalizeAnalysisSummary(response.analysis);
-  const parseWarning = response.resume.parse_warning || '';
-  const scanned = isScannedPdfWarning(parseWarning);
-  const parseFailed = response.resume.parse_status === 'error' || scanned;
-
-  let analysisStatus: ResumeAnalysisStatus;
-  if (analysis) {
-    analysisStatus = 'completed';
-  } else if (parseFailed) {
-    analysisStatus = 'failed';
-  } else {
-    analysisStatus = options.llmAvailable ? 'failed' : 'skipped_no_llm';
-  }
-
+/** Normalize the workspace `/onboarding/resume` response. */
+export function normalizeWorkspaceUpload(response: WorkspaceResumeUploadResponse): NormalizedResumeUpload {
   return {
-    analysisStatus,
-    parseCode: scanned ? 'SCANNED_PDF' : null,
-    analysis,
-    parseWarning,
+    analysisStatus: response.analysis_status,
+    parseCode: response.parse_code ?? null,
+    analysis: normalizeAnalysisSummary(response.analysis),
+    parseWarning: response.resume.parse_warning || '',
     message: response.message,
   };
 }

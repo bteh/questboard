@@ -37,9 +37,7 @@ export function ResumeTab({ onboarding, navigate, markOnboardingIncomplete }: Re
     if (!file) return;
     uploadResume.mutate(file, {
       onSuccess: (result) => {
-        const normalized = normalizeWorkspaceUpload(result, {
-          llmAvailable: onboarding?.llm_available ?? false,
-        });
+        const normalized = normalizeWorkspaceUpload(result);
         setLastUpload(normalized);
         setUploadCount((count) => count + 1);
         if (normalized.parseCode === 'SCANNED_PDF') {

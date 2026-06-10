@@ -1,3 +1,5 @@
+import type { ResumeAnalysisStatus, ResumeParseCode } from './resume';
+
 export interface WorkspaceSession {
   workspace_id: string;
   expires_at: string;
@@ -146,6 +148,8 @@ export interface WorkspaceResumeUploadResponse {
   message: string;
   resume: WorkspaceResumeStatus;
   analysis: Record<string, unknown> | null;
+  parse_code: ResumeParseCode;
+  analysis_status: ResumeAnalysisStatus;
 }
 
 export interface WorkspaceSearchRunResponse {
