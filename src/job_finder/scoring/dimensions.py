@@ -16,12 +16,23 @@ from job_finder.scoring.helpers import annualize_amount, keyword_score, salary_s
 from job_finder.scoring.signals import (
     CULTURE_ENTERPRISE_SIGNALS,
     CULTURE_STARTUP_SIGNALS,
+    INDUSTRY_TRAJECTORY_KEYWORDS,
     LEVEL_MAP,
     MGMT_SIGNALS,
     SCOPE_KEYWORDS,
     TRAJECTORY_ENTERPRISE_SIGNALS,
     TRAJECTORY_STARTUP_SIGNALS,
 )
+
+
+def _safe_years(years_experience: int | None) -> int | None:
+    """Coerce years_experience to a non-negative int, None when unusable."""
+    if years_experience is None:
+        return None
+    try:
+        return max(int(years_experience), 0)
+    except (TypeError, ValueError):
+        return None
 
 
 # \u2500\u2500 Technical skills \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -31,18 +42,38 @@ def score_technical(
     job_description: str,
     combined: str,
     tech_keywords: list[str],
+    *,
+    years_experience: int | None = None,
+    extra_keyword_hits: int = 0,
 ) -> float:
-    """Blend TF-IDF resume\u2194JD similarity with keyword matches."""
+    """Blend TF-IDF resume\u2194JD similarity with keyword matches.
+
+    More experience lowers the saturation point: a senior with 10+ years
+    reaches max keyword score with fewer hits. ``extra_keyword_hits`` lets
+    callers count matched certifications as strong keyword hits.
+    """
     tfidf_raw = tfidf_similarity(resume_text, job_description)
     tech_tfidf = min(tfidf_raw * 300, 100.0)
-    tech_kw = keyword_score(combined, tech_keywords, saturation=6)
+    years = _safe_years(years_experience)
+    saturation = 6 if years is None else max(3, 6 - years // 5)
+    tech_kw = keyword_score(
+        combined, tech_keywords, saturation=saturation,
+        extra_hits=extra_keyword_hits,
+    )
     return tech_tfidf * 0.5 + tech_kw * 0.5
 
 
 # \u2500\u2500 Leadership \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
-def score_leadership(combined: str, lead_keywords: list[str]) -> float:
-    return keyword_score(combined, lead_keywords, saturation=3)
+def score_leadership(
+    combined: str,
+    lead_keywords: list[str],
+    *,
+    years_experience: int | None = None,
+) -> float:
+    years = _safe_years(years_experience)
+    saturation = 3 if years is None else max(2, 3 - years // 8)
+    return keyword_score(combined, lead_keywords, saturation=saturation)
 
 
 # \u2500\u2500 Compensation potential \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
@@ -72,14 +103,35 @@ def score_platform(combined: str, plat_keywords: list[str]) -> float:
 
 # \u2500\u2500 Company trajectory \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 
+def effective_trajectory_keywords(
+    trajectory_keywords: list[str] | None = None,
+    *,
+    industry: str | None = None,
+) -> list[str]:
+    """Resolve the trajectory keyword list a profile actually scores against.
+
+    Explicit profile keywords always win; otherwise the generic defaults are
+    extended with industry-specific growth signals when the industry is known.
+    """
+    if trajectory_keywords:
+        return list(trajectory_keywords)
+    signals = TRAJECTORY_STARTUP_SIGNALS + TRAJECTORY_ENTERPRISE_SIGNALS
+    if industry:
+        signals = signals + INDUSTRY_TRAJECTORY_KEYWORDS.get(
+            industry.strip().lower(), []
+        )
+    return signals
+
+
 def score_trajectory(
     combined: str,
     trajectory_keywords: list[str] | None = None,
+    *,
+    industry: str | None = None,
 ) -> float:
-    if trajectory_keywords:
-        all_signals = trajectory_keywords
-    else:
-        all_signals = TRAJECTORY_STARTUP_SIGNALS + TRAJECTORY_ENTERPRISE_SIGNALS
+    all_signals = effective_trajectory_keywords(
+        trajectory_keywords, industry=industry
+    )
     return keyword_score(combined, all_signals, saturation=3)
 
 
@@ -136,8 +188,16 @@ def _extract_level(title: str) -> float:
     return matched
 
 
-def resolve_current_level(baseline: dict | None) -> float:
-    """Resolve the user's current level from explicit level or title."""
+def resolve_current_level(
+    baseline: dict | None,
+    *,
+    fallback_seniority: str | None = None,
+) -> float:
+    """Resolve the user's current level from explicit level or title.
+
+    ``fallback_seniority`` (from resume analysis) calibrates the level only
+    when the career baseline carries no usable signal of its own.
+    """
     baseline = baseline or {}
 
     explicit_level = baseline.get("current_level")
@@ -152,6 +212,11 @@ def resolve_current_level(baseline: dict | None) -> float:
         if matched is not None:
             return matched
 
+    if isinstance(fallback_seniority, str):
+        matched = _match_level(fallback_seniority.strip())
+        if matched is not None:
+            return matched
+
     return 2.0
 
 
@@ -162,10 +227,12 @@ def score_career_progression(
     salary_max: float | None,
     config: dict,
     salary_period: str = "",
+    *,
+    seniority: str | None = None,
 ) -> float:
     """Score whether this job represents a career upgrade (0\u2013100)."""
     baseline = config.get("career_baseline", {})
-    current_level = resolve_current_level(baseline)
+    current_level = resolve_current_level(baseline, fallback_seniority=seniority)
     compensation_cfg = config.get("compensation", {})
     user_period = compensation_cfg.get("pay_period", "annual")
     current_tc = annualize_amount(baseline.get("current_tc", 100_000), user_period) or 100_000

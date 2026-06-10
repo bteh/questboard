@@ -37,6 +37,9 @@ class ApplicationResponse(ApplicationBase):
     score_reasoning: str = ""
     key_strengths: list[str] = []
     key_gaps: list[str] = []
+    # Per-dimension keyword evidence:
+    # {<dimension>: {"matched": [...], "missing_top": [...]}}
+    score_evidence: dict[str, dict] | None = None
     funding_stage: str | None = None
     total_funding: str | None = None
     employee_count: str | None = None

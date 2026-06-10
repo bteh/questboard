@@ -71,6 +71,8 @@ class ApplicationRecord(Base):
     score_reasoning = Column(Text, default="")
     key_strengths = Column(Text, default="")  # JSON array
     key_gaps = Column(Text, default="")  # JSON array
+    # JSON object: {<dimension>: {"matched": [...], "missing_top": [...]}}
+    score_evidence_json = Column(Text, default="")
 
     # Company intel
     funding_stage = Column(String(100), nullable=True)
@@ -140,6 +142,16 @@ class ApplicationRecord(Base):
             except json.JSONDecodeError:
                 return []
         return []
+
+    @property
+    def score_evidence(self) -> dict | None:
+        if self.score_evidence_json:
+            try:
+                data = json.loads(self.score_evidence_json)
+            except json.JSONDecodeError:
+                return None
+            return data if isinstance(data, dict) else None
+        return None
 
 
 # Database connection management
@@ -254,6 +266,10 @@ def _migrate_db(engine) -> None:
             conn.execute(
                 text("ALTER TABLE applications ADD COLUMN feedback_notes TEXT DEFAULT ''")
             )
+        if "score_evidence_json" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN score_evidence_json TEXT DEFAULT ''")
+            )
         # Convert empty job_url strings to NULL (allows multiple NULLs in unique column)
         conn.execute(text("UPDATE applications SET job_url = NULL WHERE job_url = ''"))
 
@@ -349,11 +365,20 @@ def save_application(
     notes: str = "",
     search_run_id: str | None = None,
     workspace_id: str | None = None,
+    *,
+    score_evidence: dict | str | None = None,
 ) -> ApplicationRecord | None:
     """Save a new application record to the database. Returns None if duplicate URL."""
     # Store empty URLs as None so SQLite unique constraint allows multiples
     if not job_url:
         job_url = None
+
+    if isinstance(score_evidence, dict):
+        score_evidence_json = json.dumps(score_evidence)
+    elif isinstance(score_evidence, str):
+        score_evidence_json = score_evidence
+    else:
+        score_evidence_json = ""
 
     session = get_session()
     try:
@@ -445,6 +470,7 @@ def save_application(
                             cand.score_reasoning = score_reasoning
                             cand.key_strengths = key_strengths if isinstance(key_strengths, str) else json.dumps(key_strengths or [])
                             cand.key_gaps = key_gaps if isinstance(key_gaps, str) else json.dumps(key_gaps or [])
+                            cand.score_evidence_json = score_evidence_json
                             updated = True
                         if len(description) > len(cand.description or ""):
                             cand.description = description
@@ -511,6 +537,7 @@ def save_application(
             score_reasoning=score_reasoning,
             key_strengths=key_strengths,
             key_gaps=key_gaps,
+            score_evidence_json=score_evidence_json,
             funding_stage=funding_stage,
             total_funding=total_funding,
             employee_count=employee_count,
@@ -842,6 +869,8 @@ def backfill_scores(
                 rec.score_reasoning = score_data.get("score_reasoning", "")
                 rec.key_strengths = json.dumps(score_data.get("key_strengths", []))
                 rec.key_gaps = json.dumps(score_data.get("key_gaps", []))
+                evidence = score_data.get("score_evidence")
+                rec.score_evidence_json = json.dumps(evidence) if evidence else ""
                 rec.updated_at = _utcnow()
                 scored += 1
 

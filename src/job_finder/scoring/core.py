@@ -7,11 +7,13 @@ and produces the final score dict compatible with the DB schema.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
 from job_finder.scoring.dimensions import (
+    effective_trajectory_keywords,
     score_career_progression,
     score_comp,
     score_culture,
@@ -20,14 +22,41 @@ from job_finder.scoring.dimensions import (
     score_technical,
     score_trajectory,
 )
-from job_finder.scoring.helpers import annualize_amount
+from job_finder.scoring.helpers import annualize_amount, keyword_matches
 from job_finder.scoring.signals import (
+    CULTURE_ENTERPRISE_SIGNALS,
+    CULTURE_STARTUP_SIGNALS,
     HIGH_COMP_SIGNALS,
     LEADERSHIP_KEYWORDS,
     PLATFORM_BUILDING_KEYWORDS,
     TECHNICAL_KEYWORDS,
     TIER_BASELINES,
 )
+
+# Tokens that mark a certification/licensure requirement in a JD when they
+# appear near required/must-have language.
+_CERT_TOKENS = ("certification", "certified", "certificate", "licensure", "license")
+_REQUIRED_RE = re.compile(r"required|must[- ]have|must hold|requirement")
+
+
+def _jd_requires_missing_cert(jd_text: str, cert_matches: list[str]) -> bool:
+    """True when the JD demands a cert-like token the profile doesn't cover."""
+    if cert_matches:
+        return False
+    jd_lower = jd_text.lower()
+    for m in _REQUIRED_RE.finditer(jd_lower):
+        window = jd_lower[max(0, m.start() - 120):m.end() + 120]
+        if any(token in window for token in _CERT_TOKENS):
+            return True
+    return False
+
+
+def _dimension_evidence(
+    keywords: list[str], matched: list[str],
+) -> dict[str, list[str]]:
+    matched_lower = {m.lower() for m in matched}
+    missing_top = [kw for kw in keywords if kw.lower() not in matched_lower][:5]
+    return {"matched": matched, "missing_top": missing_top}
 
 
 def score_job_basic(
@@ -87,6 +116,20 @@ def score_job_basic(
     traj_keywords = kw.get("company_trajectory") or None  # None = use defaults
     culture_keywords = kw.get("culture_fit") or None  # None = use defaults
 
+    # Resume analysis metadata (written during resume upload) calibrates
+    # keyword scoring; everything degrades to pre-existing behavior when absent.
+    ra = cfg.get("_resume_analysis") or {}
+    years_experience = ra.get("years_experience")
+    seniority = ra.get("seniority")
+    industry = ra.get("industry")
+
+    # Profile certifications: a JD mentioning one counts as a strong
+    # technical keyword hit.
+    certifications = [
+        c for c in (cfg.get("certifications") or [])
+        if isinstance(c, str) and c.strip()
+    ]
+
     # When include_equity is false, strip equity-specific signals from comp scoring
     include_equity = cfg.get("compensation", {}).get("include_equity", True)
     compensation_cfg = cfg.get("compensation", {})
@@ -108,8 +151,16 @@ def score_job_basic(
 
     # ── Dimension scores (0–100 each) ─────────────────────────────────
 
-    tech_kw = score_technical(resume_text, job_description, combined, tech_keywords)
-    lead_kw = score_leadership(combined, lead_keywords)
+    cert_matches = keyword_matches(combined, certifications) if certifications else []
+
+    tech_kw = score_technical(
+        resume_text, job_description, combined, tech_keywords,
+        years_experience=years_experience,
+        extra_keyword_hits=2 * len(cert_matches),
+    )
+    lead_kw = score_leadership(
+        combined, lead_keywords, years_experience=years_experience,
+    )
 
     comp_kw = score_comp(
         salary_min, salary_max, combined, comp_signals,
@@ -118,8 +169,36 @@ def score_job_basic(
         salary_period=salary_period,
     )
     plat_kw = score_platform(combined, plat_keywords)
-    traj_kw = score_trajectory(combined, trajectory_keywords=traj_keywords)
+    traj_kw = score_trajectory(
+        combined, trajectory_keywords=traj_keywords, industry=industry,
+    )
     culture_kw = score_culture(combined, is_remote, culture_keywords=culture_keywords)
+
+    # ── Per-dimension keyword evidence ────────────────────────────────
+    traj_effective = effective_trajectory_keywords(traj_keywords, industry=industry)
+    culture_effective = culture_keywords or (
+        CULTURE_STARTUP_SIGNALS + CULTURE_ENTERPRISE_SIGNALS
+    )
+    evidence = {
+        "technical_skills": _dimension_evidence(
+            tech_keywords, keyword_matches(combined, tech_keywords) + cert_matches,
+        ),
+        "leadership_signal": _dimension_evidence(
+            lead_keywords, keyword_matches(combined, lead_keywords),
+        ),
+        "platform_building": _dimension_evidence(
+            plat_keywords, keyword_matches(combined, plat_keywords),
+        ),
+        "company_trajectory": _dimension_evidence(
+            traj_effective, keyword_matches(combined, traj_effective),
+        ),
+        "culture_fit": _dimension_evidence(
+            culture_effective, keyword_matches(combined, culture_effective),
+        ),
+        "comp_potential": _dimension_evidence(
+            list(comp_signals), keyword_matches(combined, list(comp_signals)),
+        ),
+    }
 
     # Blend keyword scores with baselines:
     # - LLM intel: weighted blend (AI can lower scores, not just raise them)
@@ -145,6 +224,7 @@ def score_job_basic(
     progression = score_career_progression(
         job_title, job_description, salary_min, salary_max, cfg,
         salary_period=salary_period,
+        seniority=seniority,
     )
 
     overall = (
@@ -218,6 +298,12 @@ def score_job_basic(
         strengths.append(f"Strong company trajectory ({source})")
     if culture >= 55:
         strengths.append("Good culture signals")
+    if cert_matches:
+        strengths.append(
+            "Certification match: " + ", ".join(cert_matches[:3])
+        )
+    if _jd_requires_missing_cert(job_description, cert_matches):
+        gaps.append("JD requires a certification not in your profile")
 
     scoring_method = "ai" if ai_scored else "keyword"
 
@@ -241,4 +327,5 @@ def score_job_basic(
         ),
         "key_strengths": strengths,
         "key_gaps": gaps,
+        "score_evidence": evidence,
     }

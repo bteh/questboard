@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 import re
 
-from job_finder.scoring.signals import HIGH_COMP_SIGNALS
+from job_finder.scoring.signals import HIGH_COMP_SIGNALS, expand_aliases
 
 PAY_PERIOD_FACTORS: dict[str, float] = {
     "hourly": 2080.0,
@@ -35,24 +35,68 @@ def annualize_amount(amount: float | int | None, period: str | None) -> float | 
 
 # ── Keyword helpers ───────────────────────────────────────────────────────
 
+# Alphanumeric forms this short get word-boundary matching so "ML" can't
+# match inside "HTML". Longer terms keep the historical substring behavior.
+_SHORT_FORM_MAX_LEN = 3
+
+
+def _form_in_text(text_lower: str, form: str) -> bool:
+    form = form.strip().lower()
+    if not form:
+        return False
+    if len(form) <= _SHORT_FORM_MAX_LEN and form.isalnum():
+        return re.search(r"\b" + re.escape(form) + r"\b", text_lower) is not None
+    return form in text_lower
+
+
+def keyword_matches(text: str, keywords: list[str]) -> list[str]:
+    """Return the configured keywords whose alias forms appear in *text*.
+
+    Each keyword matches when ANY of its alias forms (see
+    ``signals.expand_aliases``) appears, so a profile skill "ML" matches a
+    JD that says "Machine Learning" and vice versa.
+    """
+    text_lower = text.lower()
+    expanded = expand_aliases(keywords)
+    matched: list[str] = []
+    for kw in keywords:
+        forms = expanded.get(kw, [kw])
+        if any(_form_in_text(text_lower, form) for form in forms):
+            matched.append(kw)
+    return matched
+
+
 def keyword_count(text: str, keywords: list[str]) -> int:
     """Return the number of keywords found in *text* (case-insensitive)."""
-    text_lower = text.lower()
-    return sum(1 for kw in keywords if kw.lower() in text_lower)
+    return len(keyword_matches(text, keywords))
 
 
-def keyword_score(text: str, keywords: list[str], saturation: int = 5) -> float:
+def keyword_score(
+    text: str,
+    keywords: list[str],
+    saturation: int = 5,
+    *,
+    extra_hits: int = 0,
+    return_matches: bool = False,
+) -> float | tuple[float, list[str]]:
     """Score keyword matches on a 0–100 scale with diminishing returns.
 
     Uses a saturation curve: finding *saturation* keywords gives ~80/100.
+    ``extra_hits`` adds synthetic hits to the count (e.g. matched
+    certifications counted as strong technical hits). With
+    ``return_matches=True`` returns ``(score, matched_keywords)``.
     """
-    count = keyword_count(text, keywords)
+    matched = keyword_matches(text, keywords)
+    count = len(matched) + max(int(extra_hits), 0)
     if count == 0:
-        return 0.0
-    # Asymptotic curve calibrated so `saturation` matches → 80%
-    factor = saturation / 1.6  # ln(5) ≈ 1.6
-    score = 100.0 * (1.0 - math.exp(-count / factor))
-    return min(score, 100.0)
+        score = 0.0
+    else:
+        # Asymptotic curve calibrated so `saturation` matches → 80%
+        factor = saturation / 1.6  # ln(5) ≈ 1.6
+        score = min(100.0 * (1.0 - math.exp(-count / factor)), 100.0)
+    if return_matches:
+        return score, matched
+    return score
 
 
 # ── TF-IDF similarity ────────────────────────────────────────────────────
@@ -109,9 +153,5 @@ def salary_score(
     signals = high_comp_signals if high_comp_signals is not None else HIGH_COMP_SIGNALS
     if not signals:
         return 50.0
-    jd_lower = jd_text.lower()
-    score = 40.0
-    for sig in signals:
-        if sig in jd_lower:
-            score += 10.0
+    score = 40.0 + 10.0 * len(keyword_matches(jd_text, list(signals)))
     return min(score, 100.0)
