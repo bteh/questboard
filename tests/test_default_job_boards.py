@@ -22,6 +22,14 @@ def test_default_boards_include_indeed():
     assert "indeed" in _DEFAULT_JOBSPY_BOARDS
 
 
+def test_default_prefs_include_indeed_and_linkedin():
+    """A second working board (LinkedIn) is on by default so one board
+    tripping its circuit breaker can't black out the whole run."""
+    boards = build_pipeline_config_override(WorkspacePreferences(), "ws1")["job_boards"]
+    assert "indeed" in boards
+    assert "linkedin" in boards
+
+
 def test_config_override_searches_indeed_without_linkedin():
     prefs = WorkspacePreferences(include_linkedin_jobs=False)
     boards = build_pipeline_config_override(prefs, "ws1")["job_boards"]

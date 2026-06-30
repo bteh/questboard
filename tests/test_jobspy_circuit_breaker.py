@@ -90,6 +90,32 @@ class CircuitBreakerTest(unittest.TestCase):
         with patch.object(self.mod.time, "time", return_value=time.time() + self.mod._DISABLE_DURATION_S + 1):
             self.assertFalse(self.mod._is_board_disabled("google"))
 
+    def test_failures_within_window_open_circuit(self) -> None:
+        """Threshold failures clustered in time still open the circuit."""
+        base = time.time()
+        with patch.object(self.mod.time, "time", return_value=base):
+            for _ in range(self.mod._FAILURE_THRESHOLD):
+                self.mod._record_board_failure("indeed")
+            self.assertTrue(self.mod._is_board_disabled("indeed"))
+
+    def test_failures_spread_past_window_do_not_open_circuit(self) -> None:
+        """The real user bug: a few transient errors spread across a run must
+        NOT black out the only board. Failures older than the rolling window
+        age out, so they can't accumulate to the threshold."""
+        base = time.time()
+        # threshold-1 failures at t0
+        with patch.object(self.mod.time, "time", return_value=base):
+            for _ in range(self.mod._FAILURE_THRESHOLD - 1):
+                self.mod._record_board_failure("indeed")
+        # one more failure AFTER the window has elapsed — the old ones expired,
+        # so the counter restarts and the circuit stays closed.
+        with patch.object(
+            self.mod.time, "time",
+            return_value=base + self.mod._FAILURE_WINDOW_S + 1,
+        ):
+            self.mod._record_board_failure("indeed")
+            self.assertFalse(self.mod._is_board_disabled("indeed"))
+
     def test_success_resets_failure_counter(self) -> None:
         # Accumulate failures but not enough to open the circuit.
         for _ in range(self.mod._FAILURE_THRESHOLD - 1):

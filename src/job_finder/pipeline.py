@@ -1299,7 +1299,7 @@ class JobFinderPipeline:
         settings = self.config.get("search_settings") or {}
         results_per_board = max(1, settings.get("results_per_board", 50))
         results_per_additional = max(1, settings.get("results_per_additional_source", 100))
-        max_days_old = max(1, settings.get("max_days_old", 14))
+        max_days_old = max(1, settings.get("max_days_old", 30))
         search_distance = settings.get("search_radius_miles")  # None = JobSpy default (50 miles)
         jobspy_boards = self.config.get("job_boards") or None  # None → default boards
 

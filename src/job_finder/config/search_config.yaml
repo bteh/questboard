@@ -49,17 +49,19 @@ locations:
 # they fail consistently from a residential IP:
 #   - Glassdoor returns 400 "location not parsed" for remote searches.
 #   - ZipRecruiter returns 403 "forbidden aa" (Cloudflare) on every request.
-#   - Indeed returns sketchy/low-signal listings in our previous testing.
 # Each failure retries inside JobSpy and stalls the pipeline for ~60s per
-# query. Workspace mode also pins this to ["google"] in
-# backend/app/services/workspace_service.py — keep this YAML aligned so the
-# legacy-fallback source-list message ("searching N sources: …") doesn't
-# claim to be querying boards that aren't actually being hit.
+# query. Indeed + LinkedIn both return live results from a local IP and are
+# the workspace default too (see _DEFAULT_JOBSPY_BOARDS in
+# backend/app/services/workspace_service.py); keep this YAML aligned. Google
+# is off — it CAPTCHA-walls residential IPs and returned nothing, which
+# silently zeroed every search. The per-board circuit breaker skips any board
+# that starts failing, so listing two working boards is safe.
 #
-# Re-enable any of the disabled boards manually if you have a workaround.
+# Re-enable Glassdoor / ZipRecruiter manually if you have a proxy workaround.
 job_boards:
-  - "google"
-  # - "indeed"
+  - "indeed"
+  - "linkedin"
+  # - "google"
   # - "glassdoor"
   # - "zip_recruiter"
 
@@ -85,6 +87,8 @@ additional_sources:
   - name: "remoteok"
     enabled: true
   - name: "cryptojobslist"
+    enabled: true
+  - name: "getro"
     enabled: true
   - name: "workday"
     enabled: true
@@ -121,7 +125,7 @@ compensation:
 search_settings:
   results_per_board: 50
   results_per_additional_source: 100
-  max_days_old: 14
+  max_days_old: 30
   exclude_staffing_agencies: true
   country: "USA"
   max_parallel_searches: 6  # Concurrent JobSpy workers (each hits 5 boards, so 6 = 30 requests)

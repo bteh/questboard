@@ -17,7 +17,9 @@ class SearchRequest(BaseModel):
     include_remote: bool = True
     workplace_preference: Literal["remote_friendly", "remote_only", "location_only"] = "remote_friendly"
     max_days_old: int = 30
-    include_linkedin_jobs: bool = False
+    # LinkedIn on by default — a second working board for circuit-breaker
+    # redundancy. The client can still send False to opt out per run.
+    include_linkedin_jobs: bool = True
     use_ai: bool = False
     profile: str = "default"
     mode: Literal["search_only", "search_score", "full_pipeline"] = Field(
@@ -89,7 +91,7 @@ class SearchDefaults(BaseModel):
     include_remote: bool = True
     workplace_preference: Literal["remote_friendly", "remote_only", "location_only"] = "remote_friendly"
     max_days_old: int = 30
-    include_linkedin_jobs: bool = False
+    include_linkedin_jobs: bool = True
     profile: str = "default"
     current_title: str = ""
     current_level: str = ""

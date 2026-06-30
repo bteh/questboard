@@ -8,16 +8,20 @@ query that hits a broken board burns ~30 retries with backoff before
 giving up, blocking the entire search for minutes.
 
 The breaker watches the ``JobSpy`` logger family (each scraper logs under
-``JobSpy:<Board>``) and counts ``ERROR``-level messages per board.
-After ``_FAILURE_THRESHOLD`` errors, the board is "circuit-open" for
-``_DISABLE_DURATION_S`` seconds — subsequent ``search_jobs`` calls skip it.
-A board that returns ≥1 result in the response DataFrame resets its
-failure counter (self-healing once the upstream service recovers).
+``JobSpy:<Board>``) and counts ``ERROR``-level messages per board. Only
+errors that CLUSTER within ``_FAILURE_WINDOW_S`` count: once ``_FAILURE_THRESHOLD``
+land inside that rolling window the board goes "circuit-open" for
+``_DISABLE_DURATION_S`` seconds and subsequent ``search_jobs`` calls skip it.
+Isolated, spread-out transient errors expire instead of accumulating, so a
+healthy board running under load doesn't get blacked out by the odd 429.
+A board that returns ≥1 result in the response DataFrame resets its failure
+counter immediately (self-healing once the upstream service recovers).
 
-This is the production pattern that lets us re-enable Google as a default
-even though it currently CAPTCHA-walls residential IPs: when CAPTCHA
-clears, the breaker closes and Google comes back automatically. No human
-intervention, no permanent hard-disable.
+This is the production pattern that lets a flaky board (Google CAPTCHA,
+Indeed throttling) self-heal: when it recovers the breaker closes and the
+board comes back automatically. No human intervention, no permanent
+hard-disable. Pair it with more than one working board so a single board's
+open circuit never zeroes an entire run.
 """
 
 from __future__ import annotations
@@ -36,10 +40,17 @@ logger = logging.getLogger(__name__)
 # -- Per-board circuit breaker ---------------------------------------------
 
 _FAILURE_THRESHOLD = 3
-_DISABLE_DURATION_S = 600  # 10 minutes
+# Failures must CLUSTER within this rolling window to trip the breaker. A board
+# logs the odd transient ERROR (a single 429, a flaky timeout) under normal load;
+# without a window those isolated errors accumulate across a whole run — or even
+# across runs, since this state is module-global — and eventually black out the
+# board for no good reason. Expiring failures older than the window means only a
+# genuine burst (threshold errors close together) opens the circuit.
+_FAILURE_WINDOW_S = 120  # 2 minutes
+_DISABLE_DURATION_S = 300  # 5 minutes — recover fast once the burst passes
 
 # Module-level state. Keyed by lowercase board name.
-# Each value: {"failures": int, "disabled_until": float (epoch seconds)}.
+# Each value: {"failures": int, "disabled_until": float, "window_start": float}.
 _BOARD_CIRCUIT: dict[str, dict[str, Any]] = {}
 _BOARD_CIRCUIT_LOCK = threading.Lock()
 
@@ -76,14 +87,23 @@ def _record_board_failure(board: str) -> None:
     key = _normalize_board(board)
     if not key:
         return
+    now = time.time()
     with _BOARD_CIRCUIT_LOCK:
-        state = _BOARD_CIRCUIT.setdefault(key, {"failures": 0, "disabled_until": 0.0})
+        state = _BOARD_CIRCUIT.setdefault(
+            key, {"failures": 0, "disabled_until": 0.0, "window_start": now}
+        )
+        # Roll the failure window: if the current streak started more than
+        # _FAILURE_WINDOW_S ago, the old errors have expired — restart the count
+        # so only a fresh burst can trip the breaker.
+        if state["failures"] == 0 or now - state.get("window_start", now) > _FAILURE_WINDOW_S:
+            state["failures"] = 0
+            state["window_start"] = now
         state["failures"] = int(state.get("failures", 0)) + 1
-        if state["failures"] >= _FAILURE_THRESHOLD and time.time() >= state["disabled_until"]:
-            state["disabled_until"] = time.time() + _DISABLE_DURATION_S
+        if state["failures"] >= _FAILURE_THRESHOLD and now >= state["disabled_until"]:
+            state["disabled_until"] = now + _DISABLE_DURATION_S
             logger.warning(
-                "JobSpy circuit open for %s after %d errors — disabled for %ds",
-                key, state["failures"], _DISABLE_DURATION_S,
+                "JobSpy circuit open for %s after %d errors in %ds — disabled for %ds",
+                key, state["failures"], _FAILURE_WINDOW_S, _DISABLE_DURATION_S,
             )
 
 

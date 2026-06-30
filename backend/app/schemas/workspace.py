@@ -81,7 +81,10 @@ class WorkspacePreferences(BaseModel):
     preferred_places: list[PlaceSelection] = Field(default_factory=list)
     workplace_preference: Literal["remote_friendly", "remote_only", "location_only"] = "remote_friendly"
     max_days_old: int = 30
-    include_linkedin_jobs: bool = False
+    # On by default: LinkedIn is a second working board, so one board tripping
+    # its circuit breaker can't black out a whole run. Users can untick it in
+    # Settings if LinkedIn ever soft-blocks their IP.
+    include_linkedin_jobs: bool = True
     current_title: str = ""
     # Empty string skips the level filter entirely — wider net by default. Users
     # opt in to level narrowing by selecting a value in Settings.
@@ -145,7 +148,7 @@ class SearchSnapshot(BaseModel):
     preferred_places: list[PlaceSelection] = Field(default_factory=list)
     workplace_preference: Literal["remote_friendly", "remote_only", "location_only"] = "remote_friendly"
     max_days_old: int = 30
-    include_linkedin_jobs: bool = False
+    include_linkedin_jobs: bool = True
     current_title: str = ""
     current_level: str = ""
     compensation: CompensationPreference = Field(default_factory=CompensationPreference)
