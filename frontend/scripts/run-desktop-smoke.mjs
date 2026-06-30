@@ -234,6 +234,16 @@ function attachPageMonitors(page, apiIssues, pageIssues) {
     ) {
       return;
     }
+    if (
+      response.status() === 401
+      && response.request().method() === 'GET'
+      && /\/onboarding\/state$/.test(response.url())
+    ) {
+      // Expected bootstrap handshake: the app probes onboarding state before
+      // the workspace session is established, gets 401, bootstraps the session,
+      // then retries (200). Benign — don't flag the first probe.
+      return;
+    }
     let detail = '';
     try {
       detail = (await response.text()).trim();
@@ -288,8 +298,10 @@ async function launchPersistentContext(userDataDir) {
 async function verifySettings(page) {
   await page.goto(`${frontendUrl}/settings`, { waitUntil: 'domcontentloaded' });
   await page.getByRole('heading', { name: 'Settings' }).waitFor();
+  // The resume persisted across the runtime restart. (The old flow also typed a
+  // "Los Angeles, CA" location in the guided wizard; the shipped first-run flow
+  // is resume-derived and remote by default, so there's no city to assert.)
   await page.getByText(uploadedResumeName).waitFor();
-  await page.getByText('Los Angeles, CA').first().waitFor();
   const welcomeHeading = page.getByRole('heading', { name: 'Welcome to Launchboard' });
   assert.equal(await welcomeHeading.count(), 0, 'Onboarding should not reopen once the desktop workspace is established.');
 }
@@ -328,40 +340,52 @@ async function clickWhenStable(page, locator, timeoutMs = 30_000) {
 async function completeFirstRun(page) {
   log('Running first-launch onboarding flow');
 
-  // The wizard now opens directly on the resume step (no welcome step) and is
-  // 2 steps total (resume → search). The auto-advance to "What are you looking
-  // for?" happens automatically after the resume upload analysis returns.
+  // First-run UX (post resume-accuracy overhaul): the Dashboard renders the
+  // FirstRunHero ("Let's start your job search") with a resume drop zone.
+  // Uploading a resume navigates to /search, which renders the
+  // ReadyToLaunchHero ("You're ready to launch") summarising a resume-derived
+  // search; a single click starts the first run. The upload unmounts the older
+  // guided wizard, so we drive this primary hero path rather than the wizard.
   await page.goto(frontendUrl, { waitUntil: 'domcontentloaded' });
-  await page.getByRole('heading', { name: 'Upload Your Resume' }).waitFor();
-  const resumeInput = page.getByTestId('onboarding-resume-input');
-  await resumeInput.setInputFiles(process.env.LAUNCHBOARD_SMOKE_RESUME_PATH);
+  await page.getByRole('heading', { name: "Let's start your job search" }).waitFor({ timeout: 35_000 });
 
-  const preferencesHeading = page.getByRole('heading', { name: 'What are you looking for?' });
-  await preferencesHeading.waitFor({ timeout: 35_000 });
+  // The hero's file input is hidden; setInputFiles drives it directly. The
+  // wizard's own file input only mounts while its dialog is open, so this
+  // selector is unambiguous on the first-run dashboard.
+  await page
+    .locator('input[type="file"]')
+    .first()
+    .setInputFiles(process.env.LAUNCHBOARD_SMOKE_RESUME_PATH);
 
-  const rolesInput = page.getByTestId('onboarding-roles-input');
-  await rolesInput.fill('Data Platform Engineering Manager');
-  await rolesInput.press('Enter');
+  // The upload navigates to the /search configuration screen.
+  await page.waitForURL(/\/search/, { timeout: 35_000 });
 
-  const locationInput = page.getByPlaceholder('Add a city, state, or region');
-  await locationInput.fill('Los Angeles, CA');
-  await page.getByRole('button', { name: 'Add' }).click();
-  await page.getByText('Los Angeles, CA').first().waitFor();
+  // CI has no LLM, so the resume derives no roles; add a target role to enable
+  // the run. The roles Textarea is the only one matching this placeholder
+  // (the Keywords Textarea uses a different one).
+  const rolesField = page.getByPlaceholder(/Marketing Manager/);
+  await rolesField.waitFor({ timeout: 35_000 });
+  await rolesField.fill('Data Platform Engineering Manager');
 
   const searchResponsePromise = page.waitForResponse(
     (response) =>
-      response.url() === `${apiBaseUrl}/onboarding/search` &&
-      response.request().method() === 'POST',
-    { timeout: 15_000 },
+      /\/search\/run$/.test(response.url()) && response.request().method() === 'POST',
+    { timeout: 30_000 },
   ).catch(() => null);
 
-  await clickWhenStable(page, page.getByTestId('onboarding-save-search'));
-  await page.waitForURL(/\/search/, { timeout: 30_000 });
+  // Start-button label varies with LLM + resume state (Start Basic Ranking /
+  // Start Resume Ranking / Search & Rank / Rank from Resume) — match any.
+  await clickWhenStable(
+    page,
+    page.getByRole('button', {
+      name: /Start Basic Ranking|Start Resume Ranking|Rank from Resume|Search & Rank/,
+    }),
+  );
+
   const searchResponse = await searchResponsePromise;
   if (searchResponse) {
     assert.equal(searchResponse.status(), 200, 'Onboarding search should start successfully.');
   }
-  await page.getByText('Los Angeles, CA').first().waitFor({ timeout: 15_000 });
 }
 
 async function main() {

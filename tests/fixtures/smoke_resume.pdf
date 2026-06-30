@@ -1,31 +1,61 @@
 %PDF-1.4
 %‚„œ”
 1 0 obj
-<</Type/Catalog/Pages 2 0 R>>
+<< /Type /Catalog /Pages 2 0 R >>
 endobj
 2 0 obj
-<</Type/Pages/Kids[3 0 R]/Count 1>>
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
 endobj
 3 0 obj
-<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
 endobj
 4 0 obj
-<</Length 268>>stream
-BT /F1 12 Tf 72 720 Td (Jane Doe) Tj T* (Software Engineer) Tj T* (jane.doe@example.com) Tj T* (Experience: Python, TypeScript, FastAPI, React, SQL.) Tj T* (Built distributed systems at scale. Led teams of engineers.) Tj T* (Education: B.S. Computer Science.) Tj T* ET
+<< /Length 632 >>
+stream
+BT
+/F1 11 Tf
+50 740 Td
+13 TL
+(Jane Doe) Tj
+T*
+(Senior Software Engineer) Tj
+T*
+(jane.doe@example.com  |  San Francisco, CA) Tj
+T*
+() Tj
+T*
+(Experience:) Tj
+T*
+(Staff Engineer at Acme Corp \(2019-2025\). Built and scaled distributed) Tj
+T*
+(data platforms in Python, TypeScript, and FastAPI. Led a team of eight) Tj
+T*
+(engineers delivering streaming pipelines and developer tooling.) Tj
+T*
+(Senior Engineer at Globex \(2015-2019\). Designed REST and GraphQL APIs.) Tj
+T*
+() Tj
+T*
+(Skills: Python, TypeScript, FastAPI, PostgreSQL, Kafka, AWS, Kubernetes.) Tj
+T*
+(Education: B.S. in Computer Science, State University, 2015.) Tj
+T*
+ET
 endstream
 endobj
 5 0 obj
-<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
 endobj
 xref
 0 6
 0000000000 65535 f 
 0000000015 00000 n 
-0000000060 00000 n 
-0000000111 00000 n 
-0000000223 00000 n 
-0000000539 00000 n 
-trailer <</Size 6/Root 1 0 R>>
+0000000064 00000 n 
+0000000121 00000 n 
+0000000247 00000 n 
+0000000930 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
 startxref
-602
+1000
 %%EOF
