@@ -176,6 +176,10 @@ class HostedWorkspaceApiTest(unittest.TestCase):
                 "current_title": "Nurse Practitioner",
                 "seniority": "senior",
             },
+        ), patch.object(
+            self.workspace_service,
+            "get_workspace_llm",
+            return_value=SimpleNamespace(is_configured=True),
         ):
             response = self.client.post(
                 "/api/v1/onboarding/resume",
@@ -216,6 +220,10 @@ class HostedWorkspaceApiTest(unittest.TestCase):
         ), patch(
             "app.services.resume_analyzer.analyze_resume",
             return_value={"suggested_target_roles": ["Nurse Practitioner"]},
+        ), patch.object(
+            self.workspace_service,
+            "get_workspace_llm",
+            return_value=SimpleNamespace(is_configured=True),
         ):
             response = self._upload_resume(headers)
 
@@ -641,6 +649,10 @@ class HostedWorkspaceApiTest(unittest.TestCase):
                 "current_title": "Nurse Practitioner",
                 "seniority": "senior",
             },
+        ), patch.object(
+            self.workspace_service,
+            "get_workspace_llm",
+            return_value=SimpleNamespace(is_configured=True),
         ):
             upload = self.client.post(
                 "/api/v1/onboarding/resume",
@@ -696,6 +708,10 @@ class HostedWorkspaceApiTest(unittest.TestCase):
                 "current_title": "Nurse Practitioner",
                 "seniority": "senior",
             },
+        ), patch.object(
+            self.workspace_service,
+            "get_workspace_llm",
+            return_value=SimpleNamespace(is_configured=True),
         ):
             upload = self.client.post(
                 "/api/v1/onboarding/resume",
