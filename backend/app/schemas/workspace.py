@@ -123,7 +123,7 @@ class WorkspaceResumeUploadResponse(BaseModel):
     resume: WorkspaceResumeStatus
     analysis: dict | None = None
     parse_code: str | None = None  # "SCANNED_PDF" | None
-    analysis_status: str = "skipped_no_llm"  # "completed" | "skipped_no_llm" | "failed"
+    analysis_status: str = "skipped_no_llm"  # "completed" | "skipped_no_llm" | "analysis_error" | "failed"
 
 
 class LocationSuggestion(BaseModel):

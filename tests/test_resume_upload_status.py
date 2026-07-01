@@ -1,8 +1,9 @@
 """Tests for resume upload analysis status reporting (FIX 4).
 
 The upload response must say whether analysis ran ('completed'), was skipped
-because no LLM is configured ('skipped_no_llm'), or failed ('failed') — and
-include the analysis summary when it ran.
+because no LLM is configured ('skipped_no_llm'), hit a retry-able AI failure
+after the text was read fine ('analysis_error'), or could not read any text
+from the file ('failed'). It includes the analysis summary when analysis ran.
 """
 
 from __future__ import annotations
@@ -125,7 +126,10 @@ def test_upload_with_llm_reports_completed_with_summary(client) -> None:
     assert summary["education"] == [{"degree": "BSN", "field": "Nursing", "institution": "UCLA"}]
 
 
-def test_upload_with_llm_failure_reports_failed(client) -> None:
+def test_upload_with_llm_failure_reports_analysis_error(client) -> None:
+    # Text extracted fine + LLM configured + analyze_resume returns None.
+    # The file was read perfectly, so this is a retry-able AI failure
+    # ("analysis_error"), not an unreadable file ("failed").
     with patch("job_finder.tools.resume_parser_tool.parse_resume", return_value=RESUME_TEXT), patch(
         "app.dependencies.get_llm",
         return_value=SimpleNamespace(is_configured=True),
@@ -137,5 +141,5 @@ def test_upload_with_llm_failure_reports_failed(client) -> None:
 
     assert response.status_code == 200, response.text
     body = response.json()
-    assert body["analysis_status"] == "failed"
+    assert body["analysis_status"] == "analysis_error"
     assert body["analysis"] is None

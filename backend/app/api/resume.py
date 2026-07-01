@@ -100,7 +100,7 @@ def _analyze_and_update_profile(profile: str) -> tuple[str, dict | None]:
     """Analyze a resume and persist updated profile fields.
 
     Returns ``(analysis_status, analysis_summary)`` where status is one of
-    ``completed``, ``skipped_no_llm``, or ``failed``.
+    ``completed``, ``skipped_no_llm``, ``analysis_error``, or ``failed``.
     """
     try:
         from app.services.resume_analyzer import analyze_resume, persist_analysis_to_profile
@@ -117,7 +117,9 @@ def _analyze_and_update_profile(profile: str) -> tuple[str, dict | None]:
 
         analysis = analyze_resume(resume_text, llm)
         if not analysis:
-            return "failed", None
+            # Text read fine, LLM configured, but analysis came back empty.
+            # Retry-able AI failure, not an unreadable file.
+            return "analysis_error", None
 
         config = get_config(profile)
         persist_analysis_to_profile(

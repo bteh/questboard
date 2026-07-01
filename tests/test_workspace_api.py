@@ -258,11 +258,19 @@ class HostedWorkspaceApiTest(unittest.TestCase):
         self.assertIsNone(payload["parse_code"])
         self.assertIsNone(payload["analysis"])
 
-    def test_resume_upload_reports_failed_when_analysis_returns_nothing(self) -> None:
+    def test_resume_upload_reports_analysis_error_when_text_ok_but_llm_fails(self) -> None:
+        """Text extracted fine but the AI analysis step failed.
+
+        This must report ``analysis_error`` (the file is fine, retry the AI
+        step), NOT ``failed``. The UI renders ``failed`` as "could not extract
+        skills from this file. Try uploading it again.", which sends the user
+        into a futile re-upload loop when the real problem is a transient LLM
+        failure, not the resume.
+        """
         headers = self._auth_headers()
         with patch(
             "job_finder.tools.resume_parser_tool.parse_resume",
-            return_value="Experienced nurse practitioner",
+            return_value="Experienced nurse practitioner with 8 years in primary care",
         ), patch.object(
             self.workspace_service,
             "get_workspace_llm",
@@ -274,7 +282,11 @@ class HostedWorkspaceApiTest(unittest.TestCase):
             response = self._upload_resume(headers)
 
         self.assertEqual(response.status_code, 200, response.text)
-        self.assertEqual(response.json()["analysis_status"], "failed")
+        payload = response.json()
+        # The text WAS read (parse succeeded), so this is not an unreadable file.
+        self.assertEqual(payload["resume"]["parse_status"], "parsed")
+        self.assertEqual(payload["analysis_status"], "analysis_error")
+        self.assertIsNone(payload["parse_code"])
 
     def test_search_defaults_reflect_workspace_preferences(self) -> None:
         headers = self._auth_headers()

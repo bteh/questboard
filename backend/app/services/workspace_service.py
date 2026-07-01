@@ -1020,34 +1020,42 @@ def save_workspace_resume(
     record.extracted_text = extracted_text
 
     analysis: dict[str, Any] | None = None
+    # No text read from the file → "failed" (scanned PDFs still surface
+    # parse_code="SCANNED_PDF" below via the `scanned` check).
     analysis_status = "failed"
     if extracted_text:
         llm = get_workspace_llm(db, workspace_id, fallback_to_global=True)
         if not getattr(llm, "is_configured", False):
             analysis_status = "skipped_no_llm"
-        analysis = analyze_resume(extracted_text, llm)
-        if analysis:
-            analysis_status = "completed"
-            prefs = get_workspace_preferences(db, workspace_id)
-            updated = WorkspacePreferencesSchema.model_validate(
-                {
-                    **prefs.model_dump(),
-                    "roles": analysis.get("suggested_target_roles", prefs.roles),
-                    "keywords": analysis.get("suggested_keywords", prefs.keywords),
-                    "current_title": analysis.get("current_title") or prefs.current_title,
-                    "current_level": analysis.get("seniority") or prefs.current_level,
-                }
-            )
-            save_workspace_preferences(db, workspace_id, updated)
-            record.llm_summary = json.dumps(
-                {
-                    "industry": analysis.get("industry", ""),
-                    "seniority": analysis.get("seniority", ""),
-                    "years_experience": analysis.get("years_experience", 0),
-                    "suggested_target_roles": analysis.get("suggested_target_roles", []),
-                    "suggested_keywords": analysis.get("suggested_keywords", []),
-                }
-            )
+        else:
+            analysis = analyze_resume(extracted_text, llm)
+            if analysis:
+                analysis_status = "completed"
+                prefs = get_workspace_preferences(db, workspace_id)
+                updated = WorkspacePreferencesSchema.model_validate(
+                    {
+                        **prefs.model_dump(),
+                        "roles": analysis.get("suggested_target_roles", prefs.roles),
+                        "keywords": analysis.get("suggested_keywords", prefs.keywords),
+                        "current_title": analysis.get("current_title") or prefs.current_title,
+                        "current_level": analysis.get("seniority") or prefs.current_level,
+                    }
+                )
+                save_workspace_preferences(db, workspace_id, updated)
+                record.llm_summary = json.dumps(
+                    {
+                        "industry": analysis.get("industry", ""),
+                        "seniority": analysis.get("seniority", ""),
+                        "years_experience": analysis.get("years_experience", 0),
+                        "suggested_target_roles": analysis.get("suggested_target_roles", []),
+                        "suggested_keywords": analysis.get("suggested_keywords", []),
+                    }
+                )
+            else:
+                # Text read fine, but the LLM analysis step didn't finish.
+                # Distinct from "failed" so the UI tells the user to retry
+                # instead of blaming a file that was read perfectly.
+                analysis_status = "analysis_error"
 
     db.commit()
     try:

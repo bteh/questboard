@@ -44,8 +44,10 @@ export function ResumeTab({ onboarding, navigate, markOnboardingIncomplete }: Re
           toast.error('Resume saved, but no text could be read from it');
         } else if (normalized.analysisStatus === 'completed') {
           toast.success('Resume uploaded and analyzed');
+        } else if (normalized.analysisStatus === 'analysis_error') {
+          toast.warning('Resume saved. The AI step didn’t finish, so no skills yet. Try again in a moment.');
         } else if (normalized.analysisStatus === 'failed') {
-          toast.warning('Resume uploaded, but analysis failed');
+          toast.warning('Resume saved, but we couldn’t read any text from it');
         } else {
           toast.success('Resume uploaded');
         }
@@ -97,6 +99,14 @@ export function ResumeTab({ onboarding, navigate, markOnboardingIncomplete }: Re
                   className="font-medium underline underline-offset-2"
                 >
                   Connect an AI provider
+                </button>
+              ) : lastUpload.analysisStatus === 'analysis_error' ? (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="font-medium underline underline-offset-2"
+                >
+                  Try again
                 </button>
               ) : undefined
             }

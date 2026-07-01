@@ -1,4 +1,4 @@
-import { AlertTriangle, ScanLine, Sparkles } from 'lucide-react';
+import { AlertTriangle, RefreshCw, ScanLine, Sparkles } from 'lucide-react';
 
 import type { NormalizedResumeUpload } from '@/lib/resume-analysis';
 import { cn } from '@/lib/utils';
@@ -65,7 +65,28 @@ export function ResumeAnalysisBanner({ upload, action, className }: ResumeAnalys
     );
   }
 
-  // analysisStatus === 'failed' (non-scanned parse failure or LLM error)
+  if (upload.analysisStatus === 'analysis_error') {
+    return (
+      <div
+        role="status"
+        className={cn(
+          'flex items-start gap-2.5 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200',
+          className,
+        )}
+      >
+        <RefreshCw className="mt-0.5 h-4 w-4 shrink-0" />
+        <div className="min-w-0 flex-1 space-y-1">
+          <p className="font-medium">Your resume was saved and we read it fine.</p>
+          <p className="text-amber-800/90 dark:text-amber-300/90">
+            The step that pulls out your skills didn&apos;t finish this time. Try again in a moment.
+          </p>
+          {action}
+        </div>
+      </div>
+    );
+  }
+
+  // analysisStatus === 'failed' means no text could be read from the file.
   return (
     <div
       role="alert"
@@ -76,9 +97,10 @@ export function ResumeAnalysisBanner({ upload, action, className }: ResumeAnalys
     >
       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
       <div className="min-w-0 flex-1 space-y-1">
-        <p className="font-medium">Resume saved, but analysis failed.</p>
+        <p className="font-medium">Resume saved, but we couldn&apos;t read any text from it.</p>
         <p className="text-red-800/90 dark:text-red-300/90">
-          {upload.parseWarning || 'We could not extract skills from this file. Try uploading it again.'}
+          {upload.parseWarning ||
+            'Scoring and skill extraction need selectable text. Upload a text-based PDF or a DOCX.'}
         </p>
         {action}
       </div>

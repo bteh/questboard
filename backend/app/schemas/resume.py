@@ -29,5 +29,5 @@ class ResumeUploadResponse(BaseModel):
     message: str = "Resume uploaded successfully"
     parse_status: str = "ok"  # "ok" | "error"
     parse_code: str | None = None  # "SCANNED_PDF" | None
-    analysis_status: str = "skipped_no_llm"  # "completed" | "skipped_no_llm" | "failed"
+    analysis_status: str = "skipped_no_llm"  # "completed" | "skipped_no_llm" | "analysis_error" | "failed"
     analysis: ResumeAnalysisSummary | None = None
