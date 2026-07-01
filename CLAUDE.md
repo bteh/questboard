@@ -164,11 +164,12 @@ of errors (threshold within a rolling window, not lifetime), so transient hiccup
 one board don't black out a run -- run with >=2 working boards so an open circuit on
 one still leaves results.
 
-**Plugin scrapers** (15 sources via `src/job_finder/tools/scrapers/`): Remotive, Himalayas,
+**Plugin scrapers** (16 sources via `src/job_finder/tools/scrapers/`): Remotive, Himalayas,
 We Work Remotely, Hacker News Who's Hiring, RemoteOK, CryptoJobsList, Getro (crypto + VC
-talent-network boards, opt-in), Arbeitnow, The Muse, YC Work at a Startup, plus ATS scrapers
-for Greenhouse, Lever, Ashby, and Workday (company lists driven by user watchlist). Adding a
-new scraper = one decorated file, auto-discovered on import.
+talent-network boards, opt-in), Consider (VC talent-network boards embedded in board HTML, e.g.
+a16z crypto's portfolio board at a16zcrypto.com/jobs, opt-in), Arbeitnow, The Muse, YC Work
+at a Startup, plus ATS scrapers for Greenhouse, Lever, Ashby, and Workday (company lists
+driven by user watchlist). Adding a new scraper = one decorated file, auto-discovered on import.
 
 ## Key Patterns to Reuse
 

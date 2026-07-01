@@ -90,6 +90,8 @@ additional_sources:
     enabled: true
   - name: "getro"
     enabled: true
+  - name: "consider"
+    enabled: true
   - name: "workday"
     enabled: true
   - name: "arbeitnow"
