@@ -464,10 +464,23 @@ class LLMClient:
             resp = self._client.chat.completions.create(**kwargs)
             return resp.choices[0].message.content
         except Exception as exc:
-            # Fall back without json_mode if the provider rejects it
-            if json_mode and ("response_format" in str(exc) or "json" in str(exc).lower()):
+            # Some models/providers reject specific params. Strip the offending
+            # one(s) and retry once. Newer Anthropic models (e.g.
+            # claude-opus-4-8) reject `temperature` ("temperature is deprecated
+            # for this model"); some providers reject `response_format`.
+            err = str(exc).lower()
+            retry = False
+            if "temperature" in err and "temperature" in kwargs:
+                logger.debug("Model rejected temperature, retrying without it")
+                kwargs.pop("temperature", None)
+                retry = True
+            if json_mode and "response_format" in kwargs and (
+                "response_format" in err or "json" in err
+            ):
                 logger.debug("Provider rejected response_format, retrying without it")
                 kwargs.pop("response_format", None)
+                retry = True
+            if retry:
                 try:
                     resp = self._client.chat.completions.create(**kwargs)
                     return resp.choices[0].message.content
@@ -617,24 +630,37 @@ class LLMClient:
                 })
         user_blocks.append({"type": "text", "text": rest})
 
+        msg_kwargs: dict[str, Any] = {
+            "model": model or self.model,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+            "system": [
+                {
+                    "type": "text",
+                    "text": system_prompt,
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ],
+            "messages": [{"role": "user", "content": user_blocks}],
+        }
         try:
-            response = client.messages.create(
-                model=model or self.model,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                system=[
-                    {
-                        "type": "text",
-                        "text": system_prompt,
-                        "cache_control": {"type": "ephemeral"},
-                    }
-                ],
-                messages=[{"role": "user", "content": user_blocks}],
-            )
+            response = client.messages.create(**msg_kwargs)
         except Exception as exc:
-            logger.debug("Anthropic messages.create failed: %s — falling back", exc)
-            return self.chat_json(system_prompt, user_message,
-                                  temperature=temperature, max_tokens=max_tokens, model=model)
+            # Newer models (e.g. claude-opus-4-8) reject `temperature`; drop it
+            # and retry once so we keep prompt caching instead of falling back.
+            if "temperature" in str(exc).lower() and "temperature" in msg_kwargs:
+                logger.debug("Model rejected temperature, retrying without it")
+                msg_kwargs.pop("temperature", None)
+                try:
+                    response = client.messages.create(**msg_kwargs)
+                except Exception as exc2:
+                    logger.debug("Anthropic retry failed: %s — falling back", exc2)
+                    return self.chat_json(system_prompt, user_message,
+                                          temperature=temperature, max_tokens=max_tokens, model=model)
+            else:
+                logger.debug("Anthropic messages.create failed: %s — falling back", exc)
+                return self.chat_json(system_prompt, user_message,
+                                      temperature=temperature, max_tokens=max_tokens, model=model)
 
         # Log cache stats so we can verify caching is actually firing.
         usage = getattr(response, "usage", None)
