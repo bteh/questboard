@@ -2,7 +2,7 @@ import { Wifi, Building2, MapPin } from 'lucide-react';
 import { ColorBadge } from './color-badge';
 
 const WORK_TYPE_STYLES: Record<string, { bg: string; text: string; darkBg: string; darkText: string; icon: typeof Wifi; label: string }> = {
-  remote:  { bg: '#E0E7FF', text: '#3730A3', darkBg: '#312E81', darkText: '#A5B4FC', icon: Wifi,      label: 'Remote' },
+  remote:  { bg: '#E3EDE7', text: '#3F6B54', darkBg: '#25382E', darkText: '#8FC2A4', icon: Wifi,      label: 'Remote' },
   hybrid:  { bg: '#FEF3C7', text: '#92400E', darkBg: '#78350F', darkText: '#FDE68A', icon: Building2, label: 'Hybrid' },
   onsite:  { bg: '#F1F5F9', text: '#334155', darkBg: '#334155', darkText: '#CBD5E1', icon: MapPin,    label: 'Onsite' },
 };

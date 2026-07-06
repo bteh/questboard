@@ -204,7 +204,7 @@ export function AiSetupWizard() {
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-semibold text-text-primary">Quick Start — Local AI</span>
-                  <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
+                  <span className="rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success">
                     Free
                   </span>
                   <span className="rounded-full bg-brand-light/60 px-2 py-0.5 text-[10px] font-medium text-brand">
@@ -313,7 +313,7 @@ export function AiSetupWizard() {
 
             {isReady && (
               <div className="mt-2 flex items-start gap-1.5 text-[10px] leading-relaxed text-text-muted">
-                <Shield className="mt-0.5 h-3 w-3 shrink-0 text-emerald-500" />
+                <Shield className="mt-0.5 h-3 w-3 shrink-0 text-success" />
                 <p>AI runs entirely on your computer. Nothing leaves your machine.</p>
               </div>
             )}
@@ -397,7 +397,7 @@ export function AiSetupWizard() {
           </div>
 
           <div className="flex items-start gap-1.5 text-[10px] leading-relaxed text-text-muted">
-            <Shield className="mt-0.5 h-3 w-3 shrink-0 text-emerald-500" />
+            <Shield className="mt-0.5 h-3 w-3 shrink-0 text-success" />
             <p>Your key stays on this computer and is only sent to that provider.</p>
           </div>
         </div>

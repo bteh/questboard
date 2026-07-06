@@ -29,7 +29,7 @@ export function FundingBadge({ app }: FundingBadgeProps) {
   }
   if (parts.length === 0) return null;
   return (
-    <ColorBadge bg="#F3E8FF" text="#6B21A8" darkBg="#581C87" darkText="#D8B4FE" className="max-w-[280px] truncate">
+    <ColorBadge bg="#F2EAD3" text="#7A621F" darkBg="#37301A" darkText="#CBB46A" className="max-w-[280px] truncate">
       <TrendingUp className="h-3 w-3 shrink-0" />
       <span className="truncate">{parts.join(' · ')}</span>
     </ColorBadge>

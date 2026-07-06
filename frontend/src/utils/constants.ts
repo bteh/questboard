@@ -32,41 +32,51 @@ interface BadgeColors {
   darkText: string;
 }
 
+// Warm palette badge presets. Sage = positive / progress (the app's one green),
+// danger = negative (the app's one red). Amber is kept inline where it applies.
+const SAGE_BADGE: BadgeColors = { bg: '#E3EDE7', text: '#3F6B54', darkBg: '#25382E', darkText: '#8FC2A4' };
+const DANGER_BADGE: BadgeColors = { bg: '#F6DFDC', text: '#A23A30', darkBg: '#3A211E', darkText: '#E9A69E' };
+const AMBER_BADGE: BadgeColors = { bg: '#FEF3C7', text: '#92400E', darkBg: '#78350F', darkText: '#FDE68A' };
+const TEAL_BADGE: BadgeColors = { bg: '#DCE9EA', text: '#3A6E73', darkBg: '#22383A', darkText: '#8FBEC2' };
+const CLAY_BADGE: BadgeColors = { bg: '#F3E1D6', text: '#A85A33', darkBg: '#3E271A', darkText: '#DDA985' };
+const OLIVE_BADGE: BadgeColors = { bg: '#ECEBD4', text: '#61662B', darkBg: '#39381C', darkText: '#C6C787' };
+
 export const STATUS_COLORS: Record<string, BadgeColors> = {
   found:        { bg: '#F1F5F9', text: '#334155', darkBg: '#334155', darkText: '#CBD5E1' },
-  reviewed:     { bg: '#E0E7FF', text: '#3730A3', darkBg: '#312E81', darkText: '#A5B4FC' },
-  applying:     { bg: '#FEF3C7', text: '#92400E', darkBg: '#78350F', darkText: '#FDE68A' },
-  applied:      { bg: '#DBEAFE', text: '#1E40AF', darkBg: '#1E3A5F', darkText: '#93C5FD' },
-  interviewing: { bg: '#DCFCE7', text: '#166534', darkBg: '#14532D', darkText: '#86EFAC' },
-  offer:        { bg: '#D1FAE5', text: '#065F46', darkBg: '#064E3B', darkText: '#6EE7B7' },
-  rejected:     { bg: '#FEE2E2', text: '#991B1B', darkBg: '#7F1D1D', darkText: '#FCA5A5' },
+  reviewed:     SAGE_BADGE,
+  applying:     AMBER_BADGE,
+  applied:      SAGE_BADGE,
+  interviewing: SAGE_BADGE,
+  offer:        SAGE_BADGE,
+  rejected:     DANGER_BADGE,
   withdrawn:    { bg: '#F1F5F9', text: '#64748B', darkBg: '#334155', darkText: '#94A3B8' },
 };
 
 export const STATUS_DOT_COLORS: Record<string, string> = {
   found: '#94A3B8',
-  reviewed: '#6366F1',
-  applying: '#F59E0B',
-  applied: '#3B82F6',
-  interviewing: '#10B981',
-  offer: '#10B981',
+  reviewed: '#3F6B54',
+  applying: '#E0872F',
+  applied: '#3F6B54',
+  interviewing: '#3F6B54',
+  offer: '#3F6B54',
   rejected: '#94A3B8',
   withdrawn: '#94A3B8',
 };
 
 export const RECOMMENDATION_COLORS: Record<string, BadgeColors> = {
-  STRONG_APPLY: { bg: '#DCFCE7', text: '#166534', darkBg: '#14532D', darkText: '#86EFAC' },
-  APPLY:        { bg: '#DBEAFE', text: '#1E40AF', darkBg: '#1E3A5F', darkText: '#93C5FD' },
-  MAYBE:        { bg: '#FEF3C7', text: '#92400E', darkBg: '#78350F', darkText: '#FDE68A' },
-  SKIP:         { bg: '#FEE2E2', text: '#991B1B', darkBg: '#7F1D1D', darkText: '#FCA5A5' },
+  STRONG_APPLY: SAGE_BADGE,
+  APPLY:        SAGE_BADGE,
+  MAYBE:        AMBER_BADGE,
+  SKIP:         DANGER_BADGE,
 };
 
+// Warm categorical hues so the 7 company tiers stay distinguishable on-palette.
 export const COMPANY_TYPE_COLORS: Record<string, BadgeColors> = {
-  'FAANG+':         { bg: '#FEF3C7', text: '#92400E', darkBg: '#78350F', darkText: '#FDE68A' },
-  'Big Tech':       { bg: '#DBEAFE', text: '#1E40AF', darkBg: '#1E3A5F', darkText: '#93C5FD' },
-  'Elite Startup':  { bg: '#E0E7FF', text: '#3730A3', darkBg: '#312E81', darkText: '#A5B4FC' },
-  'Growth Stage':   { bg: '#DCFCE7', text: '#166534', darkBg: '#14532D', darkText: '#86EFAC' },
-  'Early Startup':  { bg: '#F0FDF4', text: '#14532D', darkBg: '#14532D', darkText: '#86EFAC' },
+  'FAANG+':         AMBER_BADGE,
+  'Big Tech':       CLAY_BADGE,
+  'Elite Startup':  TEAL_BADGE,
+  'Growth Stage':   SAGE_BADGE,
+  'Early Startup':  OLIVE_BADGE,
   'Midsize':        { bg: '#F1F5F9', text: '#334155', darkBg: '#334155', darkText: '#CBD5E1' },
   'Enterprise':     { bg: '#E2E8F0', text: '#334155', darkBg: '#334155', darkText: '#CBD5E1' },
 };

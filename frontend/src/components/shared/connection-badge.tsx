@@ -13,14 +13,14 @@ export function ConnectionBadge({ llm }: ConnectionBadgeProps) {
 
   let bg: string, text: string, dotColor: string, label: string;
   if (llm.available) {
-    bg = isDark ? '#064E3B' : '#DCFCE7';
-    text = isDark ? '#6EE7B7' : '#166534';
-    dotColor = '#10B981';
+    bg = isDark ? '#25382E' : '#E3EDE7';
+    text = isDark ? '#8FC2A4' : '#3F6B54';
+    dotColor = isDark ? '#7FB393' : '#3F6B54';
     label = llm.label || 'Connected';
   } else if (llm.configured) {
-    bg = isDark ? '#7F1D1D' : '#FEE2E2';
-    text = isDark ? '#FCA5A5' : '#991B1B';
-    dotColor = '#EF4444';
+    bg = isDark ? '#3A211E' : '#F6DFDC';
+    text = isDark ? '#E9A69E' : '#A23A30';
+    dotColor = isDark ? '#E27A6F' : '#C4443A';
     label = 'Disconnected';
   } else {
     bg = isDark ? '#27272A' : '#F1F5F9';

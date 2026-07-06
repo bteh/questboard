@@ -15,9 +15,9 @@ function toNumericValue(value: number | string | ReadonlyArray<number | string> 
 }
 
 const COLORS: Record<string, string> = {
-  STRONG_APPLY: '#10B981',
-  APPLY: '#3B82F6',
-  MAYBE: '#F59E0B',
+  STRONG_APPLY: '#3F6B54',
+  APPLY: '#7FB393',
+  MAYBE: '#E0872F',
   SKIP: '#9CA3AF',
 };
 
@@ -58,7 +58,7 @@ export function RecommendationChart({ data }: RecommendationChartProps) {
           stroke="none"
         >
           {chartData.map((entry) => (
-            <Cell key={entry.label} fill={entry.color || COLORS[entry.label] || '#4F46E5'} />
+            <Cell key={entry.label} fill={entry.color || COLORS[entry.label] || '#3F6B54'} />
           ))}
         </Pie>
         <Tooltip

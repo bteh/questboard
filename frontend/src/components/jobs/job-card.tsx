@@ -130,9 +130,9 @@ function ScoreBulletList({
 
 function scoreBgClass(value: number | null): string {
   if (value == null) return 'bg-bg-muted';
-  if (value > 60) return 'bg-emerald-500';
-  if (value >= 40) return 'bg-amber-500';
-  return 'bg-red-500';
+  if (value > 60) return 'bg-success';
+  if (value >= 40) return 'bg-warning';
+  return 'bg-danger';
 }
 
 export function JobCard({ app, sourceLabels, latestRunId }: JobCardProps) {
@@ -323,7 +323,7 @@ export function JobCard({ app, sourceLabels, latestRunId }: JobCardProps) {
           <div className="mt-2 flex items-center gap-3 text-xs text-text-muted">
             {isNewInLatestRun && (
               <span
-                className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300"
+                className="inline-flex items-center rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-success"
                 title="First surfaced by your most recent search"
               >
                 New

@@ -2,12 +2,12 @@ import { useMemo } from 'react';
 import type { ChartDataPoint } from '@/types/analytics';
 
 const STAGE_CONFIG: Record<string, { color: string; label: string }> = {
-  found:        { color: '#6366F1', label: 'Found' },
-  reviewed:     { color: '#818CF8', label: 'Reviewed' },
-  applying:     { color: '#F59E0B', label: 'Applying' },
-  applied:      { color: '#3B82F6', label: 'Applied' },
-  interviewing: { color: '#10B981', label: 'Interviewing' },
-  offer:        { color: '#059669', label: 'Offer' },
+  found:        { color: '#4C8A63', label: 'Found' },
+  reviewed:     { color: '#8FA054', label: 'Reviewed' },
+  applying:     { color: '#E0872F', label: 'Applying' },
+  applied:      { color: '#4E8A8F', label: 'Applied' },
+  interviewing: { color: '#C06A3C', label: 'Interviewing' },
+  offer:        { color: '#3F6B54', label: 'Offer' },
 };
 
 interface FunnelChartProps {

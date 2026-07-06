@@ -7,33 +7,35 @@ interface PipelineStepsProps {
   sourceCount?: number;
 }
 
+// Warm earthy triad for the 3 pipeline phases: sage → amber → clay.
+// Distinguishable per stage, but harmonious and on-palette (no blue/violet slop).
 const STEPS = (count: number) => [
   {
     icon: Search,
     label: 'Search',
     description: count > 0 ? `${count} job boards` : 'Multiple boards',
-    color: 'text-blue-600 dark:text-blue-400',
-    bg: 'bg-blue-50 dark:bg-blue-950/40',
-    activeBg: 'bg-blue-100 dark:bg-blue-900/50',
-    dot: 'bg-blue-500',
+    color: 'text-[#3F6B54] dark:text-[#7FB393]',
+    bg: 'bg-[#EAF0EB] dark:bg-[#7FB393]/10',
+    activeBg: 'bg-[#DCE7DF] dark:bg-[#7FB393]/20',
+    dot: 'bg-[#3F6B54] dark:bg-[#7FB393]',
   },
   {
     icon: BarChart3,
     label: 'Rank',
     description: '7-dimension scoring',
-    color: 'text-violet-600 dark:text-violet-400',
-    bg: 'bg-violet-50 dark:bg-violet-950/40',
-    activeBg: 'bg-violet-100 dark:bg-violet-900/50',
-    dot: 'bg-violet-500',
+    color: 'text-[#B4701C] dark:text-[#F0A24E]',
+    bg: 'bg-[#FBEEDA] dark:bg-[#F0A24E]/10',
+    activeBg: 'bg-[#F6E1C0] dark:bg-[#F0A24E]/20',
+    dot: 'bg-[#E0872F] dark:bg-[#F0A24E]',
   },
   {
     icon: Sparkles,
     label: 'Enhance',
     description: 'Letters & research',
-    color: 'text-amber-600 dark:text-amber-400',
-    bg: 'bg-amber-50 dark:bg-amber-950/40',
-    activeBg: 'bg-amber-100 dark:bg-amber-900/50',
-    dot: 'bg-amber-500',
+    color: 'text-[#A64B2A] dark:text-[#D98A6A]',
+    bg: 'bg-[#F6E4DA] dark:bg-[#D98A6A]/10',
+    activeBg: 'bg-[#EFD4C5] dark:bg-[#D98A6A]/20',
+    dot: 'bg-[#B5623C] dark:bg-[#D98A6A]',
   },
 ];
 

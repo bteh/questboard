@@ -14,7 +14,7 @@ export function SalaryBadge({ min, max, source }: SalaryBadgeProps) {
   if (!text) return null;
   const estimated = source === 'parsed_from_description';
   return (
-    <ColorBadge bg="#D1FAE5" text="#065F46" darkBg="#064E3B" darkText="#6EE7B7">
+    <ColorBadge bg="#E3EDE7" text="#3F6B54" darkBg="#25382E" darkText="#8FC2A4">
       <DollarSign className="h-3 w-3" />
       <span title={estimated ? 'Estimated from the job description text, not employer-reported.' : undefined}>
         {text}

@@ -238,7 +238,7 @@ export function InlineAiConnect() {
               <span className="text-xs font-semibold text-text-primary">
                 Google Gemini
               </span>
-              <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600">
+              <span className="rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success">
                 Free
               </span>
               <span className="rounded-full bg-brand-light/60 px-2 py-0.5 text-[10px] font-medium text-brand">
@@ -315,7 +315,7 @@ export function InlineAiConnect() {
             </div>
 
             <div className="mt-3 flex items-start gap-1.5 text-[10px] leading-relaxed text-text-muted">
-              <Shield className="mt-0.5 h-3 w-3 shrink-0 text-emerald-500" />
+              <Shield className="mt-0.5 h-3 w-3 shrink-0 text-success" />
               <p>Your key stays on this computer and is only sent to Google.</p>
             </div>
           </div>
@@ -406,7 +406,7 @@ export function InlineAiConnect() {
             </Button>
 
             <div className="mt-3 flex items-start gap-1.5 text-[10px] leading-relaxed text-text-muted">
-              <Shield className="mt-0.5 h-3 w-3 shrink-0 text-emerald-500" />
+              <Shield className="mt-0.5 h-3 w-3 shrink-0 text-success" />
               <p>
                 {isOllama
                   ? 'Runs entirely on your computer. Nothing leaves your machine.'

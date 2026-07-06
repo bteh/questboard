@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { RouterProvider } from '@tanstack/react-router';
 import { router } from './router';
 // @ts-expect-error — font package has no type declarations
-import '@fontsource-variable/inter';
+import '@fontsource-variable/atkinson-hyperlegible-next';
 import './index.css';
 
 createRoot(document.getElementById('root')!).render(

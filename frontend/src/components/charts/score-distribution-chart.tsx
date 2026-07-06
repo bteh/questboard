@@ -16,11 +16,11 @@ function toNumericValue(value: number | string | ReadonlyArray<number | string> 
 
 function barColor(label: string): string {
   const rangeStart = parseInt(label, 10);
-  if (isNaN(rangeStart)) return '#4F46E5';
-  if (rangeStart >= 70) return '#10B981';
-  if (rangeStart >= 55) return '#3B82F6';
-  if (rangeStart >= 40) return '#F59E0B';
-  return '#94A3B8';
+  if (isNaN(rangeStart)) return '#3F6B54';
+  if (rangeStart >= 70) return '#3F6B54';   // sage
+  if (rangeStart >= 55) return '#7F9B4E';   // olive
+  if (rangeStart >= 40) return '#E0872F';   // amber
+  return '#94A3B8';                          // gray (neutral, non-alarming)
 }
 
 interface ScoreDistributionChartProps {

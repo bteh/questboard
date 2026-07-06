@@ -3,11 +3,11 @@ import { getChartTheme, tooltipStyle } from '@/utils/chart-theme';
 import type { ChartDataPoint } from '@/types/analytics';
 
 const TYPE_COLORS: Record<string, string> = {
-  'FAANG+': '#F59E0B',
-  'Big Tech': '#3B82F6',
-  'Elite Startup': '#6366F1',
-  'Growth Stage': '#10B981',
-  'Early Startup': '#34D399',
+  'FAANG+': '#E0872F',
+  'Big Tech': '#C06A3C',
+  'Elite Startup': '#4E8A8F',
+  'Growth Stage': '#4C8A63',
+  'Early Startup': '#8FA054',
   'Midsize': '#94A3B8',
   'Enterprise': '#64748B',
   'Unknown': '#CBD5E1',
@@ -27,7 +27,7 @@ export function CompanyTypesChart({ data }: CompanyTypesChartProps) {
         <Tooltip contentStyle={tooltipStyle()} />
         <Bar dataKey="value" radius={[0, 4, 4, 0]}>
           {data.map((entry) => (
-            <Cell key={entry.label} fill={entry.color || TYPE_COLORS[entry.label] || '#4F46E5'} />
+            <Cell key={entry.label} fill={entry.color || TYPE_COLORS[entry.label] || '#3F6B54'} />
           ))}
         </Bar>
       </BarChart>

@@ -546,7 +546,7 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
                     )}
                   >
                     {name === 'gemini' ? 'Gemini' : 'Groq'}
-                    <span className="ml-1 text-[9px] text-emerald-600">free</span>
+                    <span className="ml-1 text-[9px] text-success">free</span>
                   </button>
                 );
               })}
@@ -635,7 +635,7 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
             </Button>
 
             <div className="flex items-start gap-1.5 text-[10px] leading-relaxed text-text-muted">
-              <Shield className="mt-0.5 h-3 w-3 shrink-0 text-emerald-500" />
+              <Shield className="mt-0.5 h-3 w-3 shrink-0 text-success" />
               <p>Your key stays on this computer and is only sent to {POPULAR_PROVIDER_CHOICES[selectedProvider].title}.</p>
             </div>
           </div>

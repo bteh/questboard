@@ -1,7 +1,9 @@
+// Warm-varied avatar set (sages, olives, ambers, clays, muted teal). No pure
+// blue/indigo/violet so avatars sit inside the warm operator palette.
 const AVATAR_COLORS = [
-  '#4F46E5', '#7C3AED', '#2563EB', '#0891B2', '#059669',
-  '#D97706', '#DC2626', '#DB2777', '#9333EA', '#0D9488',
-  '#6366F1', '#8B5CF6', '#0284C7', '#0F766E', '#B45309',
+  '#3F6B54', '#4C8A63', '#5E7C4F', '#6E8B4E', '#8FA054',
+  '#A98B3C', '#B4701C', '#E0872F', '#C06A3C', '#A64B2A',
+  '#4E8A8F', '#3D7068', '#7FB393', '#8A6D3B',
 ];
 
 export function avatarColor(name: string): string {
@@ -21,8 +23,8 @@ export function scoreColor(score: number | null): 'high' | 'mid-high' | 'mid' | 
 
 export function scoreColorHex(score: number | null): string {
   const level = scoreColor(score);
-  if (level === 'high') return '#10B981';      // green
-  if (level === 'mid-high') return '#3B82F6';  // blue
-  if (level === 'mid') return '#F59E0B';       // amber
-  return '#EF4444';                             // red
+  if (level === 'high') return '#3F6B54';       // sage
+  if (level === 'mid-high') return '#7F9B4E';   // olive
+  if (level === 'mid') return '#E0872F';        // amber
+  return '#C4443A';                              // warm red
 }

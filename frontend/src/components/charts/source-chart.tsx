@@ -15,10 +15,12 @@ function toNumericValue(value: number | string | ReadonlyArray<number | string> 
   return 0;
 }
 
+// Warm-varied categorical set (sages, olives, ambers, clays, teal) so many
+// job sources stay distinguishable without leaving the warm palette.
 const BAR_COLORS = [
-  '#6366F1', '#818CF8', '#3B82F6', '#06B6D4', '#10B981',
-  '#F59E0B', '#EF4444', '#EC4899', '#8B5CF6', '#14B8A6',
-  '#F97316', '#64748B', '#A855F7', '#059669', '#4F46E5',
+  '#3F6B54', '#E0872F', '#4E8A8F', '#C06A3C', '#8FA054',
+  '#B4701C', '#4C8A63', '#A64B2A', '#3D7068', '#6E8B4E',
+  '#A98B3C', '#7FB393', '#5E7C4F', '#8A6D3B', '#94A3B8',
 ];
 
 interface SourceChartProps {

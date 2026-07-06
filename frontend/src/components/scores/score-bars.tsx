@@ -7,10 +7,10 @@ interface ScoreBarsProps {
 }
 
 const GRADIENT_MAP: Record<ReturnType<typeof scoreColor>, string> = {
-  high: 'linear-gradient(90deg, #34D399, #10B981)',
-  'mid-high': 'linear-gradient(90deg, #93C5FD, #3B82F6)',
-  mid: 'linear-gradient(90deg, #FCD34D, #F59E0B)',
-  low: 'linear-gradient(90deg, #FCA5A5, #EF4444)',
+  high: 'linear-gradient(90deg, #7FB393, #3F6B54)',
+  'mid-high': 'linear-gradient(90deg, #A8BD73, #7F9B4E)',
+  mid: 'linear-gradient(90deg, #F0B968, #E0872F)',
+  low: 'linear-gradient(90deg, #E7A59D, #C4443A)',
 };
 
 /** Score-column key -> evidence-dict key (set by the keyword scorer). */
@@ -58,7 +58,7 @@ function EvidenceChips({ evidence }: { evidence: ScoreEvidenceEntry }) {
         <span
           key={`x-${term}`}
           title="In the job description but not in your profile"
-          className="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-1.5 py-px text-[10px] leading-4 text-red-700/80 line-through decoration-red-300 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300/80 dark:decoration-red-800"
+          className="inline-flex items-center rounded-full border border-danger/30 bg-danger/10 px-1.5 py-px text-[10px] leading-4 text-danger/90 line-through decoration-danger/40"
         >
           {term}
         </span>

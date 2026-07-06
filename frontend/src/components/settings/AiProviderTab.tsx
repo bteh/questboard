@@ -25,17 +25,17 @@ import type { LLMConfig, LLMStatus } from '@/types/settings';
 // ── Provider metadata for cards ──────────────────────────────────────
 // Maps backend preset names to user-friendly descriptions and key URLs.
 const PROVIDER_INFO: Record<string, { description: string; keyUrl?: string; keyLabel?: string; badge: string; badgeColor: string; recommended?: boolean }> = {
-  gemini:         { description: 'Gemini for Launchboard. Free tier available, but users still need a free Gemini API key.', keyUrl: 'https://aistudio.google.com/apikey', keyLabel: 'Get free Gemini key', badge: 'Free', badgeColor: 'text-emerald-600 bg-emerald-500/10', recommended: true },
-  groq:           { description: 'Very fast — 1,000 uses/day', keyUrl: 'https://console.groq.com/keys', keyLabel: 'Get free key', badge: 'Free', badgeColor: 'text-emerald-600 bg-emerald-500/10' },
-  cerebras:       { description: 'Ultra-fast — generous free tier', keyUrl: 'https://cloud.cerebras.ai', keyLabel: 'Get free key', badge: 'Free', badgeColor: 'text-emerald-600 bg-emerald-500/10' },
-  openrouter:     { description: '29 free AI models through one key — 200 uses/day', keyUrl: 'https://openrouter.ai/keys', keyLabel: 'Get free key', badge: 'Free', badgeColor: 'text-emerald-600 bg-emerald-500/10' },
-  mistral:        { description: 'European AI provider — generous free tier', keyUrl: 'https://console.mistral.ai/api-keys', keyLabel: 'Get free key', badge: 'Free', badgeColor: 'text-emerald-600 bg-emerald-500/10' },
+  gemini:         { description: 'Gemini for Launchboard. Free tier available, but users still need a free Gemini API key.', keyUrl: 'https://aistudio.google.com/apikey', keyLabel: 'Get free Gemini key', badge: 'Free', badgeColor: 'text-success bg-success/10', recommended: true },
+  groq:           { description: 'Very fast — 1,000 uses/day', keyUrl: 'https://console.groq.com/keys', keyLabel: 'Get free key', badge: 'Free', badgeColor: 'text-success bg-success/10' },
+  cerebras:       { description: 'Ultra-fast — generous free tier', keyUrl: 'https://cloud.cerebras.ai', keyLabel: 'Get free key', badge: 'Free', badgeColor: 'text-success bg-success/10' },
+  openrouter:     { description: '29 free AI models through one key — 200 uses/day', keyUrl: 'https://openrouter.ai/keys', keyLabel: 'Get free key', badge: 'Free', badgeColor: 'text-success bg-success/10' },
+  mistral:        { description: 'European AI provider — generous free tier', keyUrl: 'https://console.mistral.ai/api-keys', keyLabel: 'Get free key', badge: 'Free', badgeColor: 'text-success bg-success/10' },
   sambanova:      { description: 'Powerful AI — $5 free trial credits', keyUrl: 'https://cloud.sambanova.ai', keyLabel: 'Get free key', badge: 'Trial', badgeColor: 'text-amber-600 bg-amber-500/10' },
   deepseek:       { description: 'Strong AI — free signup bonus, then very cheap', keyUrl: 'https://platform.deepseek.com/api_keys', keyLabel: 'Get key', badge: 'Trial + cheap', badgeColor: 'text-amber-600 bg-amber-500/10' },
   'openai-api':   { description: 'Supported today for GPT models in Launchboard. Requires an OpenAI API key.', keyUrl: 'https://platform.openai.com/api-keys', keyLabel: 'Get OpenAI API key', badge: 'Paid', badgeColor: 'text-amber-600 bg-amber-500/10' },
   'anthropic-api': { description: 'Supported today for Claude models in Launchboard. Requires an Anthropic API key.', keyUrl: 'https://console.anthropic.com/settings/keys', keyLabel: 'Get Anthropic API key', badge: 'Paid', badgeColor: 'text-amber-600 bg-amber-500/10' },
-  ollama:         { description: 'Runs on your computer — completely private, no account needed', keyUrl: 'https://ollama.com', keyLabel: 'Install Ollama (free)', badge: 'No account', badgeColor: 'text-blue-600 bg-blue-500/10' },
-  custom:         { description: 'Connect your own local AI model or OpenAI-compatible server', badge: 'Custom', badgeColor: 'text-violet-600 bg-violet-500/10' },
+  ollama:         { description: 'Runs on your computer — completely private, no account needed', keyUrl: 'https://ollama.com', keyLabel: 'Install Ollama (free)', badge: 'No account', badgeColor: 'text-brand bg-brand/10' },
+  custom:         { description: 'Connect your own local AI model or OpenAI-compatible server', badge: 'Custom', badgeColor: 'text-brand bg-brand/10' },
 };
 
 /** Dev mode shows proxy/internal presets — requires explicit opt-in via localStorage */
@@ -447,7 +447,7 @@ export function AiProviderTab() {
             </Button>
 
             <div className="flex items-start gap-1.5 text-[11px] leading-relaxed text-text-muted">
-              <Shield className="h-3 w-3 shrink-0 text-emerald-500 mt-0.5" />
+              <Shield className="h-3 w-3 shrink-0 text-success mt-0.5" />
               <p>
                 {hostedMode
                   ? 'Your key is encrypted on Launchboard and only sent to that provider.'
@@ -683,7 +683,7 @@ export function AiProviderTab() {
                     <div>
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-semibold text-text-primary">Google Gemini</p>
-                        <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 uppercase">Free</span>
+                        <span className="rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success uppercase">Free</span>
                         <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-semibold text-brand uppercase">Recommended</span>
                       </div>
                       <p className="mt-0.5 text-xs text-text-muted">Fastest low-cost setup. Free tier available, but you still need a free Gemini API key.</p>
@@ -734,7 +734,7 @@ export function AiProviderTab() {
                     </div>
                   </div>
                   <div className="flex items-start gap-2 pl-[52px]">
-                    <Shield className="h-3 w-3 text-emerald-500 shrink-0 mt-0.5" />
+                    <Shield className="h-3 w-3 text-success shrink-0 mt-0.5" />
                     <p className="text-[10px] text-text-muted leading-relaxed">
                       {hostedMode
                         ? 'Your key is sent to Launchboard over HTTPS, stored encrypted for your workspace, and used only to call Google.'
@@ -805,7 +805,7 @@ export function AiProviderTab() {
                       </div>
                     </div>
                     <div className="flex items-start gap-2 pl-[52px]">
-                      <Shield className="h-3 w-3 text-emerald-500 shrink-0 mt-0.5" />
+                      <Shield className="h-3 w-3 text-success shrink-0 mt-0.5" />
                       <p className="text-[10px] text-text-muted leading-relaxed">
                         {hostedMode
                           ? 'Your key is sent to Launchboard over HTTPS, stored encrypted for your workspace, and used only to call that provider.'
@@ -906,7 +906,7 @@ export function AiProviderTab() {
                       <div>
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-semibold text-text-primary">Switch to Google Gemini</p>
-                          <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 uppercase">Free</span>
+                          <span className="rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success uppercase">Free</span>
                         </div>
                       <p className="mt-0.5 text-xs text-text-muted">Fastest way to add AI again without paying for user usage.</p>
                     </div>
@@ -1095,7 +1095,7 @@ export function AiProviderTab() {
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className={cn('text-sm font-medium', llmForm.provider === 'custom' ? 'text-brand' : 'text-text-primary')}>Custom Provider</span>
-                      <span className="rounded-full bg-violet-500/10 px-2 py-0.5 text-[10px] font-medium text-violet-600">Compatible</span>
+                      <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[10px] font-medium text-brand">Compatible</span>
                     </div>
                     <p className="mt-1 text-xs text-text-muted">Connect your own AI model or server</p>
                   </button>
@@ -1322,7 +1322,7 @@ export function AiProviderTab() {
                           </div>
                         </div>
                         <div className="flex items-start gap-2 rounded-lg bg-bg-subtle/60 px-3 py-2">
-                          <Shield className="h-3.5 w-3.5 text-emerald-500 shrink-0 mt-0.5" />
+                          <Shield className="h-3.5 w-3.5 text-success shrink-0 mt-0.5" />
                           <p className="text-[11px] text-text-muted leading-relaxed">
                             {hostedMode
                               ? `Your key is sent to Launchboard over HTTPS, stored encrypted for your workspace, and used only to call ${selectedPreset?.label || 'that provider'}.`

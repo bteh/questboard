@@ -107,12 +107,6 @@ function HostedAuthScreen() {
   if (devHostedAuth) {
     return (
       <div className="relative min-h-screen overflow-hidden bg-bg-page">
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute left-[-8rem] top-[-8rem] h-64 w-64 rounded-full bg-brand-light blur-3xl opacity-80" />
-          <div className="absolute right-[-6rem] top-24 h-56 w-56 rounded-full bg-bg-subtle blur-3xl opacity-90" />
-          <div className="absolute bottom-[-5rem] left-1/3 h-48 w-48 rounded-full bg-brand-light blur-3xl opacity-60" />
-        </div>
-
         <div className="relative mx-auto flex min-h-screen max-w-6xl items-center px-4 py-10 sm:px-6 lg:px-8">
           <div className="grid w-full gap-6 lg:grid-cols-[1.05fr_0.95fr]">
             <Card className="border-border-default/80 bg-bg-card/95 backdrop-blur">

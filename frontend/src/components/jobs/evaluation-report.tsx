@@ -21,7 +21,7 @@ interface EvaluationReportViewProps {
 const STRENGTH_STYLES: Record<RequirementMatch['strength'], { label: string; className: string; icon: typeof CheckCircle2 }> = {
   strong: {
     label: 'Strong',
-    className: 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300',
+    className: 'border-success/30 bg-success/10 text-success',
     icon: CheckCircle2,
   },
   partial: {
@@ -31,7 +31,7 @@ const STRENGTH_STYLES: Record<RequirementMatch['strength'], { label: string; cla
   },
   missing: {
     label: 'Missing',
-    className: 'border-rose-300 bg-rose-50 text-rose-800 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300',
+    className: 'border-danger/30 bg-danger/10 text-danger',
     icon: XCircle,
   },
 };
@@ -118,10 +118,10 @@ export function EvaluationReportView({ report }: EvaluationReportViewProps) {
             <AlertTriangle className="h-3 w-3" />
             Red flags to weigh before applying
           </h4>
-          <ul className="space-y-1.5 rounded-lg border border-rose-200/60 bg-rose-50/50 p-3 dark:border-rose-900/40 dark:bg-rose-950/20">
+          <ul className="space-y-1.5 rounded-lg border border-danger/30 bg-danger/10 p-3">
             {report.red_flags.map((flag, idx) => (
               <li key={idx} className="flex items-start gap-2 text-sm text-text-secondary leading-relaxed">
-                <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-rose-500" />
+                <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-danger" />
                 <span>{flag}</span>
               </li>
             ))}

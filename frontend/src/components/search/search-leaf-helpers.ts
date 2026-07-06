@@ -30,22 +30,24 @@ export function titleCase(value: string): string {
     .join(' ');
 }
 
-// Category color mapping — applied dynamically from whatever categories the API returns
+// Category color mapping — applied dynamically from whatever categories the API
+// returns. Warm-varied hues (sage, teal, clay, olive) keep the source categories
+// distinguishable inside the warm palette. Amber, orange, and slate already fit.
 export const CATEGORY_COLORS: Record<string, string> = {
-  jobspy: 'text-blue-600 dark:text-blue-400',
-  remote: 'text-emerald-600 dark:text-emerald-400',
-  startup: 'text-violet-600 dark:text-violet-400',
-  ats: 'text-sky-600 dark:text-sky-400',
+  jobspy: 'text-[#3F6B54] dark:text-[#7FB393]',
+  remote: 'text-[#4E8A8F] dark:text-[#8FBEC2]',
+  startup: 'text-[#C06A3C] dark:text-[#DDA985]',
+  ats: 'text-[#8FA054] dark:text-[#B7C77E]',
   community: 'text-amber-600 dark:text-amber-400',
   crypto: 'text-orange-600 dark:text-orange-400',
   general: 'text-slate-600 dark:text-slate-400',
 };
 
 export const CATEGORY_DOTS: Record<string, string> = {
-  jobspy: 'bg-blue-500',
-  remote: 'bg-emerald-500',
-  startup: 'bg-violet-500',
-  ats: 'bg-sky-500',
+  jobspy: 'bg-[#3F6B54]',
+  remote: 'bg-[#4E8A8F]',
+  startup: 'bg-[#C06A3C]',
+  ats: 'bg-[#8FA054]',
   community: 'bg-amber-500',
   crypto: 'bg-orange-500',
   general: 'bg-slate-400',

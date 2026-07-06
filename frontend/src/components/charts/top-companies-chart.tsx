@@ -14,7 +14,7 @@ export function TopCompaniesChart({ data }: TopCompaniesChartProps) {
         <XAxis type="number" tick={{ fontSize: 12, fill: theme.axis }} />
         <YAxis dataKey="label" type="category" tick={{ fontSize: 12, fill: theme.axis }} width={95} />
         <Tooltip contentStyle={tooltipStyle()} />
-        <Bar dataKey="value" fill="#10B981" radius={[0, 4, 4, 0]} />
+        <Bar dataKey="value" fill="#4C8A63" radius={[0, 4, 4, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );
