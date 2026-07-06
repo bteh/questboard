@@ -9,6 +9,7 @@ import { useWorkspace } from '@/contexts/workspace-context';
 import { Button } from '@/components/ui/button';
 import { AiDiagnosticModal } from '@/components/onboarding/ai-diagnostic-modal';
 import { SystemHealthPanel } from '@/components/health/system-health-panel';
+import { BrandMark } from '@/components/shared/brand-mark';
 import { cn } from '@/lib/utils';
 
 const NAV_ITEMS = [
@@ -55,10 +56,7 @@ export function Sidebar() {
       {/* Brand */}
       <Link to="/" className="flex items-center gap-3 px-5 py-5 hover:bg-bg-subtle transition-colors cursor-pointer">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand shadow-sm">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-white">
-            <path d="M4 12V4l4 2v6l-4-2z" fill="currentColor" opacity="0.7" />
-            <path d="M8 6l4-2v8l-4 2V6z" fill="currentColor" />
-          </svg>
+          <BrandMark className="h-4 w-4 text-white" />
         </div>
         <div>
           <span className="text-sm font-semibold text-text-primary tracking-tight">Launchboard</span>

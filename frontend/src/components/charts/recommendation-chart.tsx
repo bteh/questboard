@@ -58,7 +58,8 @@ export function RecommendationChart({ data }: RecommendationChartProps) {
           stroke="none"
         >
           {chartData.map((entry) => (
-            <Cell key={entry.label} fill={entry.color || COLORS[entry.label] || '#3F6B54'} />
+            // Warm palette wins over any stale color carried on the data point.
+            <Cell key={entry.label} fill={COLORS[entry.label] || entry.color || '#3F6B54'} />
           ))}
         </Pie>
         <Tooltip

@@ -15,6 +15,7 @@ import { ArrowRight, Menu, ShieldCheck, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { BrandMark } from '@/components/shared/brand-mark';
 
 export const Route = createRootRoute({
   component: RootLayout,
@@ -28,10 +29,7 @@ function MobileHeader({ onMenuOpen }: { onMenuOpen: () => void }) {
       </Button>
       <Link to="/" className="flex items-center gap-2 cursor-pointer">
         <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand shadow-sm">
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-white">
-            <path d="M4 12V4l4 2v6l-4-2z" fill="currentColor" opacity="0.7" />
-            <path d="M8 6l4-2v8l-4 2V6z" fill="currentColor" />
-          </svg>
+          <BrandMark className="h-3.5 w-3.5 text-white" />
         </div>
         <span className="text-sm font-semibold text-text-primary tracking-tight">Launchboard</span>
       </Link>
@@ -120,10 +118,7 @@ function HostedAuthScreen() {
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand shadow-sm">
-                        <svg width="20" height="20" viewBox="0 0 16 16" fill="none" className="text-white">
-                          <path d="M4 12V4l4 2v6l-4-2z" fill="currentColor" opacity="0.7" />
-                          <path d="M8 6l4-2v8l-4 2V6z" fill="currentColor" />
-                        </svg>
+                        <BrandMark className="h-5 w-5 text-white" />
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-text-primary tracking-tight">Launchboard</p>
