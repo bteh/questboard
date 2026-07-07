@@ -120,6 +120,13 @@ class ApplicationRecord(Base):
     url_status = Column(String(20), default="unknown")  # alive, dead, unknown
     last_checked_at = Column(DateTime, nullable=True)
 
+    # Posting date provenance — the job's TRUE original post date as reported by
+    # the source board, kept distinct from date_found (when WE first saw it) so
+    # the UI can show real age and flag stale/ghost reposts. Stored as the raw
+    # source string (ISO or YYYY-MM-DD); the frontend parses it at display time.
+    date_posted = Column(String(40), default="")
+    date_confidence = Column(String(20), default="")  # exact | fuzzy | missing
+
     # Timestamps
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
@@ -216,6 +223,14 @@ def _migrate_db(engine) -> None:
         if "last_checked_at" not in existing_cols:
             conn.execute(
                 text("ALTER TABLE applications ADD COLUMN last_checked_at DATETIME")
+            )
+        if "date_posted" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN date_posted VARCHAR(40) DEFAULT ''")
+            )
+        if "date_confidence" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN date_confidence VARCHAR(20) DEFAULT ''")
             )
         if "search_run_id" not in existing_cols:
             conn.execute(
@@ -374,6 +389,8 @@ def save_application(
     *,
     score_evidence: dict | str | None = None,
     salary_source: str | None = None,
+    date_posted: str | None = None,
+    date_confidence: str | None = None,
 ) -> ApplicationRecord | None:
     """Save a new application record to the database. Returns None if duplicate URL."""
     # Store empty URLs as None so SQLite unique constraint allows multiples
@@ -412,6 +429,16 @@ def save_application(
                     and existing.company_type != company_type
                 ):
                     existing.company_type = company_type
+                    changed = True
+                # Adopt a better post date on re-scrape: a listing that now
+                # carries a verifiable date replaces an empty/guessed one, but a
+                # known date is never downgraded back to a guess (rank order).
+                _conf_rank = {"exact": 3, "fuzzy": 2, "missing": 1, "": 0}
+                if date_posted and _conf_rank.get((date_confidence or "").lower(), 0) > _conf_rank.get(
+                    (getattr(existing, "date_confidence", "") or "").lower(), 0
+                ):
+                    existing.date_posted = date_posted
+                    existing.date_confidence = date_confidence or ""
                     changed = True
                 if changed:
                     existing.updated_at = _utcnow()
@@ -466,6 +493,10 @@ def save_application(
                             updated = True
                         if salary_source and not cand.salary_source:
                             cand.salary_source = salary_source
+                            updated = True
+                        if date_posted and not getattr(cand, "date_posted", ""):
+                            cand.date_posted = date_posted
+                            cand.date_confidence = date_confidence or ""
                             updated = True
                         if overall_score and (not cand.overall_score or overall_score > cand.overall_score):
                             cand.overall_score = overall_score
@@ -536,6 +567,8 @@ def save_application(
             salary_min_annualized=salary_min_annualized,
             salary_max_annualized=salary_max_annualized,
             salary_source=salary_source,
+            date_posted=date_posted or "",
+            date_confidence=date_confidence or "",
             overall_score=overall_score,
             technical_score=technical_score,
             leadership_score=leadership_score,

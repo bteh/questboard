@@ -65,6 +65,11 @@ export interface ApplicationBase {
   salary_source?: 'reported' | 'parsed_from_description' | null;
   work_type_confidence?: 'reported' | 'inferred' | null;
   date_confidence?: 'exact' | 'fuzzy' | 'missing' | null;
+  // Trust & freshness (ghost-job defense). date_posted is the job's TRUE
+  // original post date (raw source string); direct_from_company is true when
+  // the listing links straight to the employer's own ATS/board.
+  date_posted?: string | null;
+  direct_from_company?: boolean;
 }
 
 export interface ApplicationResponse extends ApplicationBase {

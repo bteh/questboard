@@ -9,6 +9,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from job_finder.job_trust import is_direct_source
 from app.models.database import get_db
 from app.schemas.application import (
     ApplicationCreate,
@@ -66,8 +67,10 @@ def _to_response(record) -> ApplicationResponse:
         salary_min_annualized=getattr(record, "salary_min_annualized", None),
         salary_max_annualized=getattr(record, "salary_max_annualized", None),
         salary_source=getattr(record, "salary_source", None),
-        date_confidence=getattr(record, "date_confidence", None),
+        date_confidence=getattr(record, "date_confidence", None) or None,
         work_type_confidence=getattr(record, "work_type_confidence", None),
+        date_posted=getattr(record, "date_posted", None) or None,
+        direct_from_company=is_direct_source(getattr(record, "source", "")),
         overall_score=record.overall_score,
         technical_score=record.technical_score,
         leadership_score=record.leadership_score,

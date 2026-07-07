@@ -28,6 +28,12 @@ class ApplicationBase(BaseModel):
     salary_source: str | None = None
     date_confidence: str | None = None
     work_type_confidence: str | None = None
+    # Trust & freshness (ghost-job defense). date_posted is the job's TRUE
+    # original post date (raw source string); the UI derives real age from it.
+    # direct_from_company is True when the source links straight to the
+    # employer's own ATS/board (Greenhouse, Lever, Ashby, Workable, ...).
+    date_posted: str | None = None
+    direct_from_company: bool = False
 
 
 class ApplicationResponse(ApplicationBase):

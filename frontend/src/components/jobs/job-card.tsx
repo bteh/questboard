@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { ExternalLink, ChevronDown, MapPin, Send, CheckCircle2, AlertTriangle, Trash2, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { ExternalLink, ChevronDown, MapPin, Send, CheckCircle2, AlertTriangle, Trash2, ThumbsUp, ThumbsDown, BadgeCheck, ListChecks } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CompanyAvatar } from '@/components/shared/company-avatar';
@@ -12,7 +12,10 @@ import { JobDetail } from './job-detail';
 import { ApplyDrawer } from './apply-drawer';
 import { useDeleteApplication, useUpdateFeedback } from '@/hooks/use-applications';
 import { truncateDescription, formatDate, formatSalary } from '@/utils/format';
+import { classifyFreshness, postedAgoLabel, staleWarning, type Freshness } from '@/utils/job-trust';
+import { computeRequirementFit } from '@/utils/job-fit';
 import { cn } from '@/lib/utils';
+import type { EvaluationReport } from '@/types/application';
 import { resolveSourceLabel } from '@/hooks/use-scrapers';
 import { toast } from 'sonner';
 import { SCORE_DIMENSIONS } from '@/utils/constants';
@@ -33,6 +36,16 @@ function getRecencyLabel(dateFound: string | null | undefined): string | null {
   if (hours < 168) return 'This week';
   return null;
 }
+
+// Color the true-post-date label by age. Fresh/recent stay quiet (muted with a
+// green dot) so the card doesn't shout; only aging/stale go amber to warn.
+const FRESHNESS_DOT: Record<Freshness, string> = {
+  fresh: 'bg-success',
+  recent: 'bg-success/60',
+  aging: 'bg-warning',
+  stale: 'bg-warning',
+  unknown: 'bg-text-faint',
+};
 
 interface JobCardProps {
   app: ApplicationResponse;
@@ -160,6 +173,24 @@ export function JobCard({ app, sourceLabels, latestRunId }: JobCardProps) {
   const recency = getRecencyLabel(app.date_found);
   const salaryText = formatSalary(app.salary_min, app.salary_max);
 
+  // Trust & freshness: the TRUE original post date (not when we found it) so a
+  // months-old repost can't look fresh. Falls back to date_found recency.
+  const postedAgo = postedAgoLabel(app.date_posted, app.date_confidence);
+  const freshness = classifyFreshness(app.date_posted, app.date_confidence);
+  const staleNote = staleWarning(app.date_posted, app.date_confidence);
+  const isDirect = !!app.direct_from_company;
+
+  // Honest fit: "you cover N of M requirements" from the full evaluation, when
+  // one exists (STRONG_APPLY/APPLY jobs). Parsed lazily; empty for the rest.
+  const fit = useMemo(() => {
+    if (!app.evaluation_report_json) return null;
+    try {
+      return computeRequirementFit(JSON.parse(app.evaluation_report_json) as EvaluationReport);
+    } catch {
+      return null;
+    }
+  }, [app.evaluation_report_json]);
+
   return (
     <Card
       className={cn(
@@ -236,9 +267,32 @@ export function JobCard({ app, sourceLabels, latestRunId }: JobCardProps) {
           <div className="mt-3 flex flex-wrap items-center gap-1.5">
             <RecommendationBadge recommendation={app.recommendation} />
             <WorkTypeBadge workType={app.work_type} isRemote={app.is_remote} />
+            {isDirect && (
+              <span
+                title="Links straight to the company's own careers page. You apply direct, with no aggregator in between."
+                className="inline-flex items-center gap-1 rounded-md border border-success/25 bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success"
+              >
+                <BadgeCheck className="h-3 w-3" />
+                Direct
+              </span>
+            )}
             {app.source && (
               <span className="inline-flex items-center rounded-md bg-bg-subtle border border-border-default px-2 py-0.5 text-[11px] font-medium text-text-secondary">
                 {resolveSourceLabel(app.source, labels)}
+              </span>
+            )}
+            {fit && (
+              <span
+                title={`Your resume covers ${fit.strong} of ${fit.total} of this job's stated requirements`}
+                className={cn(
+                  'inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium',
+                  fit.ratio >= 0.6
+                    ? 'border-success/25 bg-success/10 text-success'
+                    : 'border-warning/40 bg-warning/10 text-warning',
+                )}
+              >
+                <ListChecks className="h-3 w-3" />
+                Covers {fit.strong}/{fit.total}
               </span>
             )}
             <CompanyTypeBadge companyType={app.company_type} />
@@ -329,8 +383,34 @@ export function JobCard({ app, sourceLabels, latestRunId }: JobCardProps) {
                 New
               </span>
             )}
-            {recency && <span>{recency}</span>}
-            {app.date_found && !recency && <span>{formatDate(app.date_found, 'relative')}</span>}
+            {/* True original post date (not when we found it) — a repost can't
+                reset this. Fresh/recent stay quiet; aging/stale go amber. */}
+            {postedAgo ? (
+              <span
+                className={cn(
+                  'inline-flex items-center gap-1.5',
+                  (freshness === 'aging' || freshness === 'stale') && 'text-warning',
+                )}
+                title={
+                  staleNote
+                    ? `${postedAgo} on the source board. ${staleNote}.`
+                    : `${postedAgo} on the source board`
+                }
+              >
+                <span className={cn('h-1.5 w-1.5 rounded-full shrink-0', FRESHNESS_DOT[freshness])} />
+                {postedAgo}
+                {freshness === 'stale' && (
+                  <span className="inline-flex items-center gap-1 font-medium">
+                    <AlertTriangle className="h-3 w-3" />
+                    may be filled
+                  </span>
+                )}
+              </span>
+            ) : recency ? (
+              <span>{recency}</span>
+            ) : app.date_found ? (
+              <span>{formatDate(app.date_found, 'relative')}</span>
+            ) : null}
             {app.employee_count && <span>{app.employee_count} employees</span>}
             {app.job_url && (
               app.url_status === 'dead' ? (
@@ -347,7 +427,7 @@ export function JobCard({ app, sourceLabels, latestRunId }: JobCardProps) {
                   onClick={(e) => e.stopPropagation()}
                 >
                   <ExternalLink className="h-3 w-3" />
-                  View posting
+                  {isDirect ? 'Apply on company site' : 'View posting'}
                 </a>
               )
             )}

@@ -5,6 +5,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ScoreBars } from '@/components/scores/score-bars';
 import { ScoreCircle } from '@/components/scores/score-circle';
 import { StrengthsGaps } from '@/components/scores/strengths-gaps';
+import { RequirementFit } from '@/components/scores/requirement-fit';
+import { computeRequirementFit } from '@/utils/job-fit';
 import { StatusBadge } from '@/components/badges/status-badge';
 import { ErrorBoundary } from '@/components/shared/error-boundary';
 import { EvaluationReportView } from '@/components/jobs/evaluation-report';
@@ -322,8 +324,13 @@ export function JobDetail({ app }: JobDetailProps) {
             </p>
           )}
 
-          {/* Strengths & gaps */}
-          <StrengthsGaps strengths={app.key_strengths} gaps={app.key_gaps} />
+          {/* Honest fit: requirement coverage when we have a full evaluation,
+              else the keyword-based strengths/gaps. */}
+          {computeRequirementFit(evaluationReport) ? (
+            <RequirementFit report={evaluationReport} />
+          ) : (
+            <StrengthsGaps strengths={app.key_strengths} gaps={app.key_gaps} />
+          )}
         </div>
       )}
 

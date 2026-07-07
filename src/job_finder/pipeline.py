@@ -2721,6 +2721,8 @@ class JobFinderPipeline:
                 salary_min_annualized=job.get("salary_min_annualized"),
                 salary_max_annualized=job.get("salary_max_annualized"),
                 salary_source=job.get("salary_source"),
+                date_posted=job.get("date_posted"),
+                date_confidence=job.get("date_confidence"),
                 overall_score=job.get("overall_score"),
                 technical_score=job.get("technical_score"),
                 leadership_score=job.get("leadership_score"),

@@ -882,6 +882,8 @@ def _save_search_results(
             work_type=wt,
             search_run_id=search_run_id,
             workspace_id=workspace_id,
+            date_posted=job.get("date_posted"),
+            date_confidence=job.get("date_confidence"),
         )
     progress_cb(f"Saved {len(jobs)} jobs to database")
 

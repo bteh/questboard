@@ -53,6 +53,9 @@ def _migrate_db(engine) -> None:
             ("salary_min_annualized", "ALTER TABLE applications ADD COLUMN salary_min_annualized FLOAT"),
             ("salary_max_annualized", "ALTER TABLE applications ADD COLUMN salary_max_annualized FLOAT"),
             ("evaluation_report_json", "ALTER TABLE applications ADD COLUMN evaluation_report_json TEXT DEFAULT ''"),
+            # Trust & freshness (ghost-job defense): the job's true post date.
+            ("date_posted", "ALTER TABLE applications ADD COLUMN date_posted VARCHAR(40) DEFAULT ''"),
+            ("date_confidence", "ALTER TABLE applications ADD COLUMN date_confidence VARCHAR(20) DEFAULT ''"),
         ])
         with engine.begin() as conn:
             # Convert empty job_url strings to NULL (allows multiple NULLs in unique column)
