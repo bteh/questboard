@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Shield,
   FileText,
-  Send,
   CheckCircle2,
   Copy,
   ExternalLink,
@@ -29,13 +28,14 @@ import { ScoreCircle } from '@/components/scores/score-circle';
 import { CompanyAvatar } from '@/components/shared/company-avatar';
 import { RecommendationBadge } from '@/components/badges/recommendation-badge';
 import { usePrepareApplication, useSubmitApplication } from '@/hooks/use-apply';
+import { useUpdateStatus } from '@/hooks/use-applications';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import type { ApplicationResponse } from '@/types/application';
 import type { PrepareResponse } from '@/api/apply';
 
 /* ─── Step definitions ─── */
-type DrawerStep = 'preparing' | 'review' | 'submitted' | 'error';
+type DrawerStep = 'preparing' | 'review' | 'confirm' | 'submitted' | 'error';
 
 interface ApplyDrawerProps {
   app: ApplicationResponse;
@@ -61,7 +61,7 @@ function AtsBadge({ atsType, atsDetected }: { atsType: string | null; atsDetecte
     return (
       <span className="inline-flex items-center gap-1.5 rounded-md bg-bg-muted px-2.5 py-1 text-xs font-medium text-text-secondary">
         <FileText className="h-3 w-3 text-text-muted" />
-        Manual application — we'll prepare your materials
+        We prepared your materials — apply on the company's site
       </span>
     );
   }
@@ -70,7 +70,7 @@ function AtsBadge({ atsType, atsDetected }: { atsType: string | null; atsDetecte
   return (
     <span className="inline-flex items-center gap-1.5 rounded-md bg-brand-light px-2.5 py-1 text-xs font-medium text-brand">
       <Shield className="h-3 w-3" />
-      {name} detected — direct API submission
+      Applies direct on {name} — the company's own board
     </span>
   );
 }
@@ -139,15 +139,79 @@ function SubmittedStep({
         <CheckCircle2 className="h-8 w-8 text-success" />
       </div>
       <div className="text-center space-y-1.5">
-        <h3 className="text-lg font-semibold text-text-primary">Application Submitted</h3>
-        {method && (
+        <h3 className="text-lg font-semibold text-text-primary">
+          {method ? 'Application submitted' : 'Marked as applied'}
+        </h3>
+        {method ? (
           <p className="text-sm text-text-secondary">Applied via {method}</p>
+        ) : (
+          <p className="text-sm text-text-secondary">Nice work. We added it to your tracker.</p>
         )}
-        <p className="text-xs text-text-muted">Your application has been tracked</p>
+        <p className="text-xs text-text-muted">Good luck. You'll find it under Applied.</p>
       </div>
       <Button onClick={onClose} className="mt-2 bg-brand text-white hover:bg-brand-hover">
-        View Application
+        Done
       </Button>
+    </div>
+  );
+}
+
+/* ─── Step 2b: Confirm applied (honest path) ─── */
+function ConfirmStep({
+  company,
+  jobUrl,
+  onMarkApplied,
+  onNotYet,
+  pending,
+}: {
+  company: string;
+  jobUrl: string | null;
+  onMarkApplied: () => void;
+  onNotYet: () => void;
+  pending: boolean;
+}) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-5 py-10">
+      <div className="h-16 w-16 rounded-full bg-brand-light flex items-center justify-center">
+        <ExternalLink className="h-7 w-7 text-brand" />
+      </div>
+      <div className="text-center space-y-1.5 max-w-xs">
+        <h3 className="text-base font-semibold text-text-primary">
+          We opened {company}'s application in a new tab
+        </h3>
+        <p className="text-sm text-text-secondary">
+          Finish applying there with your kit, then mark it here so it lands in your tracker.
+        </p>
+      </div>
+      <div className="flex items-center gap-3 mt-1">
+        <Button variant="outline" size="sm" onClick={onNotYet} disabled={pending}>
+          Not yet
+        </Button>
+        <Button
+          size="sm"
+          className="bg-brand text-white hover:bg-brand-hover"
+          onClick={onMarkApplied}
+          disabled={pending}
+        >
+          {pending ? (
+            <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+          ) : (
+            <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+          )}
+          I applied — mark it
+        </Button>
+      </div>
+      {jobUrl && (
+        <a
+          href={jobUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-[11px] text-text-muted hover:text-text-secondary transition-colors"
+        >
+          <ExternalLink className="h-3 w-3" />
+          Reopen the posting
+        </a>
+      )}
     </div>
   );
 }
@@ -209,6 +273,7 @@ export function ApplyDrawer({ app, open, onClose }: ApplyDrawerProps) {
 
   const prepareMutation = usePrepareApplication();
   const submitMutation = useSubmitApplication();
+  const updateStatus = useUpdateStatus();
 
   /* ─── Reset state when drawer closes ─── */
   useEffect(() => {
@@ -264,7 +329,28 @@ export function ApplyDrawer({ app, open, onClose }: ApplyDrawerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  /* ─── Submit handler ─── */
+  /* ─── Honest primary path: open the real posting, then confirm ─── */
+  const handleApplyOnSite = useCallback(() => {
+    if (app.job_url) {
+      window.open(app.job_url, '_blank', 'noopener,noreferrer');
+    }
+    setStep('confirm');
+  }, [app.job_url]);
+
+  const handleMarkApplied = useCallback(() => {
+    updateStatus.mutate(
+      { id: app.id, data: { status: 'applied' } },
+      {
+        onSuccess: () => {
+          setSubmitMethod(null);
+          setStep('submitted');
+        },
+        onError: () => toast.error('Could not update status'),
+      },
+    );
+  }, [app.id, updateStatus]);
+
+  /* ─── Opt-in only: let us submit through the ATS API for you ─── */
   const handleSubmit = useCallback(() => {
     submitMutation.mutate(
       { id: app.id, data: { cover_letter: coverLetter || undefined, dry_run: false } },
@@ -324,8 +410,9 @@ export function ApplyDrawer({ app, open, onClose }: ApplyDrawerProps) {
         <SheetHeader className="px-6 pt-6 pb-0">
           <SheetTitle className="text-base font-semibold text-text-primary">
             {step === 'preparing' && 'Preparing Your Application'}
-            {step === 'review' && 'Review Your Application'}
-            {step === 'submitted' && 'Application Submitted'}
+            {step === 'review' && 'Your application kit'}
+            {step === 'confirm' && 'Did you finish applying?'}
+            {step === 'submitted' && 'Tracked'}
             {step === 'error' && 'Application Error'}
           </SheetTitle>
           <SheetDescription className="text-xs text-text-muted">
@@ -351,6 +438,16 @@ export function ApplyDrawer({ app, open, onClose }: ApplyDrawerProps) {
               />
             )}
 
+            {step === 'confirm' && (
+              <ConfirmStep
+                company={app.company}
+                jobUrl={app.job_url}
+                onMarkApplied={handleMarkApplied}
+                onNotYet={() => setStep('review')}
+                pending={updateStatus.isPending}
+              />
+            )}
+
             {step === 'submitted' && (
               <SubmittedStep method={submitMethod} onClose={onClose} />
             )}
@@ -367,56 +464,47 @@ export function ApplyDrawer({ app, open, onClose }: ApplyDrawerProps) {
         </ScrollArea>
 
         {/* ─── Footer actions (review step only) ─── */}
+        {/* Honest model: you apply on the company's real site with your kit in
+            hand. We never submit on your behalf unless you explicitly opt in. */}
         {step === 'review' && (
           <>
             <Separator />
-            <div className="flex items-center justify-end gap-3 px-6 py-4">
-              {atsDetected ? (
-                <>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleCopyMaterials}
-                  >
-                    <Copy className="h-3.5 w-3.5 mr-1.5" />
-                    Copy & Apply Manually
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="bg-brand text-white hover:bg-brand-hover"
+            <div className="px-6 py-4 space-y-2.5">
+              <div className="flex items-center justify-end gap-3">
+                <Button variant="outline" size="sm" onClick={handleCopyMaterials}>
+                  <Copy className="h-3.5 w-3.5 mr-1.5" />
+                  Copy materials
+                </Button>
+                <Button
+                  size="sm"
+                  className="bg-brand text-white hover:bg-brand-hover"
+                  onClick={app.job_url ? handleApplyOnSite : handleCopyMaterials}
+                >
+                  {app.job_url ? (
+                    <>
+                      <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                      Apply on company site
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5 mr-1.5" />
+                      Copy materials
+                    </>
+                  )}
+                </Button>
+              </div>
+              {atsDetected && (
+                <div className="text-right">
+                  <button
+                    type="button"
                     onClick={handleSubmit}
                     disabled={submitMutation.isPending}
+                    className="inline-flex items-center gap-1 text-[11px] text-text-muted hover:text-text-secondary underline underline-offset-2 disabled:opacity-50"
                   >
-                    {submitMutation.isPending ? (
-                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                    ) : (
-                      <Send className="h-3.5 w-3.5 mr-1.5" />
-                    )}
-                    Submit Application
-                  </Button>
-                </>
-              ) : (
-                <>
-                  {app.job_url && (
-                    <a
-                      href={app.job_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs text-brand hover:text-brand-hover transition-colors font-medium"
-                    >
-                      <ExternalLink className="h-3.5 w-3.5" />
-                      Open Job Posting
-                    </a>
-                  )}
-                  <Button
-                    size="sm"
-                    className="bg-brand text-white hover:bg-brand-hover"
-                    onClick={handleCopyMaterials}
-                  >
-                    <Copy className="h-3.5 w-3.5 mr-1.5" />
-                    Copy Materials
-                  </Button>
-                </>
+                    {submitMutation.isPending && <Loader2 className="h-3 w-3 animate-spin" />}
+                    Or let us submit it through {atsType} for you
+                  </button>
+                </div>
               )}
             </div>
           </>
