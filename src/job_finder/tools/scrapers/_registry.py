@@ -90,7 +90,7 @@ def run_scrapers(
     if not active:
         return []
 
-    _ats_scrapers = {"greenhouse", "lever", "ashby"}
+    _ats_scrapers = {"greenhouse", "lever", "ashby", "workable"}
     # Defensive copy — we may extend this dict with discovered slugs below.
     ats_watchlist: dict[str, list[str]] = {
         k: list(v) for k, v in (watchlist_by_ats or {}).items()

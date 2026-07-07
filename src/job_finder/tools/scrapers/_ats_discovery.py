@@ -65,6 +65,16 @@ ATS_HOSTS: dict[str, dict[str, Any]] = {
             re.IGNORECASE,
         ),
     },
+    "workable": {
+        "domain": "apply.workable.com",
+        # https://apply.workable.com/<slug>/... — the first path segment is
+        # the account slug. Endpoint-only segments (j, jobs, view, api, …) are
+        # rejected by _SLUG_BLOCKLIST below.
+        "slug_re": re.compile(
+            r"^https?://apply\.workable\.com/([^/?#]+)",
+            re.IGNORECASE,
+        ),
+    },
 }
 
 CACHE_TTL_DAYS = 7
@@ -87,6 +97,14 @@ _SLUG_BLOCKLIST = {
     "support",
     "api",
     "docs",
+    # Workable non-account path segments (apply.workable.com/j/<id>, etc.)
+    "j",
+    "view",
+    "spi",
+    "widget",
+    "accounts",
+    "backend",
+    "whoami",
 }
 
 
