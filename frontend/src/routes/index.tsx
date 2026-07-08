@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { createRoute, Link, useNavigate } from '@tanstack/react-router';
-import { Route as rootRoute } from './__root';
+import { Route as appRoute } from './app';
+import { LegacyFrame } from '@/components/layout/legacy-frame';
 import { Briefcase, Star, Send, Phone, Inbox, ArrowRight, Search, Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,9 +21,13 @@ import { useSearchContext } from '@/contexts/search-context';
 import { useSourceLabels } from '@/hooks/use-scrapers';
 
 export const Route = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => appRoute,
   path: '/',
-  component: DashboardPage,
+  component: () => (
+    <LegacyFrame>
+      <DashboardPage />
+    </LegacyFrame>
+  ),
 });
 
 function DashboardPage() {

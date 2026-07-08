@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { createRoute, Link, useNavigate } from '@tanstack/react-router';
-import { Route as rootRoute } from './__root';
+import { Route as appRoute } from './app';
+import { LegacyFrame } from '@/components/layout/legacy-frame';
 import {
   LayoutGrid, List, Search, X, Inbox, SearchX,
   ArrowUpDown, ChevronLeft, ChevronRight, Rocket, LinkIcon, Loader2, Trash2,
@@ -30,9 +31,13 @@ import type { ApplicationFilters } from '@/types/application';
 import { cn } from '@/lib/utils';
 
 export const Route = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => appRoute,
   path: '/applications',
-  component: ApplicationsPage,
+  component: () => (
+    <LegacyFrame>
+      <ApplicationsPage />
+    </LegacyFrame>
+  ),
   validateSearch: (search: Record<string, unknown>) => ({
     run: (search.run as string) || undefined,
     scope:

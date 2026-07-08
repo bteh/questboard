@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
-import { createRoute, Link } from '@tanstack/react-router';
-import { Route as rootRoute } from './__root';
+import { createRoute } from '@tanstack/react-router';
+import { Route as appRoute } from './app';
 import {
   Chip,
   LedgerRow,
@@ -23,7 +23,7 @@ import {
 import type { ApplicationFilters, ApplicationResponse, RequirementMatch } from '@/types/application';
 
 export const Route = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => appRoute,
   path: '/board',
   component: BoardPage,
 });
@@ -362,7 +362,7 @@ function BoardPage() {
   }
 
   return (
-    <div className="qb-page" style={{ position: 'fixed', inset: 0, zIndex: 40, overflowY: 'auto' }}>
+    <>
       <StampDefs />
       <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 44px 96px' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, padding: '52px 0 26px' }}>
@@ -399,14 +399,6 @@ function BoardPage() {
               {sortNewest ? 'newly found' : 'best score'}
             </b>
           </button>
-          <Link
-            to="/applications"
-            search={{ run: undefined, scope: undefined }}
-            className="qb-textlink"
-            style={{ fontSize: 14 }}
-          >
-            Back to the app
-          </Link>
         </div>
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
@@ -516,6 +508,6 @@ function BoardPage() {
 
       <RequirementSheet app={sheetApp} labels={labels} onClose={() => setSheetApp(null)} />
       <ExplainSheet app={explainApp} labels={labels} onClose={() => setExplainApp(null)} />
-    </div>
+    </>
   );
 }

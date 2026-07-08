@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createRoute, useNavigate } from '@tanstack/react-router';
-import { Route as rootRoute } from './__root';
+import { Route as appRoute } from './app';
+import { LegacyFrame } from '@/components/layout/legacy-frame';
 import { Search as SearchIcon, BarChart3, Bot } from 'lucide-react';
 import { useStartSearch, useSearchDefaults, useSuggestSearch } from '@/hooks/use-search';
 import { toast } from 'sonner';
@@ -37,9 +38,13 @@ import { SearchRunView } from '@/components/search/SearchRunView';
 import { getStagesForMode } from '@/components/search/search-leaf-helpers';
 
 export const Route = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => appRoute,
   path: '/search',
-  component: SearchPage,
+  component: () => (
+    <LegacyFrame>
+      <SearchPage />
+    </LegacyFrame>
+  ),
 });
 
 function SearchPage() {

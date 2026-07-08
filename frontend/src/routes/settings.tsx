@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { createRoute, useNavigate } from '@tanstack/react-router';
-import { Route as rootRoute } from './__root';
+import { Route as appRoute } from './app';
+import { LegacyFrame } from '@/components/layout/legacy-frame';
 import {
   FileText,
   Rocket,
@@ -27,9 +28,13 @@ function isSettingsTab(value: unknown): value is SettingsTab {
 }
 
 export const Route = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => appRoute,
   path: '/settings',
-  component: SettingsPage,
+  component: () => (
+    <LegacyFrame>
+      <SettingsPage />
+    </LegacyFrame>
+  ),
   validateSearch: (search: Record<string, unknown>) => ({
     tab: isSettingsTab(search.tab) ? search.tab : undefined,
   }),

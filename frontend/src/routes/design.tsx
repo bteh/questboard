@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { createRoute } from '@tanstack/react-router';
+import { createRoute, redirect } from '@tanstack/react-router';
 import { Route as rootRoute } from './__root';
 import {
   Chip,
@@ -18,9 +18,13 @@ import {
   type Vertical,
 } from '@questboard/ui';
 
+/* Internal component sheet: dev builds only, rendered bare (no shell). */
 export const Route = createRoute({
   getParentRoute: () => rootRoute,
   path: '/design',
+  beforeLoad: () => {
+    if (!import.meta.env.DEV) throw redirect({ to: '/' });
+  },
   component: DesignPage,
 });
 
@@ -269,10 +273,7 @@ function DesignPage() {
   }
 
   return (
-    <div
-      className="qb-page"
-      style={{ position: 'fixed', inset: 0, zIndex: 40, overflowY: 'auto' }}
-    >
+    <div className="qb-page" style={{ minHeight: '100vh' }}>
       <StampDefs />
       <div style={{ maxWidth: 1120, margin: '0 auto', padding: '52px 44px 96px' }}>
         <h1
