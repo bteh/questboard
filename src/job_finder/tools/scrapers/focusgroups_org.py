@@ -193,10 +193,14 @@ def _normalize_card(card: dict) -> dict | None:
         row["date_posted"] = date_posted
         row["date_confidence"] = date_confidence_for(date_posted)
 
+    # Omit any salary key we have no figure for: "up to $X" has no floor, and
+    # a salary_min=None key downstream reads as stated pay data.
     lo, hi = _parse_pay(pay_text)
     if lo is not None or hi is not None:
-        row["salary_min"] = lo
-        row["salary_max"] = hi
+        if lo is not None:
+            row["salary_min"] = lo
+        if hi is not None:
+            row["salary_max"] = hi
         row["salary_period"] = "session"
         row["salary_source"] = "reported"
 

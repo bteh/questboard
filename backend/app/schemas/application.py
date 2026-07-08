@@ -47,6 +47,8 @@ class ApplicationResponse(ApplicationBase):
     is_rolling: bool = False
     first_quest_ok: bool = False
     quest_json: str = ""
+    # quest_json parsed for card rendering; None when absent or unparseable.
+    quest: dict | None = None
     overall_score: float | None = None
     technical_score: float | None = None
     leadership_score: float | None = None

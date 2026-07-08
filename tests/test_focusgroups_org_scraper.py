@@ -110,10 +110,19 @@ class FixtureParseTest(unittest.TestCase):
 
     def test_up_to_pay_card(self) -> None:
         r = self.by_title["Clinical Trial on Type 2 Diabetes - up to $1500"]
-        self.assertIsNone(r["salary_min"])
+        # "up to $X" has no floor: the key is omitted, never salary_min=None.
+        self.assertNotIn("salary_min", r)
         self.assertEqual(r["salary_max"], 1500.0)
         self.assertEqual(r["salary_source"], "reported")
         self.assertTrue(r["quest"]["featured"])
+
+    def test_no_none_valued_salary_keys_on_any_row(self) -> None:
+        # Regression: "up to $X" chips used to emit salary_min=None, which
+        # survives dict merges downstream and reads as stated pay data.
+        for r in self.rows:
+            for key in ("salary_min", "salary_max"):
+                if key in r:
+                    self.assertIsNotNone(r[key], f"{r['title']}: {key} is None")
 
     def test_varies_card_emits_no_salary_keys(self) -> None:
         r = self.by_title["Streaming & Mobile Usage Habits"]

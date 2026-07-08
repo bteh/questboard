@@ -9,18 +9,32 @@
  * - pay renders only when the record states pay, always the raw stated
  *   numbers, and parsed-from-description pay is marked as estimated
  *   (same standard as job-card.tsx / salary-badge.tsx)
+ * - quest rows (vertical camera/study/lens/party) never claim a resume need;
+ *   their needs line is assembled only from fields the source stated
  */
 
 import type { ApplicationResponse, EvaluationReport } from '@/types/application';
 import { computeRequirementFit, type RequirementFit } from '@/utils/job-fit';
 import { postedAgoLabel } from '@/utils/job-trust';
 
+export type BoardVertical = 'career' | 'camera' | 'study' | 'lens' | 'party';
+
+const QUEST_VERTICALS: ReadonlySet<string> = new Set(['camera', 'study', 'lens', 'party']);
+
+/** The row's vertical; anything unknown (or absent) is the career shape. */
+export function boardVertical(app: Pick<ApplicationResponse, 'vertical'>): BoardVertical {
+  const v = app.vertical || 'career';
+  return (QUEST_VERTICALS.has(v) ? v : 'career') as BoardVertical;
+}
+
 export interface BoardCardModel {
   id: number;
+  vertical: BoardVertical;
   title: string;
   href?: string;
   meta: string;
   needs: string;
+  firstQuest?: boolean;
   /** Parsed requirement fit, null when no evaluation report exists. */
   fit: RequirementFit | null;
   /** The full report backing the fit, for the requirement ledger sheet. */
@@ -139,12 +153,174 @@ export function needsLine(fit: RequirementFit | null): string {
   return `Needs: resume, covers ${fit.strong} of ${fit.total} requirements`;
 }
 
+type Quest = Record<string, unknown> | null | undefined;
+
+function questNum(quest: Quest, key: string): number | null {
+  const v = quest?.[key];
+  return typeof v === 'number' && Number.isFinite(v) ? v : null;
+}
+
+function questStr(quest: Quest, key: string): string {
+  const v = quest?.[key];
+  return typeof v === 'string' ? v : '';
+}
+
+function ageLabel(quest: Quest): string {
+  const min = questNum(quest, 'age_min');
+  const max = questNum(quest, 'age_max');
+  if (min !== null && max !== null) return `ages ${min} to ${max}`;
+  if (min !== null) return `ages ${min} and up`;
+  if (max !== null) return `ages up to ${max}`;
+  return '';
+}
+
+/**
+ * Needs line for a quest row, from stated fields only; '' when the source
+ * stated nothing. Study rows lead with "screener only": research and trial
+ * sources gate on a screener and demographics, never a resume.
+ */
+export function questNeedsLine(vertical: BoardVertical, quest: Quest): string {
+  if (!quest) return '';
+  const parts: string[] = [];
+  if (vertical === 'study') parts.push('screener only');
+  if (quest.healthy_volunteers === true) parts.push('healthy volunteers');
+  const sex = questStr(quest, 'sex').toLowerCase();
+  if (sex === 'female') parts.push('women only');
+  if (sex === 'male') parts.push('men only');
+  const ages = ageLabel(quest);
+  if (ages) parts.push(ages);
+  const union = questStr(quest, 'union');
+  if (union) parts.push(union);
+  const tickets = questNum(quest, 'max_tickets');
+  if (tickets !== null) parts.push(`up to ${tickets} tickets`);
+  return parts.length ? `Needs: ${parts.join(', ')}` : '';
+}
+
+/** "taping Jul 14" for camera, "session Jul 14" for studies. */
+const EVENT_WORDS: Partial<Record<BoardVertical, string>> = {
+  camera: 'taping',
+  study: 'session',
+};
+
+/** "{source}, posted 2 days ago, taping Jul 14, Atlanta" or "rolling sign-up". */
+export function questMeta(app: ApplicationResponse, sourceLabel?: string): string {
+  const posted = postedAgoLabel(app.date_posted, app.date_confidence);
+  let timing = '';
+  if (app.is_rolling) {
+    timing = 'rolling sign-up';
+  } else {
+    const date = shortDate(app.event_start);
+    if (date) timing = `${EVENT_WORDS[boardVertical(app)] ?? 'on'} ${date}`;
+  }
+  const place = app.is_remote
+    ? 'remote'
+    : app.location || (questStr(app.quest, 'format') === 'online' ? 'online' : '');
+  return [sourceLabel || app.source, posted ? posted.toLowerCase() : '', timing, place]
+    .filter(Boolean)
+    .join(', ');
+}
+
+const QUEST_PERIOD_UNITS: Record<string, string> = {
+  session: 'a session',
+  hourly: '/hr',
+  daily: 'a day',
+  weekly: 'a week',
+  monthly: 'a month',
+  yearly: 'a year',
+};
+
+function fmtQuestAmount(n: number): string {
+  return n.toLocaleString('en-US');
+}
+
+/**
+ * Quest pay stays the raw stated session-scale numbers: "$125" + "max" for an
+ * up-to chip (the mock's grammar), "$100–125" + "a session" for a range,
+ * "$500" + "/12 hr" for a casting day rate with stated hours.
+ */
+export function questPay(app: ApplicationResponse): { pay: string; payUnit: string } | null {
+  const min = app.salary_min;
+  const max = app.salary_max;
+  if (min == null && max == null) return null;
+  const period = (app.salary_period || '').toLowerCase();
+  let unit = QUEST_PERIOD_UNITS[period] || '';
+  const hours = questNum(app.quest, 'session_hours');
+  if (period === 'daily' && hours !== null) unit = `/${hours} hr`;
+
+  let pay: string;
+  if (min != null && max != null && min !== max) {
+    pay = `$${fmtQuestAmount(min)}–${fmtQuestAmount(max)}`;
+  } else if (min != null) {
+    pay = max == null ? `$${fmtQuestAmount(min)}+` : `$${fmtQuestAmount(min)}`;
+  } else {
+    /* max only: an "up to" figure; "max" says so without inventing a floor */
+    pay = `$${fmtQuestAmount(max as number)}`;
+    unit = 'max';
+  }
+  if (app.salary_source === 'parsed_from_description') {
+    unit = unit ? `${unit}, estimated from description` : 'estimated from description';
+  }
+  return { pay, payUnit: unit };
+}
+
+const normalizeName = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/** Quest title; the company is dropped when it just restates the source. */
+function questTitle(app: ApplicationResponse, sourceLabel?: string): string {
+  const company = (app.company || '').trim();
+  if (!company) return app.job_title;
+  const norm = normalizeName(company);
+  if (norm === normalizeName(app.source) || norm === normalizeName(sourceLabel || '')) {
+    return app.job_title;
+  }
+  return `${app.job_title}, ${company}`;
+}
+
+function stampStatus(card: BoardCardModel, app: ApplicationResponse): void {
+  if (APPLIED_STATUSES.has(app.status)) {
+    const date = shortDate(app.date_applied);
+    card.applied = date ? `Applied, ${date}` : 'Applied';
+  } else if (CLIPPED_STATUSES.has(app.status)) {
+    card.clippedDate =
+      shortDate(app.updated_at) ?? shortDate(app.date_found) ?? 'earlier';
+  }
+}
+
+function toQuestBoardCard(
+  app: ApplicationResponse,
+  vertical: BoardVertical,
+  sourceLabel?: string,
+): BoardCardModel {
+  const card: BoardCardModel = {
+    id: app.id,
+    vertical,
+    title: questTitle(app, sourceLabel),
+    href: app.job_url || undefined,
+    meta: questMeta(app, sourceLabel),
+    needs: questNeedsLine(vertical, app.quest),
+    fit: null,
+    report: null,
+  };
+  if (app.first_quest_ok) card.firstQuest = true;
+  const pay = questPay(app);
+  if (pay) {
+    card.pay = pay.pay;
+    card.payUnit = pay.payUnit;
+  }
+  stampStatus(card, app);
+  return card;
+}
+
 export function toBoardCard(app: ApplicationResponse, sourceLabel?: string): BoardCardModel {
+  const vertical = boardVertical(app);
+  if (vertical !== 'career') return toQuestBoardCard(app, vertical, sourceLabel);
+
   const report = parseReport(app.evaluation_report_json);
   const fit = computeRequirementFit(report);
 
   const card: BoardCardModel = {
     id: app.id,
+    vertical,
     title: `${app.job_title}, ${app.company}`,
     href: app.job_url || undefined,
     meta: boardMeta(app, sourceLabel),
@@ -159,13 +335,6 @@ export function toBoardCard(app: ApplicationResponse, sourceLabel?: string): Boa
     card.payUnit = payUnitFor(app);
   }
 
-  if (APPLIED_STATUSES.has(app.status)) {
-    const date = shortDate(app.date_applied);
-    card.applied = date ? `Applied, ${date}` : 'Applied';
-  } else if (CLIPPED_STATUSES.has(app.status)) {
-    card.clippedDate =
-      shortDate(app.updated_at) ?? shortDate(app.date_found) ?? 'earlier';
-  }
-
+  stampStatus(card, app);
   return card;
 }
