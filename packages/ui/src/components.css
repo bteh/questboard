@@ -43,7 +43,9 @@
 .qb-band span { font-size: 12.5px; font-weight: 500; color: inherit; }
 .qb-band.qb-sage { background: rgba(63, 107, 84, .1); color: var(--sage); }
 .qb-band.qb-clay { background: rgba(166, 82, 46, .1); color: var(--clay); }
-.qb-band.qb-ochre { background: rgba(138, 106, 31, .1); color: var(--ochre); }
+/* ochre text on its own tint sits at 4.44:1; one step more ink clears the
+   4.5:1 gate. The tint and the standalone stamps keep the canon hue. */
+.qb-band.qb-ochre { background: rgba(138, 106, 31, .1); color: #84651D; }
 .qb-band.qb-slate { background: rgba(68, 96, 122, .1); color: var(--slate); }
 .qb-band.qb-wine { background: rgba(125, 59, 76, .1); color: var(--wine); }
 .qb-qbody { padding: 14px 16px 10px; display: flex; flex-direction: column; gap: 7px; flex: 1; }

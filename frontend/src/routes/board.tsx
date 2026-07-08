@@ -20,6 +20,7 @@ import {
   toBoardCard,
   withinPayCeiling,
 } from '@/utils/board-card';
+import { VERTICAL_KEYS, verticalParams, type VerticalKey } from '@/utils/board-verticals';
 import type { ApplicationFilters, ApplicationResponse, RequirementMatch } from '@/types/application';
 
 export const Route = createRoute({
@@ -29,21 +30,6 @@ export const Route = createRoute({
 });
 
 const PAGE_SIZE = 24;
-
-/* The vertical chips row. "All" spans every vertical the board serves;
-   party stays off the row until a party source exists. Quest verticals ask
-   the API for upcoming rows only, so stale tapings never reach the board. */
-type VerticalKey = 'all' | 'career' | 'camera' | 'study' | 'lens';
-
-const VERTICAL_KEYS: VerticalKey[] = ['all', 'career', 'camera', 'study', 'lens'];
-const ALL_VERTICALS = 'career,camera,study,lens';
-
-function verticalParams(key: VerticalKey): Pick<ApplicationFilters, 'vertical' | 'upcoming_only'> {
-  return {
-    vertical: key === 'all' ? ALL_VERTICALS : key,
-    upcoming_only: key === 'career' ? undefined : true,
-  };
-}
 
 /* Preset chips. Each one maps 1:1 onto a real API filter param, so its
    count is the API's own total for that query, never a guess. Chips that

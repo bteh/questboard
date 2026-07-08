@@ -1,0 +1,94 @@
+/* The landing page, ported from packages/ui/reference/quest-board-mock.html
+   (#landing). Values match the mock; depth is a darker bottom border,
+   never a shadow. Class names carry the qb- prefix like the rest of the
+   ported surfaces. */
+
+.qb-landing { min-height: 100vh; overflow-x: clip; }
+
+.qb-lwrap { max-width: 1120px; margin: 0 auto; padding: 0 44px; }
+
+/* hero */
+.qb-land-hero { position: relative; overflow: hidden; }
+.qb-land-brand { display: flex; align-items: center; gap: 10px; padding: 26px 0 0; }
+.qb-land-brand b { font-weight: 500; font-size: 15px; }
+.qb-land-tile { width: 32px; height: 32px; border-radius: 8px; background: var(--sage); display: grid; place-items: center; }
+.qb-land-tile svg { width: 16px; height: 16px; }
+.qb-land-hero h1 {
+  font-family: var(--serif); font-variation-settings: 'opsz' 144; font-weight: 560;
+  font-size: 78px; line-height: 1.04; letter-spacing: -.018em;
+  margin: 72px 0 0; max-width: 820px; text-wrap: balance;
+}
+.qb-lsub { font-size: 17.5px; color: var(--soft); max-width: 620px; margin: 22px 0 0; line-height: 1.6; }
+.qb-land-cta { display: flex; align-items: center; gap: 18px; margin-top: 30px; flex-wrap: wrap; }
+.qb-lnote { font-size: 14px; color: var(--mute); }
+/* min-height reserves the row so the flaps arriving never shift the hero */
+.qb-land-hero .qb-flaprow { margin-top: 40px; min-height: 40px; }
+.qb-land-horizon { display: block; width: 100%; height: 210px; color: var(--ink); margin-top: 26px; }
+
+/* three real cards pinned on the horizon; the reserved height keeps the
+   statement from shoving down when the cards arrive */
+.qb-land-cards { position: relative; z-index: 2; margin-top: -72px; }
+@media (min-width: 881px) {
+  .qb-land-cards { min-height: 170px; }
+}
+.qb-land-cards .qb-cardgrid { margin-top: 0; }
+.qb-cardgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+
+/* centered statement */
+.qb-lstatement {
+  font-family: var(--serif); font-variation-settings: 'opsz' 80; font-weight: 560;
+  font-size: 34px; line-height: 1.2; letter-spacing: -.012em;
+  text-align: center; text-wrap: balance;
+  margin: 116px auto 96px; max-width: 700px;
+}
+
+/* the 2x2 show-not-tell grid */
+.qb-lgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 80px 60px; margin-bottom: 130px; }
+.qb-lblock .qb-visual { margin-bottom: 20px; min-width: 0; min-height: 232px; display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; }
+.qb-lblock h3 { font-family: var(--serif); font-variation-settings: 'opsz' 60; font-weight: 560; font-size: 24px; letter-spacing: -.008em; margin: 0 0 6px; }
+.qb-lblock p { font-size: 15.5px; color: var(--soft); margin: 0; line-height: 1.6; max-width: 46ch; }
+.qb-chips-demo { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* the Done ledger demo fragment */
+.qb-ledger-demo { border: 1px solid var(--hair); border-bottom-color: var(--edge); border-radius: 10px; background: var(--paper); padding: 18px 22px; }
+.qb-done-label { font-size: 15px; font-weight: 500; margin-bottom: 8px; }
+.qb-dline { display: flex; gap: 14px; align-items: baseline; padding: 7px 0; font-size: 15px; }
+.qb-dline .qb-dd { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 13px; color: var(--mute); width: 64px; flex-shrink: 0; }
+.qb-dline .qb-dt { color: var(--ink); }
+.qb-dline .qb-dn { color: var(--soft); }
+.qb-ledger-total { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--hair); font-size: 14px; color: var(--soft); }
+.qb-ledger-total .qb-num { font-weight: 500; color: var(--ink); }
+
+/* the plain-words demo fragment */
+.qb-ai-demo { border: 1px solid var(--hair); border-bottom-color: var(--edge); border-radius: 10px; background: var(--paper); padding: 20px 22px; font-size: 15.5px; color: var(--soft); line-height: 1.6; }
+.qb-ai-demo .qb-num { color: var(--ink); font-weight: 500; }
+.qb-ai-demo .qb-price { border-top: 1px solid var(--hair); margin-top: 14px; padding-top: 12px; font-size: 14.5px; color: var(--mute); }
+.qb-ai-src { font-size: 12.5px; color: var(--mute); margin-bottom: 10px; }
+.qb-ai-out { color: var(--ink); }
+.qb-ai-hedge { font-size: 12.5px; color: var(--mute); margin-top: 10px; }
+
+/* stamp strip */
+.qb-stampstrip { border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); padding: 36px 0; display: flex; gap: 56px; justify-content: center; flex-wrap: wrap; }
+.qb-stampstrip .qb-st { text-align: center; font-size: 13px; font-weight: 500; }
+.qb-stampstrip .qb-st .qb-stamp { display: block; margin: 0 auto 8px; }
+
+/* foot */
+.qb-land-foot { padding: 56px 0 88px; display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+.qb-land-foot .qb-t { font-size: 15px; color: var(--soft); }
+.qb-land-foot .qb-btn-sage { margin-left: auto; }
+
+@media (max-width: 880px) {
+  .qb-land-hero h1 { font-size: 46px; margin-top: 48px; }
+  .qb-lwrap { padding: 0 18px; }
+  .qb-lgrid { grid-template-columns: 1fr; gap: 56px; margin-bottom: 80px; }
+  .qb-lblock .qb-visual { min-height: 0; }
+  .qb-lstatement { font-size: 26px; margin: 76px auto 64px; }
+  .qb-land-cards { margin-top: -40px; }
+  .qb-land-foot .qb-btn-sage { margin-left: 0; }
+}
+
+/* the card column must be allowed under 300px on the narrowest phones,
+   or the grid forces a horizontal scroll at 375 wide */
+@media (max-width: 420px) {
+  .qb-cardgrid { grid-template-columns: 1fr; }
+}

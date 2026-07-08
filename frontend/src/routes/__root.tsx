@@ -1,6 +1,7 @@
 import { createRootRoute, Outlet } from '@tanstack/react-router';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from '@/lib/query-client';
+import { NotFoundPage } from '@/components/shared/not-found';
 import { ProfileProvider } from '@/contexts/profile-context';
 import { SearchProvider } from '@/contexts/search-context';
 import { ThemeProvider } from '@/contexts/theme-context';
@@ -8,6 +9,8 @@ import { WorkspaceProvider } from '@/contexts/workspace-context';
 
 export const Route = createRootRoute({
   component: RootLayout,
+  /* unknown paths render bare, in voice, under the providers */
+  notFoundComponent: NotFoundPage,
 });
 
 /* Providers only. The trade-paper shell lives on the pathless 'app'
