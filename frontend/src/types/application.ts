@@ -156,6 +156,8 @@ export interface ApplicationCreate {
   status?: string;
   notes?: string;
   profile?: string;
+  /** The row's lane; the log composer writes 'personal', default career. */
+  vertical?: string;
 }
 
 export interface ApplicationUpdate {
@@ -164,6 +166,8 @@ export interface ApplicationUpdate {
   contact_name?: string;
   contact_email?: string;
   referral_source?: string;
+  /** User-entered quest facts as a JSON object string, e.g. {"paid_out": 45}. */
+  quest_json?: string;
 }
 
 export interface StatusUpdate {

@@ -4,8 +4,11 @@ import { Route as appRoute } from './routes/app';
 import { Route as indexRoute } from './routes/index';
 import { Route as welcomeRoute } from './routes/welcome';
 import { Route as searchRoute } from './routes/search';
-import { Route as applicationsRoute } from './routes/applications';
-import { Route as analyticsRoute } from './routes/analytics';
+import { Route as logRoute } from './routes/log';
+import { Route as logLedgerRoute } from './routes/log-ledger';
+import { Route as logNumbersRoute } from './routes/log-numbers';
+import { Route as applicationsRedirect } from './routes/applications';
+import { Route as analyticsRedirect } from './routes/analytics';
 import { Route as settingsRoute } from './routes/settings';
 import { Route as designRoute } from './routes/design';
 import { Route as boardRoute } from './routes/board';
@@ -13,13 +16,17 @@ import { Route as homeRoute } from './routes/home';
 
 /* App pages live under the pathless 'app' layout (the trade-paper shell
    plus the hosted auth gate). The entry switch at /, the landing at
-   /welcome, and the design sheet render bare under the root. */
+   /welcome, and the design sheet render bare under the root. The old
+   /applications and /analytics addresses redirect into the log trio. */
 const routeTree = rootRoute.addChildren([
   appRoute.addChildren([
     homeRoute,
     searchRoute,
-    applicationsRoute,
-    analyticsRoute,
+    logRoute,
+    logLedgerRoute,
+    logNumbersRoute,
+    applicationsRedirect,
+    analyticsRedirect,
     settingsRoute,
     boardRoute,
   ]),

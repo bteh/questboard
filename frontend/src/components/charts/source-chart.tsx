@@ -15,12 +15,10 @@ function toNumericValue(value: number | string | ReadonlyArray<number | string> 
   return 0;
 }
 
-// Warm-varied categorical set (sages, olives, ambers, clays, teal) so many
-// job sources stay distinguishable without leaving the warm palette.
+// The five canon vertical hues plus a muted ink, cycled, so many sources
+// stay distinguishable without leaving the committed palette.
 const BAR_COLORS = [
-  '#3F6B54', '#E0872F', '#4E8A8F', '#C06A3C', '#8FA054',
-  '#B4701C', '#4C8A63', '#A64B2A', '#3D7068', '#6E8B4E',
-  '#A98B3C', '#7FB393', '#5E7C4F', '#8A6D3B', '#94A3B8',
+  '#3F6B54', '#A6522E', '#8A6A1F', '#44607A', '#7D3B4C', '#6E6B60',
 ];
 
 interface SourceChartProps {

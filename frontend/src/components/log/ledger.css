@@ -1,0 +1,96 @@
+/* The full ledger (/log/ledger): the old Applications page reskinned to
+   ledger grammar. Hairline borders, mono tabular numbers, trade-paper
+   controls; the table and cards keep their behavior. */
+
+.qb-ledger-head { padding: 40px 0 0; }
+.qb-ledger-back { font-size: 13.5px; }
+.qb-ledger-head h1 {
+  font-family: var(--serif);
+  font-variation-settings: 'opsz' 80;
+  font-weight: 560;
+  font-size: 26px;
+  letter-spacing: -.01em;
+  margin: 6px 0 0;
+}
+.qb-ledger-count {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: var(--mute);
+  margin-top: 4px;
+}
+
+.qb-ledger-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.qb-scope {
+  display: inline-flex;
+  border: 1px solid var(--hair);
+  border-radius: 4px;
+  background: var(--paper);
+  padding: 2px;
+  gap: 2px;
+}
+.qb-scope button {
+  border: 0;
+  background: none;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--soft);
+  padding: 4px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.qb-scope button:hover { color: var(--ink); }
+.qb-scope button.qb-active { background: var(--step2); color: var(--ink); font-weight: 500; }
+
+.qb-ledger-ctl {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--hair);
+  background: var(--paper);
+  border-radius: 4px;
+  padding: 5px 12px;
+  font-family: inherit;
+  font-size: 13.5px;
+  color: var(--soft);
+  cursor: pointer;
+  text-decoration: none;
+}
+.qb-ledger-ctl:hover { color: var(--ink); border-color: var(--step4); }
+.qb-ledger-ctl:disabled { opacity: .5; cursor: default; }
+
+.qb-ledger-pages {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 32px;
+  padding-top: 14px;
+  border-top: 1px solid var(--hair);
+}
+.qb-ledger-pages .qb-range {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: var(--mute);
+}
+.qb-pagenums { display: flex; align-items: center; gap: 4px; }
+.qb-pagenums button {
+  min-width: 28px;
+  height: 26px;
+  border: 1px solid transparent;
+  background: none;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  color: var(--soft);
+  cursor: pointer;
+}
+.qb-pagenums button:hover { color: var(--ink); border-color: var(--hair); }
+.qb-pagenums button.qb-active { background: var(--ink); color: var(--ground); }
+
+@media (max-width: 700px) {
+  .qb-ledger-head { padding-top: 24px; }
+}

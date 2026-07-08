@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ApplicationBase(BaseModel):
@@ -110,16 +110,36 @@ class ApplicationUpdate(BaseModel):
     contact_name: str | None = None
     contact_email: str | None = None
     referral_source: str | None = None
+    # The log writes user-entered quest facts here, e.g. {"paid_out": 45}
+    # when a quest is marked done with a real paid figure. Must be a JSON
+    # object; the value is stored verbatim and never inferred server-side.
+    quest_json: str | None = None
+
+    @field_validator("quest_json")
+    @classmethod
+    def _quest_json_is_object(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        import json
+
+        try:
+            parsed = json.loads(v)
+        except json.JSONDecodeError as exc:
+            raise ValueError("quest_json must be valid JSON") from exc
+        if not isinstance(parsed, dict):
+            raise ValueError("quest_json must be a JSON object")
+        return v
 
 
 class StatusUpdate(BaseModel):
     # One shared lifecycle, widened additively for quests. 'clipped' is the
     # real saved/shortlisted status (the board used to overload 'reviewed',
     # which stays valid); booked/attended/paid_out/expired cover the quest
-    # lifecycle. Every pre-existing value stays valid.
+    # lifecycle; 'shelved' is the log's put-aside state (reopen restores it).
+    # Every pre-existing value stays valid.
     status: Literal[
         "found", "reviewed", "clipped", "applying", "applied", "interviewing",
-        "offer", "rejected", "withdrawn",
+        "offer", "rejected", "withdrawn", "shelved",
         "booked", "attended", "paid_out", "expired",
     ]
     notes: str | None = None
@@ -134,7 +154,7 @@ class FeedbackUpdate(BaseModel):
 
 class ApplicationCreate(BaseModel):
     job_title: str
-    company: str
+    company: str = ""
     location: str = ""
     job_url: str = ""
     source: str = "manual"
@@ -145,3 +165,7 @@ class ApplicationCreate(BaseModel):
     status: str = "found"
     notes: str = ""
     profile: str = "default"
+    # Which lane the row belongs to. The log's composer writes 'personal'
+    # (source 'user', no URL); everything else defaults to career. Validated
+    # against APPLICATION_VERTICALS on save.
+    vertical: str = "career"

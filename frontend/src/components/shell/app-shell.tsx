@@ -10,9 +10,10 @@ import './app-shell.css';
 const PAGE_TITLES: Record<string, string> = {
   '/home': 'Home',
   '/search': 'Search',
-  '/applications': 'Your log',
+  '/log': 'Your log',
+  '/log/ledger': 'The full ledger',
+  '/log/numbers': 'Your numbers',
   '/board': 'The board',
-  '/analytics': 'Analytics',
   '/settings': 'Settings',
 };
 
@@ -126,7 +127,8 @@ export function AppShell() {
 
   const onHome = Boolean(matchRoute({ to: '/home' }));
   const onBoard = Boolean(matchRoute({ to: '/board' }));
-  const onLog = Boolean(matchRoute({ to: '/applications' }));
+  /* fuzzy so the ledger and the numbers keep the log tab lit */
+  const onLog = Boolean(matchRoute({ to: '/log', fuzzy: true }));
   const onSettings = Boolean(matchRoute({ to: '/settings' }));
 
   return (
@@ -142,11 +144,7 @@ export function AppShell() {
             <BoardIcon />
             The board
           </Link>
-          <Link
-            to="/applications"
-            search={{ run: undefined, scope: undefined }}
-            className={cx('qb-nav-item', onLog && 'qb-active')}
-          >
+          <Link to="/log" className={cx('qb-nav-item', onLog && 'qb-active')}>
             <LogIcon />
             Your log
           </Link>
@@ -180,11 +178,7 @@ export function AppShell() {
             <Link to="/board" className={cx('qb-mtab', onBoard && 'qb-active')}>
               The board
             </Link>
-            <Link
-              to="/applications"
-              search={{ run: undefined, scope: undefined }}
-              className={cx('qb-mtab', onLog && 'qb-active')}
-            >
+            <Link to="/log" className={cx('qb-mtab', onLog && 'qb-active')}>
               Your log
             </Link>
             <Link

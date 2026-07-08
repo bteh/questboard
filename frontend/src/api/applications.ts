@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPatch, apiDelete } from '@/lib/api-client';
+import { apiGet, apiGetBlob, apiPost, apiPatch, apiDelete } from '@/lib/api-client';
 import type { ApplicationListResponse, ApplicationResponse, ApplicationCreate, ApplicationUpdate, StatusUpdate, ApplicationFilters } from '@/types/application';
 
 export function getApplications(filters: ApplicationFilters = {}): Promise<ApplicationListResponse> {
@@ -43,6 +43,12 @@ export function deleteApplication(id: number): Promise<void> {
 export function deduplicateApplications(profile?: string): Promise<{ removed: number; message: string }> {
   const query = profile ? `?profile=${encodeURIComponent(profile)}` : '';
   return apiPost<{ removed: number; message: string }>(`/applications/deduplicate${query}`);
+}
+
+/** The ledger's CSV export: the whole career table as a file. */
+export function exportApplicationsCsv(profile?: string): Promise<Blob> {
+  const query = profile ? `?profile=${encodeURIComponent(profile)}` : '';
+  return apiGetBlob(`/applications/export/csv${query}`);
 }
 
 export function checkUrls(ids?: number[], limit?: number): Promise<{ checked: number; alive: number; dead: number }> {

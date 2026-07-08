@@ -137,7 +137,10 @@ def _to_response(record) -> ApplicationResponse:
 
 @router.get("", response_model=ApplicationListResponse)
 def list_applications(
-    status: str | None = None,
+    status: str | None = Query(
+        None,
+        description="Status(es) to list, single or comma list (e.g. clipped,applied,shelved)",
+    ),
     min_score: float | None = None,
     recommendation: str | None = None,
     source: str | None = None,
@@ -227,12 +230,15 @@ def create_application(
     workspace = Depends(get_active_workspace_context_csrf),
     db: Session = Depends(get_db),
 ):
-    """Manually add a job application."""
-    record = application_service.create_application(
-        db,
-        body,
-        workspace_id=workspace.workspace.id if workspace else None,
-    )
+    """Manually add a job application or a personal log quest."""
+    try:
+        record = application_service.create_application(
+            db,
+            body,
+            workspace_id=workspace.workspace.id if workspace else None,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     return _to_response(record)
 
 
@@ -599,7 +605,9 @@ def purge_all_applications(
 
     from app.models.application import ApplicationRecord
 
-    query = db.query(ApplicationRecord)
+    # Personal quests are the user's own writing, not scraped applications;
+    # the ledger's clear-all never deletes them.
+    query = db.query(ApplicationRecord).filter(ApplicationRecord.vertical != "personal")
     if workspace:
         query = query.filter(ApplicationRecord.workspace_id == workspace.workspace.id)
     elif profile:

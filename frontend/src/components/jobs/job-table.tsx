@@ -14,6 +14,7 @@ import { CompanyTypeBadge } from '@/components/badges/company-type-badge';
 import { WorkTypeBadge } from '@/components/badges/work-type-badge';
 import { resolveSourceLabel } from '@/hooks/use-scrapers';
 import { formatDate, formatSalary } from '@/utils/format';
+import { STATUS_LABELS } from '@/utils/constants';
 import type { ApplicationResponse } from '@/types/application';
 
 interface JobTableProps {
@@ -42,11 +43,11 @@ export function JobTable({ data, onRowClick, selectedId }: JobTableProps) {
       header: 'Score',
       cell: (info) => {
         const score = info.getValue();
-        if (score == null) return <span className="text-text-muted">—</span>;
+        if (score == null) return <span className="text-xs text-text-muted">unscored</span>;
         return (
           <div className="flex items-center gap-2">
             <Progress value={score} className="w-16 h-1.5" />
-            <span className="text-xs font-medium w-6">{Math.round(score)}</span>
+            <span className="qb-num text-xs font-medium w-6">{Math.round(score)}</span>
           </div>
         );
       },
@@ -57,7 +58,15 @@ export function JobTable({ data, onRowClick, selectedId }: JobTableProps) {
     }),
     columnHelper.accessor('status', {
       header: 'Status',
-      cell: (info) => <StatusBadge status={info.getValue()} />,
+      cell: (info) => {
+        const status = info.getValue();
+        /* an application that went out earns the pressed stamp, the
+           ledger's own grammar; everything else keeps its badge */
+        if (status === 'applied' || status === 'interviewing' || status === 'offer') {
+          return <span className="qb-applied-stamp">{STATUS_LABELS[status] || status}</span>;
+        }
+        return <StatusBadge status={status} />;
+      },
     }),
     columnHelper.accessor('work_type', {
       header: 'Work Type',
@@ -67,11 +76,11 @@ export function JobTable({ data, onRowClick, selectedId }: JobTableProps) {
       header: 'Salary',
       cell: (info) => {
         const salary = formatSalary(info.getValue(), info.row.original.salary_max);
-        if (!salary) return <span className="text-text-muted">&mdash;</span>;
+        if (!salary) return <span className="text-xs text-text-muted">not stated</span>;
         const estimated = info.row.original.salary_source === 'parsed_from_description';
         return (
           <span
-            className="text-xs text-text-secondary whitespace-nowrap"
+            className="qb-num text-xs text-text-secondary whitespace-nowrap"
             title={estimated ? 'Estimated from the job description text, not employer-reported.' : undefined}
           >
             {salary}
@@ -86,7 +95,7 @@ export function JobTable({ data, onRowClick, selectedId }: JobTableProps) {
     }),
     columnHelper.accessor('date_found', {
       header: 'Found',
-      cell: (info) => <span className="text-xs text-text-muted">{formatDate(info.getValue(), 'short')}</span>,
+      cell: (info) => <span className="qb-num text-xs text-text-muted">{formatDate(info.getValue(), 'short')}</span>,
     }),
     columnHelper.accessor('job_url', {
       header: '',

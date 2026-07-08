@@ -19,6 +19,38 @@ export function useApplications(filters: ApplicationFilters = {}) {
   });
 }
 
+/**
+ * Write one row's fields into EVERY cached ['applications', *] list at once.
+ *
+ * This is the shared-cache contract the log trio rides on: the log page, the
+ * ledger, and the board all read ['applications', filters] keys from the one
+ * QueryClient, so an optimistic status edit made anywhere shows everywhere
+ * instantly, before the server round-trip settles. Returns the touched
+ * entries so a mutation's onError can roll them back.
+ */
+export function patchApplicationLists(
+  queryClient: ReturnType<typeof useQueryClient>,
+  id: number,
+  patch: Partial<ApplicationResponse>,
+): [readonly unknown[], ApplicationListResponse | undefined][] {
+  const previousLists = queryClient.getQueriesData<ApplicationListResponse>({
+    queryKey: ['applications'],
+  });
+  queryClient.setQueriesData<ApplicationListResponse>(
+    { queryKey: ['applications'] },
+    (old) => {
+      if (!old || !Array.isArray(old.items)) return old;
+      return {
+        ...old,
+        items: old.items.map((item: ApplicationResponse) =>
+          item.id === id ? { ...item, ...patch } : item,
+        ),
+      };
+    },
+  );
+  return previousLists;
+}
+
 export function useApplication(id: number) {
   return useQuery({
     queryKey: ['applications', id],
@@ -54,19 +86,51 @@ export function useUpdateStatus() {
     mutationFn: ({ id, data }: { id: number; data: StatusUpdate }) => updateApplicationStatus(id, data),
     onMutate: async ({ id, data }) => {
       await queryClient.cancelQueries({ queryKey: ['applications'] });
-      const previousLists = queryClient.getQueriesData<ApplicationListResponse>({ queryKey: ['applications'] });
-      queryClient.setQueriesData<ApplicationListResponse>(
-        { queryKey: ['applications'] },
-        (old) => {
-          if (!old) return old;
-          return {
-            ...old,
-            items: old.items.map((item: ApplicationResponse) =>
-              item.id === id ? { ...item, status: data.status } : item
-            ),
-          };
+      const previousLists = patchApplicationLists(queryClient, id, { status: data.status });
+      return { previousLists };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousLists) {
+        context.previousLists.forEach(([key, data]) => {
+          queryClient.setQueryData(key, data);
+        });
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['analytics'] });
+    },
+  });
+}
+
+/**
+ * The log's status edits: mark done (optionally with the paid figure the
+ * user typed, carried in quest_json), shelve, reopen. Writes through
+ * PATCH /applications/{id} and patches every cached list optimistically,
+ * so the Done ledger below and the full ledger page reflect the edit
+ * before the request settles.
+ */
+export function useLogEdit() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: ApplicationUpdate }) => updateApplication(id, data),
+    onMutate: async ({ id, data }) => {
+      await queryClient.cancelQueries({ queryKey: ['applications'] });
+      const patch: Partial<ApplicationResponse> = {
+        // The list sorts on updated_at; mirror the server's touch so the
+        // optimistic row keeps its place honestly.
+        updated_at: new Date().toISOString(),
+      };
+      if (data.status !== undefined) patch.status = data.status;
+      if (data.quest_json !== undefined) {
+        patch.quest_json = data.quest_json;
+        try {
+          patch.quest = JSON.parse(data.quest_json) as Record<string, unknown>;
+        } catch {
+          /* server-side validation rejects malformed JSON; leave quest as-is */
         }
-      );
+      }
+      const previousLists = patchApplicationLists(queryClient, id, patch);
       return { previousLists };
     },
     onError: (_err, _vars, context) => {

@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { useTheme } from '@/contexts/theme-context';
 import { tooltipStyle } from '@/utils/chart-theme';
 import type { ChartDataPoint } from '@/types/analytics';
 
@@ -14,11 +13,12 @@ function toNumericValue(value: number | string | ReadonlyArray<number | string> 
   return 0;
 }
 
+/* Sage carries the apply pair, ochre the maybes, muted ink the skips. */
 const COLORS: Record<string, string> = {
   STRONG_APPLY: '#3F6B54',
-  APPLY: '#7FB393',
-  MAYBE: '#E0872F',
-  SKIP: '#9CA3AF',
+  APPLY: '#799787',
+  MAYBE: '#8A6A1F',
+  SKIP: '#B5B1A4',
 };
 
 const LABELS: Record<string, string> = {
@@ -33,15 +33,15 @@ interface RecommendationChartProps {
 }
 
 export function RecommendationChart({ data }: RecommendationChartProps) {
-  const { resolved } = useTheme();
   const chartData = useMemo(
     () => data.map((d) => ({ ...d, name: LABELS[d.label] || d.label })),
     [data],
   );
   const total = useMemo(() => data.reduce((sum, d) => sum + d.value, 0), [data]);
-  const legendColor = resolved === 'dark' ? '#D4D4D8' : '#334155';
-  const centerColor = resolved === 'dark' ? '#FAFAFA' : '#0F172A';
-  const centerSubColor = resolved === 'dark' ? '#A1A1AA' : '#94A3B8';
+  /* the trade paper is light-only */
+  const legendColor = 'rgba(28, 27, 23, .84)';
+  const centerColor = '#1C1B17';
+  const centerSubColor = 'rgba(28, 27, 23, .66)';
 
   return (
     <ResponsiveContainer width="100%" height={280}>
@@ -77,7 +77,7 @@ export function RecommendationChart({ data }: RecommendationChartProps) {
           iconSize={8}
           formatter={(value: string) => <span style={{ color: legendColor, fontSize: 12 }}>{value}</span>}
         />
-        <text x="50%" y="46%" textAnchor="middle" dominantBaseline="central" style={{ fontSize: 22, fontWeight: 700, fill: centerColor }}>
+        <text x="50%" y="46%" textAnchor="middle" dominantBaseline="central" style={{ fontFamily: 'var(--mono)', fontSize: 22, fontWeight: 500, fill: centerColor }}>
           {total}
         </text>
         <text x="50%" y="58%" textAnchor="middle" dominantBaseline="central" style={{ fontSize: 11, fill: centerSubColor }}>

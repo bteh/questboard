@@ -14,13 +14,15 @@ function toNumericValue(value: number | string | ReadonlyArray<number | string> 
   return 0;
 }
 
+/* Ink and the canon hues: sage for strong, ochre for apply, clay for maybe,
+   warm ink-gray for the rest. Same buckets as the recommendation thresholds. */
 function barColor(label: string): string {
   const rangeStart = parseInt(label, 10);
   if (isNaN(rangeStart)) return '#3F6B54';
   if (rangeStart >= 70) return '#3F6B54';   // sage
-  if (rangeStart >= 55) return '#7F9B4E';   // olive
-  if (rangeStart >= 40) return '#E0872F';   // amber
-  return '#94A3B8';                          // gray (neutral, non-alarming)
+  if (rangeStart >= 55) return '#8A6A1F';   // ochre
+  if (rangeStart >= 40) return '#A6522E';   // clay
+  return '#82817D';                          // muted ink
 }
 
 interface ScoreDistributionChartProps {

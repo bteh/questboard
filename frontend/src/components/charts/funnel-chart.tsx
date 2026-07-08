@@ -1,12 +1,14 @@
 import { useMemo } from 'react';
 import type { ChartDataPoint } from '@/types/analytics';
 
+/* Ink into the canon hues, darkening toward the offer: every color keeps
+   the white in-bar count above 4.5:1. */
 const STAGE_CONFIG: Record<string, { color: string; label: string }> = {
-  found:        { color: '#4C8A63', label: 'Found' },
-  reviewed:     { color: '#8FA054', label: 'Reviewed' },
-  applying:     { color: '#E0872F', label: 'Applying' },
-  applied:      { color: '#4E8A8F', label: 'Applied' },
-  interviewing: { color: '#C06A3C', label: 'Interviewing' },
+  found:        { color: '#6E6B60', label: 'Found' },
+  reviewed:     { color: '#44607A', label: 'Reviewed' },
+  applying:     { color: '#8A6A1F', label: 'Applying' },
+  applied:      { color: '#4E7A63', label: 'Applied' },
+  interviewing: { color: '#A6522E', label: 'Interviewing' },
   offer:        { color: '#3F6B54', label: 'Offer' },
 };
 
@@ -18,7 +20,7 @@ export function FunnelChart({ data }: FunnelChartProps) {
   const stages = useMemo(() => {
     const maxValue = Math.max(...data.map((d) => d.value), 1);
     return data.map((d, i) => {
-      const config = STAGE_CONFIG[d.label] || { color: '#94A3B8', label: d.label };
+      const config = STAGE_CONFIG[d.label] || { color: '#82817D', label: d.label };
       const prevValue = i > 0 ? data[i - 1].value : null;
       const conversionRate = prevValue && prevValue > 0
         ? Math.round((d.value / prevValue) * 100)

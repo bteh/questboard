@@ -8,12 +8,12 @@ from sqlalchemy.orm import Session
 
 # The mandatory vertical scope. Every list-level read of applications goes
 # through it so quest rows never leak into career surfaces by omission.
-from job_finder.models.database import scoped_applications
+from job_finder.models.database import APPLICATION_VERTICALS, scoped_applications
 from app.models.application import ApplicationRecord
 
 _ALLOWED_SORT_BY = frozenset({
     "overall_score", "date_found", "company", "job_title", "salary_min", "salary_max",
-    "event_start",
+    "event_start", "updated_at",
 })
 
 
@@ -55,7 +55,14 @@ def get_applications(
     query = scoped_applications(db.query(ApplicationRecord), verticals)
 
     if status:
-        query = query.filter(ApplicationRecord.status == status)
+        # Single value or comma list, mirroring the vertical param: the log
+        # reads its whole spread (clipped, applied, shelved, done...) in one
+        # query so every surface shares one cache entry.
+        wanted_statuses = [s.strip() for s in status.split(",") if s.strip()]
+        if len(wanted_statuses) == 1:
+            query = query.filter(ApplicationRecord.status == wanted_statuses[0])
+        elif wanted_statuses:
+            query = query.filter(ApplicationRecord.status.in_(wanted_statuses))
     if min_score is not None:
         query = query.filter(ApplicationRecord.overall_score >= min_score)
     if recommendation:
@@ -173,11 +180,17 @@ def get_application(db: Session, app_id: int, workspace_id: str | None = None) -
 
 def create_application(db: Session, data, workspace_id: str | None = None) -> ApplicationRecord:
     """Create a new application record from an ApplicationCreate schema."""
+    vertical = data.vertical or "career"
+    if vertical not in APPLICATION_VERTICALS:
+        raise ValueError(f"unknown application vertical: {vertical!r}")
     record = ApplicationRecord(
         job_title=data.job_title,
         company=data.company,
         location=data.location,
-        job_url=data.job_url,
+        # Empty URLs store as NULL so the unique constraint permits many
+        # URL-less rows (personal quests have no source link), matching
+        # job_finder save_application's convention.
+        job_url=data.job_url or None,
         source=data.source,
         description=data.description,
         is_remote=data.is_remote,
@@ -186,6 +199,7 @@ def create_application(db: Session, data, workspace_id: str | None = None) -> Ap
         status=data.status,
         notes=data.notes,
         profile=data.profile,
+        vertical=vertical,
         workspace_id=workspace_id,
     )
     db.add(record)
