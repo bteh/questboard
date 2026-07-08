@@ -7,6 +7,8 @@ export interface ScraperSource {
   description: string;
   category: string;
   enabled_by_default: boolean;
+  /** Board lane this source feeds; the API serves career sources by default. */
+  vertical?: string;
 }
 
 export function getScraperSources(): Promise<ScraperSource[]> {

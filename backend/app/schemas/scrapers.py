@@ -10,3 +10,4 @@ class ScraperSource(BaseModel):
     description: str
     category: str
     enabled_by_default: bool
+    vertical: str = "career"

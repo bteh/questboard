@@ -206,7 +206,15 @@ describe('status mapping', () => {
     expect(card.applied).toBe('Applied');
   });
 
-  it('maps the reviewed status to a clipped card', () => {
+  it('maps the clipped status to a clipped card', () => {
+    const card = toBoardCard(
+      makeApp({ status: 'clipped', updated_at: '2026-07-06T12:00:00Z' }),
+    );
+    expect(card.clippedDate).toBe('Jul 6');
+    expect(card.applied).toBeUndefined();
+  });
+
+  it('still maps the legacy reviewed status to a clipped card', () => {
     const card = toBoardCard(
       makeApp({ status: 'reviewed', updated_at: '2026-07-06T12:00:00Z' }),
     );

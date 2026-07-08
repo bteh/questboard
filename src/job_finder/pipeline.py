@@ -1139,6 +1139,23 @@ def _backfill_linkedin_descriptions(
         list(pool.map(_fetch_one, jobs))
 
 
+def _career_scraper_enabled(meta, yaml_entry: dict | None) -> bool:
+    """Whether the career pipeline may enable this scraper.
+
+    Non-career scrapers are never enabled here, not even when the user's yaml
+    says enabled: true. Quest ingestion has its own entry point, so a quest
+    source toggled on in settings can never route audience seats or study
+    listings into resume scoring and career purges.
+    """
+    if meta.search_fn is None:
+        return False
+    if getattr(meta, "vertical", "career") != "career":
+        return False
+    if yaml_entry is not None:
+        return bool(yaml_entry.get("enabled", True))
+    return meta.enabled_by_default
+
+
 class JobFinderPipeline:
     """Orchestrates the full job-search pipeline.
 
@@ -1451,15 +1468,10 @@ class JobFinderPipeline:
                 logger.warning("Config lists unknown scrapers (typo?): %s", unknown)
 
             for name, meta in all_scrapers.items():
-                if meta.search_fn is None:
-                    continue
                 yaml_entry = next(
                     (s for s in extra_sources if s.get("name") == name), None
                 )
-                if yaml_entry is not None:
-                    if yaml_entry.get("enabled", True):
-                        enabled_names.append(name)
-                elif meta.enabled_by_default:
+                if _career_scraper_enabled(meta, yaml_entry):
                     enabled_names.append(name)
 
             # Build watchlist_by_ats from profile config + company catalog.
@@ -1480,9 +1492,13 @@ class JobFinderPipeline:
                 slug = entry.get("slug", "")
                 if ats and slug and ats != "unknown":
                     watchlist_by_ats.setdefault(ats, []).append(slug)
-            # Enable ATS scrapers that have watchlist companies
+            # Enable ATS scrapers that have watchlist companies (career only)
             for ats_name in watchlist_by_ats:
-                if ats_name not in enabled_names and ats_name in all_scrapers:
+                if (
+                    ats_name not in enabled_names
+                    and ats_name in all_scrapers
+                    and getattr(all_scrapers[ats_name], "vertical", "career") == "career"
+                ):
                     enabled_names.append(ats_name)
         except Exception as e:
             logger.warning("Could not load scraper registry: %s", e)

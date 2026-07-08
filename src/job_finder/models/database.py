@@ -14,13 +14,20 @@ from sqlalchemy import (
     Column,
     DateTime,
     Float,
+    Index,
     Integer,
     String,
     Text,
     Boolean,
     create_engine,
+    text as _sql_text,
 )
-from sqlalchemy.orm import DeclarativeBase, Session, scoped_session, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, Query, Session, scoped_session, sessionmaker
+
+# Vertical vocabulary stored on applications rows. Must stay identical to the
+# UI tokens (packages/ui/src/tokens.ts). 'personal' exists there for log-side
+# entries only and is not a valid applications vertical.
+APPLICATION_VERTICALS = ("career", "camera", "study", "lens", "party")
 
 
 def _utcnow() -> datetime:
@@ -99,6 +106,19 @@ class ApplicationRecord(Base):
     first_seen_run_id = Column(String(12), nullable=True, index=True)
     workspace_id = Column(String(64), nullable=True, index=True)
 
+    # Quest vertical: which board lane this row belongs to (career, camera,
+    # study, lens, party). Career machinery must read rows through
+    # scoped_applications() so quest rows stay invisible unless a caller opts in.
+    vertical = Column(String(20), nullable=False, default="career", server_default="career")
+    # Dated quests (tapings, study sessions, gigs). NULL for ordinary jobs.
+    event_start = Column(DateTime, nullable=True)
+    event_end = Column(DateTime, nullable=True)
+    # Standing sign-up platforms (UserTesting-style), undated by design.
+    is_rolling = Column(Boolean, default=False, server_default=_sql_text("0"))
+    first_quest_ok = Column(Boolean, default=False, server_default=_sql_text("0"))
+    # Quest-only detail (screeners, headcount, session length, party stake).
+    quest_json = Column(Text, default="", server_default="")
+
     # Status tracking
     status = Column(String(50), default="found")
     date_found = Column(DateTime, default=_utcnow)
@@ -131,6 +151,12 @@ class ApplicationRecord(Base):
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
+    __table_args__ = (
+        Index("ix_applications_vertical", "vertical"),
+        Index("ix_applications_vertical_status", "vertical", "status"),
+        Index("ix_applications_event_start", "event_start"),
+    )
+
     def __repr__(self) -> str:
         return f"<Application {self.company} - {self.job_title} ({self.status})>"
 
@@ -161,6 +187,30 @@ class ApplicationRecord(Base):
                 return None
             return data if isinstance(data, dict) else None
         return None
+
+
+def scoped_applications(
+    query_or_session,
+    verticals: list[str] | tuple[str, ...] | None = None,
+) -> Query:
+    """Mandatory vertical scope for ApplicationRecord queries.
+
+    Defaults to career, so legacy consumers (listings, analytics, exports,
+    purges, backfills) can never see or touch quest rows without opting in
+    explicitly. Accepts a Session (starts a fresh query) or an existing query
+    (adds the filter). Raises ValueError on a vertical outside the vocabulary.
+    """
+    if isinstance(query_or_session, Query):
+        query = query_or_session
+    else:
+        query = query_or_session.query(ApplicationRecord)
+    wanted = tuple(verticals) if verticals else ("career",)
+    unknown = [v for v in wanted if v not in APPLICATION_VERTICALS]
+    if unknown:
+        raise ValueError(f"unknown application vertical(s): {unknown}")
+    if len(wanted) == 1:
+        return query.filter(ApplicationRecord.vertical == wanted[0])
+    return query.filter(ApplicationRecord.vertical.in_(wanted))
 
 
 # Database connection management
@@ -291,6 +341,43 @@ def _migrate_db(engine) -> None:
             conn.execute(
                 text("ALTER TABLE applications ADD COLUMN score_evidence_json TEXT DEFAULT ''")
             )
+        if "vertical" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN vertical VARCHAR(20) NOT NULL DEFAULT 'career'")
+            )
+        if "event_start" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN event_start DATETIME")
+            )
+        if "event_end" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN event_end DATETIME")
+            )
+        if "is_rolling" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN is_rolling BOOLEAN DEFAULT 0")
+            )
+        if "first_quest_ok" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN first_quest_ok BOOLEAN DEFAULT 0")
+            )
+        if "quest_json" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN quest_json TEXT DEFAULT ''")
+            )
+        # create_all skips tables that already exist, so existing DBs need the
+        # quest indexes created here. The composite index needs status, which
+        # every real DB has; skip it on partial tables instead of failing boot.
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_applications_vertical ON applications (vertical)"
+        ))
+        if "status" in existing_cols:
+            conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS ix_applications_vertical_status ON applications (vertical, status)"
+            ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_applications_event_start ON applications (event_start)"
+        ))
         # Convert empty job_url strings to NULL (allows multiple NULLs in unique column)
         conn.execute(text("UPDATE applications SET job_url = NULL WHERE job_url = ''"))
 
@@ -391,8 +478,17 @@ def save_application(
     salary_source: str | None = None,
     date_posted: str | None = None,
     date_confidence: str | None = None,
+    vertical: str = "career",
+    event_start: datetime | None = None,
+    event_end: datetime | None = None,
+    is_rolling: bool = False,
+    first_quest_ok: bool = False,
+    quest_json: str = "",
 ) -> ApplicationRecord | None:
     """Save a new application record to the database. Returns None if duplicate URL."""
+    vertical = vertical or "career"
+    if vertical not in APPLICATION_VERTICALS:
+        raise ValueError(f"unknown application vertical: {vertical!r}")
     # Store empty URLs as None so SQLite unique constraint allows multiples
     if not job_url:
         job_url = None
@@ -447,8 +543,10 @@ def save_application(
                 session.expunge(existing)
                 return existing
 
-        # Skip cross-source duplicates by normalized company + title
-        if job_title and company:
+        # Skip cross-source duplicates by normalized company + title.
+        # Career only: two quests from the same org with the same title are
+        # usually different sessions, and a quest must never merge into a job.
+        if vertical == "career" and job_title and company:
             from job_finder.pipeline import _normalize_company, _normalize_title
             norm_co = _normalize_company(company)
             norm_title = _normalize_title(job_title)
@@ -459,7 +557,7 @@ def save_application(
                 # Use the longest word in the company name for SQL LIKE filter
                 longest_word = max(co_words, key=len) if co_words else norm_co
                 candidates = (
-                    _scope_query(session.query(ApplicationRecord))
+                    scoped_applications(_scope_query(session.query(ApplicationRecord)))
                     .filter(
                         func.lower(ApplicationRecord.company).contains(longest_word),
                         ApplicationRecord.job_title.isnot(None),
@@ -600,6 +698,12 @@ def save_application(
             # job first?"
             first_seen_run_id=search_run_id,
             workspace_id=workspace_id,
+            vertical=vertical,
+            event_start=event_start,
+            event_end=event_end,
+            is_rolling=is_rolling,
+            first_quest_ok=first_quest_ok,
+            quest_json=quest_json,
         )
         session.add(record)
         session.commit()
@@ -660,11 +764,12 @@ def get_all_applications(
     profile: str | None = None,
     company_type: str | None = None,
     workspace_id: str | None = None,
+    verticals: list[str] | None = None,
 ) -> list[ApplicationRecord]:
-    """Retrieve applications with optional filters."""
+    """Retrieve applications with optional filters (career only by default)."""
     session = get_session()
     try:
-        query = session.query(ApplicationRecord)
+        query = scoped_applications(session, verticals)
         if profile:
             query = query.filter(ApplicationRecord.profile == profile)
         if workspace_id:
@@ -714,7 +819,9 @@ def purge_non_matching_locations(
 
     session = get_session()
     try:
-        query = session.query(ApplicationRecord)
+        # Career rows only: this purge runs on every pipeline run, and a NYC
+        # taping or study session must never be deleted by SF job preferences.
+        query = scoped_applications(session)
         if profile:
             query = query.filter(ApplicationRecord.profile == profile)
         if workspace_id:
@@ -777,7 +884,8 @@ def purge_non_matching_roles(
 
     session = get_session()
     try:
-        query = session.query(ApplicationRecord)
+        # Career rows only: quest titles never match job roles and must survive.
+        query = scoped_applications(session)
         if profile:
             query = query.filter(ApplicationRecord.profile == profile)
         if workspace_id:
@@ -815,7 +923,8 @@ def backfill_company_types() -> int:
 
     session = get_session()
     try:
-        records = session.query(ApplicationRecord).filter(
+        # Career rows only: a show or study sponsor is not a hiring company.
+        records = scoped_applications(session).filter(
             (ApplicationRecord.company_type == "Unknown")
             | (ApplicationRecord.company_type == None)  # noqa: E711
         ).all()
@@ -868,7 +977,8 @@ def backfill_scores(
 
     session = get_session()
     try:
-        query = session.query(ApplicationRecord).filter(
+        # Career rows only: resume scoring makes no sense on quest rows.
+        query = scoped_applications(session).filter(
             ApplicationRecord.overall_score == None  # noqa: E711
         )
         if profile:

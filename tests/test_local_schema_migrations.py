@@ -72,11 +72,53 @@ class LocalSchemaMigrationTest(unittest.TestCase):
     def _create_legacy_database(self) -> None:
         conn = sqlite3.connect(self.db_path)
         try:
+            # A realistic pre-quest applications table: the base columns every
+            # old install has, WITHOUT the later additive columns
+            # (salary_source, date_posted, vertical, ...) that boot-time
+            # migration must add before the first applications query.
             conn.executescript(
                 """
                 CREATE TABLE applications (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    job_url TEXT
+                    job_title VARCHAR(500) NOT NULL,
+                    company VARCHAR(300) NOT NULL,
+                    location VARCHAR(300),
+                    job_url VARCHAR(2000) UNIQUE,
+                    source VARCHAR(100),
+                    description TEXT,
+                    is_remote BOOLEAN,
+                    salary_min FLOAT,
+                    salary_max FLOAT,
+                    estimated_total_comp VARCHAR(200),
+                    overall_score FLOAT,
+                    technical_score FLOAT,
+                    leadership_score FLOAT,
+                    platform_building_score FLOAT,
+                    comp_potential_score FLOAT,
+                    company_trajectory_score FLOAT,
+                    culture_fit_score FLOAT,
+                    career_progression_score FLOAT,
+                    recommendation VARCHAR(50),
+                    score_reasoning TEXT,
+                    key_strengths TEXT,
+                    key_gaps TEXT,
+                    funding_stage VARCHAR(100),
+                    total_funding VARCHAR(100),
+                    employee_count VARCHAR(100),
+                    company_intel_json TEXT,
+                    resume_tweaks_json TEXT,
+                    cover_letter TEXT,
+                    application_method VARCHAR(100),
+                    status VARCHAR(50),
+                    date_found DATETIME,
+                    date_applied DATETIME,
+                    date_response DATETIME,
+                    notes TEXT,
+                    contact_name VARCHAR(300),
+                    contact_email VARCHAR(300),
+                    referral_source VARCHAR(300),
+                    created_at DATETIME,
+                    updated_at DATETIME
                 );
 
                 CREATE TABLE workspaces (
@@ -125,6 +167,11 @@ class LocalSchemaMigrationTest(unittest.TestCase):
                 "INSERT INTO workspaces (id, mode) VALUES (?, ?)",
                 ("legacy-workspace", "personal"),
             )
+            conn.execute(
+                "INSERT INTO applications (job_title, company, job_url, status) "
+                "VALUES (?, ?, ?, ?)",
+                ("Data Engineer", "Acme", "https://example.com/jobs/legacy-1", "found"),
+            )
             conn.commit()
         finally:
             conn.close()
@@ -164,6 +211,32 @@ class LocalSchemaMigrationTest(unittest.TestCase):
         self.assertIn("created_at", run_columns)
         self.assertIn("updated_at", run_columns)
 
+    def test_legacy_db_serves_applications_after_boot_migration(self) -> None:
+        """Boot-time migration must leave GET /applications working.
+
+        This is the failure mode where one schema manager gains a column and
+        the backend boot path does not: the ORM SELECT names every mapped
+        column and the first applications query 500s on a legacy local DB.
+        """
+        app_columns = self._columns_for("applications")
+        for column in (
+            "vertical", "event_start", "event_end", "is_rolling",
+            "first_quest_ok", "quest_json",
+            "salary_source", "date_posted", "date_confidence",
+            "user_feedback", "feedback_notes", "score_evidence_json",
+            "first_seen_run_id", "url_status", "last_checked_at",
+        ):
+            self.assertIn(column, app_columns)
+
+        response = self.client.get("/api/v1/applications")
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload["total"], 1)
+        row = payload["items"][0]
+        self.assertEqual(row["job_title"], "Data Engineer")
+        self.assertEqual(row["vertical"], "career")
+
 
 if __name__ == "__main__":
     unittest.main()
+

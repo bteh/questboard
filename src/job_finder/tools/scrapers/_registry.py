@@ -21,6 +21,9 @@ class ScraperMeta:
     category: str            # "remote" | "ats" | "startup" | "crypto" | "community" | "jobspy"
     enabled_by_default: bool
     search_fn: Callable | None  # None for jobspy metadata-only entries
+    # Board lane this source feeds (matches packages/ui tokens: career, camera,
+    # study, lens, party). The career pipeline only ever runs career sources.
+    vertical: str = "career"
 
 
 _REGISTRY: dict[str, ScraperMeta] = {}
@@ -33,6 +36,7 @@ def register_scraper(
     description: str = "",
     category: str = "general",
     enabled_by_default: bool = True,
+    vertical: str = "career",
 ) -> Callable:
     """Decorator that registers a scraper function with its metadata."""
     def decorator(fn: Callable) -> Callable:
@@ -44,6 +48,7 @@ def register_scraper(
             category=category,
             enabled_by_default=enabled_by_default,
             search_fn=fn,
+            vertical=vertical,
         )
         return fn
     return decorator
@@ -52,6 +57,18 @@ def register_scraper(
 def get_registry() -> dict[str, ScraperMeta]:
     """Return the full registry dict (name -> ScraperMeta)."""
     return _REGISTRY
+
+
+def default_scraper_names() -> list[str]:
+    """Scrapers that run when no explicit names are given: career sources only.
+
+    Quest scrapers (vertical != career) run only when a caller names them, so
+    no default sweep can route quest listings into the career pipeline.
+    """
+    return [
+        name for name, meta in _REGISTRY.items()
+        if meta.search_fn is not None and meta.vertical == "career"
+    ]
 
 
 def get_all_metadata() -> list[ScraperMeta]:
@@ -83,10 +100,7 @@ def run_scrapers(
     """
     from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout, as_completed
 
-    active = names or [
-        name for name, meta in _REGISTRY.items()
-        if meta.search_fn is not None
-    ]
+    active = names or default_scraper_names()
     if not active:
         return []
 
