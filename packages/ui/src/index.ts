@@ -19,6 +19,8 @@ export { LedgerRow } from './components/LedgerRow';
 export type { LedgerRowProps } from './components/LedgerRow';
 export { Sheet, Scrim } from './components/Sheet';
 export type { SheetProps, ScrimProps } from './components/Sheet';
+export { ExplainNote, ConsentCard } from './components/ExplainNote';
+export type { ExplainNoteProps, ConsentCardProps } from './components/ExplainNote';
 export { SplitFlap } from './components/SplitFlap';
 export type { SplitFlapProps } from './components/SplitFlap';
 export { TextLink } from './components/TextLink';

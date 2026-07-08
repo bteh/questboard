@@ -10,6 +10,7 @@ import {
 
 import { PageHeader } from '@/components/layout/page-header';
 import { AiProviderTab } from '@/components/settings/AiProviderTab';
+import { TheAiDownloadSection } from '@/components/settings/TheAiDownload';
 import { AutoApplyTab } from '@/components/settings/AutoApplyTab';
 import { ResumeTab } from '@/components/settings/ResumeTab';
 import { SearchPrefsTab } from '@/components/settings/SearchPrefsTab';
@@ -72,7 +73,7 @@ function SettingsPage() {
     <div>
       <PageHeader title="Settings" />
 
-      {/* Real top-level tabs — only the active tab's cards render below.
+      {/* Real top-level tabs; only the active tab's cards render below.
           The user only sees one focused page at a time instead of one
           1500-line scroll. */}
       <div className="mb-6 border-b border-border-default">
@@ -124,13 +125,18 @@ function SettingsPage() {
           />
         )}
 
-        {/* ── Search tab — three smaller cards instead of one giant card ───── */}
+        {/* ── Search tab: three smaller cards instead of one giant card ───── */}
         {activeTab === 'search' && (
           <SearchPrefsTab onboarding={onboarding} navigate={navigate} />
         )}
 
         {/* ── AI Provider ─────────────────────────────────────── */}
-        {activeTab === 'ai' && <AiProviderTab />}
+        {activeTab === 'ai' && (
+          <>
+            <TheAiDownloadSection />
+            <AiProviderTab />
+          </>
+        )}
 
         {/* ── Auto-Apply ─────────────────────────────────────── */}
         {activeTab === 'auto-apply' && <AutoApplyTab />}

@@ -13,6 +13,7 @@ import {
 } from '@questboard/ui';
 import { useApplications, useUpdateStatus } from '@/hooks/use-applications';
 import { useSourceLabels, resolveSourceLabel } from '@/hooks/use-scrapers';
+import { ExplainSheet } from '@/components/board/explain-sheet';
 import {
   CLIP_STATUS,
   parseAmount,
@@ -142,11 +143,13 @@ function BoardCards({
   payCeiling,
   labels,
   onOpenSheet,
+  onExplain,
 }: {
   filters: ApplicationFilters;
   payCeiling: number | null;
   labels: Record<string, string>;
   onOpenSheet: (app: ApplicationResponse) => void;
+  onExplain: (app: ApplicationResponse) => void;
 }) {
   const { data } = useApplications(filters);
   const updateStatus = useUpdateStatus();
@@ -187,6 +190,8 @@ function BoardCards({
             payUnit={card.payUnit}
             applied={card.applied}
             clippedDate={card.clippedDate}
+            showExplain
+            onExplain={() => onExplain(app)}
             onClip={() => updateStatus.mutate({ id: app.id, data: { status: CLIP_STATUS } })}
           />
         );
@@ -278,6 +283,7 @@ function BoardPage() {
      starts back at one page without an effect */
   const [pageState, setPageState] = useState<{ key: string; pages: number }>({ key: '', pages: 1 });
   const [sheetApp, setSheetApp] = useState<ApplicationResponse | null>(null);
+  const [explainApp, setExplainApp] = useState<ApplicationResponse | null>(null);
 
   const search = useDebounced(searchRaw.trim());
   const payFloor = parseAmount(useDebounced(payFromRaw));
@@ -486,6 +492,7 @@ function BoardPage() {
               payCeiling={payCeiling}
               labels={labels}
               onOpenSheet={setSheetApp}
+              onExplain={setExplainApp}
             />
           ))}
         </div>
@@ -508,6 +515,7 @@ function BoardPage() {
       </div>
 
       <RequirementSheet app={sheetApp} labels={labels} onClose={() => setSheetApp(null)} />
+      <ExplainSheet app={explainApp} labels={labels} onClose={() => setExplainApp(null)} />
     </div>
   );
 }
