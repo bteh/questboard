@@ -55,10 +55,15 @@ def _meta(vertical: str, enabled_by_default: bool = False, search_fn=lambda **k:
     )
 
 
-def test_all_existing_scrapers_default_to_career_vertical():
+def test_quest_scrapers_are_never_enabled_by_default():
     metas = get_all_metadata()
     assert metas, "registry unexpectedly empty"
-    assert all(m.vertical == "career" for m in metas)
+    career = [m for m in metas if m.vertical == "career"]
+    quest = [m for m in metas if m.vertical != "career"]
+    assert career, "career scrapers missing from registry"
+    assert quest, "quest scrapers expected in the registry"
+    assert all(not m.enabled_by_default for m in quest)
+    assert all(m.vertical in {"career", "camera", "study", "lens", "party"} for m in metas)
 
 
 def test_register_scraper_records_vertical(fake_camera_scraper):
@@ -166,4 +171,6 @@ def test_sources_endpoint_widens_on_request(api_client, fake_camera_scraper):
         "/api/v1/scrapers/sources", params={"vertical": "camera"}
     )
     camera_names = {s["name"] for s in camera_only.json()}
-    assert camera_names == {fake_camera_scraper}
+    assert fake_camera_scraper in camera_names
+    assert all(get_registry()[n].vertical == "camera" for n in camera_names)
+    assert "remotive" not in camera_names

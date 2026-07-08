@@ -1,0 +1,70 @@
+{
+  "success": true,
+  "shows": [
+    {
+      "project_id": 10577,
+      "public_name": "Litigant Pool for Judge Lake (Culver City)",
+      "project_notes": "We are looking for Litigant Standbys for the court show. If you're good at Improv & Comfort Talking on Camera apply. If you have been a litigant on ANY OF OUR Court Shows you can't do it again. $20 per Hour",
+      "formatted_datetime": "7/08/26 9:30 AM PDT",
+      "featured": false,
+      "is_cancelable": false,
+      "application_status": null,
+      "actions": {
+        "can_apply": true,
+        "register_url": "/register"
+      }
+    },
+    {
+      "project_id": 10574,
+      "public_name": "We The People w/ Judge Lauren Lake (Culver City)",
+      "project_notes": "Daytime Court Show will entertain and work a range of emotions. You're a part of the show. The show runs about 3 - 6 hrs in Culver City. Business Professional Attire Only!!! Bright or Dark Colors (No Neon or Reflective Attire). Street Parking.",
+      "formatted_datetime": "7/09/26 9:15 AM PDT",
+      "featured": false,
+      "is_cancelable": false,
+      "application_status": null,
+      "actions": {
+        "can_apply": true,
+        "register_url": "/register"
+      }
+    },
+    {
+      "project_id": 8366,
+      "public_name": "Court Show Rush Call (Culver City)",
+      "project_notes": "If you're near the Court Show Studio in Culver City or can arrive on location within 30 - 45 minutes of a Rush Call add your name to this list. This group will be notified for Rush Calls for all the court show at this studio. The attire will still need to be Dark Business Professional Attire. ",
+      "formatted_datetime": "12/31/26 12:00 PM PST",
+      "featured": false,
+      "is_cancelable": false,
+      "application_status": null,
+      "actions": {
+        "can_apply": true,
+        "register_url": "/register"
+      }
+    },
+    {
+      "project_id": 7710,
+      "public_name": "RUSH CALLS",
+      "project_notes": "APPLY HERE if you are available for a possible RUSH CALL. If needed for an SRO RUSH CALL, you will be e-mailed/texted the show information. We will confirm you on the website if booked for a RUSH CALL.",
+      "formatted_datetime": "12/31/26 5:00 PM PST",
+      "featured": false,
+      "is_cancelable": false,
+      "application_status": null,
+      "actions": {
+        "can_apply": true,
+        "register_url": "/register"
+      }
+    },
+    {
+      "project_id": 10478,
+      "public_name": "Litigant Onboarding",
+      "project_notes": "Litigant Onboarding only. You're a part of this Emmy-Nominated Daytime Court Show. Call time will be given by your producer. Guaranteed 6.25 hour minimum payment. Tapes in Culver City. Business Professional Attire Only!!! Bright or Dark Colors (No Neon or Reflective Attire). Street Parking.",
+      "formatted_datetime": "12/31/26 11:00 PM PST",
+      "featured": false,
+      "is_cancelable": false,
+      "application_status": null,
+      "actions": {
+        "can_apply": true,
+        "register_url": "/register"
+      }
+    }
+  ]
+}

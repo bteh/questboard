@@ -1,0 +1,202 @@
+{
+ "studies": [
+  {
+   "protocolSection": {
+    "identificationModule": {
+     "nctId": "NCT05133102",
+     "briefTitle": "Longitudinal Oral Microbiome Sampling for BE",
+     "organization": {
+      "fullName": "Columbia University",
+      "class": "OTHER"
+     }
+    },
+    "statusModule": {
+     "overallStatus": "RECRUITING",
+     "studyFirstPostDateStruct": {
+      "date": "2021-11-24",
+      "type": "ACTUAL"
+     }
+    },
+    "sponsorCollaboratorsModule": {
+     "leadSponsor": {
+      "name": "Columbia University",
+      "class": "OTHER"
+     }
+    },
+    "descriptionModule": {
+     "briefSummary": "This is a longitudinal cohort study to assess the impact of repeated sampling of an oral microbiome signature for Barrett's esophagus (BE). Potential participants will be identified through chart review of patients who have had an endoscopy in the past three years."
+    },
+    "designModule": {
+     "studyType": "OBSERVATIONAL",
+     "enrollmentInfo": {
+      "count": 275,
+      "type": "ESTIMATED"
+     }
+    },
+    "eligibilityModule": {
+     "healthyVolunteers": true,
+     "sex": "ALL",
+     "minimumAge": "18 Years",
+     "stdAges": [
+      "ADULT",
+      "OLDER_ADULT"
+     ]
+    },
+    "contactsLocationsModule": {
+     "locations": [
+      {
+       "facility": "University of Michigan",
+       "status": "RECRUITING",
+       "city": "Ann Arbor",
+       "state": "Michigan",
+       "country": "United States",
+       "geoPoint": {
+        "lat": 42.27756,
+        "lon": -83.74088
+       }
+      },
+      {
+       "facility": "Columbia University Irving Medical Center",
+       "status": "RECRUITING",
+       "city": "New York",
+       "state": "New York",
+       "country": "United States",
+       "geoPoint": {
+        "lat": 40.71427,
+        "lon": -74.00597
+       }
+      }
+     ]
+    }
+   },
+   "hasResults": false
+  },
+  {
+   "protocolSection": {
+    "identificationModule": {
+     "nctId": "NCT05154669",
+     "briefTitle": "Integrating Financial Coaching and Smoking Cessation Coaching",
+     "organization": {
+      "fullName": "NYU Langone Health",
+      "class": "OTHER"
+     }
+    },
+    "statusModule": {
+     "overallStatus": "RECRUITING",
+     "studyFirstPostDateStruct": {
+      "date": "2021-12-13",
+      "type": "ACTUAL"
+     }
+    },
+    "sponsorCollaboratorsModule": {
+     "leadSponsor": {
+      "name": "NYU Langone Health",
+      "class": "OTHER"
+     }
+    },
+    "descriptionModule": {
+     "briefSummary": "This study conduct a two-arm, parallel-group randomized controlled trial. The study will recruit and randomize 900 smokers (n=450 per arm) to either: (1) Control: Standard Smoking Cessation Counseling or (2) Intervention: Integrated Financial-Smoking Cessation Counseling."
+    },
+    "designModule": {
+     "studyType": "INTERVENTIONAL",
+     "phases": [
+      "PHASE3"
+     ],
+     "enrollmentInfo": {
+      "count": 602,
+      "type": "ESTIMATED"
+     }
+    },
+    "eligibilityModule": {
+     "healthyVolunteers": true,
+     "sex": "ALL",
+     "minimumAge": "18 Years",
+     "maximumAge": "100 Years",
+     "stdAges": [
+      "ADULT",
+      "OLDER_ADULT"
+     ]
+    },
+    "contactsLocationsModule": {
+     "locations": [
+      {
+       "facility": "NYU Langone Health",
+       "status": "RECRUITING",
+       "city": "New York",
+       "state": "New York",
+       "country": "United States",
+       "geoPoint": {
+        "lat": 40.71427,
+        "lon": -74.00597
+       }
+      }
+     ]
+    }
+   },
+   "hasResults": false
+  },
+  {
+   "protocolSection": {
+    "identificationModule": {
+     "nctId": "NCT04936529",
+     "briefTitle": "A Study of a Vaccine in Combination With β-glucan and GM-CSF in People With Neuroblastoma",
+     "organization": {
+      "fullName": "Memorial Sloan Kettering Cancer Center",
+      "class": "OTHER"
+     }
+    },
+    "statusModule": {
+     "overallStatus": "RECRUITING",
+     "studyFirstPostDateStruct": {
+      "date": "2021-06-23",
+      "type": "ACTUAL"
+     }
+    },
+    "sponsorCollaboratorsModule": {
+     "leadSponsor": {
+      "name": "Memorial Sloan Kettering Cancer Center",
+      "class": "OTHER"
+     }
+    },
+    "descriptionModule": {
+     "briefSummary": "The purpose of the study is to explore the combination of a bivalent vaccine, a sugar called beta-glucan (β-glucan), and a protein called granulocyte-macrophage colony stimulating factor (GM-CSF) as an effective treatment for people with high-risk neuroblastoma that is in complet"
+    },
+    "designModule": {
+     "studyType": "INTERVENTIONAL",
+     "phases": [
+      "PHASE2"
+     ],
+     "enrollmentInfo": {
+      "count": 286,
+      "type": "ESTIMATED"
+     }
+    },
+    "eligibilityModule": {
+     "healthyVolunteers": true,
+     "sex": "ALL",
+     "stdAges": [
+      "CHILD",
+      "ADULT",
+      "OLDER_ADULT"
+     ]
+    },
+    "contactsLocationsModule": {
+     "locations": [
+      {
+       "facility": "Memorial Sloan Kettering Cancer Center",
+       "status": "RECRUITING",
+       "city": "New York",
+       "state": "New York",
+       "country": "United States",
+       "geoPoint": {
+        "lat": 40.71427,
+        "lon": -74.00597
+       }
+      }
+     ]
+    }
+   },
+   "hasResults": false
+  }
+ ]
+}
