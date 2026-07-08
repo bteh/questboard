@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
-import { createRoute } from '@tanstack/react-router';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createRoute, redirect, useNavigate } from '@tanstack/react-router';
 import { Route as appRoute } from './app';
 import {
   Chip,
@@ -14,6 +14,18 @@ import {
 import { useApplications, useUpdateStatus } from '@/hooks/use-applications';
 import { useSourceLabels, resolveSourceLabel } from '@/hooks/use-scrapers';
 import { ExplainSheet } from '@/components/board/explain-sheet';
+import { RestockLine } from '@/components/board/restock-line';
+import {
+  dismissNotice,
+  hasBoardParams,
+  noticeDismissed,
+  presetKeysFrom,
+  presetKeysTo,
+  readSavedBoardState,
+  saveBoardState,
+  validateBoardSearch,
+  type BoardParams,
+} from '@/components/board/board-state';
 import {
   CLIP_STATUS,
   parseAmount,
@@ -22,11 +34,33 @@ import {
 } from '@/utils/board-card';
 import { VERTICAL_KEYS, verticalParams, type VerticalKey } from '@/utils/board-verticals';
 import type { ApplicationFilters, ApplicationResponse, RequirementMatch } from '@/types/application';
+import '@/components/board/board.css';
 
+/* Filter state lives in the URL (?v, ?q, ?from, ?to, ?p): a filtered board
+   is a shareable address, back/forward walks chip changes, and the topbar
+   search box submits into ?q=. The last state persists at
+   questboard:board.v1; a bare /board redirects to it once, so Tuesday's
+   board is already set up on Wednesday, and explicit params always win. */
 export const Route = createRoute({
   getParentRoute: () => appRoute,
   path: '/board',
   component: BoardPage,
+  validateSearch: validateBoardSearch,
+  beforeLoad: ({ search, cause }) => {
+    /* only on the way IN: an in-route search change (cause 'stay') is the
+       reader clearing chips, and re-applying saved state would snap the
+       filters right back */
+    if (cause !== 'enter') return;
+    if (hasBoardParams(search)) return;
+    const saved = readSavedBoardState();
+    if (saved && hasBoardParams(saved)) {
+      throw redirect({
+        to: '/board',
+        search: { v: saved.v, q: saved.q, from: saved.from, to: saved.to, p: saved.p },
+        replace: true,
+      });
+    }
+  },
 });
 
 const PAGE_SIZE = 24;
@@ -35,7 +69,9 @@ const PAGE_SIZE = 24;
    count is the API's own total for that query, never a guess. Chips that
    share a group write the same param and stay mutually exclusive.
    careerOnly presets lean on scoring/company fields quest rows never have,
-   so they hide when a single quest vertical is selected. */
+   so they hide when a single quest vertical is selected. noexp keeps only
+   rows whose source stated a beginner-friendly signal; career rows carry
+   no such signal, so they drop rather than get guessed in. */
 interface Preset {
   key: string;
   label: string;
@@ -45,12 +81,15 @@ interface Preset {
 }
 
 const PRESETS: Preset[] = [
+  { key: 'noexp', label: 'no experience needed', params: { first_quest_ok: true } },
   { key: 'remote', label: 'remote', params: { is_remote: true } },
   { key: 'strong', label: 'strong apply', params: { recommendation: 'STRONG_APPLY' }, careerOnly: true },
   { key: 'score50', label: 'scored 50 or better', params: { min_score: 50 }, careerOnly: true },
   { key: 'early', label: 'early startup', params: { company_type: 'Early Startup' }, group: 'company', careerOnly: true },
   { key: 'bigtech', label: 'big tech', params: { company_type: 'Big Tech' }, group: 'company', careerOnly: true },
 ];
+
+const PRESET_KEYS = PRESETS.map((p) => p.key);
 
 function presetParams(activeKeys: Set<string>): Partial<ApplicationFilters> {
   let merged: Partial<ApplicationFilters> = {};
@@ -59,16 +98,6 @@ function presetParams(activeKeys: Set<string>): Partial<ApplicationFilters> {
   }
   return merged;
 }
-
-const inputStyle: CSSProperties = {
-  border: '1px solid var(--hair)',
-  background: 'var(--paper)',
-  borderRadius: 4,
-  padding: '6px 12px',
-  fontFamily: 'inherit',
-  fontSize: 13.5,
-  color: 'var(--ink)',
-};
 
 function useDebounced(value: string, ms = 300): string {
   const [debounced, setDebounced] = useState(value);
@@ -255,16 +284,51 @@ function RequirementSheet({
   );
 }
 
+/* "Never done any of this?" One honest door: the no-experience preset,
+   backed by the source-stated first_quest_ok flag. Dismissal is stored
+   locally and never asked about again. */
+function FirstRunNotice({ onStartHere }: { onStartHere: () => void }) {
+  const [gone, setGone] = useState(() => noticeDismissed());
+  if (gone) return null;
+  return (
+    <div className="qb-board-notice">
+      <span>
+        Never done any of this? Most quests here need nothing you don't already have.{' '}
+        <button type="button" className="qb-textlink" style={{ fontSize: 14 }} onClick={onStartHere}>
+          Start here
+        </button>
+      </span>
+      <button
+        type="button"
+        className="qb-dismiss"
+        onClick={() => {
+          dismissNotice();
+          setGone(true);
+        }}
+      >
+        Dismiss
+      </button>
+    </div>
+  );
+}
+
 function BoardPage() {
   const labels = useSourceLabels();
-  const [verticalKey, setVerticalKey] = useState<VerticalKey>('all');
-  const [activeKeys, setActiveKeys] = useState<Set<string>>(new Set());
-  const [searchRaw, setSearchRaw] = useState('');
-  const [payFromRaw, setPayFromRaw] = useState('');
-  const [payToRaw, setPayToRaw] = useState('');
+  const navigate = useNavigate();
+  const params = Route.useSearch();
+
+  /* the URL is the one truth for chips and presets */
+  const verticalKey: VerticalKey = params.v ?? 'all';
+  const activeKeys = useMemo(() => presetKeysFrom(params.p, PRESET_KEYS), [params.p]);
+
+  /* text inputs buffer locally, debounce into the URL with replace so
+     typing never spams history */
+  const [searchRaw, setSearchRaw] = useState(params.q ?? '');
+  const [payFromRaw, setPayFromRaw] = useState(params.from ?? '');
+  const [payToRaw, setPayToRaw] = useState(params.to ?? '');
   /* newest first by default: the API's score sort floats unscored rows to
      the top (desc nullsfirst), which reads as noise on a board */
-  const [sortNewest, setSortNewest] = useState(true);
+  const [sortNewest, setSortNewest] = useState(() => readSavedBoardState()?.sort !== 'score');
   /* pages loaded, keyed to the filters that loaded them: any filter change
      starts back at one page without an effect */
   const [pageState, setPageState] = useState<{ key: string; pages: number }>({ key: '', pages: 1 });
@@ -272,8 +336,52 @@ function BoardPage() {
   const [explainApp, setExplainApp] = useState<ApplicationResponse | null>(null);
 
   const search = useDebounced(searchRaw.trim());
-  const payFloor = parseAmount(useDebounced(payFromRaw));
-  const payCeiling = parseAmount(useDebounced(payToRaw));
+  const payFrom = useDebounced(payFromRaw.trim());
+  const payTo = useDebounced(payToRaw.trim());
+  const payFloor = parseAmount(payFrom);
+  const payCeiling = parseAmount(payTo);
+
+  /* what this page last wrote into the URL; anything else is history nav */
+  const pushedRef = useRef<{ q?: string; from?: string; to?: string }>({
+    q: params.q,
+    from: params.from,
+    to: params.to,
+  });
+
+  /* debounced edits -> URL (replace) */
+  useEffect(() => {
+    const next = { q: search || undefined, from: payFrom || undefined, to: payTo || undefined };
+    const cur = pushedRef.current;
+    if (cur.q === next.q && cur.from === next.from && cur.to === next.to) return;
+    pushedRef.current = next;
+    void navigate({
+      to: '/board',
+      search: (prev: BoardParams) => ({ ...prev, ...next }),
+      replace: true,
+    });
+  }, [search, payFrom, payTo, navigate]);
+
+  /* back/forward -> inputs: adopt a URL this page did not write */
+  useEffect(() => {
+    const cur = pushedRef.current;
+    if (params.q === cur.q && params.from === cur.from && params.to === cur.to) return;
+    pushedRef.current = { q: params.q, from: params.from, to: params.to };
+    setSearchRaw(params.q ?? '');
+    setPayFromRaw(params.from ?? '');
+    setPayToRaw(params.to ?? '');
+  }, [params.q, params.from, params.to]);
+
+  /* the whole state persists locally so the next bare /board reopens it */
+  useEffect(() => {
+    saveBoardState({
+      v: params.v,
+      q: params.q,
+      from: params.from,
+      to: params.to,
+      p: params.p,
+      sort: sortNewest ? undefined : 'score',
+    });
+  }, [params.v, params.q, params.from, params.to, params.p, sortNewest]);
 
   const baseFilters = useMemo<ApplicationFilters>(
     () => ({
@@ -298,34 +406,47 @@ function BoardPage() {
   const visiblePresets = PRESETS.filter((p) => !p.careerOnly || !questScoped);
 
   function selectVertical(key: VerticalKey) {
-    setVerticalKey(key);
-    if (key !== 'all' && key !== 'career') {
-      /* a hidden careerOnly preset must not keep silently filtering the feed */
-      setActiveKeys((prev) => {
-        const next = new Set(
-          [...prev].filter((k) => !PRESETS.find((p) => p.key === k)?.careerOnly),
-        );
-        return next.size === prev.size ? prev : next;
-      });
-    }
+    void navigate({
+      to: '/board',
+      search: (prev: BoardParams) => {
+        let keys = presetKeysFrom(prev.p, PRESET_KEYS);
+        if (key !== 'all' && key !== 'career') {
+          /* a hidden careerOnly preset must not keep silently filtering the feed */
+          keys = new Set([...keys].filter((k) => !PRESETS.find((p) => p.key === k)?.careerOnly));
+        }
+        return {
+          ...prev,
+          v: key === 'all' ? undefined : key,
+          p: presetKeysTo(keys, PRESET_KEYS),
+        };
+      },
+    });
   }
 
   function toggle(key: string) {
-    setActiveKeys((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        const preset = PRESETS.find((p) => p.key === key);
-        if (preset?.group) {
-          for (const other of PRESETS) {
-            if (other.group === preset.group) next.delete(other.key);
+    void navigate({
+      to: '/board',
+      search: (prev: BoardParams) => {
+        const next = presetKeysFrom(prev.p, PRESET_KEYS);
+        if (next.has(key)) {
+          next.delete(key);
+        } else {
+          const preset = PRESETS.find((p) => p.key === key);
+          if (preset?.group) {
+            for (const other of PRESETS) {
+              if (other.group === preset.group) next.delete(other.key);
+            }
           }
+          next.add(key);
         }
-        next.add(key);
-      }
-      return next;
+        return { ...prev, p: presetKeysTo(next, PRESET_KEYS) };
+      },
     });
+  }
+
+  /* the notice's one door: switch the no-experience preset on */
+  function startHere() {
+    if (!activeKeys.has('noexp')) toggle('noexp');
   }
 
   /* count as if this chip were switched on alongside the current filters */
@@ -350,42 +471,16 @@ function BoardPage() {
   return (
     <>
       <StampDefs />
-      <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 44px 96px' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, padding: '52px 0 26px' }}>
-          <h1
-            style={{
-              fontFamily: 'var(--serif)',
-              fontVariationSettings: "'opsz' 80",
-              fontWeight: 560,
-              fontSize: 26,
-              letterSpacing: '-.01em',
-              margin: 0,
-            }}
-          >
-            The board
-          </h1>
-          <span className="qb-num" style={{ fontSize: 13, color: 'var(--mute)' }}>
-            {total !== undefined ? `${total} live` : 'loading'}
-          </span>
-          <button
-            type="button"
-            onClick={() => setSortNewest((v) => !v)}
-            style={{
-              marginLeft: 'auto',
-              fontSize: 14,
-              color: 'var(--soft)',
-              background: 'none',
-              border: 0,
-              fontFamily: 'inherit',
-              cursor: 'pointer',
-            }}
-          >
-            Sort:{' '}
-            <b style={{ fontWeight: 500, color: 'var(--ink)' }}>
-              {sortNewest ? 'newly found' : 'best score'}
-            </b>
+      <div className="qb-board-wrap">
+        <div className="qb-board-head">
+          <h1>The board</h1>
+          <span className="qb-live">{total !== undefined ? `${total} live` : 'loading'}</span>
+          <button type="button" className="qb-sort" onClick={() => setSortNewest((v) => !v)}>
+            Sort: <b>{sortNewest ? 'newly found' : 'best score'}</b>
           </button>
         </div>
+
+        <RestockLine />
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
           {VERTICAL_KEYS.map((key) => (
@@ -412,14 +507,14 @@ function BoardPage() {
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 12 }}>
           <input
-            style={{ ...inputStyle, width: 240 }}
+            className="qb-board-filter qb-board-search"
             placeholder="Search the board"
             aria-label="Search the board"
             value={searchRaw}
             onChange={(e) => setSearchRaw(e.target.value)}
           />
           <input
-            style={{ ...inputStyle, width: 110 }}
+            className="qb-board-filter qb-board-pay"
             inputMode="numeric"
             placeholder="pay from $150k"
             aria-label="Pay floor, a year"
@@ -427,7 +522,7 @@ function BoardPage() {
             onChange={(e) => setPayFromRaw(e.target.value)}
           />
           <input
-            style={{ ...inputStyle, width: 110 }}
+            className="qb-board-filter qb-board-pay"
             inputMode="numeric"
             placeholder="to $210k"
             aria-label="Pay ceiling, a year"
@@ -438,6 +533,8 @@ function BoardPage() {
             Only counts pay the posting states; jobs with no stated pay stay on the board.
           </span>
         </div>
+
+        <FirstRunNotice onStartHere={startHere} />
 
         {firstPage.isError && (
           <p style={{ marginTop: 40, fontSize: 14.5, color: 'var(--soft)' }}>

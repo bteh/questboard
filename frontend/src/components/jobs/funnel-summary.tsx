@@ -26,7 +26,7 @@ function StageDeltaLine({ stage }: { stage: FunnelStage }) {
   return (
     <span className="text-[var(--lb-text-tertiary)]">
       <span className="text-[var(--lb-danger)]">−{formatCount(stage.dropped)}</span>
-      {droppedPct >= 1 && <> · {droppedPct.toFixed(0)}%</>}
+      {droppedPct >= 1 && <>, {droppedPct.toFixed(0)}%</>}
     </span>
   );
 }

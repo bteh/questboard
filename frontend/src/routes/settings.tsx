@@ -1,43 +1,40 @@
 import { useRef } from 'react';
-import { createRoute, useNavigate } from '@tanstack/react-router';
+import { createRoute, Link, useNavigate } from '@tanstack/react-router';
 import { Route as appRoute } from './app';
-import { LegacyFrame } from '@/components/layout/legacy-frame';
-import {
-  FileText,
-  Rocket,
-  Search,
-  Sparkles,
-} from 'lucide-react';
 
-import { PageHeader } from '@/components/layout/page-header';
 import { AiProviderTab } from '@/components/settings/AiProviderTab';
 import { TheAiDownloadSection } from '@/components/settings/TheAiDownload';
 import { AutoApplyTab } from '@/components/settings/AutoApplyTab';
 import { ResumeTab } from '@/components/settings/ResumeTab';
 import { SearchPrefsTab } from '@/components/settings/SearchPrefsTab';
+import {
+  SETTINGS_TABS,
+  resolveSettingsTab,
+  type SettingsTab,
+} from '@/components/settings/settings-tabs';
 import { useOnboardingState } from '@/hooks/use-workspace';
-import { cn } from '@/lib/utils';
+import { cx } from '@questboard/ui';
+import '@/components/settings/settings.css';
 
-type SettingsTab = 'resume' | 'search' | 'ai' | 'auto-apply';
-
-const SETTINGS_TABS: SettingsTab[] = ['resume', 'search', 'ai', 'auto-apply'];
-
-function isSettingsTab(value: unknown): value is SettingsTab {
-  return typeof value === 'string' && (SETTINGS_TABS as string[]).includes(value);
-}
+/* Settings, trade paper: four tabs via ?tab=. Search became Restock; old
+   ?tab=search links map onto it. The tab contents keep their working
+   forms. The footer holds the one link back out to the front page. */
 
 export const Route = createRoute({
   getParentRoute: () => appRoute,
   path: '/settings',
-  component: () => (
-    <LegacyFrame>
-      <SettingsPage />
-    </LegacyFrame>
-  ),
+  component: SettingsPage,
   validateSearch: (search: Record<string, unknown>) => ({
-    tab: isSettingsTab(search.tab) ? search.tab : undefined,
+    tab: resolveSettingsTab(search.tab),
   }),
 });
+
+const TAB_LABELS: Record<SettingsTab, string> = {
+  resume: 'Resume',
+  restock: 'Restock',
+  ai: 'AI',
+  'auto-apply': 'Auto-apply',
+};
 
 function SettingsPage() {
   const navigate = useNavigate();
@@ -48,17 +45,10 @@ function SettingsPage() {
   };
   const { data: onboarding } = useOnboardingState();
 
-  const TAB_DEFS: Array<{ id: SettingsTab; label: string; icon: typeof FileText }> = [
-    { id: 'resume', label: 'Resume', icon: FileText },
-    { id: 'search', label: 'Search', icon: Search },
-    { id: 'ai', label: 'AI provider', icon: Sparkles },
-    { id: 'auto-apply', label: 'Auto-apply', icon: Rocket },
-  ];
-
   // Roving tabindex for ArrowLeft/ArrowRight keyboard navigation between tabs.
   const tabButtonRefs = useRef<Record<SettingsTab, HTMLButtonElement | null>>({
     resume: null,
-    search: null,
+    restock: null,
     ai: null,
     'auto-apply': null,
   });
@@ -66,68 +56,57 @@ function SettingsPage() {
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
     event.preventDefault();
     const delta = event.key === 'ArrowRight' ? 1 : -1;
-    const nextIndex = (currentIndex + delta + TAB_DEFS.length) % TAB_DEFS.length;
-    const nextTab = TAB_DEFS[nextIndex].id;
+    const nextIndex = (currentIndex + delta + SETTINGS_TABS.length) % SETTINGS_TABS.length;
+    const nextTab = SETTINGS_TABS[nextIndex];
     setActiveTab(nextTab);
     tabButtonRefs.current[nextTab]?.focus();
   };
 
   return (
-    <div>
-      <PageHeader title="Settings" />
-
-      {/* Real top-level tabs; only the active tab's cards render below.
-          The user only sees one focused page at a time instead of one
-          1500-line scroll. */}
-      <div className="mb-6 border-b border-border-default">
-        <nav className="flex gap-1 overflow-x-auto" role="tablist" aria-label="Settings sections">
-          {TAB_DEFS.map(({ id, label, icon: Icon }, index) => {
-            const isActive = activeTab === id;
-            return (
-              <button
-                key={id}
-                type="button"
-                role="tab"
-                id={`settings-tab-${id}`}
-                aria-controls={`settings-panel-${id}`}
-                aria-selected={isActive}
-                tabIndex={isActive ? 0 : -1}
-                ref={(node) => {
-                  tabButtonRefs.current[id] = node;
-                }}
-                onClick={() => setActiveTab(id)}
-                onKeyDown={(event) => handleTabKeyDown(event, index)}
-                className={cn(
-                  'group inline-flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors -mb-px',
-                  isActive
-                    ? 'border-brand text-text-primary'
-                    : 'border-transparent text-text-tertiary hover:text-text-primary',
-                )}
-              >
-                <Icon className={cn('h-4 w-4 transition-colors', isActive ? 'text-brand' : 'text-text-muted group-hover:text-text-secondary')} />
-                {label}
-              </button>
-            );
-          })}
-        </nav>
+    <div className="qb-settings" style={{ maxWidth: 860, margin: '0 auto', padding: '0 44px 64px' }}>
+      <div className="qb-settings-head">
+        <h1>Settings</h1>
       </div>
 
+      {/* One focused tab at a time; only the active tab's cards render. */}
+      <nav className="qb-settings-tabs" role="tablist" aria-label="Settings sections">
+        {SETTINGS_TABS.map((id, index) => {
+          const isActive = activeTab === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              id={`settings-tab-${id}`}
+              aria-controls={`settings-panel-${id}`}
+              aria-selected={isActive}
+              tabIndex={isActive ? 0 : -1}
+              ref={(node) => {
+                tabButtonRefs.current[id] = node;
+              }}
+              onClick={() => setActiveTab(id)}
+              onKeyDown={(event) => handleTabKeyDown(event, index)}
+              className={cx(isActive && 'qb-active')}
+            >
+              {TAB_LABELS[id]}
+            </button>
+          );
+        })}
+      </nav>
+
       <div
-        className="max-w-3xl space-y-6"
+        className="qb-settings-panel"
         role="tabpanel"
         id={`settings-panel-${activeTab}`}
         aria-labelledby={`settings-tab-${activeTab}`}
         tabIndex={0}
       >
-        {/* ── Resume ──────────────────────────────────────────── */}
         {activeTab === 'resume' && <ResumeTab onboarding={onboarding} navigate={navigate} />}
 
-        {/* ── Search tab: three smaller cards instead of one giant card ───── */}
-        {activeTab === 'search' && (
+        {activeTab === 'restock' && (
           <SearchPrefsTab onboarding={onboarding} navigate={navigate} />
         )}
 
-        {/* ── AI Provider ─────────────────────────────────────── */}
         {activeTab === 'ai' && (
           <>
             <TheAiDownloadSection />
@@ -135,8 +114,13 @@ function SettingsPage() {
           </>
         )}
 
-        {/* ── Auto-Apply ─────────────────────────────────────── */}
         {activeTab === 'auto-apply' && <AutoApplyTab />}
+      </div>
+
+      <div className="qb-settings-foot">
+        <Link to="/welcome" className="qb-textlink" style={{ fontSize: 13.5 }}>
+          See the front page
+        </Link>
       </div>
     </div>
   );

@@ -165,6 +165,13 @@ def list_applications(
         False,
         description="Drop rows whose event_start is already past; rows with no event date pass",
     ),
+    first_quest_ok: bool | None = Query(
+        None,
+        description=(
+            "true keeps only rows whose source stated a beginner-friendly signal; "
+            "rows without the stated signal drop, never guessed in"
+        ),
+    ),
     posted_within_days: int | None = Query(
         None,
         ge=1,
@@ -206,6 +213,7 @@ def list_applications(
             first_seen_run_id=first_seen_run_id,
             exclude_dead=not include_dead,
             upcoming_only=upcoming_only,
+            first_quest_ok=first_quest_ok,
             posted_within_days=posted_within_days,
             event_within_days=event_within_days,
             sort_by=sort_by,

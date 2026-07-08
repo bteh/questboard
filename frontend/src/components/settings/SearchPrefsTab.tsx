@@ -46,7 +46,7 @@ export function SearchPrefsTab({ onboarding, navigate }: SearchPrefsTabProps) {
   const handleSavePreferences = () => {
     savePreferences.mutate(prefsForm, {
       onSuccess: () => toast.success('Preferences saved', {
-        action: { label: 'Start searching', onClick: () => navigate({ to: '/search' }) },
+        action: { label: 'Restock the board', onClick: () => navigate({ to: '/restock' }) },
       }),
       onError: () => toast.error('Failed to save preferences'),
     });

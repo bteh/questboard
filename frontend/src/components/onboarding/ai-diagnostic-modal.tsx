@@ -342,7 +342,7 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
         break;
       case 'open_search':
         onOpenChange(false);
-        navigate({ to: '/search' });
+        navigate({ to: '/restock' });
         break;
       case 'switch_provider':
         // Modal stays open — user picks a new provider below

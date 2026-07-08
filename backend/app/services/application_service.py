@@ -39,6 +39,7 @@ def get_applications(
     first_seen_run_id: str | None = None,
     exclude_dead: bool = False,
     upcoming_only: bool = False,
+    first_quest_ok: bool | None = None,
     posted_within_days: int | None = None,
     event_within_days: int | None = None,
     sort_by: str = "overall_score",
@@ -116,6 +117,19 @@ def get_applications(
                 ApplicationRecord.event_start >= now,
             )
         )
+    if first_quest_ok is not None:
+        # "No experience needed", provably. Only rows whose source stated a
+        # beginner-friendly signal carry the flag; career rows and unmarked
+        # quest rows never have it, so they drop rather than get guessed in.
+        if first_quest_ok:
+            query = query.filter(ApplicationRecord.first_quest_ok.is_(True))
+        else:
+            query = query.filter(
+                or_(
+                    ApplicationRecord.first_quest_ok.is_(False),
+                    ApplicationRecord.first_quest_ok.is_(None),
+                )
+            )
     if posted_within_days is not None:
         # "Posted in the last N days", provably. date_posted is a raw source
         # string, ISO-8601 when the source stated a real date and free text
