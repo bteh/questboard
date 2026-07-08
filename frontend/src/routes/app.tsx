@@ -3,13 +3,18 @@ import { Route as rootRoute } from './__root';
 import { AppShell } from '@/components/shell/app-shell';
 import { HostedAuthScreen } from '@/components/auth/hosted-auth-screen';
 import { useWorkspace } from '@/contexts/workspace-context';
+import { markEntered } from '@/lib/entry';
 
 /* Pathless layout: every app page renders inside the trade-paper shell.
    The hosted-mode auth gate lives here, so landing-class routes under
-   the root never see it. */
+   the root never see it. Reaching any app page counts as entering, so a
+   deep link to /board on a phone never bounces through marketing later. */
 export const Route = createRoute({
   getParentRoute: () => rootRoute,
   id: 'app',
+  beforeLoad: () => {
+    markEntered();
+  },
   component: AppLayout,
 });
 
