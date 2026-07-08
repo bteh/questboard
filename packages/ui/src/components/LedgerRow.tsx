@@ -1,8 +1,11 @@
+import type { ReactNode } from 'react';
+
 export interface LedgerRowProps {
   title: string;
   /* the small muted tag, e.g. the vertical name */
   tag?: string;
-  pay?: string;
+  /* right-aligned mono cell: a pay figure, or any short verdict node */
+  pay?: ReactNode;
   payUnit?: string;
 }
 

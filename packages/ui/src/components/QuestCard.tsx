@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { verticals, type Vertical } from '../tokens';
 import { cx } from '../cx';
 import { Stamp } from './Stamp';
@@ -16,12 +16,14 @@ export interface QuestCardProps {
   title: string;
   href?: string;
   meta: string;
-  needs: string;
+  /* usually a string; a node lets the needs line carry an inline action */
+  needs: ReactNode;
   /* the small mono barrier word, e.g. "prep" */
   bar?: string;
   firstQuest?: boolean;
-  pay: string;
-  payUnit: string;
+  /* omit both pay fields when the posting states no pay; nothing renders */
+  pay?: string;
+  payUnit?: string;
   /* e.g. "Applied, Jun 30"; wins over clippedDate */
   applied?: string;
   /* set once the quest is clipped, e.g. "Jul 7" */
@@ -95,7 +97,13 @@ export function QuestCard({
       </div>
       <div className="qb-qbody">
         <div className="qb-qtitle">
-          <a href={href}>{title}</a>
+          <a
+            href={href}
+            target={href.startsWith('http') ? '_blank' : undefined}
+            rel={href.startsWith('http') ? 'noreferrer' : undefined}
+          >
+            {title}
+          </a>
         </div>
         <div className="qb-meta">
           {meta}
@@ -134,9 +142,11 @@ export function QuestCard({
         )}
       </div>
       <div className="qb-qfoot">
-        <span className="qb-pay">
-          {pay} <span className="qb-u">{payUnit}</span>
-        </span>
+        {pay && (
+          <span className="qb-pay">
+            {pay} {payUnit && <span className="qb-u">{payUnit}</span>}
+          </span>
+        )}
         {showExplain && !applied && (
           <button type="button" className="qb-clip qb-xbtn" onClick={onExplain}>
             Explain this
