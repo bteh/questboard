@@ -1,0 +1,108 @@
+/* The masthead home, ported from packages/ui/reference/quest-board-mock.html
+   (#page-home). Values match the mock; depth is a darker bottom border,
+   never a shadow. Class names carry the qb- prefix like the rest of the
+   ported surfaces. */
+
+.qb-hwrap { max-width: 1120px; margin: 0 auto; padding: 0 44px; }
+
+/* chapter 1: masthead */
+.qb-mast { position: relative; overflow: hidden; }
+.qb-mast-inner { position: relative; padding: 64px 0 0; }
+.qb-lede {
+  font-family: var(--serif);
+  font-variation-settings: 'opsz' 144;
+  font-weight: 560;
+  font-size: 64px; line-height: 1.08; letter-spacing: -.015em;
+  margin: 0; max-width: 900px;
+  text-wrap: balance;
+  /* two lines reserved so the totals arriving never shift the page */
+  min-height: 2.16em;
+}
+.qb-lede .qb-num { color: var(--sage); font-weight: 500; letter-spacing: -.02em; }
+.qb-msub { margin: 18px 0 0; font-size: 16px; color: var(--soft); }
+.qb-msub + .qb-msub { margin-top: 6px; }
+/* min-height reserves the row so the flaps arriving never shift the page */
+.qb-mast .qb-flaprow { margin-top: 30px; min-height: 40px; }
+
+/* engraved horizon, the masthead's closing edge, at masthead scale */
+.qb-home-horizon { display: block; width: 100%; height: 128px; color: var(--ink); margin-top: 6px; }
+
+/* credo line, ink coming into register on scroll */
+.qb-credo { font-size: 16px; color: var(--soft); margin: 0 0 24px; }
+.qb-credo .qb-w { display: inline-block; filter: blur(1px); opacity: .25; transition: filter .2s ease-out, opacity .2s ease-out; }
+.qb-credo .qb-w.qb-on { filter: blur(0); opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .qb-credo .qb-w { filter: none; opacity: 1; transition: none; } }
+
+/* chapters */
+.qb-chapter { margin-top: 96px; }
+.qb-chapter.qb-washed {
+  margin-left: -44px; margin-right: -44px;
+  padding: 26px 44px 30px;
+  background: linear-gradient(180deg, rgba(63, 107, 84, 0), rgba(63, 107, 84, .04) 30%, rgba(63, 107, 84, .04) 70%, rgba(63, 107, 84, 0));
+}
+.qb-ch-title { font-size: 20px; font-weight: 500; margin: 0 0 24px; display: flex; align-items: baseline; gap: 12px; }
+.qb-ch-title .qb-aside { margin-left: auto; font-size: 14px; color: var(--mute); font-weight: 400; }
+
+/* featured bounty card */
+.qb-feat {
+  background: var(--paper); border: 1px solid var(--hair); border-radius: 10px;
+  border-bottom-color: var(--edge);
+  overflow: hidden;
+}
+.qb-feat .qb-band { padding: 8px 24px; height: 36px; gap: 9px; }
+.qb-feat .qb-band span { font-size: 13px; }
+.qb-feat-body { padding: 22px 24px 20px; display: flex; gap: 28px; align-items: flex-start; }
+.qb-feat-body .qb-feat-left { flex: 1; min-width: 0; }
+.qb-feat h3 { font-family: var(--serif); font-variation-settings: 'opsz' 60; font-weight: 560; font-size: 26px; letter-spacing: -.01em; margin: 0 0 6px; line-height: 1.2; }
+.qb-feat h3 a { color: inherit; text-decoration: none; }
+.qb-feat h3 a:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.qb-feat .qb-feat-meta { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 13px; color: var(--mute); }
+.qb-feat .qb-feat-needs { font-size: 14px; color: var(--soft); margin-top: 10px; }
+.qb-feat .qb-feat-actions { margin-top: 18px; display: flex; gap: 18px; align-items: center; }
+.qb-feat-pay { text-align: right; flex-shrink: 0; }
+.qb-feat-pay .qb-p { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 32px; font-weight: 500; letter-spacing: -.02em; line-height: 1; }
+.qb-feat-pay .qb-u { font-size: 13px; color: var(--mute); font-family: var(--mono); }
+.qb-feat-pay .qb-postmark { margin-left: auto; margin-bottom: 10px; }
+
+/* rows: the ledger grammar of "New on the board" */
+.qb-hrows { border-top: 1px solid var(--hair); }
+.qb-hrow {
+  display: grid; grid-template-columns: 40px 1fr 240px 160px 52px;
+  gap: 16px; align-items: center;
+  min-height: 76px; padding: 12px 4px;
+  border-bottom: 1px solid var(--hair);
+  transition: background .15s cubic-bezier(.25, 1, .5, 1);
+  position: relative;
+}
+.qb-hrow:hover { background: var(--step2); }
+@media (prefers-reduced-motion: reduce) { .qb-hrow { transition: none; } }
+.qb-hrow .qb-stampcell { display: grid; place-items: center; }
+.qb-hrow .qb-hmain { min-width: 0; }
+.qb-hrow .qb-htitle { font-size: 16px; font-weight: 500; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qb-hrow .qb-htitle a { color: inherit; text-decoration: none; }
+.qb-hrow .qb-htitle a:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.qb-hrow .qb-hmeta { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 13px; color: var(--mute); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qb-hrow .qb-hneeds { font-size: 13px; color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qb-hrow .qb-paycell { text-align: right; }
+.qb-hrow .qb-hpay { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 500; letter-spacing: -.01em; white-space: nowrap; }
+.qb-hrow .qb-hpay .qb-u { font-size: 13px; color: var(--mute); font-weight: 400; }
+.qb-hrow .qb-hpay.qb-none { color: var(--mute); font-size: 13px; font-weight: 400; }
+.qb-hrow .qb-clipcell { display: grid; place-items: center; }
+
+/* log strip */
+.qb-logstrip { border-top: 1px solid var(--hair); padding-top: 28px; display: flex; gap: 72px; align-items: flex-end; }
+.qb-logstat .qb-lab { font-size: 13px; color: var(--mute); margin-bottom: 4px; }
+.qb-logstat .qb-val { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 500; letter-spacing: -.01em; font-size: 20px; }
+.qb-logstat.qb-senior .qb-val { font-size: 28px; }
+
+@media (max-width: 880px) {
+  .qb-hwrap { padding: 0 18px; }
+  .qb-lede { font-size: 42px; }
+  .qb-hrow { grid-template-columns: 40px 1fr 120px; }
+  .qb-hrow .qb-hneeds, .qb-hrow .qb-clip, .qb-hrow .qb-clipcell { display: none; }
+  .qb-chapter.qb-washed { margin-left: -18px; margin-right: -18px; padding-left: 18px; padding-right: 18px; }
+  .qb-feat-body { flex-direction: column; gap: 14px; }
+  .qb-feat-pay { text-align: left; }
+  .qb-feat-pay .qb-postmark { margin-left: 0; }
+  .qb-logstrip { gap: 40px; flex-wrap: wrap; }
+}

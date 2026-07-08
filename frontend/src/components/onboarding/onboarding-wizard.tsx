@@ -42,12 +42,9 @@ interface OnboardingWizardProps {
   /** Fired when the user finishes the wizard by clicking Save and continue. */
   onComplete: () => void;
   /**
-   * Fired when the user dismisses the wizard without finishing it — the X
-   * button in the corner, or (if you want to) any of the "Skip" affordances.
-   * This is how we keep non-technical users from getting trapped: closing
-   * the wizard once sticks across reloads via useOnboarding's localStorage
-   * flag. Defaults to onComplete for backwards compatibility with callers
-   * that don't care about the distinction.
+   * Fired when the user dismisses the wizard without finishing it: the X
+   * button in the corner, or any of the "Skip" affordances. Defaults to
+   * onComplete for callers that don't care about the distinction.
    */
   onDismiss?: () => void;
 }

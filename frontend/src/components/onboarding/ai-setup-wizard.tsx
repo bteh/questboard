@@ -52,8 +52,7 @@ const STEP_MESSAGES: Record<string, string> = {
  *   2. API key — paste a Gemini/Groq/OpenAI key
  *   3. Advanced — go to Settings for custom endpoints
  *
- * In web dev mode (not desktop), this component should not render —
- * the parent should use InlineAiConnect instead.
+ * Desktop-only: in web mode this component should not render.
  */
 export function AiSetupWizard() {
   const navigate = useNavigate();

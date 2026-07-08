@@ -22,8 +22,8 @@ export function markEntered(): void {
   }
 }
 
-/* Where / sends a returner. PR 3 flips this to '/home' once the masthead
-   home page exists; until then returners land on the board itself. */
-export function entryRedirectTarget(): '/board' | null {
-  return hasEntered() ? '/board' : null;
+/* Where / sends a returner: the masthead home, the subscriber's front page.
+   The pitch never replays for a known reader. */
+export function entryRedirectTarget(): '/home' | null {
+  return hasEntered() ? '/home' : null;
 }

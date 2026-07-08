@@ -3,6 +3,7 @@ import type { useNavigate } from '@tanstack/react-router';
 import { FileText, Loader2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { OnboardingWizard } from '@/components/onboarding/onboarding-wizard';
 import { ResumeAnalysisPanel } from '@/components/settings/resume-analysis-panel';
 import { ResumeAnalysisBanner } from '@/components/shared/resume-analysis-banner';
 import { Button } from '@/components/ui/button';
@@ -15,22 +16,16 @@ import type { OnboardingState } from '@/types/workspace';
 interface ResumeTabProps {
   onboarding: OnboardingState | undefined;
   navigate: ReturnType<typeof useNavigate>;
-  markOnboardingIncomplete: () => void;
 }
 
-export function ResumeTab({ onboarding, navigate, markOnboardingIncomplete }: ResumeTabProps) {
+export function ResumeTab({ onboarding, navigate }: ResumeTabProps) {
   const uploadResume = useUploadWorkspaceResume();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [lastUpload, setLastUpload] = useState<NormalizedResumeUpload | null>(null);
   // Re-mounts the analysis panel with fresh chip state on every new upload.
   const [uploadCount, setUploadCount] = useState(0);
-
-  const handleRestartOnboarding = () => {
-    markOnboardingIncomplete();
-    toast.success('Onboarding will re-open on the next page load.');
-    // Bounce to dashboard so the gate has a chance to re-render the wizard.
-    navigate({ to: '/' });
-  };
+  // The guided wizard's one remaining door: it opens right here, no bounce.
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   const handleUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -76,7 +71,7 @@ export function ResumeTab({ onboarding, navigate, markOnboardingIncomplete }: Re
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-text-primary">{onboarding.resume.filename}</p>
                 <p className="text-xs text-text-muted">
-                  {Math.max(1, Math.round(onboarding.resume.file_size / 1024))} KB · {onboarding.resume.parse_status}
+                  {Math.max(1, Math.round(onboarding.resume.file_size / 1024))} KB, {onboarding.resume.parse_status}
                 </p>
                 {onboarding.resume.parse_warning && !lastUpload && (
                   <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">{onboarding.resume.parse_warning}</p>
@@ -127,17 +122,23 @@ export function ResumeTab({ onboarding, navigate, markOnboardingIncomplete }: Re
         </Button>
         <input ref={fileInputRef} type="file" accept=".pdf,application/pdf" className="hidden" onChange={handleUpload} />
 
-        {/* First-run helpers — small, unobtrusive recovery affordance for
-            users who dismissed the wizard and want to see it again. */}
+        {/* The guided setup's quiet recovery door: with the old dashboard
+            heroes gone, this is where the wizard lives, opened in place. */}
         <div className="border-t border-border-default pt-3">
           <button
             type="button"
-            onClick={handleRestartOnboarding}
+            onClick={() => setWizardOpen(true)}
             className="text-xs text-text-muted transition-colors hover:text-text-secondary"
           >
-            Restart the first-run walkthrough
+            Restart guided setup
           </button>
         </div>
+
+        <OnboardingWizard
+          open={wizardOpen}
+          onComplete={() => setWizardOpen(false)}
+          onDismiss={() => setWizardOpen(false)}
+        />
       </CardContent>
     </Card>
   );

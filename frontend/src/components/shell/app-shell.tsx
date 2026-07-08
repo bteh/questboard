@@ -8,7 +8,7 @@ import { cx } from '@questboard/ui';
 import './app-shell.css';
 
 const PAGE_TITLES: Record<string, string> = {
-  '/': 'Dashboard',
+  '/home': 'Home',
   '/search': 'Search',
   '/applications': 'Your log',
   '/board': 'The board',
@@ -124,7 +124,7 @@ export function AppShell() {
     document.title = `${title}, Questboard`;
   }, [matches]);
 
-  const onHome = Boolean(matchRoute({ to: '/' }));
+  const onHome = Boolean(matchRoute({ to: '/home' }));
   const onBoard = Boolean(matchRoute({ to: '/board' }));
   const onLog = Boolean(matchRoute({ to: '/applications' }));
   const onSettings = Boolean(matchRoute({ to: '/settings' }));
@@ -133,7 +133,7 @@ export function AppShell() {
     <TooltipProvider>
       <div className="qb-page qb-app">
         <aside className="qb-side">
-          <Link to="/" className="qb-brand">
+          <Link to="/home" className="qb-brand">
             <BrandTile />
             <span><b>Questboard</b></span>
           </Link>
@@ -174,7 +174,7 @@ export function AppShell() {
             <AvatarDisc />
           </div>
           <nav className="qb-mobilebar" aria-label="Main">
-            <Link to="/" className={cx('qb-mtab', onHome && 'qb-active')}>
+            <Link to="/home" className={cx('qb-mtab', onHome && 'qb-active')}>
               Home
             </Link>
             <Link to="/board" className={cx('qb-mtab', onBoard && 'qb-active')}>
