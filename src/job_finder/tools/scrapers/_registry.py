@@ -85,6 +85,7 @@ def run_scrapers(
     max_days_old: int = 14,
     watchlist_by_ats: dict[str, list[str]] | None = None,
     filters: dict[str, Any] | None = None,
+    scraper_kwargs: dict[str, dict[str, Any]] | None = None,
 ) -> list[dict]:
     """Run selected scrapers **in parallel** and merge results.
 
@@ -97,6 +98,8 @@ def run_scrapers(
     locations : target locations (used by scrapers that support it)
     max_days_old : max age of listings in days (used by scrapers that support it)
     watchlist_by_ats : mapping of ATS name → list of company slugs from user watchlist
+    scraper_kwargs : optional per-scraper extra kwargs (name -> kwargs), used by
+        quest ingestion to hand query/geo hints only to scrapers that take them
     """
     from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout, as_completed
 
@@ -179,6 +182,8 @@ def run_scrapers(
                 extra = ats_watchlist.get(name, [])
                 if extra:
                     kwargs["watchlist_companies"] = extra
+            if scraper_kwargs and name in scraper_kwargs:
+                kwargs.update(scraper_kwargs[name])
             return name, meta.search_fn(
                 roles=roles,
                 max_results=max_results,

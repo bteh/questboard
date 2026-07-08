@@ -229,6 +229,115 @@ describe('status mapping', () => {
   });
 });
 
+describe('quest rows', () => {
+  it('maps an unpaid camera event honestly: no pay line, no resume line', () => {
+    const card = toBoardCard(
+      makeApp({
+        vertical: 'camera',
+        job_title: 'Jimmy Kimmel Live audience',
+        company: '1iota',
+        source: 'oneiota',
+        location: 'Los Angeles',
+        first_quest_ok: true,
+        event_start: '2026-07-14T12:00:00',
+        quest: { show: 'Jimmy Kimmel Live', age_min: 18, max_tickets: 4 },
+      }),
+      '1iota',
+    );
+    expect(card.vertical).toBe('camera');
+    /* company just restates the source, so the title stands alone */
+    expect(card.title).toBe('Jimmy Kimmel Live audience');
+    expect(card.pay).toBeUndefined();
+    expect(card.payUnit).toBeUndefined();
+    expect(card.meta).toBe('1iota, taping Jul 14, Los Angeles');
+    expect(card.needs).toBe('Needs: ages 18 and up, up to 4 tickets');
+    expect(card.needs).not.toContain('resume');
+    expect(card.firstQuest).toBe(true);
+    expect(card.fit).toBeNull();
+    expect(card.report).toBeNull();
+  });
+
+  it('renders session pay the mock way: "$125" with a "max" unit for up-to chips', () => {
+    const card = toBoardCard(
+      makeApp({
+        vertical: 'study',
+        company: 'FocusGroups.org',
+        source: 'focusgroups_org',
+        location: 'Chicago',
+        salary_min: null,
+        salary_max: 125,
+        salary_period: 'session',
+        salary_source: 'reported',
+        quest: { age_min: 21, age_max: 45, category: 'Focus Group' },
+      }),
+    );
+    expect(card.pay).toBe('$125');
+    expect(card.payUnit).toBe('max');
+    expect(card.needs).toBe('Needs: screener only, ages 21 to 45');
+    expect(card.title).toBe('Data Engineer');
+  });
+
+  it('renders a stated session range with its period word', () => {
+    const card = toBoardCard(
+      makeApp({
+        vertical: 'study',
+        salary_min: 100,
+        salary_max: 125,
+        salary_period: 'session',
+        quest: {},
+      }),
+    );
+    expect(card.pay).toBe('$100–125');
+    expect(card.payUnit).toBe('a session');
+    expect(card.needs).toBe('Needs: screener only');
+  });
+
+  it('renders a casting day rate with its stated hours', () => {
+    const card = toBoardCard(
+      makeApp({
+        vertical: 'camera',
+        salary_min: 500,
+        salary_max: 500,
+        salary_period: 'daily',
+        quest: { session_hours: 12, age_min: 18, age_max: 35, union: 'non-union' },
+      }),
+    );
+    expect(card.pay).toBe('$500');
+    expect(card.payUnit).toBe('/12 hr');
+    expect(card.needs).toBe('Needs: ages 18 to 35, non-union');
+  });
+
+  it('labels rolling sign-ups in the meta instead of an event date', () => {
+    const card = toBoardCard(
+      makeApp({
+        vertical: 'study',
+        source: 'playtestcloud',
+        is_rolling: true,
+        is_remote: true,
+        salary_min: 9,
+        salary_max: 11,
+        salary_period: 'hourly',
+        quest: {},
+      }),
+    );
+    expect(card.meta).toBe('playtestcloud, rolling sign-up, remote');
+    expect(card.pay).toBe('$9–11');
+    expect(card.payUnit).toBe('/hr');
+  });
+
+  it('says nothing in the needs line when the source stated nothing', () => {
+    const card = toBoardCard(makeApp({ vertical: 'lens' }));
+    expect(card.needs).toBe('');
+    expect(card.firstQuest).toBeUndefined();
+  });
+
+  it('keeps rows without a vertical on the career shape', () => {
+    expect(toBoardCard(makeApp()).vertical).toBe('career');
+    expect(toBoardCard(makeApp({ vertical: 'weird' })).vertical).toBe('career');
+    expect(toBoardCard(makeApp({ vertical: 'camera' })).vertical).toBe('camera');
+  });
+});
+
 describe('typed pay range helpers', () => {
   it('parses shorthand amounts', () => {
     expect(parseAmount('150k')).toBe(150000);

@@ -89,6 +89,8 @@ export interface ApplicationResponse extends ApplicationBase {
   event_end?: string | null;
   is_rolling?: boolean;
   first_quest_ok?: boolean;
+  /** Parsed quest_json served by the API; prefer this over quest_json. */
+  quest?: Record<string, unknown> | null;
   quest_json?: string;
   overall_score: number | null;
   technical_score: number | null;
@@ -172,6 +174,8 @@ export interface StatusUpdate {
 export interface ApplicationFilters {
   /** Vertical(s) to list, single or comma list; the API defaults to career. */
   vertical?: string;
+  /** Drop rows whose event_start is already past; rows with no event date pass. */
+  upcoming_only?: boolean;
   status?: string;
   recommendation?: string;
   company_type?: string;

@@ -9,6 +9,7 @@ import {
   Sheet,
   StampDefs,
   TextLink,
+  verticals,
 } from '@questboard/ui';
 import { useApplications, useUpdateStatus } from '@/hooks/use-applications';
 import { useSourceLabels, resolveSourceLabel } from '@/hooks/use-scrapers';
@@ -28,22 +29,40 @@ export const Route = createRoute({
 
 const PAGE_SIZE = 24;
 
+/* The vertical chips row. "All" spans every vertical the board serves;
+   party stays off the row until a party source exists. Quest verticals ask
+   the API for upcoming rows only, so stale tapings never reach the board. */
+type VerticalKey = 'all' | 'career' | 'camera' | 'study' | 'lens';
+
+const VERTICAL_KEYS: VerticalKey[] = ['all', 'career', 'camera', 'study', 'lens'];
+const ALL_VERTICALS = 'career,camera,study,lens';
+
+function verticalParams(key: VerticalKey): Pick<ApplicationFilters, 'vertical' | 'upcoming_only'> {
+  return {
+    vertical: key === 'all' ? ALL_VERTICALS : key,
+    upcoming_only: key === 'career' ? undefined : true,
+  };
+}
+
 /* Preset chips. Each one maps 1:1 onto a real API filter param, so its
    count is the API's own total for that query, never a guess. Chips that
-   share a group write the same param and stay mutually exclusive. */
+   share a group write the same param and stay mutually exclusive.
+   careerOnly presets lean on scoring/company fields quest rows never have,
+   so they hide when a single quest vertical is selected. */
 interface Preset {
   key: string;
   label: string;
   params: Partial<ApplicationFilters>;
   group?: string;
+  careerOnly?: boolean;
 }
 
 const PRESETS: Preset[] = [
   { key: 'remote', label: 'remote', params: { is_remote: true } },
-  { key: 'strong', label: 'strong apply', params: { recommendation: 'STRONG_APPLY' } },
-  { key: 'score50', label: 'scored 50 or better', params: { min_score: 50 } },
-  { key: 'early', label: 'early startup', params: { company_type: 'Early Startup' }, group: 'company' },
-  { key: 'bigtech', label: 'big tech', params: { company_type: 'Big Tech' }, group: 'company' },
+  { key: 'strong', label: 'strong apply', params: { recommendation: 'STRONG_APPLY' }, careerOnly: true },
+  { key: 'score50', label: 'scored 50 or better', params: { min_score: 50 }, careerOnly: true },
+  { key: 'early', label: 'early startup', params: { company_type: 'Early Startup' }, group: 'company', careerOnly: true },
+  { key: 'bigtech', label: 'big tech', params: { company_type: 'Big Tech' }, group: 'company', careerOnly: true },
 ];
 
 function presetParams(activeKeys: Set<string>): Partial<ApplicationFilters> {
@@ -95,6 +114,29 @@ function PresetChip({
   return <Chip label={preset.label} count={data?.total} active={active} onClick={onToggle} />;
 }
 
+function VerticalChip({
+  verticalKey,
+  active,
+  onSelect,
+}: {
+  verticalKey: VerticalKey;
+  active: boolean;
+  onSelect: () => void;
+}) {
+  /* the count is the whole vertical's live total, independent of presets:
+     the chip says what is behind the door, not what the filters keep */
+  const { data } = useApplications({ ...verticalParams(verticalKey), page: 1, page_size: 1 });
+  return (
+    <Chip
+      vertical={verticalKey === 'all' ? 'all' : verticalKey}
+      label={verticalKey === 'all' ? 'All' : verticals[verticalKey].label}
+      count={data?.total}
+      active={active}
+      onClick={onSelect}
+    />
+  );
+}
+
 function BoardCards({
   filters,
   payCeiling,
@@ -135,11 +177,12 @@ function BoardCards({
         return (
           <QuestCard
             key={app.id}
-            vertical="career"
+            vertical={card.vertical}
             title={card.title}
             href={card.href}
             meta={card.meta}
             needs={needs}
+            firstQuest={card.firstQuest}
             pay={card.pay}
             payUnit={card.payUnit}
             applied={card.applied}
@@ -223,6 +266,7 @@ function RequirementSheet({
 
 function BoardPage() {
   const labels = useSourceLabels();
+  const [verticalKey, setVerticalKey] = useState<VerticalKey>('all');
   const [activeKeys, setActiveKeys] = useState<Set<string>>(new Set());
   const [searchRaw, setSearchRaw] = useState('');
   const [payFromRaw, setPayFromRaw] = useState('');
@@ -241,6 +285,7 @@ function BoardPage() {
 
   const baseFilters = useMemo<ApplicationFilters>(
     () => ({
+      ...verticalParams(verticalKey),
       ...presetParams(activeKeys),
       search: search || undefined,
       salary_min: payFloor ?? undefined,
@@ -248,7 +293,7 @@ function BoardPage() {
       sort_order: 'desc',
       page_size: PAGE_SIZE,
     }),
-    [activeKeys, search, payFloor, sortNewest],
+    [verticalKey, activeKeys, search, payFloor, sortNewest],
   );
 
   const filtersKey = JSON.stringify(baseFilters);
@@ -256,6 +301,22 @@ function BoardPage() {
 
   const firstPage = useApplications({ ...baseFilters, page: 1 });
   const total = firstPage.data?.total;
+
+  const questScoped = verticalKey !== 'all' && verticalKey !== 'career';
+  const visiblePresets = PRESETS.filter((p) => !p.careerOnly || !questScoped);
+
+  function selectVertical(key: VerticalKey) {
+    setVerticalKey(key);
+    if (key !== 'all' && key !== 'career') {
+      /* a hidden careerOnly preset must not keep silently filtering the feed */
+      setActiveKeys((prev) => {
+        const next = new Set(
+          [...prev].filter((k) => !PRESETS.find((p) => p.key === k)?.careerOnly),
+        );
+        return next.size === prev.size ? prev : next;
+      });
+    }
+  }
 
   function toggle(key: string) {
     setActiveKeys((prev) => {
@@ -285,6 +346,7 @@ function BoardPage() {
     }
     probe.add(preset.key);
     return {
+      ...verticalParams(verticalKey),
       ...presetParams(probe),
       search: search || undefined,
       salary_min: payFloor ?? undefined,
@@ -342,11 +404,18 @@ function BoardPage() {
         </div>
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-          <Chip vertical="career" label="Career" active count={total} />
+          {VERTICAL_KEYS.map((key) => (
+            <VerticalChip
+              key={key}
+              verticalKey={key}
+              active={verticalKey === key}
+              onSelect={() => selectVertical(key)}
+            />
+          ))}
         </div>
 
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 12 }}>
-          {PRESETS.map((preset) => (
+          {visiblePresets.map((preset) => (
             <PresetChip
               key={preset.key}
               preset={preset}

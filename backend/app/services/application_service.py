@@ -13,6 +13,7 @@ from app.models.application import ApplicationRecord
 
 _ALLOWED_SORT_BY = frozenset({
     "overall_score", "date_found", "company", "job_title", "salary_min", "salary_max",
+    "event_start",
 })
 
 
@@ -37,6 +38,7 @@ def get_applications(
     search_run_id: str | None = None,
     first_seen_run_id: str | None = None,
     exclude_dead: bool = False,
+    upcoming_only: bool = False,
     sort_by: str = "overall_score",
     sort_dir: str = "desc",
     page: int = 1,
@@ -94,6 +96,17 @@ def get_applications(
     if exclude_dead:
         # Hide only CONFIRMED-dead postings; unknown/alive/never-checked stay.
         query = query.filter(ApplicationRecord.url_status != "dead")
+    if upcoming_only:
+        # Drop quests whose taping/session already happened. NULL event_start
+        # (career rows, rolling signups) always passes: "no date" is not
+        # "in the past". Stored values are naive UTC, so compare naive UTC.
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        query = query.filter(
+            or_(
+                ApplicationRecord.event_start.is_(None),
+                ApplicationRecord.event_start >= now,
+            )
+        )
     if search:
         pattern = f"%{search}%"
         query = query.filter(

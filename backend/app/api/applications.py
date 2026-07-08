@@ -56,6 +56,15 @@ def _to_response(record) -> ApplicationResponse:
             gaps = json.loads(record.key_gaps)
     except (json.JSONDecodeError, TypeError):
         pass
+    quest = None
+    try:
+        raw_quest = getattr(record, "quest_json", "") or ""
+        if raw_quest:
+            parsed = json.loads(raw_quest)
+            if isinstance(parsed, dict):
+                quest = parsed
+    except (json.JSONDecodeError, TypeError):
+        pass
 
     return ApplicationResponse(
         id=record.id,
@@ -65,6 +74,7 @@ def _to_response(record) -> ApplicationResponse:
         is_rolling=getattr(record, "is_rolling", False) or False,
         first_quest_ok=getattr(record, "first_quest_ok", False) or False,
         quest_json=getattr(record, "quest_json", "") or "",
+        quest=quest,
         job_title=record.job_title,
         company=record.company,
         location=record.location or "",
@@ -148,6 +158,10 @@ def list_applications(
         None,
         description="Vertical(s) to list, single or comma list (career,camera,study,lens,party). Defaults to career",
     ),
+    upcoming_only: bool = Query(
+        False,
+        description="Drop rows whose event_start is already past; rows with no event date pass",
+    ),
     sort_by: str = "overall_score",
     sort_dir: str = "desc",
     page: int = Query(1, ge=1),
@@ -172,6 +186,7 @@ def list_applications(
             search_run_id=search_run_id,
             first_seen_run_id=first_seen_run_id,
             exclude_dead=not include_dead,
+            upcoming_only=upcoming_only,
             sort_by=sort_by,
             sort_dir=sort_dir,
             page=page,
@@ -598,6 +613,23 @@ def backfill_scores(
     return {"scored": scored, "message": f"Backfilled scores for {scored} jobs"}
 
 
+def _reject_non_career_row(db: Session, app_id: int, workspace) -> None:
+    """400 loudly when auto-apply machinery is pointed at a quest row.
+
+    Cover letters, resume tweaks, and ATS submission only make sense for
+    career applications; a quest row (camera/study/lens/party) reaching this
+    path is a frontend bug, not a 404.
+    """
+    record = application_service.get_application(
+        db, app_id, workspace_id=workspace.workspace.id if workspace else None,
+    )
+    if record and (getattr(record, "vertical", "career") or "career") != "career":
+        raise HTTPException(
+            status_code=400,
+            detail="Prepare/apply is career-only; this is a quest row",
+        )
+
+
 @router.post("/{app_id}/prepare", response_model=PrepareResponse)
 def prepare_application(
     app_id: int,
@@ -610,6 +642,7 @@ def prepare_application(
     Generates missing materials via LLM when available and saves them to the DB.
     """
     profile = sanitize_profile(profile)
+    _reject_non_career_row(db, app_id, workspace)
     result = apply_service.prepare_application(
         db, app_id, profile=profile,
         workspace_id=workspace.workspace.id if workspace else None,
@@ -632,6 +665,7 @@ def submit_application(
     Defaults to dry_run=True for safety. Set dry_run=False for live submission.
     """
     profile = sanitize_profile(profile)
+    _reject_non_career_row(db, app_id, workspace)
     result = apply_service.submit_application(
         db,
         app_id,

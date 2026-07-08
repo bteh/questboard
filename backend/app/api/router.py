@@ -8,6 +8,7 @@ from app.api import (
     locations,
     me,
     onboarding,
+    quests,
     resume,
     scrapers,
     search,
@@ -27,6 +28,7 @@ api_router.include_router(analytics.router, prefix="/api/v1")
 api_router.include_router(dev_auth.router, prefix="/api/v1")
 api_router.include_router(me.router, prefix="/api/v1")
 api_router.include_router(search.router, prefix="/api/v1")
+api_router.include_router(quests.router, prefix="/api/v1")
 api_router.include_router(session.router, prefix="/api/v1")
 api_router.include_router(onboarding.router, prefix="/api/v1")
 api_router.include_router(locations.router, prefix="/api/v1")
