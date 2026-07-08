@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useMatchRoute } from '@tanstack/react-router';
-import { Activity, LayoutDashboard, Search, Briefcase, BarChart3, Settings as SettingsIcon, Zap, Sun, Moon, Monitor } from 'lucide-react';
+import { Activity, LayoutDashboard, Search, Briefcase, BarChart3, Newspaper, Settings as SettingsIcon, Zap, Sun, Moon, Monitor } from 'lucide-react';
 import { useDashboardStats } from '@/hooks/use-analytics';
 import { useLLMStatus } from '@/hooks/use-settings';
 import { useSystemHealth } from '@/hooks/use-system-health';
@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { to: '/' as const, label: 'Dashboard', icon: LayoutDashboard },
   { to: '/search' as const, label: 'Search', icon: Search },
   { to: '/applications' as const, label: 'Applications', icon: Briefcase },
+  { to: '/board' as const, label: 'Board', icon: Newspaper },
   { to: '/analytics' as const, label: 'Analytics', icon: BarChart3 },
   { to: '/settings' as const, label: 'Settings', icon: SettingsIcon },
 ];

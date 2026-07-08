@@ -61,6 +61,13 @@ export interface ApplicationBase {
   work_type: string;
   salary_min: number | null;
   salary_max: number | null;
+  // Normalized pay fields, absent on records saved before they shipped.
+  // The annualized pair backs pay filtering; display always uses the raw
+  // stated numbers so we never show a figure the posting did not state.
+  salary_currency?: string;
+  salary_period?: string;
+  salary_min_annualized?: number | null;
+  salary_max_annualized?: number | null;
   // Additive provenance fields — absent on records scored before they shipped.
   salary_source?: 'reported' | 'parsed_from_description' | null;
   work_type_confidence?: 'reported' | 'inferred' | null;
@@ -164,6 +171,8 @@ export interface ApplicationFilters {
   sort_order?: 'asc' | 'desc';
   min_score?: number;
   is_remote?: boolean;
+  /** Annual pay floor; the API keeps rows with no stated pay. */
+  salary_min?: number;
   page?: number;
   page_size?: number;
   profile?: string;

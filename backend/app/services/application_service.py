@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
-from sqlalchemy import func, or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from app.models.application import ApplicationRecord
@@ -28,6 +28,7 @@ def get_applications(
     company_type: str | None = None,
     is_remote: bool | None = None,
     work_type: str | None = None,
+    salary_min: float | None = None,
     profile: str | None = None,
     workspace_id: str | None = None,
     search_run_id: str | None = None,
@@ -56,6 +57,25 @@ def get_applications(
         query = query.filter(ApplicationRecord.is_remote == is_remote)
     if work_type:
         query = query.filter(ApplicationRecord.work_type == work_type)
+    if salary_min is not None:
+        # Annual pay floor. Mirrors job_finder.pipeline._job_salary_passes:
+        # prefer annualized values, use the range midpoint when both ends are
+        # stated, and KEEP rows with no salary data (dropping them would hide
+        # most listings, and "no pay stated" is not "pays below the floor").
+        lo = func.coalesce(
+            ApplicationRecord.salary_min_annualized, ApplicationRecord.salary_min
+        )
+        hi = func.coalesce(
+            ApplicationRecord.salary_max_annualized, ApplicationRecord.salary_max
+        )
+        query = query.filter(
+            or_(
+                and_(lo.is_(None), hi.is_(None)),
+                and_(lo.isnot(None), hi.isnot(None), (lo + hi) / 2 >= salary_min),
+                and_(lo.is_(None), hi.isnot(None), hi >= salary_min),
+                and_(lo.isnot(None), hi.is_(None), lo >= salary_min),
+            )
+        )
     if workspace_id:
         query = query.filter(ApplicationRecord.workspace_id == workspace_id)
     elif profile:

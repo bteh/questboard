@@ -6,6 +6,7 @@ import { Route as applicationsRoute } from './routes/applications';
 import { Route as analyticsRoute } from './routes/analytics';
 import { Route as settingsRoute } from './routes/settings';
 import { Route as designRoute } from './routes/design';
+import { Route as boardRoute } from './routes/board';
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
@@ -14,6 +15,7 @@ const routeTree = rootRoute.addChildren([
   analyticsRoute,
   settingsRoute,
   designRoute,
+  boardRoute,
 ]);
 
 export const router = createRouter({ routeTree });
