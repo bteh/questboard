@@ -176,6 +176,10 @@ export interface ApplicationFilters {
   vertical?: string;
   /** Drop rows whose event_start is already past; rows with no event date pass. */
   upcoming_only?: boolean;
+  /** Keep only rows provably posted in the last N days; unverifiable dates drop. */
+  posted_within_days?: number;
+  /** Keep only rows whose taping/session date falls in the next N days. */
+  event_within_days?: number;
   status?: string;
   recommendation?: string;
   company_type?: string;

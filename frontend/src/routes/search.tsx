@@ -134,8 +134,8 @@ function SearchPage() {
 
   // First-run hand-off: when the brand-new user's very first search completes,
   // ship them straight to the results so they don't get stranded staring at
-  // the run log. Only fires once — the flag is set in the onboarding wizard
-  // and FirstRunHero quick-search path, then cleared here.
+  // the run log. Only fires once: the flag is set in the onboarding wizard,
+  // then cleared here.
   useEffect(() => {
     if (state !== 'completed' || !runId) return;
     let pending: string | null = null;
@@ -150,7 +150,7 @@ function SearchPage() {
     } catch {
       // ignore
     }
-    toast.success('Your first search is ready — opening your top matches.');
+    toast.success('Your first search is ready. Opening your top matches.');
     navigate({
       to: '/applications',
       search: { run: runId, scope: undefined },
@@ -309,7 +309,7 @@ function SearchPage() {
 
         toast.success('Search updated from your resume', {
           id: SUGGEST_TOAST_ID,
-          description: updatedParts.join(' · '),
+          description: updatedParts.join(', '),
         });
       },
       onError: (error) => {

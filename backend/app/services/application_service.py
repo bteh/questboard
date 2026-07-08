@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
@@ -39,6 +39,8 @@ def get_applications(
     first_seen_run_id: str | None = None,
     exclude_dead: bool = False,
     upcoming_only: bool = False,
+    posted_within_days: int | None = None,
+    event_within_days: int | None = None,
     sort_by: str = "overall_score",
     sort_dir: str = "desc",
     page: int = 1,
@@ -106,6 +108,35 @@ def get_applications(
                 ApplicationRecord.event_start.is_(None),
                 ApplicationRecord.event_start >= now,
             )
+        )
+    if posted_within_days is not None:
+        # "Posted in the last N days", provably. date_posted is a raw source
+        # string, ISO-8601 when the source stated a real date and free text
+        # ("Reposted 9 Days Ago") when it did not. Only rows whose stored
+        # value sorts inside [now - N days, now + 1 day] count; ISO strings
+        # compare correctly as text, and the future-bounded upper edge drops
+        # every non-ISO value (letters and bare day counts sort above it).
+        # A date-only string from yesterday cannot prove it is inside a
+        # 24-hour window, so it does not count: undercounting is the honest
+        # side of that ambiguity. Rows the classifier marked "missing" never
+        # count even if a string survives.
+        now = datetime.now(timezone.utc)
+        lower = (now - timedelta(days=posted_within_days)).strftime("%Y-%m-%dT%H:%M:%S")
+        upper = (now + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S")
+        query = query.filter(
+            ApplicationRecord.date_posted >= lower,
+            ApplicationRecord.date_posted <= upper,
+            func.lower(func.coalesce(ApplicationRecord.date_confidence, "")) != "missing",
+        )
+    if event_within_days is not None:
+        # Rows whose taping/session date falls inside the next N days. Only
+        # real event_start values count; rows with no event date are not
+        # "happening this week". Stored values are naive UTC.
+        now_naive = datetime.now(timezone.utc).replace(tzinfo=None)
+        query = query.filter(
+            ApplicationRecord.event_start.isnot(None),
+            ApplicationRecord.event_start >= now_naive,
+            ApplicationRecord.event_start <= now_naive + timedelta(days=event_within_days),
         )
     if search:
         pattern = f"%{search}%"

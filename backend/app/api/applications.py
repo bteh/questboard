@@ -162,6 +162,22 @@ def list_applications(
         False,
         description="Drop rows whose event_start is already past; rows with no event date pass",
     ),
+    posted_within_days: int | None = Query(
+        None,
+        ge=1,
+        description=(
+            "Keep only rows whose true post date provably falls inside the last N days; "
+            "rows with no verifiable post date are dropped, never guessed in"
+        ),
+    ),
+    event_within_days: int | None = Query(
+        None,
+        ge=1,
+        description=(
+            "Keep only rows whose taping/session date (event_start) falls inside the next N days; "
+            "rows with no event date are dropped"
+        ),
+    ),
     sort_by: str = "overall_score",
     sort_dir: str = "desc",
     page: int = Query(1, ge=1),
@@ -187,6 +203,8 @@ def list_applications(
             first_seen_run_id=first_seen_run_id,
             exclude_dead=not include_dead,
             upcoming_only=upcoming_only,
+            posted_within_days=posted_within_days,
+            event_within_days=event_within_days,
             sort_by=sort_by,
             sort_dir=sort_dir,
             page=page,

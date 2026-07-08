@@ -9,12 +9,14 @@ import { Route as analyticsRoute } from './routes/analytics';
 import { Route as settingsRoute } from './routes/settings';
 import { Route as designRoute } from './routes/design';
 import { Route as boardRoute } from './routes/board';
+import { Route as homeRoute } from './routes/home';
 
 /* App pages live under the pathless 'app' layout (the trade-paper shell
    plus the hosted auth gate). The entry switch at /, the landing at
    /welcome, and the design sheet render bare under the root. */
 const routeTree = rootRoute.addChildren([
   appRoute.addChildren([
+    homeRoute,
     searchRoute,
     applicationsRoute,
     analyticsRoute,

@@ -69,9 +69,8 @@ describe('the entry switch at /', () => {
     expect(entryRedirectTarget()).toBeNull();
   });
 
-  it('sends a returner to the board', () => {
-    /* NB: PR 3 flips the target to /home once the masthead home exists */
+  it('sends a returner to the masthead home', () => {
     stubStorage({ [ENTERED_KEY]: '1' });
-    expect(entryRedirectTarget()).toBe('/board');
+    expect(entryRedirectTarget()).toBe('/home');
   });
 });

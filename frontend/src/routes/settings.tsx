@@ -16,7 +16,6 @@ import { AutoApplyTab } from '@/components/settings/AutoApplyTab';
 import { ResumeTab } from '@/components/settings/ResumeTab';
 import { SearchPrefsTab } from '@/components/settings/SearchPrefsTab';
 import { useOnboardingState } from '@/hooks/use-workspace';
-import { useOnboarding } from '@/hooks/use-onboarding';
 import { cn } from '@/lib/utils';
 
 type SettingsTab = 'resume' | 'search' | 'ai' | 'auto-apply';
@@ -48,7 +47,6 @@ function SettingsPage() {
     navigate({ to: '/settings', search: { tab: next === 'resume' ? undefined : next } });
   };
   const { data: onboarding } = useOnboardingState();
-  const { markIncomplete: markOnboardingIncomplete } = useOnboarding();
 
   const TAB_DEFS: Array<{ id: SettingsTab; label: string; icon: typeof FileText }> = [
     { id: 'resume', label: 'Resume', icon: FileText },
@@ -122,13 +120,7 @@ function SettingsPage() {
         tabIndex={0}
       >
         {/* ── Resume ──────────────────────────────────────────── */}
-        {activeTab === 'resume' && (
-          <ResumeTab
-            onboarding={onboarding}
-            navigate={navigate}
-            markOnboardingIncomplete={markOnboardingIncomplete}
-          />
-        )}
+        {activeTab === 'resume' && <ResumeTab onboarding={onboarding} navigate={navigate} />}
 
         {/* ── Search tab: three smaller cards instead of one giant card ───── */}
         {activeTab === 'search' && (
