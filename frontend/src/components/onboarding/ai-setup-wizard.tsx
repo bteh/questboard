@@ -40,7 +40,7 @@ interface OllamaSetupStatus {
 const STEP_MESSAGES: Record<string, string> = {
   installing: 'Setting up local AI engine...',
   pulling: 'Downloading AI model...',
-  configuring: 'Configuring Launchboard...',
+  configuring: 'Configuring Questboard...',
   ready: 'Local AI is ready!',
 };
 

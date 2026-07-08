@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Install the latest built Launchboard.app into /Applications."""
+"""Install the latest built Questboard.app into /Applications."""
 
 from __future__ import annotations
 
@@ -13,12 +13,12 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--source",
-        default="frontend/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/Launchboard.app",
-        help="Path to the built Launchboard.app bundle.",
+        default="frontend/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/Questboard.app",
+        help="Path to the built Questboard.app bundle.",
     )
     parser.add_argument(
         "--destination",
-        default="/Applications/Launchboard.app",
+        default="/Applications/Questboard.app",
         help="Install destination for the app bundle.",
     )
     parser.add_argument(
@@ -43,7 +43,7 @@ def main() -> int:
 
     if destination.exists():
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        backup_target = backup_dir / f"Launchboard-{timestamp}.app"
+        backup_target = backup_dir / f"Questboard-{timestamp}.app"
         destination.rename(backup_target)
         print(f"Backed up existing app to {backup_target}")
 

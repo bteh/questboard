@@ -1,5 +1,5 @@
 /**
- * Launchboard mark: a rising arrow launching from an origin dot.
+ * Questboard mark: a rising arrow launching from an origin dot.
  * Reads as "launch / upward trajectory", on-brand with the warm growth theme
  * and legible down to 14px. Renders in currentColor (white on the sage tile).
  */

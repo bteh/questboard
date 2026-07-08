@@ -4,7 +4,7 @@
 # Why this exists: cliproxyapi runs as a brew-managed background service
 # but doesn't auto-refresh Claude OAuth tokens reliably. When the token
 # expires (~12-24h cadence), every request to the proxy fails with
-# `auth_unavailable` and Launchboard shows "AI disconnected". The fix is
+# `auth_unavailable` and Questboard shows "AI disconnected". The fix is
 # to stop the daemon, run `cliproxyapi -login` interactively to capture
 # a fresh OAuth code, then restart the daemon.
 #
@@ -58,5 +58,5 @@ else
 fi
 
 echo
-info "Done. Launchboard's 'AI disconnected' banner will clear within 2 minutes,"
+info "Done. Questboard's 'AI disconnected' banner will clear within 2 minutes,"
 info "or hit Settings → AI → Test Connection to force-refresh."

@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Verify Launchboard desktop bundle")
+    parser = argparse.ArgumentParser(description="Verify Questboard desktop bundle")
     parser.add_argument(
         "--bundle-root",
         default="frontend/src-tauri/target/release/bundle",
@@ -50,8 +50,8 @@ def resolve_bundle_root(bundle_root: Path) -> Path:
 
 
 def verify_macos_bundle(bundle_root: Path) -> None:
-    app_binary = bundle_root / "macos" / "Launchboard.app" / "Contents" / "MacOS" / "launchboard-desktop"
-    sidecar = bundle_root / "macos" / "Launchboard.app" / "Contents" / "Resources" / "sidecars" / "launchboard-runtime"
+    app_binary = bundle_root / "macos" / "Questboard.app" / "Contents" / "MacOS" / "questboard-desktop"
+    sidecar = bundle_root / "macos" / "Questboard.app" / "Contents" / "Resources" / "sidecars" / "questboard-runtime"
     dmg_dir = bundle_root / "dmg"
 
     if not app_binary.exists():

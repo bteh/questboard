@@ -15,7 +15,7 @@ const pythonCandidates = [
 const python = pythonCandidates.find((candidate) => existsSync(candidate))
 
 if (!python) {
-  console.error('Launchboard desktop build requires the repo virtualenv. Run `make setup` first.')
+  console.error('Questboard desktop build requires the repo virtualenv. Run `make setup` first.')
   process.exit(1)
 }
 

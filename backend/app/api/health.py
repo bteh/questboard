@@ -118,7 +118,7 @@ def _get_tips(
     """Generate actionable tips for things that need setup."""
     tips = []
     if not profiles:
-        tips.append("Run 'launchboard-setup' or 'make setup' to create your first profile")
+        tips.append("Run 'questboard-setup' or 'make setup' to create your first profile")
     if not resume_found:
         tips.append("Add your resume PDF to the knowledge/ directory for scoring")
     if not llm_provider:

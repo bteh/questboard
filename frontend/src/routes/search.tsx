@@ -135,13 +135,13 @@ function SearchPage() {
     if (state !== 'completed' || !runId) return;
     let pending: string | null = null;
     try {
-      pending = window.localStorage.getItem('launchboard:first-run-pending');
+      pending = window.localStorage.getItem('questboard:first-run-pending');
     } catch {
       pending = null;
     }
     if (pending !== '1') return;
     try {
-      window.localStorage.removeItem('launchboard:first-run-pending');
+      window.localStorage.removeItem('questboard:first-run-pending');
     } catch {
       // ignore
     }
@@ -411,7 +411,7 @@ function SearchPage() {
       desc: llmAvailable ? 'Rank + draft cover letters + company notes' : 'Requires AI',
       detail: llmAvailable
         ? `Searches ${boardsLabel}, ranks by resume fit, drafts tailored cover letters, and prepares company background notes. You always review before applying.`
-        : 'Connect AI to unlock tailored cover letters, company notes, and the full Launchboard workflow. Basic search and ranking still work without it.',
+        : 'Connect AI to unlock tailored cover letters, company notes, and the full Questboard workflow. Basic search and ranking still work without it.',
       icon: Bot,
       color: 'text-[#A64B2A] dark:text-[#D98A6A]',
       bg: 'bg-[#F6E4DA]/60 dark:bg-[#D98A6A]/8',

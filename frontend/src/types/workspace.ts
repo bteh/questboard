@@ -162,7 +162,7 @@ export interface WorkspaceSearchRunResponse {
 /**
  * LLM-tailored search profile generated from the workspace's resume.
  *
- * The whole point of this object is to make Launchboard work for *any*
+ * The whole point of this object is to make Questboard work for *any*
  * career, not just the seven hardcoded archetype templates. A user with
  * an unusual or multi-domain background gets a profile generated
  * specifically for them — covering niches we never modeled (climate

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Launchboard doctor — single command health check.
+"""Questboard doctor — single command health check.
 
 Run with `make doctor` or `python3 scripts/doctor.py`. Designed to be useful
 to a non-technical user trying to figure out why their search isn't returning
@@ -124,9 +124,9 @@ class Doctor:
         if self.has_failures:
             print(red("  Doctor found problems. See FAIL items above for hints."))
         elif warns:
-            print(yellow("  Launchboard is healthy. A few warnings worth reviewing above."))
+            print(yellow("  Questboard is healthy. A few warnings worth reviewing above."))
         else:
-            print(green("  Launchboard is healthy. All checks passed."))
+            print(green("  Questboard is healthy. All checks passed."))
         print()
 
 
@@ -184,7 +184,7 @@ def check_imports(repo: Path) -> tuple[str, str, str]:
 
 
 def _db_paths(repo: Path) -> list[Path]:
-    """All SQLite DB files Launchboard can be reading from."""
+    """All SQLite DB files Questboard can be reading from."""
     candidates = [
         repo / "backend" / "data" / "job_tracker.db",
         repo / "data" / "job_tracker.db",
@@ -301,7 +301,7 @@ def check_llm_config(repo: Path) -> tuple[str, str, str]:
         return (
             WARN,
             "no LLM configured",
-            "Launchboard works without AI but ranking is keyword-only. Connect a provider in Settings → AI.",
+            "Questboard works without AI but ranking is keyword-only. Connect a provider in Settings → AI.",
         )
     return PASS, f"LLM ready ({provider}, {model})", ""
 
@@ -366,7 +366,7 @@ def check_demo_fixtures(repo: Path) -> tuple[str, str, str]:
 def main() -> int:
     repo = Path(__file__).resolve().parent.parent
     print()
-    print(bold("  Launchboard doctor"))
+    print(bold("  Questboard doctor"))
     print(dim(f"  repo: {repo}"))
     print()
 

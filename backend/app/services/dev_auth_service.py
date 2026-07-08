@@ -82,7 +82,7 @@ def _place(
 _DEFAULT_PERSONAS: tuple[dict[str, Any], ...] = (
     {
         "id": "maya-chen",
-        "email": "maya.chen@launchboard.dev",
+        "email": "maya.chen@questboard.dev",
         "full_name": "Maya Chen",
         "headline": "Principal product designer moving deeper into AI tools",
         "background": "Eight years across B2B SaaS, design systems, and high-velocity startup product work.",
@@ -132,7 +132,7 @@ _DEFAULT_PERSONAS: tuple[dict[str, Any], ...] = (
     },
     {
         "id": "diego-alvarez",
-        "email": "diego.alvarez@launchboard.dev",
+        "email": "diego.alvarez@questboard.dev",
         "full_name": "Diego Alvarez",
         "headline": "Staff data engineer targeting AI platform and infrastructure teams",
         "background": "Ten years in data engineering, backend systems, and analytics platforms for growth-stage companies.",
@@ -181,7 +181,7 @@ _DEFAULT_PERSONAS: tuple[dict[str, Any], ...] = (
     },
     {
         "id": "olivia-thomas",
-        "email": "olivia.thomas@launchboard.dev",
+        "email": "olivia.thomas@questboard.dev",
         "full_name": "Olivia Thomas",
         "headline": "Nurse practitioner moving from acute care into telehealth",
         "background": "Seven years across family practice, urgent care, and patient education with strong care-coordination experience.",
@@ -229,7 +229,7 @@ _DEFAULT_PERSONAS: tuple[dict[str, Any], ...] = (
     },
     {
         "id": "jordan-lee",
-        "email": "jordan.lee@launchboard.dev",
+        "email": "jordan.lee@questboard.dev",
         "full_name": "Jordan Lee",
         "headline": "Customer success leader pivoting toward operations and AI enablement",
         "background": "Six years leading support and customer success programs for SaaS teams, with a strong process and tooling bias.",
@@ -470,7 +470,7 @@ def decode_access_token(token: str) -> dict[str, Any]:
 def _build_pdf_bytes(text: str) -> bytes:
     lines = [line.strip()[:88] for line in text.splitlines() if line.strip()]
     if not lines:
-        lines = ["Launchboard Dev Persona Resume"]
+        lines = ["Questboard Dev Persona Resume"]
     escaped = [
         line.encode("ascii", "replace").decode("ascii").replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
         for line in lines[:36]
@@ -669,7 +669,7 @@ def provision_test_account(
     reset: bool = False,
 ) -> tuple[str, str, str]:
     normalized_email = _normalize_email(email)
-    normalized_name = " ".join(full_name.split()).strip() or normalized_email.split("@")[0] or "Launchboard User"
+    normalized_name = " ".join(full_name.split()).strip() or normalized_email.split("@")[0] or "Questboard User"
     user_id = user_id_for_email(normalized_email)
 
     from app.services import auth_service

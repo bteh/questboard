@@ -6,7 +6,7 @@ search endpoint at ``/wday/cxs/{tenant}/{site_id}/jobs`` that requires no
 authentication and returns structured job data including full descriptions.
 
 This scraper searches multiple Workday-powered career portals in parallel,
-filters by role keywords and location, and returns results in Launchboard's
+filters by role keywords and location, and returns results in Questboard's
 standard job dict format.
 
 Employer configs are loaded from ``config/workday_employers.yaml``.
@@ -369,7 +369,7 @@ def _search_employer(
     roles: list[str] | None,
     max_results: int,
 ) -> list[dict]:
-    """Search a single Workday employer and return Launchboard job dicts."""
+    """Search a single Workday employer and return Questboard job dicts."""
     # Build search queries from roles — pick diverse representative terms
     # rather than always taking the first N, which may cluster in one category
     if roles:

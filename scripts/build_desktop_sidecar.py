@@ -22,11 +22,11 @@ def pyinstaller_work_dir() -> Path:
 
 
 def sidecar_name() -> str:
-    return "launchboard-runtime.exe" if sys.platform == "win32" else "launchboard-runtime"
+    return "questboard-runtime.exe" if sys.platform == "win32" else "questboard-runtime"
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Build Launchboard desktop sidecar")
+    parser = argparse.ArgumentParser(description="Build Questboard desktop sidecar")
     parser.add_argument(
         "--target-arch",
         default="",
@@ -66,7 +66,7 @@ def build_sidecar(*, target_arch: str = "") -> Path:
         "--clean",
         "--onefile",
         "--name",
-        "launchboard-runtime",
+        "questboard-runtime",
         "--distpath",
         str(output_dir),
         "--workpath",

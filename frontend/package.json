@@ -1,8 +1,8 @@
 {
-  "name": "@launchboard/frontend",
+  "name": "@questboard/frontend",
   "private": true,
   "version": "0.2.0",
-  "description": "Launchboard web frontend — React + TanStack Router + Tailwind",
+  "description": "Questboard web frontend — React + TanStack Router + Tailwind",
   "license": "MIT",
   "type": "module",
   "scripts": {

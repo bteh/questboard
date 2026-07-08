@@ -143,7 +143,7 @@ def user_from_claims(claims: dict[str, Any]) -> HostedUser:
         or metadata.get("name")
         or claims.get("full_name")
         or email.split("@")[0]
-        or "Launchboard User"
+        or "Questboard User"
     )
     avatar_url = str(metadata.get("avatar_url") or metadata.get("picture") or "").strip()
     return HostedUser(

@@ -32,10 +32,10 @@ class SearchDefaultsStrictnessTest(unittest.TestCase):
             k: os.environ.get(k)
             for k in [
                 "DATA_DIR", "WORKSPACE_STORAGE_DIR", "HOSTED_MODE",
-                "MANAGE_SCHEMA_ON_STARTUP", "DATABASE_URL", "LAUNCHBOARD_DESKTOP_MODE",
+                "MANAGE_SCHEMA_ON_STARTUP", "DATABASE_URL", "QUESTBOARD_DESKTOP_MODE",
             ]
         }
-        self.temp_dir = tempfile.mkdtemp(prefix="launchboard-defaults-test-")
+        self.temp_dir = tempfile.mkdtemp(prefix="questboard-defaults-test-")
         data_dir = os.path.join(self.temp_dir, "data")
         os.makedirs(data_dir, exist_ok=True)
         self.db_path = os.path.join(data_dir, "job_tracker.db")
@@ -44,7 +44,7 @@ class SearchDefaultsStrictnessTest(unittest.TestCase):
         os.environ["HOSTED_MODE"] = "false"
         os.environ["MANAGE_SCHEMA_ON_STARTUP"] = "true"
         os.environ["DATABASE_URL"] = f"sqlite:///{self.db_path}"
-        os.environ["LAUNCHBOARD_DESKTOP_MODE"] = "true"
+        os.environ["QUESTBOARD_DESKTOP_MODE"] = "true"
         for name in list(sys.modules):
             if name == "app" or name.startswith("app.") or name.startswith("job_finder.models"):
                 sys.modules.pop(name, None)

@@ -2,7 +2,7 @@
 
 ## Our standard
 
-Launchboard is an open-source project and contributor community. Participation is expected to stay respectful, constructive, and professional.
+Questboard is an open-source project and contributor community. Participation is expected to stay respectful, constructive, and professional.
 
 Examples of behavior that help the project:
 
@@ -30,7 +30,7 @@ Project maintainers may edit, remove, or reject comments, issues, pull requests,
 
 ## Reporting
 
-If you experience or witness unacceptable behavior, report it privately to the maintainers through the contact method listed in [SECURITY.md](/Users/briantehsayy/Desktop/launchboard/SECURITY.md) or the repository owner contact listed on GitHub.
+If you experience or witness unacceptable behavior, report it privately to the maintainers through the contact method listed in [SECURITY.md](/Users/briantehsayy/Desktop/questboard/SECURITY.md) or the repository owner contact listed on GitHub.
 
 ## Notes
 

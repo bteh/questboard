@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { useWorkspace } from '@/contexts/workspace-context';
 import { useOnboardingState } from '@/hooks/use-workspace';
 
-const STORAGE_KEY = 'launchboard:onboarding-complete';
+const STORAGE_KEY = 'questboard:onboarding-complete';
 
 function readPersisted(): boolean {
   try {
@@ -42,7 +42,7 @@ function writePersisted(value: boolean): void {
  *   1. If the workspace server reports `has_started_search === true`,
  *      onboarding is DONE (the user already ran a search, no wizard ever).
  *   2. If the user has saved preferences (OnboardingWizard.handleSave fires
- *      `launchboard:onboarding-complete = "1"`), onboarding is DONE.
+ *      `questboard:onboarding-complete = "1"`), onboarding is DONE.
  *   3. If the user calls `dismiss()` (Skip from welcome step, X button, or
  *      the in-session state from OnboardingGate), onboarding is DONE.
  *   4. The `markIncomplete()` helper is exposed so a "Restart onboarding"

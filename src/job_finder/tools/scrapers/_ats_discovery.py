@@ -20,7 +20,7 @@ Discovery is best-effort: a DDG failure (rate limit, network, parser drift)
 logs a warning and returns whatever's currently cached. ATS scrapers still
 run on their seed list even when discovery breaks.
 
-Disable via ``LAUNCHBOARD_DISABLE_ATS_DISCOVERY=1`` if you ever need to.
+Disable via ``QUESTBOARD_DISABLE_ATS_DISCOVERY=1`` if you ever need to.
 """
 
 from __future__ import annotations
@@ -113,7 +113,7 @@ def _cache_path(host: str) -> Path:
 
 
 def _discovery_disabled() -> bool:
-    return os.environ.get("LAUNCHBOARD_DISABLE_ATS_DISCOVERY", "").strip().lower() in {"1", "true", "yes"}
+    return os.environ.get("QUESTBOARD_DISABLE_ATS_DISCOVERY", "").strip().lower() in {"1", "true", "yes"}
 
 
 def extract_slug(host: str, url: str) -> str | None:

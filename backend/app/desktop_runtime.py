@@ -1,4 +1,4 @@
-"""Local desktop runtime entrypoint for Launchboard."""
+"""Local desktop runtime entrypoint for Questboard."""
 
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ def configure_desktop_environment(
     os.environ["CONFIG_DIR"] = str(config_dir)
     os.environ["MANAGE_SCHEMA_ON_STARTUP"] = "true"
     os.environ["CORS_ORIGINS"] = ",".join(desktop_cors_origins(dev_origin))
-    os.environ["LAUNCHBOARD_DESKTOP_MODE"] = "true"
+    os.environ["QUESTBOARD_DESKTOP_MODE"] = "true"
 
 
 def parse_args() -> argparse.Namespace:
@@ -51,7 +51,7 @@ def parse_args() -> argparse.Namespace:
     default_resume_dir = repo_root / "knowledge"
     default_config_dir = repo_root / "src" / "job_finder" / "config"
 
-    parser = argparse.ArgumentParser(description="Launchboard desktop runtime")
+    parser = argparse.ArgumentParser(description="Questboard desktop runtime")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", default=8765, type=int)
     parser.add_argument("--data-dir", default=str(default_data_dir))

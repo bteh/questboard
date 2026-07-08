@@ -38,7 +38,7 @@ class StrictnessDefaultMigrationTest(unittest.TestCase):
             "DATABASE_URL": os.environ.get("DATABASE_URL"),
             "MANAGE_SCHEMA_ON_STARTUP": os.environ.get("MANAGE_SCHEMA_ON_STARTUP"),
         }
-        self.temp_dir = tempfile.mkdtemp(prefix="launchboard-strictness-test-")
+        self.temp_dir = tempfile.mkdtemp(prefix="questboard-strictness-test-")
         self.db_path = os.path.join(self.temp_dir, "hosted.db")
         self.database_url = f"sqlite:///{self.db_path}"
         os.environ["DATABASE_URL"] = self.database_url

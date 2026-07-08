@@ -135,7 +135,7 @@ export function SearchConfigForm({
           <div className="rounded-xl border border-brand/20 bg-brand-light/20 p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm font-medium text-text-primary">Launchboard works best with AI connected.</p>
+                <p className="text-sm font-medium text-text-primary">Questboard works best with AI connected.</p>
                 <p className="mt-1 text-xs text-text-muted">
                   Start with basic search now. Connect AI when you want resume-fit ranking, search suggestions, target-company autofill, and tailored draft materials.
                 </p>
@@ -248,7 +248,7 @@ export function SearchConfigForm({
                     </p>
                     <p className="text-xs text-text-muted mt-1">
                       {onboarding?.resume.exists
-                        ? 'Launchboard can derive a first search from your resume right away. Connect AI from the sidebar if you want auto-fill, deeper fit ranking, and drafting.'
+                        ? 'Questboard can derive a first search from your resume right away. Connect AI from the sidebar if you want auto-fill, deeper fit ranking, and drafting.'
                         : 'This gets you basic search right away. Upload a resume and connect AI later if you want auto-fill and deeper ranking.'}
                     </p>
                   </div>
@@ -510,7 +510,7 @@ export function SearchConfigForm({
                     </div>
                   )}
                   {!missingSearchTerms && !missingLocations && parsedRoles.length === 0 && parsedKeywords.length === 0 && canUseResumeFallback && (
-                    <p className="text-xs text-text-muted text-center mt-2">No roles or keywords entered. Launchboard will derive them from your uploaded resume for this run.</p>
+                    <p className="text-xs text-text-muted text-center mt-2">No roles or keywords entered. Questboard will derive them from your uploaded resume for this run.</p>
                   )}
                   {!missingSearchTerms && !missingLocations && usesRemoteFallback && (
                     <p className="text-xs text-text-muted text-center mt-2">No place selected yet, so this run will keep remote jobs everywhere until you add one.</p>

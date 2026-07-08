@@ -35,7 +35,7 @@ class DevHostedAuthTest(unittest.TestCase):
             "SUPABASE_URL",
             "SUPABASE_JWT_AUDIENCE",
         ]}
-        self.temp_dir = tempfile.mkdtemp(prefix="launchboard-dev-hosted-auth-")
+        self.temp_dir = tempfile.mkdtemp(prefix="questboard-dev-hosted-auth-")
         self.data_dir = os.path.join(self.temp_dir, "data")
         self.workspace_dir = os.path.join(self.temp_dir, "workspaces")
         self.db_path = os.path.join(self.data_dir, "job_tracker.db")
@@ -44,7 +44,7 @@ class DevHostedAuthTest(unittest.TestCase):
         os.environ["WORKSPACE_STORAGE_DIR"] = self.workspace_dir
         os.environ["HOSTED_MODE"] = "true"
         os.environ["DEV_HOSTED_AUTH"] = "true"
-        os.environ["DEV_HOSTED_AUTH_SECRET"] = "launchboard-dev-secret-key-1234567890"
+        os.environ["DEV_HOSTED_AUTH_SECRET"] = "questboard-dev-secret-key-1234567890"
         os.environ["MANAGE_SCHEMA_ON_STARTUP"] = "true"
         os.environ["DATABASE_URL"] = f"sqlite:///{self.db_path}"
         os.environ.pop("SUPABASE_URL", None)

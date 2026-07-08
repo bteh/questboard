@@ -151,7 +151,7 @@ export function ReadyToLaunchHero() {
             });
             activate(result.run_id, 'search_score', snapshot);
             try {
-              window.localStorage.setItem('launchboard:first-run-pending', '1');
+              window.localStorage.setItem('questboard:first-run-pending', '1');
             } catch {
               // ignore
             }
@@ -187,7 +187,7 @@ export function ReadyToLaunchHero() {
         });
         activate(result.run_id, 'search_score', snapshot);
         try {
-          window.localStorage.setItem('launchboard:first-run-pending', '1');
+          window.localStorage.setItem('questboard:first-run-pending', '1');
         } catch {
           // localStorage may be disabled in some sandboxed shells; non-fatal.
         }

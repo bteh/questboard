@@ -6,7 +6,7 @@ keywords, scraper allowlist, target roles, comp targets) tailored to one
 career family — healthcare, education, government, trades, nonprofit, etc.
 
 The motivation is the user-friendliness ask: a non-technical user opening
-Launchboard for the first time shouldn't have to fight tech-coded defaults
+Questboard for the first time shouldn't have to fight tech-coded defaults
 to find a nursing job. The archetype picker on the first-run wizard maps
 their profession to one of these presets, which swaps the defaults so the
 search and scoring feel native to their field.

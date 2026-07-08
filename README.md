@@ -1,14 +1,14 @@
-# Launchboard
+# Questboard
 
-**AI-powered job search agent.** Upload your resume, set your target roles, and Launchboard searches 14+ job boards, scores every listing against your background, drafts tailored cover letters, and tracks your pipeline — all on your own machine.
+**AI-powered job search agent.** Upload your resume, set your target roles, and Questboard searches 14+ job boards, scores every listing against your background, drafts tailored cover letters, and tracks your pipeline, all on your own machine.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![CI](https://github.com/bteh/launchboard/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/bteh/launchboard/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![CI](https://github.com/bteh/questboard/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/bteh/questboard/actions/workflows/ci.yml)
 
 ## Quick start
 
 ```bash
-git clone https://github.com/bteh/launchboard.git
-cd launchboard
+git clone https://github.com/bteh/questboard.git
+cd questboard
 make setup
 make dev
 ```
@@ -19,13 +19,13 @@ That's it. Open [localhost:5173](http://localhost:5173), upload your resume, set
 
 ## What it does
 
-- **Searches 14+ sources in parallel** — Indeed, Glassdoor, LinkedIn, Greenhouse / Lever / Ashby ATS boards (preloaded with 150+ active startup slugs), YC Work at a Startup, RemoteOK, Hacker News Who's Hiring, and more
+- **Searches 14+ sources in parallel**: Indeed, Glassdoor, LinkedIn, Greenhouse / Lever / Ashby ATS boards (preloaded with 150+ active startup slugs), YC Work at a Startup, RemoteOK, Hacker News Who's Hiring, and more
 - **Scores every job** across 7 weighted dimensions: skills match, leadership, career progression, comp, platform building, company trajectory, culture fit
 - **Drafts cover letters and resume tweaks** for top matches via your LLM
 - **Auto-applies** through Greenhouse + Lever APIs (opt-in, dry-run by default, capped per run)
-- **Tracks your pipeline** end-to-end — analytics dashboard, status flow, CSV export
+- **Tracks your pipeline** end-to-end: analytics dashboard, status flow, CSV export
 
-Profession-agnostic: works for engineers, nurses, marketers, designers — prompts and scoring keywords adapt via your YAML profile.
+Profession-agnostic: works for engineers, nurses, marketers, designers. Prompts and scoring keywords adapt via your YAML profile.
 
 ## Connect AI (optional)
 
@@ -42,7 +42,7 @@ brew install ollama && ollama pull llama3.2:3b
 
 10 providers configurable in Settings (Gemini, Groq, Cerebras, OpenRouter, Mistral, DeepSeek, SambaNova, OpenAI, Anthropic, Ollama). Any OpenAI-compatible endpoint works via Custom Provider. Detail in [docs/ai-access.md](docs/ai-access.md).
 
-> **Heads up:** ChatGPT Plus and Claude Pro are chat-only subscriptions — they don't include API access for third-party apps. Use the free options above.
+> **Heads up:** ChatGPT Plus and Claude Pro are chat-only subscriptions and don't include API access for third-party apps. Use the free options above.
 
 ## Self-hosting
 
@@ -54,7 +54,7 @@ Runs the full stack with optional bundled Ollama. Configure your LLM in `.env`. 
 
 ## Desktop app
 
-Launchboard is moving toward a desktop-first experience (Tauri shell + Python sidecar runtime). Build locally:
+Questboard is moving toward a desktop-first experience (Tauri shell + Python sidecar runtime). Build locally:
 
 ```bash
 make desktop-dev      # dev mode against your local repo .venv
@@ -76,10 +76,10 @@ Architecture and conventions: [CLAUDE.md](CLAUDE.md). Contributing guide: [CONTR
 
 ## Reliability boundaries
 
-- **Local code paths are deterministic** — search, offline scoring, ATS detection, persistence
-- **LLM outputs are drafts** — cover letters, resume tweaks, and company research are not web-grounded; verify factual claims yourself
-- **Auto-apply is opt-in** — `dry_run: true` by default, only Greenhouse/Lever, only STRONG_APPLY jobs, capped per run
-- **Dedup is URL-keyed** — exact duplicates are removed; fuzzy cross-board duplicates with different URLs can survive
+- **Local code paths are deterministic**: search, offline scoring, ATS detection, persistence
+- **LLM outputs are drafts**: cover letters, resume tweaks, and company research are not web-grounded; verify factual claims yourself
+- **Auto-apply is opt-in**: `dry_run: true` by default, only Greenhouse/Lever, only STRONG_APPLY jobs, capped per run
+- **Dedup is URL-keyed**: exact duplicates are removed; fuzzy cross-board duplicates with different URLs can survive
 
 ## Contributing
 
@@ -94,11 +94,11 @@ gh pr create --fill
 CODEOWNERS auto-requests review from maintainers. CI must be green and the PR needs 1 approval before merge. Full workflow + setup in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 **Project principles:**
-1. **AI-enhanced, not AI-dependent** — offline search and scoring always work
-2. **No heavy frameworks** — plain Python, shallow dependency tree (no CrewAI, no LangChain)
-3. **Profession-agnostic** — adapts to any career field via profile YAML
-4. **Graceful degradation** — LLM calls return `None` on failure, pipeline never crashes
-5. **Local-first** — SQLite, local files, no cloud required
+1. **AI-enhanced, not AI-dependent**: offline search and scoring always work
+2. **No heavy frameworks**: plain Python, shallow dependency tree (no CrewAI, no LangChain)
+3. **Profession-agnostic**: adapts to any career field via profile YAML
+4. **Graceful degradation**: LLM calls return `None` on failure, pipeline never crashes
+5. **Local-first**: SQLite, local files, no cloud required
 
 ## License
 

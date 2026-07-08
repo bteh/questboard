@@ -77,7 +77,7 @@ logger = logging.getLogger(__name__)
 # HTTP 400 "location not parsed" for "City, ST" inputs.
 _DEFAULT_JOBSPY_BOARDS: list[str] = ["indeed"]
 _LINKEDIN_JOBSPY_BOARD = "linkedin"
-_DESKTOP_SESSION_HEADER = "X-Launchboard-Session"
+_DESKTOP_SESSION_HEADER = "X-Questboard-Session"
 
 _TITLE_KEYWORDS = {
     "engineer", "engineering", "manager", "director", "designer", "analyst",
@@ -494,7 +494,7 @@ def _set_workspace_cookies(response: Response, session_token: str, csrf_token: s
 
 
 def _desktop_mode_enabled() -> bool:
-    return os.environ.get("LAUNCHBOARD_DESKTOP_MODE", "").strip().lower() == "true"
+    return os.environ.get("QUESTBOARD_DESKTOP_MODE", "").strip().lower() == "true"
 
 
 def _session_token_from_request(request: Request) -> str | None:
@@ -789,10 +789,10 @@ def save_workspace_llm_config(
     settings = get_settings()
     if settings.hosted_mode and not settings.allow_workspace_llm_config:
         raise HTTPException(status_code=403, detail="Hosted AI is platform-managed")
-    if settings.hosted_mode and settings.allow_workspace_llm_config and not os.getenv("LAUNCHBOARD_SECRET"):
+    if settings.hosted_mode and settings.allow_workspace_llm_config and not os.getenv("QUESTBOARD_SECRET"):
         raise HTTPException(
             status_code=503,
-            detail="Hosted BYO AI requires LAUNCHBOARD_SECRET so workspace keys can be stored safely.",
+            detail="Hosted BYO AI requires QUESTBOARD_SECRET so workspace keys can be stored safely.",
         )
     record = _get_workspace_preferences_record(db, workspace_id)
     if not record:

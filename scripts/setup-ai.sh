@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Setup AI for Launchboard — installs Ollama + pulls a model so AI works out of the box.
+# Setup AI for Questboard — installs Ollama + pulls a model so AI works out of the box.
 # Called by `make setup`. Can also be run standalone: ./scripts/setup-ai.sh
 
 set -euo pipefail
@@ -53,7 +53,7 @@ fi
 echo ""
 info "AI Setup"
 echo ""
-echo "  Launchboard uses AI to score jobs, write cover letters, and"
+echo "  Questboard uses AI to score jobs, write cover letters, and"
 echo "  research companies. The easiest option is Ollama — a free,"
 echo "  private AI that runs on your machine (no account needed)."
 echo ""

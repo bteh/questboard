@@ -42,7 +42,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Launchboard API",
+    title="Questboard API",
     version="0.2.0",
     description="AI-powered job search & application tracking API",
     lifespan=lifespan,

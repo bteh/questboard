@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Launchboard",
+  "productName": "Questboard",
   "version": "0.2.0",
-  "identifier": "com.launchboard.desktop",
+  "identifier": "com.questboard.desktop",
   "build": {
     "beforeDevCommand": "npm run desktop:dev:web",
     "devUrl": "http://127.0.0.1:5173",
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Launchboard",
+        "title": "Questboard",
         "width": 1480,
         "height": 980,
         "minWidth": 1180,

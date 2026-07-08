@@ -32,7 +32,7 @@ class LocalSchemaMigrationTest(unittest.TestCase):
             "MANAGE_SCHEMA_ON_STARTUP",
             "DATABASE_URL",
         ]}
-        self.temp_dir = tempfile.mkdtemp(prefix="launchboard-local-migrate-")
+        self.temp_dir = tempfile.mkdtemp(prefix="questboard-local-migrate-")
         self.data_dir = os.path.join(self.temp_dir, "data")
         self.workspace_dir = os.path.join(self.temp_dir, "workspaces")
         self.db_path = os.path.join(self.data_dir, "job_tracker.db")

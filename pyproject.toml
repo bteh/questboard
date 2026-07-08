@@ -1,5 +1,5 @@
 [project]
-name = "launchboard"
+name = "questboard"
 version = "0.2.0"
 description = "AI-powered job search pipeline — scrape, score, optimize, and track job applications"
 readme = "README.md"
@@ -36,8 +36,8 @@ dependencies = [
 ]
 
 [project.scripts]
-launchboard = "job_finder.main:run"
-launchboard-setup = "job_finder.setup:run_setup"
+questboard = "job_finder.main:run"
+questboard-setup = "job_finder.setup:run_setup"
 job-finder = "job_finder.main:run"
 search-jobs = "job_finder.main:search"
 score-jobs = "job_finder.main:score"
@@ -47,9 +47,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project.urls]
-Homepage = "https://github.com/bteh/launchboard"
-Repository = "https://github.com/bteh/launchboard"
-Issues = "https://github.com/bteh/launchboard/issues"
+Homepage = "https://github.com/bteh/questboard"
+Repository = "https://github.com/bteh/questboard"
+Issues = "https://github.com/bteh/questboard/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/job_finder"]

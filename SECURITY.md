@@ -19,7 +19,7 @@ Please report issues such as:
 - insecure handling of API keys or tokens
 - arbitrary file access, SSRF, command execution, or injection bugs
 - resume or job data exposure
-- dependency vulnerabilities with a realistic impact on Launchboard
+- dependency vulnerabilities with a realistic impact on Questboard
 
 ## What not to report publicly
 
@@ -28,7 +28,7 @@ Please report issues such as:
 
 ## Scope notes
 
-Launchboard integrates with third-party job sources and AI providers. Some upstream scraping, rate limiting, or provider-policy issues may be product risks without being security vulnerabilities. When in doubt, report privately and include why you think the issue is security-relevant.
+Questboard integrates with third-party job sources and AI providers. Some upstream scraping, rate limiting, or provider-policy issues may be product risks without being security vulnerabilities. When in doubt, report privately and include why you think the issue is security-relevant.
 
 ## Response goals
 

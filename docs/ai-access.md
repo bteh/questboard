@@ -2,11 +2,11 @@
 
 _Last updated: April 6, 2026_
 
-Launchboard is now a **desktop-first, open-source** product. That changes which AI access patterns are practical and which ones we should avoid.
+Questboard is now a **desktop-first, open-source** product. That changes which AI access patterns are practical and which ones we should avoid.
 
 ## Supported today
 
-These are the supported AI connection paths for Launchboard desktop:
+These are the supported AI connection paths for Questboard desktop:
 
 - **Gemini API key**
 - **OpenAI API key**
@@ -18,7 +18,7 @@ This is the product-safe baseline because it is easy to explain, easy to support
 
 ## Not supported today
 
-These are **not** supported as first-class Launchboard features right now:
+These are **not** supported as first-class Questboard features right now:
 
 - **Use my ChatGPT account**
 - **Use my Claude account**
@@ -37,7 +37,7 @@ OpenAI also officially supports **Codex** local tooling with ChatGPT plans:
 - [Using Codex with your ChatGPT plan](https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan)
 - [Codex CLI](https://developers.openai.com/codex/cli)
 
-That means local account-backed use is becoming more realistic, but it is still different from Launchboard directly signing into a ChatGPT subscription as if it were normal app API access.
+That means local account-backed use is becoming more realistic, but it is still different from Questboard directly signing into a ChatGPT subscription as if it were normal app API access.
 
 ## Why Claude account login is not a supported path
 
@@ -49,7 +49,7 @@ Anthropic does officially support **Claude Code** with Pro/Max:
 
 - [Using Claude Code with your Pro or Max plan](https://support.anthropic.com/en/articles/11145838-using-claude-code-with-your-pro-or-max-plan)
 
-But that still does **not** mean Launchboard should present Claude account login as a normal supported product feature.
+But that still does **not** mean Questboard should present Claude account login as a normal supported product feature.
 
 ## What open-source tools are doing
 
@@ -58,11 +58,11 @@ There are active desktop/local tools exploring account-backed access:
 - [OpenCode](https://opencode.ai/) documents ChatGPT and Claude-related provider paths in a local tool context.
 - [ChatMock](https://github.com/RayBytes/ChatMock) exposes a local OpenAI-compatible server backed by OpenAI/Codex login.
 
-Those examples are useful product references, but they are **not** the same as a cleanly supported Launchboard feature.
+Those examples are useful product references, but they are **not** the same as a cleanly supported Questboard feature.
 
 ## Product decision
 
-Launchboard should use this rule set:
+Questboard should use this rule set:
 
 - **Supported now:** API keys, Ollama, custom local endpoints
 - **Possible later:** desktop-only experimental ChatGPT-account integration if it can be built on an official local OpenAI path

@@ -295,7 +295,7 @@ class GeneratedProfile(BaseModel):
     `archetype.confidence` and `archetype.reasoning` fields, which expose
     the LLM's introspection.
 
-    The whole point is to make Launchboard work for *any* career, not
+    The whole point is to make Questboard work for *any* career, not
     just the seven hardcoded buckets. A user with an unusual or
     multi-domain background gets a profile generated specifically for
     them, rather than being forced into the closest preset.
@@ -335,7 +335,7 @@ class GeneratedProfile(BaseModel):
     )
     recommended_external_boards: list[str] = Field(
         default_factory=list,
-        description="URLs of niche job boards Launchboard does NOT yet scrape but that this candidate should manually check. Lets the system surface domain-specific boards (aijobs.ai for AI, web3.career for crypto, USAJobs.gov for government, etc.) without us needing a scraper for every one.",
+        description="URLs of niche job boards Questboard does NOT yet scrape but that this candidate should manually check. Lets the system surface domain-specific boards (aijobs.ai for AI, web3.career for crypto, USAJobs.gov for government, etc.) without us needing a scraper for every one.",
     )
     primary_strengths: list[str] = Field(
         default_factory=list,

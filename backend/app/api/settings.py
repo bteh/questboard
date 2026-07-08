@@ -47,7 +47,7 @@ def _workspace_scoped_llm_mode() -> bool:
     settings = get_settings()
     return bool(
         settings.hosted_mode
-        or os.environ.get("LAUNCHBOARD_DESKTOP_MODE", "").strip().lower() == "true"
+        or os.environ.get("QUESTBOARD_DESKTOP_MODE", "").strip().lower() == "true"
     )
 
 

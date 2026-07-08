@@ -86,7 +86,7 @@ export function FirstRunHero() {
   const handleQuickSearch = () => {
     const trimmed = jobTitle.trim();
     if (!trimmed) {
-      toast.error('Type a job title to try Launchboard.');
+      toast.error('Type a job title to try Questboard.');
       return;
     }
     if (!data?.preferences) {
@@ -117,7 +117,7 @@ export function FirstRunHero() {
         });
         activate(result.run_id, 'search_score', snapshot);
         try {
-          window.localStorage.setItem('launchboard:first-run-pending', '1');
+          window.localStorage.setItem('questboard:first-run-pending', '1');
         } catch {
           // localStorage may be unavailable in sandboxed shells; non-fatal.
         }
@@ -178,7 +178,7 @@ export function FirstRunHero() {
         {/* Fallback — quick keyword search */}
         <div className="space-y-3">
           <p className="text-center text-sm text-text-muted">
-            or skip the resume — type a job title to try Launchboard first
+            or skip the resume — type a job title to try Questboard first
           </p>
           <div className="flex gap-2">
             <div className="relative flex-1">

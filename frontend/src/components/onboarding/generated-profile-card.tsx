@@ -21,7 +21,7 @@ import type { GeneratedProfile } from '@/types/workspace';
 /**
  * Renders an LLM-generated profile next to (or instead of) the hardcoded
  * archetype templates in the ReadyToLaunchHero. The whole point is to
- * show the user that Launchboard tailored a profile *specifically for
+ * show the user that Questboard tailored a profile *specifically for
  * them* — covering niches we never modeled — instead of forcing them
  * into the closest preset.
  *

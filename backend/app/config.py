@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     hosted_mode: bool = False
     dev_hosted_auth: bool = False
     dev_hosted_auth_secret: str = ""
-    dev_hosted_auth_issuer: str = "https://launchboard.dev.local/auth/v1"
+    dev_hosted_auth_issuer: str = "https://questboard.dev.local/auth/v1"
     dev_hosted_personas_path: str = ""
     dev_hosted_auth_token_ttl_hours: int = 12
     session_cookie_name: str = "lb_session"
@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_anon_key: str = ""
     supabase_service_role_key: str = ""
-    supabase_storage_bucket: str = "launchboard-private"
+    supabase_storage_bucket: str = "questboard-private"
     supabase_jwt_audience: str = "authenticated"
     supabase_jwt_secret: str = ""
     supabase_jwks_url: str = ""
@@ -84,11 +84,11 @@ class Settings(BaseSettings):
 
     @property
     def resolved_dev_hosted_auth_secret(self) -> str:
-        return self.dev_hosted_auth_secret.strip() or "launchboard-dev-hosted-auth-secret-key"
+        return self.dev_hosted_auth_secret.strip() or "questboard-dev-hosted-auth-secret-key"
 
     @property
     def resolved_dev_hosted_auth_issuer(self) -> str:
-        return self.dev_hosted_auth_issuer.strip() or "https://launchboard.dev.local/auth/v1"
+        return self.dev_hosted_auth_issuer.strip() or "https://questboard.dev.local/auth/v1"
 
     @property
     def allow_workspace_llm_config(self) -> bool:

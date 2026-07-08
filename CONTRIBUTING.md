@@ -1,6 +1,6 @@
-# Contributing to Launchboard
+# Contributing to Questboard
 
-Thanks for your interest in improving Launchboard! This guide covers setup, conventions, and how to submit changes.
+Thanks for your interest in improving Questboard! This guide covers setup, conventions, and how to submit changes.
 
 ## Prerequisites
 
@@ -10,8 +10,8 @@ Thanks for your interest in improving Launchboard! This guide covers setup, conv
 ## Development Setup
 
 ```bash
-git clone https://github.com/bteh/launchboard.git
-cd launchboard
+git clone https://github.com/bteh/questboard.git
+cd questboard
 make setup    # creates venv, installs Python + Node deps, copies .env
 ```
 
@@ -22,7 +22,7 @@ make setup    # creates venv, installs Python + Node deps, copies .env
 ```bash
 make dev      # starts backend (localhost:8000) + frontend (localhost:5173)
 make desktop-dev  # starts the Tauri desktop shell against the local runtime
-make desktop-install  # builds and refreshes /Applications/Launchboard.app
+make desktop-install  # builds and refreshes /Applications/Questboard.app
 make desktop-smoke  # runs the desktop onboarding/upload/search smoke flow
 make backend  # backend only
 make frontend # frontend only

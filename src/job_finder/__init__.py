@@ -1,1 +1,1 @@
-"""Launchboard — AI-powered job search agent."""
+"""Questboard — AI-powered job search agent."""

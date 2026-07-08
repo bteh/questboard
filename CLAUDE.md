@@ -1,4 +1,4 @@
-# CLAUDE.md -- Launchboard
+# CLAUDE.md -- Questboard
 
 AI-powered job search agent. Searches 14+ job boards, scores jobs against your resume
 using 7-dimension weighted scoring, generates tailored application materials via LLM,
