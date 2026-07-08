@@ -1,0 +1,23 @@
+/* Trade-paper design tokens, ported from reference/quest-board-mock.html */
+:root {
+  --ground: #F6F3EC;
+  --step2: #EFEBE0;
+  --hair: #E4DED1;
+  --step4: #CFC8B8;
+  --mute: rgba(28, 27, 23, .66);
+  --soft: rgba(28, 27, 23, .84);
+  --ink: #1C1B17;
+  --paper: #FFFFFF;
+  --edge: #D9D1BF;
+  --sage: #3F6B54;
+  --sage-dark: #345A46;
+  --clay: #A6522E;
+  --ochre: #8A6A1F;
+  --slate: #44607A;
+  --wine: #7D3B4C;
+  --radius-control: 4px;
+  --radius-card: 10px;
+  --serif: 'Fraunces', ui-serif, Georgia, serif;
+  --sans: 'Atkinson Hyperlegible Next', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+  --mono: ui-monospace, 'SF Mono', 'Berkeley Mono', 'JetBrains Mono', Menlo, monospace;
+}

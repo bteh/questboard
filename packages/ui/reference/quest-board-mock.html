@@ -1,0 +1,1657 @@
+<title>Launchboard concept v9</title>
+<style>
+@font-face {
+  font-family: 'Fraunces';
+  src: url(data:font/woff2;base64,__SERIF_B64__) format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: 'Atkinson Hyperlegible Next';
+  src: url(data:font/woff2;base64,__SANS_B64__) format('woff2');
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: block;
+}
+:root {
+  --ground: #F6F3EC;
+  --step2: #EFEBE0;
+  --hair: #E4DED1;
+  --step4: #CFC8B8;
+  --mute: rgba(28,27,23,.66);
+  --soft: rgba(28,27,23,.84);
+  --ink: #1C1B17;
+  --paper: #FFFFFF;
+  --edge: #D9D1BF;
+  --sage: #3F6B54;
+  --sage-dark: #345A46;
+  --clay: #A6522E;
+  --ochre: #8A6A1F;
+  --slate: #44607A;
+  --wine: #7D3B4C;
+  --serif: 'Fraunces', ui-serif, Georgia, serif;
+  --sans: 'Atkinson Hyperlegible Next', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+  --mono: ui-monospace, 'SF Mono', 'Berkeley Mono', 'JetBrains Mono', Menlo, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--sans);
+  font-size: 16px; font-weight: 400;
+  background: var(--ground);
+  color: var(--ink);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.app { display: flex; min-height: 100vh; }
+
+/* sidebar */
+.side {
+  width: 224px; flex-shrink: 0;
+  background: var(--paper);
+  border-right: 1px solid var(--hair);
+  padding: 22px 14px;
+  display: flex; flex-direction: column; gap: 2px;
+  position: sticky; top: 0; height: 100vh;
+}
+.brand { display: flex; align-items: center; gap: 10px; margin: 0 6px 26px; cursor: pointer; background: none; border: 0; padding: 0; font-family: inherit; text-align: left; }
+.brand-tile { width: 32px; height: 32px; border-radius: 8px; background: var(--sage); display: grid; place-items: center; }
+.brand-tile svg { width: 16px; height: 16px; }
+.brand b { font-weight: 500; font-size: 15px; color: var(--ink); display: block; line-height: 1.2; }
+.brand small { color: var(--mute); font-size: 12px; font-weight: 400; display: block; }
+.nav-item {
+  display: flex; align-items: center; gap: 11px;
+  padding: 8px 11px; border-radius: 4px;
+  color: var(--soft); font-weight: 400; font-size: 15px;
+  cursor: pointer; border: 0; background: none; font-family: inherit; width: 100%; text-align: left;
+}
+.nav-item svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 1.5; fill: none; stroke-linecap: round; stroke-linejoin: round; opacity: .8; }
+.nav-item.active { background: var(--ground); color: var(--ink); font-weight: 500; }
+.nav-item.soon { color: var(--step4); cursor: default; }
+.nav-item.soon em { font-style: normal; font-size: 12px; margin-left: auto; }
+.side-note { margin-top: auto; font-size: 13px; color: var(--mute); line-height: 1.5; padding: 0 6px; }
+
+/* main + topbar */
+.main { flex: 1; min-width: 0; overflow-x: clip; }
+.topbar {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 44px;
+  border-bottom: 1px solid var(--hair);
+  background: var(--paper);
+}
+.search {
+  flex: 1; max-width: 380px;
+  display: flex; align-items: center; gap: 9px;
+  border: 1px solid var(--hair); border-radius: 4px; background: var(--ground);
+  padding: 7px 12px; color: var(--mute); font-size: 14px;
+}
+.search svg { width: 15px; height: 15px; stroke: currentColor; stroke-width: 1.5; fill: none; }
+.avatar {
+  margin-left: auto;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--sage-dark); color: #fff;
+  display: grid; place-items: center;
+  font-size: 12px; font-weight: 500;
+}
+.mobilebar { display: none; align-items: center; gap: 6px; padding: 10px 16px; background: var(--paper); border-bottom: 1px solid var(--hair); }
+.mobilebar .mtab { border: 1px solid var(--hair); background: var(--ground); border-radius: 4px; padding: 6px 13px; font-family: inherit; font-size: 14px; color: var(--soft); cursor: pointer; }
+.mobilebar .mtab.active { background: var(--ink); border-color: var(--ink); color: var(--ground); }
+
+.page { display: none; }
+.page.on { display: block; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 44px; }
+
+/* chapter 1: masthead */
+.mast { position: relative; overflow: hidden; }
+.mast-inner { position: relative; padding: 64px 0 0; }
+h1.lede {
+  font-family: var(--serif);
+  font-variation-settings: 'opsz' 144;
+  font-weight: 560;
+  font-size: 64px; line-height: 1.08; letter-spacing: -.015em;
+  margin: 0; max-width: 900px;
+  text-wrap: balance;
+}
+h1.lede .num { color: var(--sage); font-weight: 500; letter-spacing: -.02em; }
+.mast .sub { margin: 18px 0 0; font-size: 16px; color: var(--soft); }
+
+/* split-flap row */
+.flaprow { display: flex; gap: 44px; row-gap: 14px; margin-top: 30px; align-items: center; flex-wrap: wrap; }
+.fgroup { display: inline-flex; align-items: center; gap: 10px; }
+.fcells { display: inline-flex; gap: 2px; }
+.flap {
+  width: 29px; height: 40px;
+  background: linear-gradient(#FFFFFF, #EDEBE4);
+  border: 1px solid var(--hair); border-radius: 4px;
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-size: 21px; font-weight: 500; color: var(--ink);
+  display: grid; place-items: center;
+  position: relative;
+}
+.flap::after { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: rgba(28,27,23,.10); }
+.flap.tick { animation: flapflip .11s linear; }
+@keyframes flapflip {
+  0% { transform: perspective(220px) rotateX(0); }
+  49% { transform: perspective(220px) rotateX(-86deg); }
+  51% { transform: perspective(220px) rotateX(86deg); }
+  100% { transform: perspective(220px) rotateX(0); }
+}
+.fcap { font-size: 14px; color: var(--soft); }
+@media (prefers-reduced-motion: reduce) { .flap.tick { animation: none; } }
+
+/* engraved horizon, the masthead's closing edge */
+.horizon { display: block; width: 100%; height: 128px; color: var(--ink); margin-top: 6px; }
+
+/* credo line, ink coming into register on scroll */
+.credo { font-size: 16px; color: var(--soft); margin: 0 0 24px; }
+.credo .w { display: inline-block; filter: blur(1px); opacity: .25; transition: filter .2s ease-out, opacity .2s ease-out; }
+.credo .w.on { filter: blur(0); opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .credo .w { filter: none; opacity: 1; transition: none; } }
+
+/* chapters */
+.chapter { margin-top: 96px; }
+.chapter:first-of-type { margin-top: 0; }
+.chapter.washed {
+  margin-left: -44px; margin-right: -44px;
+  padding: 26px 44px 30px;
+  background: linear-gradient(180deg, rgba(63,107,84,0), rgba(63,107,84,.04) 30%, rgba(63,107,84,.04) 70%, rgba(63,107,84,0));
+}
+.ch-title { font-size: 20px; font-weight: 500; margin: 0 0 24px; display: flex; align-items: baseline; gap: 12px; }
+.ch-title .aside { margin-left: auto; font-size: 14px; color: var(--mute); font-weight: 400; }
+.textlink { color: var(--sage); font-weight: 500; text-decoration: none; font-size: 15px; background: none; border: 0; font-family: inherit; cursor: pointer; padding: 0; }
+.textlink:hover { text-decoration: underline; }
+
+/* featured bounty card */
+.feat {
+  background: var(--paper); border: 1px solid var(--hair); border-radius: 10px;
+  border-bottom-color: var(--edge);
+  overflow: hidden;
+}
+.feat .band { display: flex; align-items: center; gap: 9px; padding: 8px 24px; height: 36px; }
+.band.clay { background: rgba(166,82,46,.1); color: var(--clay); }
+.band.sage { background: rgba(63,107,84,.1); color: var(--sage); }
+.band.ochre { background: rgba(138,106,31,.1); color: var(--ochre); }
+.band.slate { background: rgba(68,96,122,.1); color: var(--slate); }
+.band.wine { background: rgba(125,59,76,.1); color: var(--wine); }
+.band .stamp { width: 18px; height: 18px; }
+.band span { font-size: 13px; font-weight: 500; color: inherit; }
+.feat-body { padding: 22px 24px 20px; display: flex; gap: 28px; align-items: flex-start; }
+.feat-body .left { flex: 1; min-width: 0; }
+.feat h3 { font-family: var(--serif); font-variation-settings: 'opsz' 60; font-weight: 560; font-size: 26px; letter-spacing: -.01em; margin: 0 0 6px; line-height: 1.2; }
+.feat .meta { font-size: 13px; color: var(--mute); }
+.feat .meta .num { font-size: 13px; }
+.feat .needs { font-size: 14px; color: var(--soft); margin-top: 10px; }
+.feat .actions { margin-top: 18px; display: flex; gap: 18px; align-items: center; }
+.feat-pay { text-align: right; flex-shrink: 0; }
+.feat-pay .p { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 32px; font-weight: 500; letter-spacing: -.02em; line-height: 1; }
+.feat-pay .u { font-size: 13px; color: var(--mute); font-family: var(--mono); }
+.feat-pay .postmark { margin-bottom: 10px; }
+
+/* rows */
+.rows { border-top: 1px solid var(--hair); }
+.row {
+  display: grid; grid-template-columns: 40px 1fr 240px 160px 52px;
+  gap: 16px; align-items: center;
+  min-height: 76px; padding: 12px 4px;
+  border-bottom: 1px solid var(--hair);
+  transition: background .15s cubic-bezier(.25,1,.5,1);
+  position: relative;
+}
+.row:hover { background: var(--step2); }
+@media (prefers-reduced-motion: reduce) { .row { transition: none; } }
+.stampcell { display: grid; place-items: center; }
+.stamp { width: 34px; height: 34px; display: block; }
+.stamp.s16 { width: 16px; height: 16px; }
+.row .title { font-size: 16px; font-weight: 500; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .meta { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 13px; color: var(--mute); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .needs { font-size: 13px; color: var(--soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .paycell { text-align: right; }
+.row .pay { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 500; letter-spacing: -.01em; }
+.row .pay .u { font-size: 13px; color: var(--mute); font-weight: 400; }
+.row .pay.none { color: var(--mute); font-size: 13px; font-weight: 400; }
+.row .rbar { height: 3px; border-radius: 2px; background: var(--step2); margin-top: 6px; margin-left: auto; width: 120px; overflow: hidden; }
+.row .rbar i { display: block; height: 100%; }
+.applied-stamp { display: inline-block; transform: rotate(-2.5deg); font-family: var(--mono); font-size: 11px; font-weight: 500; color: var(--sage); border: 1.5px solid var(--sage); border-radius: 3px; padding: 2px 8px; opacity: .85; }
+
+/* quest cards: the board as a pinboard of mini bounty cards */
+.cardgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-top: 22px; }
+.qcard {
+  background: var(--paper); border: 1px solid var(--hair); border-radius: 10px;
+  border-bottom-color: var(--edge);
+  overflow: hidden; display: flex; flex-direction: column;
+  transition: border-color .18s cubic-bezier(.4,0,.2,1);
+}
+.qcard:hover { border-color: var(--step4); }
+@media (prefers-reduced-motion: reduce) { .qcard { transition: none; } }
+.qcard .band { display: flex; align-items: center; gap: 8px; padding: 7px 16px; }
+.qcard .band .stamp { width: 16px; height: 16px; }
+.qcard .band span { font-size: 12.5px; font-weight: 500; color: inherit; }
+.qcard .qbody { padding: 14px 16px 10px; display: flex; flex-direction: column; gap: 7px; flex: 1; }
+.qcard .qtitle { font-family: var(--serif); font-variation-settings: 'opsz' 60; font-weight: 560; font-size: 19px; line-height: 1.25; letter-spacing: -.008em; }
+.qcard .qtitle a { color: inherit; text-decoration: none; }
+.qcard .qtitle a:hover { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.qcard .meta { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 12.5px; color: var(--mute); line-height: 1.5; }
+.qcard .needs { font-size: 13.5px; color: var(--soft); }
+.qcard .qfoot { display: flex; align-items: center; gap: 12px; padding: 10px 16px 12px; border-top: 1px solid var(--hair); }
+.qcard .pay { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 21px; font-weight: 500; letter-spacing: -.01em; white-space: nowrap; }
+.qcard .pay .u { font-size: 12.5px; color: var(--mute); font-weight: 400; }
+.qcard .clip { margin-left: auto; min-height: 40px; padding: 8px 10px; }
+.qcard .applied-stamp { margin-left: auto; }
+.applied-stamp.pressin { animation: pressin .25s cubic-bezier(.2,.9,.3,1); }
+@keyframes pressin {
+  from { transform: scale(1.14) rotate(-6deg); opacity: 0; }
+  to { transform: scale(1) rotate(-2.5deg); opacity: .85; }
+}
+@media (prefers-reduced-motion: reduce) { .applied-stamp.pressin { animation: none; } }
+.strip .cardgrid { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-top: 12px; }
+.strip .qcard .qtitle { font-size: 17px; }
+
+/* the party line: a roster, not a meter */
+.partyline { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--soft); margin-top: 2px; }
+.seats { display: inline-flex; gap: 4px; }
+.seat {
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 1px dashed var(--step4);
+  display: inline-grid; place-items: center;
+  font-family: var(--mono); font-size: 10px; color: var(--mute);
+}
+.seat.in { border: 1px solid var(--wine); color: var(--wine); }
+
+/* the make-a-party sheet */
+.scrim { position: fixed; inset: 0; background: rgba(28,27,23,.35); display: none; z-index: 60; }
+.scrim.on { display: grid; place-items: center; padding: 20px; }
+.sheet {
+  background: var(--paper); border: 1px solid var(--hair); border-bottom-color: var(--edge);
+  border-radius: 10px; max-width: 560px; width: 100%; padding: 22px 24px;
+}
+.sheet h3 { font-family: var(--serif); font-variation-settings: 'opsz' 60; font-weight: 560; font-size: 22px; margin: 0 0 4px; letter-spacing: -.008em; }
+.sheet .smeta { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 13px; color: var(--mute); }
+.sheet .hint { font-size: 14px; color: var(--soft); margin-top: 14px; }
+.sheet .note {
+  border: 1px dashed var(--step4); border-radius: 4px; background: var(--ground);
+  padding: 12px 14px; font-size: 14.5px; color: var(--soft); margin-top: 10px; line-height: 1.55;
+}
+.sheet .srow { display: flex; align-items: center; gap: 16px; margin-top: 16px; flex-wrap: wrap; }
+.sheet .waiting { font-size: 13px; color: var(--mute); }
+.sheet .closebtn { margin-left: auto; }
+
+/* clip + postmark press */
+.clip { background: none; border: 0; font-family: inherit; font-size: 13px; color: var(--mute); cursor: pointer; padding: 8px 2px; }
+.clip:hover { color: var(--ink); }
+.clipcell { display: grid; place-items: center; }
+.postmark { width: 30px; height: 30px; display: block; transform: rotate(-2deg); opacity: .9; }
+.postmark.press { animation: press .25s cubic-bezier(.2,.9,.3,1); }
+@keyframes press {
+  from { transform: scale(1.12) rotate(-5deg); opacity: 0; }
+  to { transform: scale(1) rotate(-2deg); opacity: .9; }
+}
+@media (prefers-reduced-motion: reduce) { .postmark.press { animation: none; } }
+
+/* log strip (home) */
+.logstrip { border-top: 1px solid var(--hair); padding-top: 28px; display: flex; gap: 72px; align-items: flex-end; }
+.logstat .lab { font-size: 13px; color: var(--mute); margin-bottom: 4px; }
+.logstat .val { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 500; letter-spacing: -.01em; }
+.logstat.senior .val { font-size: 28px; }
+.logstat .val { font-size: 20px; }
+.logstat .val em { font-style: normal; font-family: var(--sans); font-size: 14px; color: var(--soft); font-weight: 400; }
+
+/* board page */
+.board-head { display: flex; align-items: baseline; gap: 14px; padding: 52px 0 26px; }
+.board-head h1 { font-family: var(--serif); font-variation-settings: 'opsz' 80; font-weight: 560; font-size: 26px; letter-spacing: -.01em; margin: 0; }
+.board-head .live { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 13px; color: var(--mute); }
+.board-head .sort { margin-left: auto; font-size: 14px; color: var(--soft); background: none; border: 0; font-family: inherit; cursor: pointer; }
+.board-head .sort b { font-weight: 500; color: var(--ink); }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.chip {
+  display: flex; align-items: center; gap: 7px;
+  border: 1px solid var(--hair); background: var(--paper); border-radius: 4px;
+  padding: 6px 13px; font-family: inherit; font-size: 14px; color: var(--soft); cursor: pointer;
+}
+.chip.active { font-weight: 500; }
+.chip.active.all { background: var(--ink); border-color: var(--ink); color: var(--ground); }
+.chip.active.c-sage { background: rgba(63,107,84,.08); color: var(--sage); border-color: rgba(63,107,84,.3); }
+.chip.active.c-clay { background: rgba(166,82,46,.08); color: var(--clay); border-color: rgba(166,82,46,.3); }
+.chip.active.c-ochre { background: rgba(138,106,31,.08); color: var(--ochre); border-color: rgba(138,106,31,.3); }
+.chip.active.c-slate { background: rgba(68,96,122,.08); color: var(--slate); border-color: rgba(68,96,122,.3); }
+.chip.active.c-wine { background: rgba(125,59,76,.08); color: var(--wine); border-color: rgba(125,59,76,.3); }
+.chip:focus-visible { outline: 2px solid var(--sage); outline-offset: 2px; }
+.presets { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+.pchip { display: flex; align-items: center; gap: 7px; border: 1px solid var(--hair); background: var(--paper); border-radius: 4px; padding: 5px 12px; font-family: inherit; font-size: 13.5px; color: var(--soft); cursor: pointer; }
+.pchip .n { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 12px; color: var(--mute); }
+.pchip.active { background: var(--step2); border-color: var(--step4); color: var(--ink); font-weight: 500; }
+.pchip.dim { opacity: .45; }
+.presets .flink { margin-left: 4px; font-size: 13.5px; color: var(--sage); background: none; border: 0; font-family: inherit; cursor: pointer; }
+.fpanel {
+  border: 1px solid var(--hair); background: var(--paper); border-radius: 10px;
+  padding: 16px 18px; margin-top: 12px;
+  display: none; gap: 40px; flex-wrap: wrap; align-items: flex-start;
+}
+.fpanel.on { display: flex; }
+.fg-label { font-size: 13px; color: var(--mute); margin-bottom: 8px; }
+.fg-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.fg-note { font-size: 12px; color: var(--mute); margin-top: 8px; }
+.place-input { border: 1px solid var(--hair); background: var(--ground); border-radius: 4px; padding: 6px 11px; font-family: inherit; font-size: 13.5px; color: var(--ink); min-width: 180px; outline: none; }
+.place-input:focus-visible { border-color: var(--step4); }
+.pay-input { min-width: 110px; width: 110px; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.fpanel { position: relative; }
+.fpanel .clearlink { position: absolute; top: 14px; right: 18px; margin-left: 0; }
+.fpanel .clearlink { margin-left: auto; background: none; border: 0; font-family: inherit; font-size: 13px; color: var(--mute); cursor: pointer; padding: 4px 0; }
+.fpanel .clearlink:hover { color: var(--ink); }
+.spare { font-size: 13.5px; color: var(--mute); margin-top: 10px; display: none; }
+.spare.on { display: block; }
+.strip { border: 1px solid var(--hair); border-radius: 10px; background: var(--paper); padding: 16px; margin-top: 18px; }
+.strip .s-head { display: flex; align-items: baseline; gap: 14px; font-size: 15px; color: var(--soft); margin-bottom: 6px; }
+.strip .s-head .right { margin-left: auto; font-size: 13.5px; color: var(--mute); background: none; border: 0; font-family: inherit; cursor: pointer; }
+.strip .row { border-bottom: 1px solid var(--hair); }
+.strip .row:last-child { border-bottom: 0; }
+.bword { font-family: var(--mono); font-size: 11px; color: var(--mute); white-space: nowrap; }
+.fq { font-family: var(--mono); font-size: 11px; font-weight: 500; white-space: nowrap; }
+.kitrow {
+  display: flex; align-items: center; gap: 14px;
+  border: 1px solid var(--hair); background: var(--paper); border-radius: 10px;
+  padding: 11px 18px; margin-top: 16px;
+  font-size: 14px; color: var(--soft);
+}
+.kitrow .textlink { margin-left: auto; font-size: 13.5px; flex-shrink: 0; }
+.notice {
+  border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair);
+  padding: 10px 4px; margin-top: 18px;
+  font-size: 14px; color: var(--soft);
+  display: flex; align-items: center;
+}
+.notice button { margin-left: auto; background: none; border: 0; color: var(--mute); font-family: inherit; font-size: 13px; cursor: pointer; }
+.board-foot { padding: 40px 0 64px; font-size: 13px; color: var(--mute); }
+
+/* engraving plate behind a vertical's section */
+.platewrap { position: relative; }
+.plate { position: absolute; top: auto; bottom: -20px; right: -200px; width: 420px; height: 420px; opacity: .04; pointer-events: none; color: var(--ink); }
+.plate svg { width: 100%; height: 100%; }
+
+/* your log page */
+.log-head { padding: 48px 0 0; }
+.log-head h1 { font-family: var(--serif); font-variation-settings: 'opsz' 80; font-weight: 560; font-size: 26px; letter-spacing: -.01em; margin: 0; }
+.log-status { font-size: 13px; color: var(--mute); margin-top: 4px; }
+.composer { margin-top: 24px; }
+.composer input {
+  width: 100%; border: 1px solid var(--hair); background: var(--paper); border-radius: 4px;
+  padding: 12px 14px; font-family: inherit; font-size: 15px; color: var(--ink); outline: none;
+}
+.composer input::placeholder { color: var(--mute); }
+.composer input:focus-visible { border-color: var(--step4); }
+.comp-saved { font-size: 13px; color: var(--mute); margin-top: 8px; display: none; }
+.comp-saved.on { display: block; }
+.signup {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  border: 1px solid var(--hair); background: var(--paper); border-radius: 10px;
+  padding: 14px 18px; margin-top: 18px;
+  font-size: 14.5px; color: var(--soft);
+}
+.signup .grow { flex: 1; min-width: 240px; }
+.signup input {
+  border: 1px solid var(--hair); background: var(--ground); border-radius: 4px;
+  padding: 8px 12px; font-family: inherit; font-size: 14px; flex: 1; min-width: 200px; outline: none;
+}
+.signup input:focus-visible { border-color: var(--step4); }
+.btn-sage { background: var(--sage); color: #fff; border: 0; border-radius: 4px; padding: 8px 14px; font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
+.btn-sage:hover { background: var(--sage-dark); }
+.plainbtn { background: none; border: 0; color: var(--soft); font-family: inherit; font-size: 14px; cursor: pointer; }
+.plainbtn:hover { color: var(--ink); }
+.loglist { margin-top: 18px; display: flex; flex-direction: column; gap: 12px; }
+.lcard {
+  border: 1px solid var(--hair); background: var(--paper); border-radius: 10px;
+  border-bottom-color: var(--edge);
+  padding: 16px 20px;
+  display: grid; grid-template-columns: 40px 1fr auto; gap: 16px; align-items: start;
+}
+.lcard .stampcell { padding-top: 2px; }
+.lcard .title { font-size: 16px; font-weight: 500; line-height: 1.3; }
+.lcard .meta { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 13px; color: var(--mute); margin-top: 2px; }
+.lcard .vtag { font-family: var(--mono); font-size: 11px; color: var(--mute); border: 1px solid var(--hair); border-radius: 3px; padding: 1px 6px; margin-left: 8px; }
+.lcard .why, .lcard .next { font-size: 14px; color: var(--soft); margin-top: 8px; }
+.lcard .shelfnote { font-size: 13px; color: var(--mute); margin-top: 8px; }
+.lcard .aff { margin-top: 12px; display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.lcard .aff button { background: none; border: 0; font-family: inherit; font-size: 13px; color: var(--mute); cursor: pointer; padding: 0; }
+.lcard .aff button:hover { color: var(--ink); }
+.lcard .aff .acts { margin-left: auto; display: flex; gap: 16px; }
+.lcard .aff .acts button { color: var(--soft); font-weight: 500; }
+.lcard .aff .acts button:hover { color: var(--ink); }
+.affinput { border: 1px solid var(--hair); background: var(--ground); border-radius: 4px; padding: 5px 10px; font-family: inherit; font-size: 13px; outline: none; min-width: 220px; }
+.vpick { display: inline-flex; gap: 6px; }
+.vpick button { border: 1px solid var(--hair); background: var(--ground); border-radius: 4px; padding: 3px 9px; font-family: inherit; font-size: 12.5px; color: var(--soft); cursor: pointer; }
+.vpick button:hover { color: var(--ink); border-color: var(--step4); }
+.lcard .rightcol { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.lcard .pay { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 500; letter-spacing: -.01em; }
+.lcard .pay .u { font-size: 13px; color: var(--mute); font-weight: 400; }
+.frombd { grid-column: 2 / -1; margin-top: 4px; border-top: 1px solid var(--hair); padding-top: 10px; }
+.fb-label { font-size: 13px; color: var(--mute); margin-bottom: 4px; }
+.fbrow { display: flex; gap: 14px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--hair); font-size: 14.5px; }
+.fbrow:last-child { border-bottom: 0; }
+.fbrow .fv { font-size: 12.5px; color: var(--mute); }
+.fbrow .fpay { margin-left: auto; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 500; white-space: nowrap; }
+.fbrow .fpay .u { font-size: 12px; color: var(--mute); font-weight: 400; }
+.done-block { margin-top: 36px; border-top: 1px solid var(--hair); padding-top: 16px; }
+.done-label { font-size: 15px; font-weight: 500; margin-bottom: 8px; }
+.dline { display: flex; gap: 14px; align-items: baseline; padding: 7px 0; font-size: 15px; }
+.dline .dd { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 13px; color: var(--mute); width: 64px; flex-shrink: 0; }
+.dline .dt { color: var(--ink); }
+.dline .dn { color: var(--soft); }
+.dline.pending .dt, .dline.pending .dn { color: var(--mute); }
+.ledger-total { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--hair); font-size: 14px; color: var(--soft); }
+.ledger-total .num { font-weight: 500; color: var(--ink); }
+.log-foot { padding: 36px 0 64px; font-size: 13px; color: var(--mute); }
+
+/* ═══ the landing page: the front door sells the world ═══ */
+#landing { display: block; }
+body.inapp #landing { display: none; }
+.app { display: none; }
+body.inapp .app { display: flex; }
+.lwrap { max-width: 1120px; margin: 0 auto; padding: 0 44px; }
+.land-hero { position: relative; overflow: hidden; }
+.land-brand { display: flex; align-items: center; gap: 10px; padding: 26px 0 0; }
+.land-brand b { font-weight: 500; font-size: 15px; }
+.land-hero h1 {
+  font-family: var(--serif); font-variation-settings: 'opsz' 144; font-weight: 560;
+  font-size: 78px; line-height: 1.04; letter-spacing: -.018em;
+  margin: 72px 0 0; max-width: 820px; text-wrap: balance;
+}
+.land-hero .lsub { font-size: 17.5px; color: var(--soft); max-width: 620px; margin: 22px 0 0; line-height: 1.6; }
+.land-cta { display: flex; align-items: center; gap: 18px; margin-top: 30px; flex-wrap: wrap; }
+.btn-sage.lbig { font-size: 16.5px; padding: 13px 24px; }
+.lnote { font-size: 14px; color: var(--mute); }
+.land-hero .flaprow { margin-top: 40px; }
+.land-horizon { display: block; width: 100%; height: 210px; color: var(--ink); margin-top: 26px; }
+.land-cards { position: relative; z-index: 2; margin-top: -72px; }
+.land-cards .cardgrid { margin-top: 0; }
+.lstatement {
+  font-family: var(--serif); font-variation-settings: 'opsz' 80; font-weight: 560;
+  font-size: 34px; line-height: 1.2; letter-spacing: -.012em;
+  text-align: center; text-wrap: balance;
+  margin: 116px auto 96px; max-width: 700px;
+}
+.lgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 80px 60px; margin-bottom: 130px; }
+.lblock .visual { margin-bottom: 20px; min-width: 0; min-height: 232px; display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; }
+.lblock h3 { font-family: var(--serif); font-variation-settings: 'opsz' 60; font-weight: 560; font-size: 24px; letter-spacing: -.008em; margin: 0 0 6px; }
+.lblock p { font-size: 15.5px; color: var(--soft); margin: 0; line-height: 1.6; max-width: 46ch; }
+.chips-demo { display: flex; gap: 8px; flex-wrap: wrap; }
+.ledger-demo { border: 1px solid var(--hair); border-bottom-color: var(--edge); border-radius: 10px; background: var(--paper); padding: 18px 22px; }
+.ai-demo { border: 1px solid var(--hair); border-bottom-color: var(--edge); border-radius: 10px; background: var(--paper); padding: 20px 22px; font-size: 15.5px; color: var(--soft); line-height: 1.6; }
+.ai-demo .num { color: var(--ink); font-weight: 500; }
+.ai-demo .price { border-top: 1px solid var(--hair); margin-top: 14px; padding-top: 12px; font-size: 14.5px; color: var(--mute); }
+.ai-src { font-size: 12.5px; color: var(--mute); margin-bottom: 10px; }
+.ai-out { color: var(--ink); }
+.ai-hedge { font-size: 12.5px; color: var(--mute); margin-top: 10px; }
+.xhead { font-family: var(--serif); font-variation-settings: 'opsz' 30; font-weight: 580; font-size: 17px; color: var(--ink); margin-bottom: 5px; letter-spacing: -.005em; }
+.xmethod { font-size: 12.5px; color: var(--mute); margin-top: 10px; }
+.xconsent { border: 1px solid var(--hair); border-bottom-color: var(--edge); border-radius: 10px; background: var(--paper); padding: 16px 18px; margin-top: 14px; }
+.xconsent .xc-title { font-family: var(--serif); font-variation-settings: 'opsz' 30; font-weight: 580; font-size: 18px; margin-bottom: 5px; }
+.xconsent .xc-body { font-size: 14.5px; color: var(--soft); line-height: 1.55; }
+.xconsent .xc-row { display: flex; gap: 14px; align-items: center; margin-top: 13px; flex-wrap: wrap; }
+.xconsent .xc-foot { font-size: 12.5px; color: var(--mute); margin-top: 11px; }
+.qcard .xbtn { margin-left: 0; white-space: nowrap; }
+.xswap { animation: xin .3s ease-out; }
+@keyframes xin { from { opacity: .25; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .xswap { animation: none; } }
+.stampstrip { border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); padding: 36px 0; display: flex; gap: 56px; justify-content: center; flex-wrap: wrap; }
+.stampstrip .st { text-align: center; font-size: 13px; font-weight: 500; }
+.stampstrip .st svg { width: 44px; height: 44px; display: block; margin: 0 auto 8px; }
+.land-foot { padding: 56px 0 88px; display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+.land-foot .t { font-size: 15px; color: var(--soft); }
+.land-foot .btn-sage { margin-left: auto; }
+
+@media (max-width: 880px) {
+  .land-hero h1 { font-size: 46px; margin-top: 48px; }
+  .lwrap { padding: 0 18px; }
+  .lgrid { grid-template-columns: 1fr; gap: 56px; margin-bottom: 80px; }
+  .lblock .visual { min-height: 0; }
+  .lstatement { font-size: 26px; margin: 76px auto 64px; }
+  .land-cards { margin-top: -40px; }
+  .land-foot .btn-sage { margin-left: 0; }
+}
+
+@media (max-width: 880px) {
+  .side { display: none; }
+  .mobilebar { display: flex; }
+  .wrap { padding: 0 18px; }
+  .topbar { padding: 10px 16px; }
+  h1.lede { font-size: 42px; }
+  .row { grid-template-columns: 40px 1fr 120px; }
+  .row .needs, .row .clip, .row .clipcell { display: none; }
+  .chapter.washed { margin-left: -18px; margin-right: -18px; padding-left: 18px; padding-right: 18px; }
+  .lcard { grid-template-columns: 40px 1fr; }
+  .lcard .rightcol { display: none; }
+}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- hand-drawn postal stamps: 1.75px single-weight line, imperfect circles -->
+    <g id="stamp-career">
+      <path d="M17 2.6 A14.4 14.4 0 1 1 6.5 6.1" fill="none" stroke-width="1.75"/>
+      <path d="M4.8 8.3 A14.4 14.4 0 0 1 15.2 2.7" fill="none" stroke-width="1.75" stroke-dasharray="3 2.4"/>
+      <circle cx="12.2" cy="21.8" r="1.5" fill="currentColor" stroke="none"/>
+      <path d="M13.6 20.4 L21.4 12.6 M15.9 11.9 H22 V18" fill="none" stroke-width="1.75"/>
+    </g>
+    <g id="stamp-camera">
+      <path d="M16.5 2.5 A14.4 14.4 0 1 1 5.8 5.6" fill="none" stroke-width="1.75"/>
+      <path d="M4.4 7.9 A14.4 14.4 0 0 1 14 2.6" fill="none" stroke-width="1.75" stroke-dasharray="2.6 2.6"/>
+      <rect x="8.6" y="12.4" width="13" height="9" rx="1.4" fill="none" stroke-width="1.75"/>
+      <path d="M9 12.5 L21.4 9.2 M11.6 11.8 l1.6 -2.8 M15.4 10.8 l1.6 -2.8 M19.2 9.8 l1.5 -2.6" fill="none" stroke-width="1.75"/>
+    </g>
+    <g id="stamp-study">
+      <path d="M18 3 A14.4 14.4 0 1 1 6 5.4" fill="none" stroke-width="1.75"/>
+      <path d="M4.7 7.6 A14.4 14.4 0 0 1 15.5 2.7" fill="none" stroke-width="1.75" stroke-dasharray="3.2 2.2"/>
+      <path d="M9.4 10.6 h11.2 a1.6 1.6 0 0 1 1.6 1.6 v5.4 a1.6 1.6 0 0 1 -1.6 1.6 h-6.4 l-3.4 3 v-3 h-1.4 a1.6 1.6 0 0 1 -1.6 -1.6 v-5.4 a1.6 1.6 0 0 1 1.6 -1.6 z" fill="none" stroke-width="1.75"/>
+      <path d="M12.4 14.9 l1.9 1.9 3.5 -3.7" fill="none" stroke-width="1.75"/>
+    </g>
+    <g id="stamp-lens">
+      <path d="M17.3 2.7 A14.4 14.4 0 1 1 6.2 5.9" fill="none" stroke-width="1.75"/>
+      <path d="M4.7 8.2 A14.4 14.4 0 0 1 15 2.6" fill="none" stroke-width="1.75" stroke-dasharray="2.8 2.4"/>
+      <rect x="7.4" y="11" width="13.2" height="9.6" rx="1.6" fill="none" stroke-width="1.75"/>
+      <path d="M11 11 l1.4 -2.2 h3.2 l1.4 2.2" fill="none" stroke-width="1.75" stroke-linejoin="round"/>
+      <circle cx="14" cy="15.8" r="3" fill="none" stroke-width="1.75"/>
+      <circle cx="18.6" cy="13.4" r=".9" fill="currentColor" stroke="none"/>
+    </g>
+    <g id="stamp-party">
+      <path d="M17.3 2.7 A14.4 14.4 0 1 1 6.2 5.9" fill="none" stroke-width="1.75"/>
+      <path d="M4.7 8.2 A14.4 14.4 0 0 1 15 2.6" fill="none" stroke-width="1.75" stroke-dasharray="2.8 2.4"/>
+      <rect x="11.1" y="9.4" width="5.8" height="10.6" rx="1" fill="none" stroke-width="1.6" transform="rotate(-21 14 20)"/>
+      <rect x="11.1" y="9.4" width="5.8" height="10.6" rx="1" fill="none" stroke-width="1.6"/>
+      <rect x="11.1" y="9.4" width="5.8" height="10.6" rx="1" fill="none" stroke-width="1.6" transform="rotate(21 14 20)"/>
+      <path d="M12.6 12.2 h2.8" fill="none" stroke-width="1.3"/>
+    </g>
+    <g id="stamp-personal">
+      <path d="M17.2 2.7 A14.4 14.4 0 1 1 6.1 5.9" fill="none" stroke-width="1.75"/>
+      <path d="M4.6 8.1 A14.4 14.4 0 0 1 14.8 2.6" fill="none" stroke-width="1.75" stroke-dasharray="2.8 2.4"/>
+      <path d="M9.4 22.6 l-3.5 1 1 -3.5 L16.6 9.4 a1.8 1.8 0 0 1 2.6 2.6 z" fill="none" stroke-width="1.75"/>
+      <path d="M15.5 10.5 l2.4 2.4" fill="none" stroke-width="1.75"/>
+      <path d="M14.8 23.6 h6.6" fill="none" stroke-width="1.75"/>
+    </g>
+  </defs>
+</svg>
+
+<div id="landing">
+  <div class="land-hero">
+    <div class="lwrap">
+      <div class="land-brand">
+        <span class="brand-tile">
+          <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <circle cx="4" cy="12" r="1.5" fill="#fff"/>
+            <path d="M5.2 10.8 10.8 5.2" stroke="#fff" stroke-width="1.9" stroke-linecap="round"/>
+            <path d="M7.4 5H11V8.6" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        <b>Launchboard</b>
+      </div>
+      <h1>One board for every side quest.</h1>
+      <p class="lsub">Real quests from real sources, with pay shown when the source states it.</p>
+      <div class="land-cta">
+        <button class="btn-sage lbig" data-enter>Open the board</button>
+        <span class="lnote">Free. Your log lives in your browser.</span>
+      </div>
+      <div class="flaprow" aria-hidden="false">
+        <span class="sr">41 quests on the board right now, 9 pay $500 or more.</span>
+        <span class="fgroup" aria-hidden="true">
+          <span class="fcells"><span class="flap" data-t="4"></span><span class="flap" data-t="1"></span></span>
+          <span class="fcap">quests on the board right now</span>
+        </span>
+        <span class="fgroup" aria-hidden="true">
+          <span class="fcells"><span class="flap" data-t="9"></span></span>
+          <span class="fcap">pay $500 or more</span>
+        </span>
+      </div>
+    </div>
+    <svg class="land-horizon" viewBox="0 0 1440 210" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+      <g stroke="currentColor" fill="none" stroke-width="1.7" opacity=".32" stroke-linecap="round">
+        <path d="M1010 96 a52 52 0 0 1 86 -5"/>
+        <path d="M1000 74 l-18 -10 M1016 49 l-13 -15 M1041 33 l-7 -18 M1071 27 l0 -20 M1101 31 l7 -18 M1128 46 l13 -14 M1147 69 l18 -9"/>
+      </g>
+      <path d="M-10 118 C 170 84, 380 100, 560 116 S 900 142, 1140 108 S 1360 82, 1450 100 L 1450 220 L -10 220 Z" fill="var(--ground)"/>
+      <path d="M-10 118 C 170 84, 380 100, 560 116 S 900 142, 1140 108 S 1360 82, 1450 100" fill="none" stroke="currentColor" stroke-width="1.7" opacity=".26" stroke-linecap="round"/>
+      <g stroke="currentColor" stroke-width="1" opacity=".14" stroke-linecap="round">
+        <path d="M210 104 l-13 10 M266 102 l-13 10 M322 104 l-13 10 M1190 112 l-13 10 M1246 106 l-13 10 M1302 100 l-13 10"/>
+      </g>
+      <path d="M-10 164 C 240 140, 500 158, 740 166 S 1160 168, 1450 146 L 1450 220 L -10 220 Z" fill="var(--ground)"/>
+      <path d="M-10 164 C 240 140, 500 158, 740 166 S 1160 168, 1450 146" fill="none" stroke="currentColor" stroke-width="1.7" opacity=".36" stroke-linecap="round"/>
+      <g stroke="currentColor" stroke-width="1" opacity=".17" stroke-linecap="round">
+        <path d="M110 158 l-14 11 M172 155 l-14 11 M234 154 l-14 11 M780 176 l-14 11 M842 176 l-14 11 M1240 156 l-14 11 M1302 152 l-14 11"/>
+      </g>
+      <g stroke="currentColor" fill="none" stroke-width="1.7" opacity=".42" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M356 156 V 126 M356 130 h20 l6 5 -6 5 h-20 z"/>
+      </g>
+      <g stroke="currentColor" fill="none" stroke-width="1.5" opacity=".26" stroke-linecap="round">
+        <path d="M760 46 q8 -9 16 0 q8 -9 16 0"/>
+        <path d="M824 28 q6 -7 12 0 q6 -7 12 0"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="lwrap land-cards">
+    <div class="cardgrid" id="landCards"></div>
+  </div>
+
+  <div class="lwrap">
+    <p class="lstatement">Every listing links straight to the source.</p>
+
+    <div class="lgrid">
+      <div class="lblock">
+        <div class="visual" id="trustCard"></div>
+        <h3>The true post date.</h3>
+        <p>Reposts and probably-filled listings get flagged before you waste an evening.</p>
+      </div>
+      <div class="lblock">
+        <div class="visual">
+          <div class="ledger-demo">
+            <div class="done-label">Done</div>
+            <div class="dline"><span class="dd">Jul 3</span><span class="dt">Prolific study batch paid out.</span><span class="dn">$45. Took 13 days.</span></div>
+            <div class="dline"><span class="dd">Jun 28</span><span class="dt">Did a paid snack focus group.</span><span class="dn">$125.</span></div>
+            <div class="dline"><span class="dd">Mar 4</span><span class="dt">Ran the 10k.</span><span class="dn">Helped by your sister.</span></div>
+            <div class="ledger-total">Paid out in <span class="num">2026</span> so far: <span class="num">$170</span>. Counting only what landed.</div>
+          </div>
+        </div>
+        <h3>The log is the proof.</h3>
+        <p>A dated ledger of what you did and what it paid. Nothing turns red, nothing resets.</p>
+      </div>
+      <div class="lblock">
+        <div class="visual">
+          <div class="chips-demo">
+            <span class="pchip">no experience needed <span class="n">9</span></span>
+            <span class="pchip active">no camera, no calls <span class="n">3</span></span>
+            <span class="pchip">remote <span class="n">7</span></span>
+            <span class="pchip">$500 or more <span class="n">7</span></span>
+            <span class="pchip dim">under 2 hours <span class="n">2</span></span>
+          </div>
+        </div>
+        <h3>Filters that count.</h3>
+        <p>Every chip shows how many quests are behind it, live.</p>
+      </div>
+      <div class="lblock">
+        <div class="visual">
+          <div class="ai-demo">
+            <div class="ai-src">A 400-word posting, boiled down:</div>
+            <div class="xhead">In plain words</div>
+            <div class="ai-out">They want a friendly voice on the phone, weekday evenings, <span class="num">$19</span> an hour. Lead your note with your two years at a front desk.</div>
+            <div class="ai-hedge">Full reads on most laptops, quick reads everywhere.</div>
+            <div class="price">Search pass, <span class="num">$29</span> once. Offer pass, <span class="num">$99</span> once. Everything else is free.</div>
+          </div>
+        </div>
+        <h3>Free AI, no monthly bill.</h3>
+        <p>Your computer does the work. That's how free stays free.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="stampstrip">
+    <div class="st" style="color:var(--sage)"><svg viewBox="0 0 28 28"><use href="#stamp-career" stroke="currentColor"/></svg>Career</div>
+    <div class="st" style="color:var(--clay)"><svg viewBox="0 0 28 28"><use href="#stamp-camera" stroke="currentColor"/></svg>On camera</div>
+    <div class="st" style="color:var(--ochre)"><svg viewBox="0 0 28 28"><use href="#stamp-study" stroke="currentColor"/></svg>Paid studies</div>
+    <div class="st" style="color:var(--slate)"><svg viewBox="0 0 28 28"><use href="#stamp-lens" stroke="currentColor"/></svg>Behind the camera</div>
+    <div class="st" style="color:var(--wine)"><svg viewBox="0 0 28 28"><use href="#stamp-party" stroke="currentColor"/></svg>Party quests</div>
+  </div>
+
+  <div class="lwrap land-foot">
+    <span class="t">The board restocks daily. Every listing links straight to the source.</span>
+    <button class="btn-sage lbig" data-enter>Open the board</button>
+  </div>
+</div>
+
+<div class="app">
+  <aside class="side">
+    <button class="brand" data-page="home">
+      <span class="brand-tile">
+        <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <circle cx="4" cy="12" r="1.5" fill="#fff"/>
+          <path d="M5.2 10.8 10.8 5.2" stroke="#fff" stroke-width="1.9" stroke-linecap="round"/>
+          <path d="M7.4 5H11V8.6" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <span><b>Launchboard</b><small>concept v9</small></span>
+    </button>
+
+    <button class="nav-item" data-page="board">
+      <svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h10"/></svg>
+      The board
+    </button>
+    <button class="nav-item" data-page="log">
+      <svg viewBox="0 0 24 24"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M9 9h6M9 13h4"/></svg>
+      Your log
+    </button>
+    <button class="nav-item soon">
+      <svg viewBox="0 0 24 24"><path d="M18 9a6 6 0 1 0-12 0c0 6-2 7-2 7h16s-2-1-2-7"/><path d="M10.5 20a2 2 0 0 0 3 0"/></svg>
+      Alerts <em>soon</em>
+    </button>
+    <button class="nav-item stub">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.5 4.5l2.1 2.1M17.4 17.4l2.1 2.1M2 12h3M19 12h3M4.5 19.5l2.1-2.1M17.4 6.6l2.1-2.1"/></svg>
+      Settings
+    </button>
+
+    <div class="side-note">Every listing links straight to the source, with pay shown when the listing states it.</div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="search">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.8-3.8"/></svg>
+        Search the board
+      </div>
+      <div class="avatar">BT</div>
+    </div>
+    <div class="mobilebar">
+      <button class="mtab active" data-page="home">Home</button>
+      <button class="mtab" data-page="board">The board</button>
+      <button class="mtab" data-page="log">Your log</button>
+    </div>
+
+    <!-- ═══ HOME ═══ -->
+    <div class="page on" id="page-home">
+      <div class="mast">
+        <div class="wrap mast-inner">
+          <h1 class="lede"><span class="num">41</span> quests on the board. <span class="num">9</span> pay <span class="num">$500</span> or more.</h1>
+          <p class="sub">Updated this morning. Every listing links straight to the source.</p>
+          <p class="sub" style="margin-top:6px">Never done any of this? Most quests here need nothing you don't already have. <a class="textlink" href="#" id="startHere">Start here</a></p>
+          <div class="flaprow" aria-hidden="false">
+            <span class="sr">11 quests posted in the last 24 hours, 6 close this week.</span>
+            <span class="fgroup" aria-hidden="true">
+              <span class="fcells"><span class="flap" data-t="1"></span><span class="flap" data-t="1"></span></span>
+              <span class="fcap">posted in the last 24 hours</span>
+            </span>
+            <span class="fgroup" aria-hidden="true">
+              <span class="fcells"><span class="flap" data-t="6"></span></span>
+              <span class="fcap">close this week</span>
+            </span>
+          </div>
+        </div>
+        <div class="wrap">
+          <svg class="horizon" viewBox="0 0 1032 128" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
+            <g stroke="currentColor" fill="none" stroke-width="1.6" opacity=".3" stroke-linecap="round">
+              <path d="M712 66 a34 34 0 0 1 56 -3"/>
+              <path d="M704 51 l-12 -7 M716 35 l-9 -10 M734 25 l-5 -12 M754 21 l0 -13 M774 24 l4 -12 M791 34 l9 -10 M803 50 l12 -7"/>
+            </g>
+            <path d="M-10 78 C 110 58, 250 66, 380 75 S 640 90, 800 72 S 950 60, 1042 70 L 1042 138 L -10 138 Z" fill="var(--ground)"/>
+            <path d="M-10 78 C 110 58, 250 66, 380 75 S 640 90, 800 72 S 950 60, 1042 70" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".26" stroke-linecap="round"/>
+            <g stroke="currentColor" stroke-width="1" opacity=".14" stroke-linecap="round">
+              <path d="M120 70 l-11 8 M164 68 l-11 8 M208 68 l-11 8 M836 78 l-11 8 M880 72 l-11 8 M924 68 l-11 8"/>
+            </g>
+            <path d="M-10 110 C 170 94, 360 106, 540 112 S 830 114, 1042 100 L 1042 138 L -10 138 Z" fill="var(--ground)"/>
+            <path d="M-10 110 C 170 94, 360 106, 540 112 S 830 114, 1042 100" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".34" stroke-linecap="round"/>
+            <g stroke="currentColor" stroke-width="1" opacity=".16" stroke-linecap="round">
+              <path d="M70 106 l-12 9 M118 104 l-12 9 M166 103 l-12 9 M382 112 l-12 9 M430 114 l-12 9 M600 120 l-12 9 M648 120 l-12 9 M920 108 l-12 9 M968 106 l-12 9"/>
+            </g>
+            <g stroke="currentColor" fill="none" stroke-width="1.6" opacity=".4" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M252 104 V 82 M252 85 h15 l5 4 -5 4 h-15 z"/>
+            </g>
+            <g stroke="currentColor" fill="none" stroke-width="1.4" opacity=".25" stroke-linecap="round">
+              <path d="M556 34 q7 -8 14 0 q7 -8 14 0"/>
+              <path d="M610 20 q5 -6 10 0 q5 -6 10 0"/>
+            </g>
+          </svg>
+        </div>
+      </div>
+
+      <div class="wrap">
+        <section class="chapter" style="margin-top:56px">
+          <h2 class="ch-title">Today's bounty</h2>
+          <article class="feat">
+            <div class="band clay">
+              <svg class="stamp s16" viewBox="0 0 28 28" style="width:18px;height:18px"><use href="#stamp-camera" stroke="currentColor"/></svg>
+              <span>On camera</span>
+            </div>
+            <div class="feat-body">
+              <div class="left">
+                <h3>Commercial, regional bank spot</h3>
+                <div class="meta">Casting Networks, posted <span class="num">Jul 4</span>, Chicago, closes in <span class="num">5</span> days</div>
+                <div class="needs">Needs: self-tape, one shoot day, speaking role</div>
+                <div class="actions">
+                  <a class="textlink" href="#">Apply at source</a>
+                  <button class="textlink" style="color:var(--mute)" id="featClip">Clip</button>
+                </div>
+              </div>
+              <div class="feat-pay" id="featPay">
+                <div class="p">$1,500</div>
+                <div class="u">flat, stated in the casting call</div>
+              </div>
+            </div>
+          </article>
+        </section>
+
+        <section class="chapter washed">
+          <p class="credo" id="credo">Every date on this board is the true post date.</p>
+          <h2 class="ch-title">New on the board <span class="aside"><a class="textlink" href="#" data-page="board">See the full board</a></span></h2>
+          <div class="rows" id="home-rows"></div>
+        </section>
+
+        <section class="chapter" style="margin-bottom:72px">
+          <div class="logstrip">
+            <div class="logstat senior">
+              <div class="lab">Applications out</div>
+              <div class="val">3</div>
+            </div>
+            <div class="logstat">
+              <div class="lab">Interviews scheduled</div>
+              <div class="val">1</div>
+            </div>
+            <div class="logstat">
+              <div class="lab">Follow-up due</div>
+              <div class="val">Thu <em>Ramp</em></div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- ═══ BOARD ═══ -->
+    <div class="page" id="page-board">
+      <div class="wrap platewrap">
+        <div class="plate" id="plateMount" aria-hidden="true"></div>
+        <div class="board-head">
+          <h1>The board</h1>
+          <span class="live num">41 live</span>
+          <button class="sort" id="sortBtn">Sort: <b>newest</b></button>
+        </div>
+
+        <div class="chips">
+          <button class="chip all active" data-v="all">All</button>
+          <button class="chip c-sage" data-v="career">
+            <svg class="stamp s16" viewBox="0 0 28 28"><use href="#stamp-career" stroke="currentColor"/></svg>
+            Career
+          </button>
+          <button class="chip c-clay" data-v="camera">
+            <svg class="stamp s16" viewBox="0 0 28 28"><use href="#stamp-camera" stroke="currentColor"/></svg>
+            On camera
+          </button>
+          <button class="chip c-ochre" data-v="study">
+            <svg class="stamp s16" viewBox="0 0 28 28"><use href="#stamp-study" stroke="currentColor"/></svg>
+            Paid studies
+          </button>
+          <button class="chip c-slate" data-v="lens">
+            <svg class="stamp s16" viewBox="0 0 28 28"><use href="#stamp-lens" stroke="currentColor"/></svg>
+            Behind the camera
+          </button>
+          <button class="chip c-wine" data-v="party">
+            <svg class="stamp s16" viewBox="0 0 28 28"><use href="#stamp-party" stroke="currentColor"/></svg>
+            Party quests
+          </button>
+        </div>
+
+        <div class="presets" id="presets">
+          <button class="pchip" data-f="noexp">no experience needed <span class="n"></span></button>
+          <button class="pchip" data-f="quiet">no camera, no calls <span class="n"></span></button>
+          <button class="pchip" data-f="remote">remote <span class="n"></span></button>
+          <button class="pchip" data-f="pay500">$500 or more <span class="n"></span></button>
+          <button class="pchip" data-f="short">under 2 hours <span class="n"></span></button>
+          <button class="flink" id="filtersBtn">Filters</button>
+        </div>
+        <div class="fpanel" id="fpanel"></div>
+        <p class="spare" id="spareLine">Everything here you can do today, no track record needed.</p>
+        <div id="kitMount"></div>
+        <div class="notice">The board now covers paid studies.<button>Dismiss</button></div>
+        <div id="stripMount"></div>
+
+        <div class="cardgrid" id="board-rows"></div>
+
+        <p class="board-foot">Concept v9. The board restocks daily.</p>
+      </div>
+    </div>
+
+    <!-- ═══ YOUR LOG ═══ -->
+    <div class="page" id="page-log">
+      <div class="wrap">
+        <div class="log-head">
+          <h1>Your log</h1>
+          <div class="log-status">Saved in this browser</div>
+        </div>
+        <div class="composer">
+          <input id="composerInput" placeholder="Add your own quest" aria-label="Add your own quest">
+          <div class="comp-saved" id="compSaved">Saved in this browser.</div>
+        </div>
+        <div id="signupMount"></div>
+        <div class="loglist" id="logList"></div>
+        <div id="doneMount"></div>
+        <p class="log-foot">Nothing here turns red. Nothing resets.</p>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="scrim" id="scrim">
+  <div class="sheet" role="dialog" aria-label="Make a party">
+    <h3>Make a party</h3>
+    <div class="smeta" id="sheetMeta"></div>
+    <p class="hint">Copy the note into your group chat. When someone says they're in, mark their seat.</p>
+    <div class="note" id="sheetNote"></div>
+    <div class="srow">
+      <button class="btn-sage" id="copyNote">Copy the note</button>
+      <span class="waiting" id="sheetWaiting"></span>
+      <button class="plainbtn closebtn" id="sheetClose">Done for now</button>
+    </div>
+  </div>
+</div>
+
+<div class="scrim" id="xscrim">
+  <div class="sheet" role="dialog" aria-label="Explain this quest">
+    <h3 id="xtitle"></h3>
+    <div class="smeta" id="xmeta"></div>
+    <div class="note" id="xnote">
+      <div class="xhead">In plain words</div>
+      <div id="xbody"></div>
+      <div class="xmethod" id="xmethod"></div>
+    </div>
+    <div class="xconsent" id="xconsent"></div>
+    <div class="srow">
+      <a class="textlink" href="#">Apply at source</a>
+      <button class="plainbtn closebtn" id="xclose">Done for now</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var HUE = { career: '#3F6B54', camera: '#A6522E', study: '#8A6A1F', lens: '#44607A', party: '#7D3B4C' };
+  var STAMP = { career: '#stamp-career', camera: '#stamp-camera', study: '#stamp-study', lens: '#stamp-lens', party: '#stamp-party' };
+  var VNAME = { career: 'career', camera: 'on camera', study: 'paid studies', lens: 'behind the camera', party: 'party quests' };
+  var BNAME = { career: 'Career', camera: 'On camera', study: 'Paid studies', lens: 'Behind the camera', party: 'Party quests' };
+  var BANDCLS = { career: 'sage', camera: 'clay', study: 'ochre', lens: 'slate', party: 'wine' };
+  var TODAY = 'Jul 7';
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var QUESTS = [
+    { v: 'camera', t: 'Background actors, major streaming series', meta: 'Casting Networks, posted today, Los Angeles', needs: 'Needs: photos and basics, no experience', pay: '$231', unit: '/8 hr', range: 0.55, age: 0, amt: 231, noexp: 1, remote: 0, short: 0, fq: 1 },
+    { v: 'career', t: 'Data Engineer, Linear', meta: 'Ashby, posted today, remote in the US', needs: 'Needs: resume, covers 7 of 9 requirements', pay: '$170–210k', unit: 'base', range: 0.62, age: 0, amt: 190000, noexp: 0, remote: 1, short: 0, fit: 0.78, gaps: 2, exp: 1,
+      plain: 'Pays $170 to 210k base, remote in the US. Asks for five years of data pipelines, dbt, Snowflake, and Python. Posted today.',
+      full: 'A small team rebuilding their warehouse, so they want someone who has owned pipelines end to end. dbt shows up in every requirement. Your resume covers 7 of the 9 asks; the two it does not show are dbt and on-call ownership. If you have done either, say so in your first two lines.' },
+    { v: 'study', t: 'Snack product testing', meta: 'FocusGroups.org, posted today, Chicago', needs: 'Needs: screener only, ages 21 to 45', pay: '$125', unit: 'max', range: 0, age: 0, amt: 125, noexp: 1, remote: 0, short: 1, fq: 1 },
+    { v: 'career', t: 'Registered Nurse, ICU nights', meta: 'Workday, posted today, Sacramento', needs: 'Needs: resume, covers 7 of 9 requirements', pay: '$58–72', unit: '/hr', range: 0.5, age: 0, amt: 135000, noexp: 0, remote: 0, short: 0, fit: 0.78, gaps: 2 },
+    { v: 'camera', t: 'UGC creator for a skincare brand', meta: 'r/UGC, posted 1d ago, remote', needs: 'Needs: 3 sample videos', bar: 'prep, one evening', pay: '$150–200', unit: '/video', range: 0.4, age: 1, amt: 200, noexp: 1, remote: 1, short: 0 },
+    { v: 'career', t: 'Marketing Coordinator, Later', meta: 'Ashby, posted 1d ago, remote in the US', needs: 'Needs: resume, no experience line in the posting', pay: '$58–70k', unit: 'base', range: 0.35, age: 1, amt: 64000, noexp: 1, remote: 1, short: 0, fit: 0.55, gaps: 0 },
+    { v: 'study', t: 'Education technology focus group', meta: 'FocusGroups.org, posted 2d ago, Manhattan', needs: 'Needs: screener about 15 min, teachers preferred', pay: '$450', unit: 'max', range: 0, age: 2, amt: 450, noexp: 1, remote: 0, short: 1, exp: 1,
+      plain: 'Pays up to $450 for one session in Manhattan. Needs a 15 minute screener first. Teachers preferred.',
+      full: 'A research firm wants working teachers to react to a classroom app, in person, about 90 minutes. The screener mostly checks that you teach now and use tech in class. Answer as yourself; screeners quietly drop people whose answers wobble.' },
+    { v: 'career', t: 'Senior Data Platform Engineer, Anthropic', meta: 'Greenhouse, posted 2d ago, San Francisco', needs: 'Needs: resume, covers 7 of 9 requirements', pay: '$280–350k', unit: 'base', range: 0.72, age: 2, amt: 315000, noexp: 0, remote: 0, short: 0, fit: 0.78, gaps: 2 },
+    { v: 'camera', t: 'Featured extra, A24 feature film', meta: 'AuditionsFree, posted 2d ago, Atlanta', needs: 'Needs: photos and basics, ages 18 and up', pay: '$500', unit: '/12 hr', range: 0, age: 2, amt: 500, noexp: 1, remote: 0, short: 0, fq: 1 },
+    { v: 'camera', t: 'Commercial, regional bank spot', meta: 'Casting Networks, posted 3d ago, Chicago', needs: 'Needs: self-tape, speaking role', bar: 'prep', pay: '$1,500', unit: 'flat', range: 0, age: 3, amt: 1500, noexp: 0, remote: 0, short: 0 },
+    { v: 'study', t: 'Online study, streaming habits', meta: 'FindFocusGroups, posted 4d ago, remote', needs: 'Needs: screener only, any state', pay: '$200', unit: 'max', range: 0, age: 4, amt: 200, noexp: 1, remote: 1, short: 1, quiet: 1 },
+    { v: 'career', t: 'Staff Data Engineer, Vercel', meta: 'Greenhouse, posted 5d ago, remote in the US', needs: 'Needs: resume, covers 8 of 9 requirements', pay: '$190–240k', unit: 'base', range: 0.55, age: 5, amt: 215000, noexp: 0, remote: 1, short: 0, applied: 'Applied, Jun 30', fit: 0.89, gaps: 1 },
+    { v: 'study', t: 'Paid game playtests, mobile', meta: 'PlaytestCloud, rolling sign-up, remote', needs: 'Needs: quiet room, think aloud, no camera', pay: '$9–11', unit: '/test', range: 0, age: 98, amt: 11, noexp: 1, remote: 1, short: 1, quiet: 1 },
+    { v: 'study', t: 'Website usability tests', meta: 'UserTesting, rolling sign-up, remote', needs: 'Needs: mic and screen share, no camera', pay: '$8–10', unit: '/test', range: 0, age: 99, amt: 10, noexp: 1, remote: 1, short: 1, quiet: 1 },
+    { v: 'study', t: 'Play a fake patient for med students', meta: 'State university careers page, posted Jun 24, on campus', needs: 'Needs: no experience, memorize a few lines, improvise the rest', pay: '$15–25', unit: '/hr', range: 0, age: 13, amt: 80, noexp: 1, short: 1 },
+    { v: 'study', t: 'Get paid to sleep in a lab overnight', meta: 'ClinicalTrials.gov, recruiting now, teaching hospital near you', needs: 'Needs: fit the health window, 2 to 3 weeks of screening, many wash out', bar: 'prep', pay: '$250', unit: '/night', range: 0, age: 90, amt: 250, noexp: 1 },
+    { v: 'camera', t: 'Sit in a paid studio audience', meta: 'Standing Room Only, rolling, Los Angeles, odd job', needs: 'Needs: free signup, dress code, clap on cue through retakes', pay: '$65', unit: '/4 hr', range: 0, age: 91, amt: 65, noexp: 1, short: 1 },
+    { v: 'lens', t: 'Post a free portfolio shoot ad, book two sessions', meta: 'The r/photography recipe, rolling, anywhere', needs: 'Needs: any camera, one ad on Craigslist or a local subreddit, a weekend', pay: '$0', unit: 'a portfolio, not cash', range: 0, age: 92, amt: 0, noexp: 1, short: 1, fq: 1 },
+    { v: 'lens', t: 'Second-shoot a wedding for a local lead', meta: 'r/WeddingPhotography pay survey, rolling, your metro, outreach not a listing', needs: 'Needs: body with two card slots, one fast prime, follow the shot list', pay: '$50–75', unit: '/hr', range: 0, age: 93, amt: 210, noexp: 1 },
+    { v: 'lens', t: 'Shoot a real estate listing for an agent', meta: 'r/RealEstatePhotography pricing threads, rolling, outreach not a listing', needs: 'Needs: wide lens and tripod, HDR basics, next-day turnaround', bar: 'prep', pay: '$150', unit: '/listing', range: 0, age: 94, amt: 150, short: 1 },
+    { v: 'lens', t: 'Shoot 30-minute family sessions', meta: 'Shoott, rolling sign-up, 21 metros', needs: 'Needs: full-frame body, they take roughly the top 5 percent of applicants', bar: 'track record', pay: '$100', unit: '/shoot hr', range: 0, age: 95, amt: 100 },
+    { v: 'party', t: 'Get cast with your real friend group, Sprite ad', meta: 'Project Casting, closes Jul 12, Miami', needs: 'Needs: 3 to 6 real friends, ages 18 to 35, one group photo, same shoot day', pay: '$1,000', unit: '/day each', range: 0, age: 3, amt: 1000, noexp: 1, short: 1, party: 1, ptotal: 4, pin: ['S', 'D'] },
+    { v: 'party', t: 'Apply to The Amazing Race with your best friend', meta: 'castingcrane.com, rolling, open year-round', needs: 'Needs: you and one friend, a 3 minute audition video, a filmed weekend', pay: '$0', unit: 'the pay is the story', range: 0, age: 96, amt: 0, noexp: 1, party: 1, fq: 1, ptotal: 2, pin: [] },
+    { v: 'party', t: 'Put $99 each on the line, team weight-loss pot', meta: 'healthywage.com, rolling, anywhere', needs: 'Needs: exactly 5 people, a scale, verified weigh-ins, 3 months. Most teams lose the entry, the point is your group actually does it', pay: '$99', unit: 'stake, each', range: 0, age: 97, amt: 99, remote: 1, party: 1, ptotal: 5, pin: ['Y', 'S', 'D', 'M', 'J'], pdate: 'Sat Jul 18' }
+  ];
+
+  var EDU_I = QUESTS.findIndex(function (q) { return q.t === 'Education technology focus group'; });
+  var FEAT_I = QUESTS.findIndex(function (q) { return q.t === 'Commercial, regional bank spot'; });
+  var VERCEL_I = QUESTS.findIndex(function (q) { return q.t === 'Staff Data Engineer, Vercel'; });
+
+  /* the personal log: written quests and clipped listings, one list */
+  var LOG = [
+    { type: 'party', t: 'Team weight-loss pot, five of us', date: 'Jul 5', ptotal: 5, pin: ['Y', 'S', 'D', 'M', 'J'], pdate: 'Sat Jul 18' },
+    { type: 'personal', t: 'Get my first background acting gig', date: TODAY, v: 'camera', why: '', next: 'Get two photos taken in plain daylight.', shelved: '' },
+    { type: 'clip', qi: EDU_I, date: 'Jul 6' },
+    { type: 'clip', qi: VERCEL_I, date: 'Jun 29' },
+    { type: 'personal', t: 'Learn pottery, wheel class', date: 'Jun 2', v: '', why: '', next: '', shelved: 'Jun 12' }
+  ];
+  var DONE = [
+    { d: 'Jul 3', t: 'Prolific study batch paid out.', n: '$45. Took 13 days.', amt: 45 },
+    { d: 'Jun 28', t: 'Did a paid snack focus group.', n: '$125.', amt: 125 },
+    { d: 'Jun 20', t: 'Online study, streaming habits.', n: '$30 requested, not paid yet.', amt: 0, pending: true },
+    { d: 'Mar 4', t: 'Ran the 10k.', n: 'Helped by your sister.', amt: 0 }
+  ];
+  QUESTS[EDU_I].clipped = true;
+  QUESTS[VERCEL_I].clipped = true;
+  QUESTS[VERCEL_I].clipDate = 'Jun 29';
+  var signupState = 0; /* 0 row, 1 email, 2 sent, 3 dismissed */
+
+  function esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function rowHtml(q, idx) {
+    var hue = HUE[q.v];
+    var bar = q.range
+      ? '<div class="rbar"><i style="width:' + Math.round(q.range * 100) + '%;background:' + hue + '"></i></div>'
+      : '';
+    var clipMeta = q.clipped ? ', clipped ' + (q.clipDate || 'Jul 6') : '';
+    var needsCell = q.applied ? '<span class="applied-stamp">' + q.applied + '</span>' : (q.needs + (q.bar ? ' &nbsp;<span class="bword">' + q.bar + '</span>' : ''));
+    var fqMark = q.fq ? ' &nbsp;<span class="fq" style="color:' + hue + '">first quest</span>' : '';
+    var clipCell = q.clipped
+      ? '<span class="clipcell"><svg class="postmark" viewBox="0 0 28 28" style="color:' + hue + '"><use href="' + STAMP[q.v] + '" stroke="currentColor"/></svg></span>'
+      : '<button class="clip" data-clip="' + idx + '" aria-label="Clip this quest">Clip</button>';
+    return '<div class="row" data-i="' + idx + '" data-v="' + q.v + '" data-age="' + q.age + '" data-amt="' + q.amt + '">'
+      + '<div class="stampcell"><svg class="stamp" viewBox="0 0 28 28" style="color:' + hue + '"><use href="' + STAMP[q.v] + '" stroke="currentColor"/></svg></div>'
+      + '<div><div class="title">' + q.t + '</div><div class="meta">' + q.meta + clipMeta + fqMark + '</div></div>'
+      + '<div class="needs">' + needsCell + '</div>'
+      + '<div class="paycell"><span class="pay">' + q.pay + ' <span class="u">' + q.unit + '</span></span>' + bar + '</div>'
+      + clipCell
+      + '</div>';
+  }
+
+  function seatsHtml(q) {
+    var s = '';
+    for (var i = 0; i < q.ptotal; i++) {
+      var init = q.pin[i] || '';
+      s += '<span class="seat' + (init ? ' in' : '') + '">' + init + '</span>';
+    }
+    return '<span class="seats">' + s + '</span>';
+  }
+  function cardHtml(q, idx) {
+    var hue = HUE[q.v];
+    var fqMark = q.fq ? ' &nbsp;<span class="fq" style="color:' + hue + '">first quest</span>' : '';
+    var needs = q.needs + (q.bar ? ' &nbsp;<span class="bword">' + q.bar + '</span>' : '');
+    var partyline = '';
+    if (q.party) {
+      var label = (q.pin.length === q.ptotal && q.pdate)
+        ? 'party full, on for ' + q.pdate
+        : 'party of ' + q.ptotal + ', ' + q.pin.length + ' in';
+      partyline = '<div class="partyline">' + seatsHtml(q) + label + '</div>';
+    }
+    var right;
+    if (q.party) right = '<button class="clip" data-makeparty="' + idx + '" style="color:var(--wine)">make a party</button>';
+    else if (q.applied) right = '<span class="applied-stamp">' + q.applied + '</span>';
+    else if (q.clipped) right = '<span class="applied-stamp" style="color:' + hue + ';border-color:' + hue + '">Clipped, ' + (q.clipDate || 'Jul 6') + '</span>';
+    else right = '<button class="clip" data-clip="' + idx + '" aria-label="Clip this quest">Clip</button>';
+    return '<article class="qcard" data-i="' + idx + '" data-v="' + q.v + '" data-age="' + q.age + '" data-amt="' + q.amt + '">'
+      + '<div class="band ' + BANDCLS[q.v] + '"><svg class="stamp s16" viewBox="0 0 28 28"><use href="' + STAMP[q.v] + '" stroke="currentColor"/></svg><span>' + BNAME[q.v] + '</span></div>'
+      + '<div class="qbody"><div class="qtitle"><a href="#" data-golink>' + q.t + '</a></div><div class="meta">' + q.meta + fqMark + '</div><div class="needs">' + needs + '</div>' + partyline + '</div>'
+      + '<div class="qfoot"><span class="pay">' + q.pay + ' <span class="u">' + q.unit + '</span></span>'
+      + (q.exp && !q.applied ? '<button class="clip xbtn" data-explain="' + idx + '">Explain this</button>' : '')
+      + right + '</div>'
+      + '</article>';
+  }
+
+  var boardRows = document.getElementById('board-rows');
+  var homeRows = document.getElementById('home-rows');
+  function rebuildRows() {
+    boardRows.innerHTML = QUESTS.map(function (q, i) { return cardHtml(q, i); }).join('');
+    homeRows.innerHTML = QUESTS.slice(0, 5).map(function (q, i) { return rowHtml(q, i); }).join('');
+    applyFilters();
+  }
+
+  /* pages */
+  var pages = { home: document.getElementById('page-home'), board: document.getElementById('page-board'), log: document.getElementById('page-log') };
+  function showPage(p) {
+    Object.keys(pages).forEach(function (k) { pages[k].classList.toggle('on', k === p); });
+    document.querySelectorAll('[data-page]').forEach(function (b) {
+      if (b.classList.contains('nav-item') || b.classList.contains('mtab')) {
+        b.classList.toggle('active', b.getAttribute('data-page') === p);
+      }
+    });
+    if (p === 'log') renderLog();
+    window.scrollTo(0, 0);
+    if (p === 'home') updateCredo();
+  }
+  document.querySelectorAll('[data-page]').forEach(function (b) {
+    b.addEventListener('click', function (e) { e.preventDefault(); showPage(b.getAttribute('data-page')); });
+  });
+
+  /* preset filters */
+  var active = { noexp: false, quiet: false, remote: false, pay500: false, short: false };
+  var curV = 'all';
+  var stripDismissed = false;
+
+  /* the full filter panel: per-vertical groups behind the Filters link */
+  var panel = { gaps: null, payMin: null, payMax: null, posted: null, place: '' };
+  var panelOpen = false;
+  var PAYHINT = { career: ['90k', '210k'], camera: ['250', '1,500'], study: ['100', '450'], lens: ['50', '300'], party: ['99', '1,000'] };
+  function parseAmt(s) {
+    s = String(s).toLowerCase().replace(/[$,\s]/g, '');
+    if (!s) return null;
+    var k = /k$/.test(s);
+    var n = parseFloat(s.replace(/k$/, ''));
+    if (isNaN(n)) return null;
+    return k ? n * 1000 : n;
+  }
+  function passes(q, f) {
+    if (curV !== 'all' && q.v !== curV) return false;
+    if (f.noexp && !q.noexp) return false;
+    if (f.quiet && !q.quiet) return false;
+    if (f.remote && !q.remote) return false;
+    if (f.pay500 && q.amt < 500) return false;
+    if (f.short && !q.short) return false;
+    if (panel.gaps !== null && !(typeof q.gaps === 'number' && q.gaps <= panel.gaps)) return false;
+    if (panel.payMin !== null && q.amt < panel.payMin) return false;
+    if (panel.payMax !== null && q.amt > panel.payMax) return false;
+    if (panel.posted === 'today' && q.age !== 0) return false;
+    if (panel.posted === 'week' && q.age > 7) return false;
+    if (panel.place && q.meta.toLowerCase().indexOf(panel.place.toLowerCase()) === -1) return false;
+    return true;
+  }
+  function match(q) { return passes(q, active); }
+
+  function panelCount() {
+    return (panel.gaps !== null ? 1 : 0) + (panel.payMin !== null || panel.payMax !== null ? 1 : 0) + (panel.posted ? 1 : 0) + (panel.place ? 1 : 0);
+  }
+  function updateFiltersBtn() {
+    var n = panelCount();
+    document.getElementById('filtersBtn').textContent = n ? 'Filters, ' + n + ' on' : 'Filters';
+  }
+  function pchipBtn(g, val, label, on) {
+    return '<button class="pchip' + (on ? ' active' : '') + '" data-pg="' + g + '" data-pv="' + val + '">' + label + '</button>';
+  }
+  function buildPanel() {
+    var fp = document.getElementById('fpanel');
+    if (!panelOpen) { fp.classList.remove('on'); return; }
+    var h = '';
+    if (curV === 'career') {
+      h += '<div><div class="fg-label">Gaps against your resume</div><div class="fg-chips">'
+        + pchipBtn('gaps', 0, 'no gaps', panel.gaps === 0)
+        + pchipBtn('gaps', 1, '1 gap at most', panel.gaps === 1)
+        + pchipBtn('gaps', 2, '2 gaps at most', panel.gaps === 2)
+        + '</div><div class="fg-note">A gap is a requirement in the posting your resume doesn’t cover. "Covers 7 of 9" means 2 gaps.</div></div>';
+    }
+    var hint = PAYHINT[curV] || PAYHINT.study;
+    h += '<div><div class="fg-label">Pay</div><div class="fg-chips">'
+      + '<input class="place-input pay-input" id="payMin" inputmode="numeric" placeholder="from $' + hint[0] + '" value="' + (panel.payMinRaw || '') + '">'
+      + '<input class="place-input pay-input" id="payMax" inputmode="numeric" placeholder="to $' + hint[1] + '" value="' + (panel.payMaxRaw || '') + '">'
+      + '</div><div class="fg-note">Only counts pay the posting states.</div></div>';
+    h += '<div><div class="fg-label">Posted</div><div class="fg-chips">'
+      + pchipBtn('posted', 'today', 'today', panel.posted === 'today')
+      + pchipBtn('posted', 'week', 'this week', panel.posted === 'week')
+      + '</div></div>';
+    h += '<div><div class="fg-label">Place</div><input class="place-input" id="placeInput" placeholder="City, or remote" value="' + esc(panel.place) + '"></div>';
+    h += '<button class="clearlink" id="panelClear">Clear</button>';
+    fp.innerHTML = h;
+    fp.classList.add('on');
+    function wirePay(id, key) {
+      document.getElementById(id).addEventListener('input', function () {
+        panel[key + 'Raw'] = this.value;
+        panel[key] = parseAmt(this.value);
+        applyFilters();
+        updateFiltersBtn();
+      });
+    }
+    wirePay('payMin', 'payMin');
+    wirePay('payMax', 'payMax');
+    document.getElementById('placeInput').addEventListener('input', function () {
+      panel.place = this.value.trim();
+      applyFilters();
+      updateFiltersBtn();
+    });
+    document.getElementById('panelClear').addEventListener('click', function () {
+      panel = { gaps: null, payMin: null, payMax: null, posted: null, place: '' };
+      buildPanel();
+      applyFilters();
+      updateFiltersBtn();
+    });
+  }
+  document.getElementById('filtersBtn').addEventListener('click', function () {
+    panelOpen = !panelOpen;
+    buildPanel();
+  });
+  document.getElementById('fpanel').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-pg]');
+    if (!b) return;
+    var g = b.getAttribute('data-pg');
+    var raw = b.getAttribute('data-pv');
+    var val = (g === 'posted') ? raw : parseFloat(raw);
+    panel[g] = (panel[g] === val) ? null : val;
+    buildPanel();
+    applyFilters();
+    updateFiltersBtn();
+  });
+
+  /* per-vertical kits: the one thing you save once so quests curate themselves */
+  var KITS = {
+    career: 'Resume on file, updated <span class="num">May 3</span>. Career quests show how much of it you already cover.|Update',
+    camera: 'Two photos and basics are enough for most castings here. Save them once and apply in one tap.|Set up',
+    study: 'Screener basics saved: age, city, occupation. Screeners prefill from them.|Edit',
+    lens: 'Save once: a body with two card slots, one fast prime, a bounce flash, and a contract template before any wedding.<div class="fg-note">Rates here come from working shooters, not platform ads. A real gig never charges you to join.</div>|Set up',
+    party: 'Quests that need your group chat. Real headcounts, real dates. We never match you with strangers.<div class="fg-note">Real casting never charges to apply, audition, or get listed.</div>|'
+  };
+  function applyFilters() {
+    var stripPicks = [];
+    if (curV === 'camera' && !stripDismissed) {
+      stripPicks = QUESTS.map(function (q, i) { return { q: q, i: i }; }).filter(function (x) { return x.q.v === 'camera' && (x.q.fq || x.q.bar); }).slice(0, 3);
+    }
+    var pickIdx = stripPicks.map(function (x) { return x.i; });
+    var rows = boardRows.querySelectorAll('.qcard');
+    rows.forEach(function (r) {
+      var i = +r.getAttribute('data-i');
+      r.style.display = (match(QUESTS[i]) && pickIdx.indexOf(i) === -1) ? '' : 'none';
+    });
+    document.querySelectorAll('#presets .pchip').forEach(function (ch) {
+      var f = ch.getAttribute('data-f');
+      var probe = Object.assign({}, active); probe[f] = true;
+      var n = QUESTS.filter(function (q) { return passes(q, probe); }).length;
+      ch.querySelector('.n').textContent = n;
+      ch.classList.toggle('dim', n < 3 && !active[f]);
+      ch.classList.toggle('active', active[f]);
+    });
+    document.getElementById('spareLine').classList.toggle('on', active.noexp);
+    var kit = document.getElementById('kitMount');
+    if (curV !== 'all' && KITS[curV]) {
+      var parts = KITS[curV].split('|');
+      kit.innerHTML = '<div class="kitrow"><span>' + parts[0] + '</span>' + (parts[1] ? '<button class="textlink">' + parts[1] + '</button>' : '') + '</div>';
+    } else {
+      kit.innerHTML = '';
+    }
+    var mount = document.getElementById('stripMount');
+    mount.innerHTML = '';
+    if (stripPicks.length) {
+      mount.innerHTML = '<div class="strip"><div class="s-head">Never been an extra? The whole pipeline is one page. <a class="textlink" href="#">First quest guide</a><button class="right" id="stripAll">Show me everything</button></div>'
+        + '<div class="cardgrid">' + stripPicks.map(function (x) { return cardHtml(x.q, x.i); }).join('') + '</div></div>';
+      mount.querySelector('#stripAll').addEventListener('click', function () {
+        stripDismissed = true;
+        applyFilters();
+      });
+    }
+    var plate = document.getElementById('plateMount');
+    plate.innerHTML = curV !== 'all'
+      ? '<svg viewBox="0 0 28 28"><use href="' + STAMP[curV] + '" stroke="currentColor" fill="none"/></svg>'
+      : '';
+  }
+  document.querySelectorAll('.pchip').forEach(function (ch) {
+    ch.addEventListener('click', function () {
+      var f = ch.getAttribute('data-f');
+      active[f] = !active[f];
+      applyFilters();
+    });
+  });
+  var sh = document.getElementById('startHere');
+  if (sh) sh.addEventListener('click', function (e) { e.preventDefault(); active.noexp = true; showPage('board'); applyFilters(); });
+
+  /* chips */
+  var chips = document.querySelectorAll('.chip');
+  chips.forEach(function (c) {
+    c.addEventListener('click', function () {
+      chips.forEach(function (x) { x.classList.remove('active'); });
+      c.classList.add('active');
+      curV = c.getAttribute('data-v');
+      panel.gaps = null;
+      panel.payMin = null;
+      panel.payMax = null;
+      panel.payMinRaw = '';
+      panel.payMaxRaw = '';
+      buildPanel();
+      updateFiltersBtn();
+      applyFilters();
+    });
+  });
+
+  /* sort */
+  var newest = true;
+  document.getElementById('sortBtn').addEventListener('click', function () {
+    newest = !newest;
+    this.innerHTML = 'Sort: <b>' + (newest ? 'newest' : 'pay') + '</b>';
+    var arr = Array.prototype.slice.call(boardRows.children);
+    arr.sort(function (a, b) {
+      return newest
+        ? (+a.getAttribute('data-age')) - (+b.getAttribute('data-age'))
+        : (+b.getAttribute('data-amt')) - (+a.getAttribute('data-amt'));
+    });
+    arr.forEach(function (el) { boardRows.appendChild(el); });
+  });
+
+  /* ── motion 1: the split-flap board, once, on load ── */
+  var flapsRan = false;
+  function runFlaps() {
+    if (flapsRan) return;
+    flapsRan = true;
+    var cells = document.querySelectorAll('.flap');
+    if (reduced) {
+      cells.forEach(function (c) { c.textContent = c.getAttribute('data-t'); });
+      return;
+    }
+    cells.forEach(function (c, i) {
+      var target = c.getAttribute('data-t');
+      var ticks = 5 + i * 2;
+      var n = 0;
+      c.textContent = String(Math.floor(Math.random() * 10));
+      var iv = setInterval(function () {
+        n++;
+        c.classList.remove('tick');
+        void c.offsetWidth;
+        c.classList.add('tick');
+        setTimeout(function () {
+          c.textContent = n >= ticks ? target : String(Math.floor(Math.random() * 10));
+        }, 52);
+        if (n >= ticks) clearInterval(iv);
+      }, 95);
+    });
+  }
+
+  /* ── motion 2: the credo line comes into register as it enters ── */
+  var credo = document.getElementById('credo');
+  credo.innerHTML = credo.textContent.trim().split(' ').map(function (w) { return '<span class="w">' + w + '</span>'; }).join(' ');
+  var credoWords = credo.querySelectorAll('.w');
+  function updateCredo() {
+    if (reduced) { credoWords.forEach(function (w) { w.classList.add('on'); }); return; }
+    var r = credo.getBoundingClientRect();
+    var vh = window.innerHeight;
+    var p = Math.max(0, Math.min(1, (vh * 0.92 - r.top) / (vh * 0.38)));
+    var k = Math.round(p * credoWords.length);
+    credoWords.forEach(function (w, i) { w.classList.toggle('on', i < k); });
+  }
+  var credoTickPending = false;
+  window.addEventListener('scroll', function () {
+    if (credoTickPending) return;
+    credoTickPending = true;
+    requestAnimationFrame(function () { credoTickPending = false; if (pages.home.classList.contains('on')) updateCredo(); });
+  }, { passive: true });
+
+  /* ── motion 3: the postmark press when a quest is clipped ── */
+  function clipQuest(i, pressTarget) {
+    var q = QUESTS[i];
+    if (q.clipped) return;
+    q.clipped = true;
+    q.clipDate = TODAY;
+    LOG.unshift({ type: 'clip', qi: i, date: TODAY });
+    if (pressTarget) {
+      var btn = pressTarget.querySelector('[data-clip]');
+      if (btn && pressTarget.classList.contains('qcard')) {
+        var st = document.createElement('span');
+        st.className = 'applied-stamp pressin';
+        st.style.color = HUE[q.v];
+        st.style.borderColor = HUE[q.v];
+        st.textContent = 'Clipped, ' + TODAY;
+        btn.replaceWith(st);
+      } else if (btn) {
+        var span = document.createElement('span');
+        span.className = 'clipcell';
+        span.innerHTML = '<svg class="postmark press" viewBox="0 0 28 28" style="color:' + HUE[q.v] + '"><use href="' + STAMP[q.v] + '" stroke="currentColor"/></svg>';
+        btn.replaceWith(span);
+        var meta = pressTarget.querySelector('.meta');
+        if (meta) meta.insertAdjacentText('beforeend', ', clipped ' + TODAY);
+      }
+    }
+    setTimeout(rebuildRows, 420);
+  }
+  document.addEventListener('click', function (e) {
+    var g = e.target.closest('[data-golink]');
+    if (g) e.preventDefault();
+    var b = e.target.closest('[data-clip]');
+    if (b) clipQuest(+b.getAttribute('data-clip'), b.closest('.row, .qcard'));
+    var mp = e.target.closest('[data-makeparty]');
+    if (mp) openPartySheet(+mp.getAttribute('data-makeparty'));
+    var xp = e.target.closest('[data-explain]');
+    if (xp) openExplain(+xp.getAttribute('data-explain'));
+  });
+
+  /* the explain sheet: the answer lands before the ask */
+  var xscrim = document.getElementById('xscrim');
+  var xGot = false, xCur = null, xTimer = null;
+  function xShowFull() {
+    var q = QUESTS[xCur];
+    var body = document.getElementById('xbody');
+    body.textContent = q.full;
+    document.getElementById('xmethod').textContent = 'Read against the posting and your resume.';
+    var n = document.getElementById('xnote');
+    n.classList.remove('xswap'); void n.offsetWidth; n.classList.add('xswap');
+  }
+  function openExplain(i) {
+    xCur = i;
+    var q = QUESTS[i];
+    if (xTimer) { clearInterval(xTimer); xTimer = null; }
+    document.getElementById('xtitle').textContent = q.t;
+    document.getElementById('xmeta').textContent = q.meta;
+    var consent = document.getElementById('xconsent');
+    if (xGot) {
+      document.getElementById('xbody').textContent = q.full;
+      document.getElementById('xmethod').textContent = 'Read against the posting and your resume.';
+      consent.style.display = 'none';
+    } else {
+      document.getElementById('xbody').textContent = q.plain;
+      document.getElementById('xmethod').textContent = 'Pulled from the posting\'s own words.';
+      consent.style.display = '';
+      consent.innerHTML = '<div class="xc-title">First time only.</div>'
+        + '<div class="xc-body">Your computer can do this work itself, so it\'s free and nothing you type leaves it. One download first, about <span class="num">1.1 GB</span>, the size of a movie.</div>'
+        + '<div class="xc-row"><button class="btn-sage" id="xstart">Start the download</button><button class="plainbtn" id="xlater">Not now</button></div>'
+        + '<div class="xc-foot">Remove it any time in Settings.</div>';
+    }
+    xscrim.classList.add('on');
+  }
+  xscrim.addEventListener('click', function (e) {
+    if (e.target === xscrim) xscrim.classList.remove('on');
+    if (e.target.id === 'xlater') {
+      document.getElementById('xconsent').innerHTML =
+        '<div class="xc-foot" style="margin-top:0">The full read is in Settings whenever you want it.</div>';
+    }
+    if (e.target.id === 'xstart') {
+      var consent = document.getElementById('xconsent');
+      var pct = 4;
+      consent.innerHTML = '<div class="xc-body">On its way, <span class="num" id="xpct">4%</span>. Keep browsing, it finishes on its own.</div>';
+      xTimer = setInterval(function () {
+        pct += 8;
+        if (pct >= 100) {
+          clearInterval(xTimer); xTimer = null; xGot = true;
+          consent.innerHTML = '<div class="xc-foot" style="margin-top:0">Done. Full reads from here on. It never downloads again.</div>';
+          xShowFull();
+        } else {
+          var el = document.getElementById('xpct'); if (el) el.textContent = pct + '%';
+        }
+      }, 220);
+    }
+  });
+  document.getElementById('xclose').addEventListener('click', function () { xscrim.classList.remove('on'); });
+
+  /* the make-a-party sheet: the invite lives in the group chat */
+  var scrim = document.getElementById('scrim');
+  function openPartySheet(i) {
+    var q = QUESTS[i];
+    document.getElementById('sheetMeta').textContent = q.t + '. ' + q.pay + ' ' + q.unit + '.';
+    document.getElementById('sheetNote').textContent = 'found us a thing: ' + q.t.toLowerCase() + '. pays ' + q.pay + ' ' + q.unit + '. needs ' + q.ptotal + ' people, ' + (q.pdate || 'pick a day') + '. you in?';
+    var missing = q.ptotal - q.pin.length;
+    document.getElementById('sheetWaiting').textContent = missing > 0
+      ? (q.pin.length ? 'Waiting on ' + missing + ' more.' : 'Nobody asked yet.')
+      : 'Party full, on for ' + q.pdate + '.';
+    scrim.classList.add('on');
+  }
+  document.getElementById('sheetClose').addEventListener('click', function () { scrim.classList.remove('on'); });
+  scrim.addEventListener('click', function (e) { if (e.target === scrim) scrim.classList.remove('on'); });
+  document.getElementById('copyNote').addEventListener('click', function () {
+    var t = document.getElementById('sheetNote').textContent;
+    if (navigator.clipboard) navigator.clipboard.writeText(t);
+    this.textContent = 'Copied';
+    var self = this;
+    setTimeout(function () { self.textContent = 'Copy the note'; }, 1400);
+  });
+  document.getElementById('featClip').addEventListener('click', function () {
+    var q = QUESTS[FEAT_I];
+    if (q.clipped) return;
+    var pay = document.getElementById('featPay');
+    pay.insertAdjacentHTML('afterbegin', '<svg class="postmark press" viewBox="0 0 28 28" style="color:' + HUE.camera + ';margin-left:auto"><use href="#stamp-camera" stroke="currentColor"/></svg>');
+    this.replaceWith(Object.assign(document.createElement('span'), { className: 'meta num', textContent: 'Clipped, ' + TODAY }));
+    clipQuest(FEAT_I, null);
+  });
+
+  /* ── your log ── */
+  function matchesFor(v, notTitle) {
+    return QUESTS.filter(function (q) { return q.v === v && !q.clipped && q.t !== notTitle; }).slice(0, 2);
+  }
+  function logCardHtml(item, idx) {
+    if (item.type === 'clip') {
+      var q = QUESTS[item.qi];
+      var hue = HUE[q.v];
+      var pm = q.applied
+        ? '<span class="applied-stamp">' + q.applied + '</span>'
+        : '<span class="applied-stamp" style="color:' + hue + ';border-color:' + hue + '">Clipped, ' + item.date + '</span>';
+      var followup = q.applied
+        ? '<div class="next">Applied Jun 30. A short follow-up is fair game after Jul 7. One note is plenty.</div>'
+        : '';
+      return '<div class="lcard">'
+        + '<div class="stampcell"><svg class="stamp" viewBox="0 0 28 28" style="color:' + hue + '"><use href="' + STAMP[q.v] + '" stroke="currentColor"/></svg></div>'
+        + '<div><div class="title">' + q.t + '</div><div class="meta">via ' + q.meta + '</div>'
+        + followup
+        + '<div class="aff"><span class="acts"><a class="textlink" style="font-size:13px" href="#">Apply at source</a></span></div></div>'
+        + '<div class="rightcol">' + pm
+        + '<span class="pay">' + q.pay + ' <span class="u">' + q.unit + '</span></span></div>'
+        + '</div>';
+    }
+    if (item.type === 'party') {
+      var pLabel = (item.pin.length === item.ptotal && item.pdate)
+        ? 'on for ' + item.pdate
+        : 'rounding up the party';
+      return '<div class="lcard">'
+        + '<div class="stampcell"><svg class="stamp" viewBox="0 0 28 28" style="color:var(--wine)"><use href="#stamp-party" stroke="currentColor"/></svg></div>'
+        + '<div><div class="title">' + esc(item.t) + '</div><div class="meta">party of ' + item.ptotal + ', made ' + item.date + ', ' + pLabel + '</div>'
+        + '<div class="partyline">' + seatsHtml(item) + (item.pin.length === item.ptotal ? 'everyone is in' : 'waiting on ' + (item.ptotal - item.pin.length) + ' more') + '</div>'
+        + '<div class="aff"><span class="acts"><button data-done="' + idx + '">Done</button><button data-fell="' + idx + '">Didn’t happen</button></span></div></div>'
+        + '<div class="rightcol"></div>'
+        + '</div>';
+    }
+    var metaBits = 'written by you, ' + item.date + (item.shelved ? ', shelved, ' + item.shelved : '');
+    var vtag = item.v ? '<span class="vtag">' + VNAME[item.v] + '</span>' : '';
+    var why = item.why ? '<div class="why">' + esc(item.why) + '</div>' : '';
+    var next = item.next ? '<div class="next">Next step: ' + esc(item.next) + '</div>' : '';
+    var shelfnote = item.shelved ? '<div class="shelfnote">Miss a month and the quest stays where you left it.</div>' : '';
+    var aff = '';
+    if (item._edit === 'v') {
+      aff += '<span class="vpick">'
+        + ['career', 'camera', 'study'].map(function (v) { return '<button data-setv="' + v + '" data-li="' + idx + '">' + VNAME[v] + '</button>'; }).join('')
+        + '<button data-setv="" data-li="' + idx + '">none</button></span>';
+    } else if (item._edit === 'why' || item._edit === 'next') {
+      aff += '<input class="affinput" data-editfield="' + item._edit + '" data-li="' + idx + '" placeholder="One line, press enter">';
+    } else {
+      if (!item.v) aff += '<button data-aff="v" data-li="' + idx + '">Add a vertical</button>';
+      if (!item.why) aff += '<button data-aff="why" data-li="' + idx + '">Add a why</button>';
+      if (!item.next) aff += '<button data-aff="next" data-li="' + idx + '">Add a next step</button>';
+    }
+    var acts = '<span class="acts">'
+      + '<button data-done="' + idx + '">Done</button>'
+      + (item.shelved ? '<button data-reopen="' + idx + '">Reopen</button>' : '<button data-shelve="' + idx + '">Shelve</button>')
+      + '</span>';
+    var frombd = '';
+    if (item.v && !item.shelved) {
+      var ms = matchesFor(item.v, item.t);
+      if (ms.length) {
+        frombd = '<div class="frombd"><div class="fb-label">From the board</div>'
+          + ms.map(function (m) {
+            return '<div class="fbrow"><span>' + m.t + '</span><span class="fv">' + VNAME[m.v] + '</span><span class="fpay">' + m.pay + ' <span class="u">' + m.unit + '</span></span></div>';
+          }).join('') + '</div>';
+      }
+    }
+    return '<div class="lcard">'
+      + '<div class="stampcell"><svg class="stamp" viewBox="0 0 28 28" style="color:var(--soft)"><use href="#stamp-personal" stroke="currentColor"/></svg></div>'
+      + '<div><div class="title">' + esc(item.t) + '</div><div class="meta">' + metaBits + vtag + '</div>'
+      + why + next + shelfnote
+      + '<div class="aff">' + aff + acts + '</div></div>'
+      + '<div class="rightcol"></div>'
+      + frombd
+      + '</div>';
+  }
+  function signupHtml() {
+    if (signupState === 3) return '';
+    if (signupState === 0) {
+      return '<div class="signup"><span class="grow">Your log lives in this browser. Add an email if you want it to survive a lost laptop.</span>'
+        + '<button class="btn-sage" data-su="keep">Keep a copy</button><button class="plainbtn" data-su="no">Not now</button></div>';
+    }
+    if (signupState === 1) {
+      return '<div class="signup"><span class="grow">No password. We send a link, you click it.</span>'
+        + '<input type="email" placeholder="Your email" aria-label="Your email">'
+        + '<button class="btn-sage" data-su="send">Send the link</button><button class="plainbtn" data-su="no">Not now</button></div>';
+    }
+    return '<div class="signup"><span class="grow">We sent a link. Your log stays where it is.</span></div>';
+  }
+  function renderLog() {
+    var hasValue = LOG.some(function (x) { return x.type === 'personal'; }) || LOG.filter(function (x) { return x.type === 'clip'; }).length >= 2;
+    document.getElementById('signupMount').innerHTML = hasValue ? signupHtml() : '';
+    document.getElementById('logList').innerHTML = LOG.map(logCardHtml).join('');
+    var paidTotal = DONE.reduce(function (s, d) { return s + (d.amt || 0); }, 0);
+    document.getElementById('doneMount').innerHTML = DONE.length
+      ? '<div class="done-block"><div class="done-label">Done</div>'
+        + DONE.map(function (d) {
+          return '<div class="dline' + (d.pending ? ' pending' : '') + '"><span class="dd">' + d.d + '</span><span class="dt">' + d.t + '</span>' + (d.n ? '<span class="dn">' + d.n + '</span>' : '') + '</div>';
+        }).join('')
+        + (paidTotal ? '<div class="ledger-total">Paid out in <span class="num">2026</span> so far: <span class="num">$' + paidTotal + '</span>. Counting only what landed.</div>' : '')
+        + '</div>'
+      : '';
+    var inp = document.querySelector('.affinput');
+    if (inp) inp.focus();
+  }
+
+  document.getElementById('composerInput').addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter') return;
+    var v = this.value.trim();
+    if (!v) return;
+    LOG.unshift({ type: 'personal', t: v, date: TODAY, v: '', why: '', next: '', shelved: '' });
+    this.value = '';
+    document.getElementById('compSaved').classList.add('on');
+    renderLog();
+  });
+
+  document.getElementById('page-log').addEventListener('click', function (e) {
+    var t = e.target;
+    if (t.hasAttribute('data-su')) {
+      var a = t.getAttribute('data-su');
+      signupState = a === 'keep' ? 1 : a === 'send' ? 2 : 3;
+      renderLog();
+      return;
+    }
+    if (t.hasAttribute('data-aff')) {
+      LOG[+t.getAttribute('data-li')]._edit = t.getAttribute('data-aff');
+      renderLog();
+      return;
+    }
+    if (t.hasAttribute('data-setv')) {
+      var it = LOG[+t.getAttribute('data-li')];
+      it.v = t.getAttribute('data-setv');
+      delete it._edit;
+      renderLog();
+      return;
+    }
+    if (t.hasAttribute('data-done')) {
+      var i = +t.getAttribute('data-done');
+      var item = LOG[i];
+      DONE.unshift({ d: TODAY, t: esc(item.t) + '.', n: '' });
+      LOG.splice(i, 1);
+      renderLog();
+      return;
+    }
+    if (t.hasAttribute('data-fell')) {
+      LOG.splice(+t.getAttribute('data-fell'), 1);
+      renderLog();
+      return;
+    }
+    if (t.hasAttribute('data-shelve')) {
+      LOG[+t.getAttribute('data-shelve')].shelved = TODAY;
+      renderLog();
+      return;
+    }
+    if (t.hasAttribute('data-reopen')) {
+      LOG[+t.getAttribute('data-reopen')].shelved = '';
+      renderLog();
+      return;
+    }
+  });
+  document.getElementById('page-log').addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter') return;
+    var t = e.target;
+    if (!t.classList || !t.classList.contains('affinput')) return;
+    var it = LOG[+t.getAttribute('data-li')];
+    var val = t.value.trim();
+    if (val) it[t.getAttribute('data-editfield')] = val;
+    delete it._edit;
+    renderLog();
+  });
+
+  rebuildRows();
+  updateCredo();
+  runFlaps();
+
+  /* the landing page: real cards as the hero, one door in */
+  var landPicks = ['Get cast with your real friend group, Sprite ad', 'Background actors, major streaming series', 'Get paid to sleep in a lab overnight'];
+  document.getElementById('landCards').innerHTML = landPicks.map(function (t) {
+    var i = QUESTS.findIndex(function (q) { return q.t === t; });
+    return cardHtml(QUESTS[i], i);
+  }).join('');
+  var trustI = QUESTS.findIndex(function (q) { return q.t === 'Education technology focus group'; });
+  document.getElementById('trustCard').innerHTML = cardHtml(QUESTS[trustI], trustI);
+  var tcx = document.querySelector('#trustCard .xbtn');
+  if (tcx) tcx.remove();
+  document.querySelectorAll('[data-enter]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.body.classList.add('inapp');
+      showPage('home');
+    });
+  });
+})();
+</script>
