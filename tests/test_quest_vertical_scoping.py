@@ -87,9 +87,12 @@ def test_save_application_threads_vertical_and_quest_fields(db):
 def test_save_application_rejects_unknown_vertical(db):
     with pytest.raises(ValueError):
         db.save_application(job_title="X", company="Y", vertical="bogus")
-    # 'personal' is a UI-only log lane, never a stored applications vertical.
-    with pytest.raises(ValueError):
-        db.save_application(job_title="X", company="Y", vertical="personal")
+    # 'personal' is the log's own storable lane (PR 4). The wall against
+    # leaking into career surfaces is scoped_applications' career default,
+    # pinned in test_log_personal_quests.py; the wall against scrapers
+    # producing it is /quests/refresh's QUEST_VERTICALS validation.
+    rec = db.save_application(job_title="X", company="Y", vertical="personal")
+    assert rec.vertical == "personal"
 
 
 def test_fuzzy_dedup_never_merges_quest_into_career(db):
@@ -270,8 +273,12 @@ def test_list_applications_rejects_unknown_vertical(api_client):
     client, _jf_db = api_client
     resp = client.get("/api/v1/applications", params={"vertical": "bogus"})
     assert resp.status_code == 400
+    # 'personal' is readable since PR 4 (the log opts in explicitly); it just
+    # never rides along by default. Isolation pinned in
+    # test_log_personal_quests.py.
     resp = client.get("/api/v1/applications", params={"vertical": "personal"})
-    assert resp.status_code == 400
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 0
 
 
 def test_default_sort_cannot_flood_classic_page_with_unscored_quests(api_client):

@@ -1,0 +1,73 @@
+/* Your numbers (/log/numbers): the old Analytics page reskinned. Paper
+   chart cards with hairline borders and the edge bottom, KPI values in
+   mono, ink and the canon hues inside the charts. */
+
+.qb-numbers-head { padding: 40px 0 24px; }
+.qb-numbers-head h1 {
+  font-family: var(--serif);
+  font-variation-settings: 'opsz' 80;
+  font-weight: 560;
+  font-size: 26px;
+  letter-spacing: -.01em;
+  margin: 6px 0 0;
+}
+.qb-numbers-sub { font-size: 13px; color: var(--mute); margin-top: 4px; }
+
+.qb-kpirow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 28px;
+}
+.qb-kpi {
+  border: 1px solid var(--hair);
+  border-bottom-color: var(--edge);
+  border-radius: 10px;
+  background: var(--paper);
+  padding: 14px 16px;
+}
+.qb-kpi .qb-kpival {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -.01em;
+  color: var(--ink);
+  line-height: 1.1;
+}
+.qb-kpi .qb-kpilab { font-size: 12.5px; color: var(--mute); margin-top: 5px; }
+
+.qb-chartgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+.qb-chartcard {
+  border: 1px solid var(--hair);
+  border-bottom-color: var(--edge);
+  border-radius: 10px;
+  background: var(--paper);
+  padding: 16px 18px;
+}
+.qb-chartcard .qb-charttitle {
+  font-family: var(--serif);
+  font-variation-settings: 'opsz' 30;
+  font-weight: 580;
+  font-size: 17px;
+  color: var(--ink);
+  margin: 0;
+  letter-spacing: -.005em;
+}
+.qb-chartcard .qb-chartsub { font-size: 12.5px; color: var(--mute); margin: 3px 0 12px; }
+.qb-chart-empty {
+  height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13.5px;
+  color: var(--mute);
+}
+
+@media (max-width: 700px) {
+  .qb-numbers-head { padding-top: 24px; }
+}

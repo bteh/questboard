@@ -1,0 +1,201 @@
+/* Your log (/log), ported from packages/ui/reference/quest-board-mock.html
+   (#page-log). Trade-paper grammar: hairlines, paper cards with the edge
+   bottom border, mono tabular numbers, stamps in the vertical hues. */
+
+.qb-logwrap { max-width: 1120px; margin: 0 auto; padding: 0 44px 96px; }
+
+.qb-log-head { padding: 48px 0 0; }
+.qb-log-head h1 {
+  font-family: var(--serif);
+  font-variation-settings: 'opsz' 80;
+  font-weight: 560;
+  font-size: 26px;
+  letter-spacing: -.01em;
+  margin: 0;
+}
+.qb-log-status { font-size: 13px; color: var(--mute); margin-top: 4px; }
+
+.qb-composer { margin-top: 24px; }
+.qb-composer input {
+  width: 100%;
+  border: 1px solid var(--hair);
+  background: var(--paper);
+  border-radius: 4px;
+  padding: 12px 14px;
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--ink);
+  outline: none;
+}
+.qb-composer input::placeholder { color: var(--mute); }
+.qb-composer input:focus-visible { border-color: var(--step4); }
+.qb-comp-saved { font-size: 13px; color: var(--mute); margin-top: 8px; }
+
+.qb-signup {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  border: 1px solid var(--hair);
+  background: var(--paper);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-top: 18px;
+  font-size: 14.5px;
+  color: var(--soft);
+}
+.qb-signup .qb-grow { flex: 1; min-width: 240px; }
+.qb-signup input {
+  border: 1px solid var(--hair);
+  background: var(--ground);
+  border-radius: 4px;
+  padding: 8px 12px;
+  font-family: inherit;
+  font-size: 14px;
+  flex: 1;
+  min-width: 200px;
+  outline: none;
+}
+.qb-signup input:focus-visible { border-color: var(--step4); }
+
+.qb-loglist { margin-top: 18px; display: flex; flex-direction: column; gap: 12px; }
+.qb-lcard {
+  border: 1px solid var(--hair);
+  background: var(--paper);
+  border-radius: 10px;
+  border-bottom-color: var(--edge);
+  padding: 16px 20px;
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  gap: 16px;
+  align-items: start;
+}
+.qb-lcard .qb-stampcell { padding-top: 2px; }
+.qb-lcard .qb-stampcell .qb-stamp { width: 28px; height: 28px; }
+.qb-lcard .qb-ltitle { font-size: 16px; font-weight: 500; line-height: 1.3; color: var(--ink); }
+.qb-lcard .qb-lmeta {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: var(--mute);
+  margin-top: 2px;
+}
+.qb-lcard .qb-vtag {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--mute);
+  border: 1px solid var(--hair);
+  border-radius: 3px;
+  padding: 1px 6px;
+  margin-left: 8px;
+}
+.qb-lcard .qb-lnext { font-size: 14px; color: var(--soft); margin-top: 8px; }
+.qb-lcard .qb-shelfnote { font-size: 13px; color: var(--mute); margin-top: 8px; }
+.qb-lcard .qb-aff {
+  margin-top: 12px;
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.qb-lcard .qb-aff .qb-acts { margin-left: auto; display: flex; gap: 16px; }
+.qb-lcard .qb-aff .qb-acts button {
+  background: none;
+  border: 0;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--soft);
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+}
+.qb-lcard .qb-aff .qb-acts button:hover { color: var(--ink); }
+.qb-affinput {
+  border: 1px solid var(--hair);
+  background: var(--ground);
+  border-radius: 4px;
+  padding: 5px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  outline: none;
+  min-width: 220px;
+}
+.qb-affinput:focus-visible { border-color: var(--step4); }
+.qb-lcard .qb-rightcol {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.qb-lcard .qb-applied-stamp { white-space: nowrap; }
+.qb-lcard .qb-lpay {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -.01em;
+  white-space: nowrap;
+}
+.qb-lcard .qb-lpay .qb-u { font-size: 13px; color: var(--mute); font-weight: 400; }
+
+.qb-done-block { margin-top: 36px; border-top: 1px solid var(--hair); padding-top: 16px; }
+.qb-done-label { font-size: 15px; font-weight: 500; margin-bottom: 8px; color: var(--ink); }
+.qb-dline { display: flex; gap: 14px; align-items: baseline; padding: 7px 0; font-size: 15px; }
+.qb-dline .qb-dd {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: var(--mute);
+  width: 64px;
+  flex-shrink: 0;
+}
+.qb-dline .qb-dt { color: var(--ink); }
+.qb-dline .qb-dn { color: var(--soft); }
+.qb-dline.qb-pending .qb-dt, .qb-dline.qb-pending .qb-dn { color: var(--mute); }
+.qb-ledger-total {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--hair);
+  font-size: 14px;
+  color: var(--soft);
+}
+.qb-ledger-total .qb-num { font-weight: 500; color: var(--ink); }
+
+.qb-log-empty { margin-top: 40px; font-size: 14.5px; color: var(--soft); }
+
+.qb-log-tail {
+  margin-top: 44px;
+  border-top: 1px solid var(--hair);
+  padding-top: 20px;
+  display: flex;
+  gap: 40px;
+  flex-wrap: wrap;
+}
+.qb-log-tail .qb-tailstat { min-width: 150px; }
+.qb-log-tail .qb-tailnum {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 30px;
+  font-weight: 500;
+  letter-spacing: -.01em;
+  color: var(--ink);
+  line-height: 1.1;
+}
+.qb-log-tail .qb-taillab { font-size: 13.5px; color: var(--mute); margin-top: 4px; }
+.qb-log-tail .qb-taillab .qb-textlink { font-size: 13.5px; }
+
+.qb-log-foot { padding: 36px 0 0; font-size: 13px; color: var(--mute); margin: 0; }
+
+@media (max-width: 700px) {
+  .qb-logwrap { padding: 0 20px 72px; }
+  .qb-log-head { padding-top: 28px; }
+  .qb-lcard { grid-template-columns: 32px 1fr; }
+  .qb-lcard .qb-rightcol {
+    grid-column: 2;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+    text-align: left;
+  }
+}

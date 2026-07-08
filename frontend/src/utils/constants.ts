@@ -1,6 +1,7 @@
 export const STATUS_OPTIONS = [
-  'found', 'reviewed', 'applying', 'applied',
+  'found', 'reviewed', 'clipped', 'applying', 'applied',
   'interviewing', 'offer', 'rejected', 'withdrawn',
+  'shelved', 'attended', 'paid_out',
 ] as const;
 
 export type StatusOption = typeof STATUS_OPTIONS[number];
@@ -9,12 +10,18 @@ export type StatusOption = typeof STATUS_OPTIONS[number];
 export const STATUS_LABELS: Record<string, string> = {
   found: 'Found',
   reviewed: 'Reviewed',
+  clipped: 'Clipped',
   applying: 'Applying',
   applied: 'Applied',
   interviewing: 'Interviewing',
   offer: 'Offer',
   rejected: 'Rejected',
   withdrawn: 'Withdrawn',
+  shelved: 'Shelved',
+  attended: 'Done',
+  paid_out: 'Paid out',
+  booked: 'Booked',
+  expired: 'Expired',
 };
 
 /** Properly capitalized display labels for recommendation values */
@@ -44,12 +51,16 @@ const OLIVE_BADGE: BadgeColors = { bg: '#ECEBD4', text: '#61662B', darkBg: '#393
 export const STATUS_COLORS: Record<string, BadgeColors> = {
   found:        { bg: '#F1F5F9', text: '#334155', darkBg: '#334155', darkText: '#CBD5E1' },
   reviewed:     SAGE_BADGE,
+  clipped:      SAGE_BADGE,
   applying:     AMBER_BADGE,
   applied:      SAGE_BADGE,
   interviewing: SAGE_BADGE,
   offer:        SAGE_BADGE,
   rejected:     DANGER_BADGE,
   withdrawn:    { bg: '#F1F5F9', text: '#64748B', darkBg: '#334155', darkText: '#94A3B8' },
+  shelved:      { bg: '#F1F5F9', text: '#64748B', darkBg: '#334155', darkText: '#94A3B8' },
+  attended:     SAGE_BADGE,
+  paid_out:     SAGE_BADGE,
 };
 
 export const STATUS_DOT_COLORS: Record<string, string> = {

@@ -152,7 +152,7 @@ function SearchPage() {
     }
     toast.success('Your first search is ready. Opening your top matches.');
     navigate({
-      to: '/applications',
+      to: '/log/ledger',
       search: { run: runId, scope: undefined },
     });
   }, [state, runId, navigate]);
@@ -508,7 +508,7 @@ function SearchPage() {
       sourceLabels={sourceLabels}
       logRef={logRef}
       handleReset={handleReset}
-      onViewJobs={() => navigate({ to: '/applications', search: { run: runId ?? undefined, scope: undefined } })}
+      onViewJobs={() => navigate({ to: '/log/ledger', search: { run: runId ?? undefined, scope: undefined } })}
     />
   );
 }

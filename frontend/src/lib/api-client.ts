@@ -147,6 +147,19 @@ export async function apiGet<T>(path: string, params?: Record<string, string | n
   return handleResponse<T>(response);
 }
 
+/** GET a file (e.g. the ledger's CSV export) with the same auth as apiGet. */
+export async function apiGetBlob(path: string): Promise<Blob> {
+  const response = await fetch(`${BASE_URL}${path}`, {
+    credentials: requestCredentials(),
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    const body = await response.text();
+    throw new ApiError(response.status, parseErrorMessage(body, response.statusText));
+  }
+  return response.blob();
+}
+
 export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
   const response = await fetch(`${BASE_URL}${path}`, {
     method: 'POST',

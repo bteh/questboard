@@ -1,29 +1,30 @@
 /**
- * Chart theme configuration that adapts to dark mode.
- * Uses CSS custom properties so charts update automatically when the theme toggles.
+ * Chart chrome in the trade-paper grammar: hairline grid and axis lines,
+ * muted ink axis text, a paper tooltip with a hairline border and no
+ * shadow. Reads the committed tokens off the document root so the charts
+ * stay in step with tokens.css; the fallbacks are the same canon values.
  */
 export function getChartTheme() {
   const style = getComputedStyle(document.documentElement);
   const get = (prop: string) => style.getPropertyValue(prop).trim();
 
   return {
-    grid: get('--lb-border-default') || '#E2E8F0',
-    axis: get('--lb-text-tertiary') || '#94A3B8',
-    axisLine: get('--lb-border-default') || '#E2E8F0',
-    tooltipBg: get('--lb-bg-card') || '#FFFFFF',
-    tooltipBorder: get('--lb-border-default') || '#E2E8F0',
-    tooltipText: get('--lb-text-primary') || '#0F172A',
+    grid: get('--hair') || '#E4DED1',
+    axis: get('--mute') || 'rgba(28, 27, 23, .66)',
+    axisLine: get('--hair') || '#E4DED1',
+    tooltipBg: get('--paper') || '#FFFFFF',
+    tooltipBorder: get('--hair') || '#E4DED1',
+    tooltipText: get('--ink') || '#1C1B17',
   };
 }
 
 export function tooltipStyle() {
   const t = getChartTheme();
   return {
-    borderRadius: 8,
+    borderRadius: 4,
     border: `1px solid ${t.tooltipBorder}`,
     fontSize: 13,
     backgroundColor: t.tooltipBg,
     color: t.tooltipText,
-    boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
   };
 }
