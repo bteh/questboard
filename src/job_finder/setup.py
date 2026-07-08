@@ -3,7 +3,7 @@
 Usage:
     python -m job_finder.setup
     # or via the CLI entry point:
-    launchboard-setup
+    questboard-setup
 """
 
 from __future__ import annotations
@@ -243,7 +243,7 @@ def run_setup():
     """Interactive setup wizard."""
     print()
     print("=" * 60)
-    print("  Launchboard  -  Setup Wizard")
+    print("  Questboard  -  Setup Wizard")
     print("=" * 60)
     print()
     print("  This will create a search profile and check your setup.")
@@ -364,7 +364,7 @@ def run_setup():
     print("  Quick start:")
     print()
     print(f"    make dev                          # Start the web UI")
-    print(f"    launchboard --profile {profile_slug}   # Run from CLI")
+    print(f"    questboard --profile {profile_slug}   # Run from CLI")
     print()
     print(f"  Or search without AI:")
     print(f"    make search PROFILE={profile_slug}")

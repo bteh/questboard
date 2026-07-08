@@ -33,7 +33,7 @@ class DeadLinkTest(unittest.TestCase):
     def setUp(self) -> None:
         self._orig = {k: os.environ.get(k) for k in
                       ["DATA_DIR", "HOSTED_MODE", "MANAGE_SCHEMA_ON_STARTUP", "DATABASE_URL"]}
-        self.temp_dir = tempfile.mkdtemp(prefix="launchboard-deadlink-")
+        self.temp_dir = tempfile.mkdtemp(prefix="questboard-deadlink-")
         self.db_path = os.path.join(self.temp_dir, "job_tracker.db")
         os.environ["HOSTED_MODE"] = "false"
         os.environ["MANAGE_SCHEMA_ON_STARTUP"] = "true"

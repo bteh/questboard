@@ -70,7 +70,7 @@ fn desktop_runtime_args(app: &App) -> Result<Vec<String>, Box<dyn Error>> {
 fn spawn_runtime(app: &App) -> Result<Child, Box<dyn Error>> {
     let runtime_args = desktop_runtime_args(app)?;
 
-    if let Some(explicit_runtime) = env::var_os("LAUNCHBOARD_DESKTOP_RUNTIME") {
+    if let Some(explicit_runtime) = env::var_os("QUESTBOARD_DESKTOP_RUNTIME") {
         let mut command = Command::new(explicit_runtime);
         command
             .args(&runtime_args)
@@ -101,10 +101,10 @@ fn spawn_runtime(app: &App) -> Result<Child, Box<dyn Error>> {
 
     let resource_dir = app.path().resource_dir()?;
     let packaged_runtime_candidates = [
-        resource_dir.join("sidecars").join("launchboard-runtime"),
+        resource_dir.join("sidecars").join("questboard-runtime"),
         resource_dir
             .join("sidecars")
-            .join("launchboard-runtime.exe"),
+            .join("questboard-runtime.exe"),
     ];
     if let Some(packaged_runtime) = packaged_runtime_candidates
         .iter()
@@ -120,7 +120,7 @@ fn spawn_runtime(app: &App) -> Result<Child, Box<dyn Error>> {
 
     Err(io::Error::new(
         io::ErrorKind::NotFound,
-        "Launchboard desktop runtime not found. For development, run `make setup` first. For packaged builds, bundle a `launchboard-runtime` sidecar or set LAUNCHBOARD_DESKTOP_RUNTIME.",
+        "Questboard desktop runtime not found. For development, run `make setup` first. For packaged builds, bundle a `questboard-runtime` sidecar or set QUESTBOARD_DESKTOP_RUNTIME.",
     )
     .into())
 }
@@ -184,7 +184,7 @@ fn main() {
                 kill_runtime(&app.handle());
                 return Err(io::Error::new(
                     io::ErrorKind::TimedOut,
-                    "Launchboard desktop runtime did not become ready within 20 seconds.",
+                    "Questboard desktop runtime did not become ready within 20 seconds.",
                 )
                 .into());
             }
@@ -197,7 +197,7 @@ fn main() {
             Ok(())
         })
         .build(tauri::generate_context!())
-        .expect("error while building Launchboard desktop");
+        .expect("error while building Questboard desktop");
 
     app.run(|app, event| match event {
         RunEvent::Exit | RunEvent::ExitRequested { .. } => {

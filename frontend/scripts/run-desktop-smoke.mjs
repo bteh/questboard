@@ -15,8 +15,8 @@ const repoRoot = path.resolve(frontendRoot, '..');
 const backendRoot = path.join(repoRoot, 'backend');
 const apiBaseUrl = 'http://127.0.0.1:8765/api/v1';
 const frontendUrl = 'http://127.0.0.1:5173';
-const headless = process.env.LAUNCHBOARD_SMOKE_HEADLESS !== 'false';
-const verbose = process.env.LAUNCHBOARD_SMOKE_VERBOSE === 'true';
+const headless = process.env.QUESTBOARD_SMOKE_HEADLESS !== 'false';
+const verbose = process.env.QUESTBOARD_SMOKE_VERBOSE === 'true';
 const outputDir = path.join(repoRoot, 'test-results', 'desktop-smoke');
 const uploadedResumeName = 'desktop-smoke-resume.pdf';
 
@@ -302,7 +302,7 @@ async function verifySettings(page) {
   // "Los Angeles, CA" location in the guided wizard; the shipped first-run flow
   // is resume-derived and remote by default, so there's no city to assert.)
   await page.getByText(uploadedResumeName).waitFor();
-  const welcomeHeading = page.getByRole('heading', { name: 'Welcome to Launchboard' });
+  const welcomeHeading = page.getByRole('heading', { name: 'Welcome to Questboard' });
   assert.equal(await welcomeHeading.count(), 0, 'Onboarding should not reopen once the desktop workspace is established.');
 }
 
@@ -355,7 +355,7 @@ async function completeFirstRun(page) {
   await page
     .locator('input[type="file"]')
     .first()
-    .setInputFiles(process.env.LAUNCHBOARD_SMOKE_RESUME_PATH);
+    .setInputFiles(process.env.QUESTBOARD_SMOKE_RESUME_PATH);
 
   // The upload navigates to the /search configuration screen.
   await page.waitForURL(/\/search/, { timeout: 35_000 });
@@ -424,9 +424,9 @@ async function main() {
     await ensurePortAvailable(5173);
     await ensurePortAvailable(8765);
 
-    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'launchboard-desktop-smoke-'));
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'questboard-desktop-smoke-'));
     const resumePath = await prepareFixture(tempRoot);
-    process.env.LAUNCHBOARD_SMOKE_RESUME_PATH = resumePath;
+    process.env.QUESTBOARD_SMOKE_RESUME_PATH = resumePath;
     const userDataDir = path.join(tempRoot, 'browser-profile');
     const runtimeDataDir = path.join(tempRoot, 'runtime-data');
     const workspaceDir = path.join(runtimeDataDir, 'workspaces');

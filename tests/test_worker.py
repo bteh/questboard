@@ -28,8 +28,8 @@ class WorkerLoopTest(unittest.TestCase):
 
     def test_worker_loop_marks_error_and_keeps_running(self) -> None:
         settings = SimpleNamespace(
-            resolved_database_url="sqlite:////tmp/launchboard-worker-test.db",
-            data_dir="/tmp/launchboard-worker-test",
+            resolved_database_url="sqlite:////tmp/questboard-worker-test.db",
+            data_dir="/tmp/questboard-worker-test",
             worker_poll_interval_seconds=0.01,
             worker_id="worker-test",
             resolved_app_release="test-release",

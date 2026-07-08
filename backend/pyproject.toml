@@ -1,7 +1,7 @@
 [project]
-name = "launchboard-backend"
+name = "questboard-backend"
 version = "0.2.0"
-description = "Launchboard — AI job search agent backend"
+description = "Questboard — AI job search agent backend"
 requires-python = ">=3.11"
 dependencies = [
     "alembic>=1.14.0",

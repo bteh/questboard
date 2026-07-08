@@ -140,7 +140,7 @@ def materialize_object(*, bucket: str, storage_path: str, local_path: str = "", 
     handle = tempfile.NamedTemporaryFile(
         mode="wb",
         suffix=suffix or Path(storage_path).suffix,
-        prefix="launchboard-",
+        prefix="questboard-",
         dir=runtime_dir,
         delete=False,
     )

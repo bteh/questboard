@@ -1,6 +1,6 @@
 # Desktop Release
 
-Launchboard now has a real desktop packaging path built around:
+Questboard now has a real desktop packaging path built around:
 
 - `Tauri v2` for the native shell
 - a bundled Python sidecar for the local runtime
@@ -34,18 +34,18 @@ This avoids shipping mixed-architecture app bundles.
 
 The repo now has two desktop workflows:
 
-- [CI](/Users/briantehsayy/Desktop/launchboard/.github/workflows/ci.yml)
+- [CI](/Users/briantehsayy/Desktop/questboard/.github/workflows/ci.yml)
   - Linux scaffold check
   - macOS native bundle build and verification
-- [Desktop Release](/Users/briantehsayy/Desktop/launchboard/.github/workflows/desktop-release.yml)
+- [Desktop Release](/Users/briantehsayy/Desktop/questboard/.github/workflows/desktop-release.yml)
   - runs on tags like `v0.2.0`
   - builds a macOS app bundle and DMG
   - uploads release artifacts to GitHub
 
 Current release artifacts:
 
-- `Launchboard.app.zip`
-- `Launchboard_*.dmg`
+- `Questboard.app.zip`
+- `Questboard_*.dmg`
 
 ## Signing And Notarization
 
@@ -119,11 +119,11 @@ These map directly to the official Tauri environment variable interface document
 
 Until Apple signing credentials are configured, macOS Gatekeeper will block the app.
 Users downloading an unsigned build should do one of the following after dragging
-Launchboard.app to /Applications:
+Questboard.app to /Applications:
 
 **Option A — Right-click workaround (easiest):**
 
-1. Right-click (or Control-click) Launchboard.app in /Applications
+1. Right-click (or Control-click) Questboard.app in /Applications
 2. Click "Open" from the context menu
 3. Click "Open" again in the dialog that appears
 4. macOS remembers this choice — subsequent launches work normally
@@ -131,7 +131,7 @@ Launchboard.app to /Applications:
 **Option B — Terminal workaround:**
 
 ```bash
-xattr -cr /Applications/Launchboard.app
+xattr -cr /Applications/Questboard.app
 ```
 
 This clears the quarantine flag. The app will launch normally after this.
@@ -153,7 +153,7 @@ needed once the GitHub secrets are populated.
 2. Create or export a `Developer ID Application` certificate.
 3. Add the GitHub secrets listed above.
 4. Push a tag like `v0.2.0`.
-5. Let [Desktop Release](/Users/briantehsayy/Desktop/launchboard/.github/workflows/desktop-release.yml) build and upload the artifacts.
+5. Let [Desktop Release](/Users/briantehsayy/Desktop/questboard/.github/workflows/desktop-release.yml) build and upload the artifacts.
 
 ## What I Can And Cannot Do
 

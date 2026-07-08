@@ -43,10 +43,10 @@ class CheckUrlsBodyContractTest(unittest.TestCase):
                 "HOSTED_MODE",
                 "MANAGE_SCHEMA_ON_STARTUP",
                 "DATABASE_URL",
-                "LAUNCHBOARD_DESKTOP_MODE",
+                "QUESTBOARD_DESKTOP_MODE",
             ]
         }
-        self.temp_dir = tempfile.mkdtemp(prefix="launchboard-check-urls-test-")
+        self.temp_dir = tempfile.mkdtemp(prefix="questboard-check-urls-test-")
         data_dir = os.path.join(self.temp_dir, "data")
         os.makedirs(data_dir, exist_ok=True)
         db_path = os.path.join(data_dir, "job_tracker.db")
@@ -59,7 +59,7 @@ class CheckUrlsBodyContractTest(unittest.TestCase):
         # Desktop mode makes /session/bootstrap return the CSRF token in the
         # response body (cookies aren't carried by TestClient across requests
         # the same way as a browser).
-        os.environ["LAUNCHBOARD_DESKTOP_MODE"] = "true"
+        os.environ["QUESTBOARD_DESKTOP_MODE"] = "true"
 
         for module_name in list(sys.modules):
             if (

@@ -4,7 +4,7 @@
  * To add a new provider: add entries to the models array and PROVIDER_GROUPS.
  *
  * Internal/proxy groups are only shown when dev mode is enabled:
- *   localStorage.setItem('launchboard-dev-mode', 'true')
+ *   localStorage.setItem('questboard-dev-mode', 'true')
  */
 
 export interface ModelOption {

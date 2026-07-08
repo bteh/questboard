@@ -1,7 +1,7 @@
 # Profession archetypes
 
 This directory holds **profession archetype presets**. Each YAML file is a
-small delta on top of `../profiles/default.yaml` that adapts Launchboard for
+small delta on top of `../profiles/default.yaml` that adapts Questboard for
 a specific career family — healthcare, education, government, trades,
 nonprofit, creative, finance, etc.
 

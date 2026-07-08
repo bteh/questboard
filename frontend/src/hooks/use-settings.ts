@@ -9,7 +9,7 @@ import type { LLMConfig, ProfilePreferences } from '@/types/settings';
 /** Dev mode shows internal/proxy presets. Auto-enabled on localhost, or manually via localStorage. */
 function isDevMode(): boolean {
   try {
-    if (localStorage.getItem('launchboard-dev-mode') === 'true') return true;
+    if (localStorage.getItem('questboard-dev-mode') === 'true') return true;
     const host = window.location.hostname;
     return host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0';
   } catch { return false; }

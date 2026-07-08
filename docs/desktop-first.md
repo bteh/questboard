@@ -2,7 +2,7 @@
 
 _Decision date: April 3, 2026_
 
-Launchboard should move to a **desktop-first** product strategy before investing further in a public hosted SaaS.
+Questboard should move to a **desktop-first** product strategy before investing further in a public hosted SaaS.
 
 Desktop does not mean "anything local goes." We still need a narrow, supportable AI story. The current product policy is documented in [ai-access.md](./ai-access.md).
 
@@ -10,7 +10,7 @@ Desktop does not mean "anything local goes." We still need a narrow, supportable
 
 Desktop only helps if the app is easy to trust and easy to start.
 
-For Launchboard, ease of adoption should mean:
+For Questboard, ease of adoption should mean:
 
 - direct download with a normal installer, not a multi-step developer setup
 - signed builds from the first public release
@@ -31,7 +31,7 @@ before optimizing for power-user configuration.
 
 ## Why desktop first
 
-Launchboard is strongest when it can:
+Questboard is strongest when it can:
 
 - keep resumes, job data, and AI credentials on the user’s own machine
 - avoid asking mainstream users to understand API billing on day one
@@ -64,7 +64,7 @@ Desktop does **not** remove source-site policy risk or scraping instability. It 
 
 ### Why Tauri over Electron
 
-Tauri is the better default for Launchboard because its desktop story already matches what we need:
+Tauri is the better default for Questboard because its desktop story already matches what we need:
 
 - official support for bundling **sidecars**, including Python applications or API servers packaged with PyInstaller
 - official updater plugin with signed update artifacts
@@ -87,7 +87,7 @@ Reference:
 - [Electron updating applications](https://www.electronjs.org/docs/latest/tutorial/updates)
 - [Electron 41.0 release notes](https://www.electronjs.org/blog/electron-41-0)
 
-## Launchboard desktop architecture
+## Questboard desktop architecture
 
 ### Keep
 
@@ -100,7 +100,7 @@ Reference:
 ### Change
 
 - replace “hosted product first” with **desktop product first**
-- add a **desktop runtime entrypoint** that starts Launchboard locally for the Tauri shell
+- add a **desktop runtime entrypoint** that starts Questboard locally for the Tauri shell
 - collapse the current hosted web/worker concerns into a simpler local runtime model
 
 ### Recommended runtime model
@@ -113,7 +113,7 @@ Instead:
 2. Add a **desktop runtime entrypoint** that starts the API and local background work together for a single-user machine.
 3. Treat the Tauri app as the primary user shell, with the Python runtime as an internal local service.
 
-That means Launchboard desktop should feel like:
+That means Questboard desktop should feel like:
 
 - open app
 - upload resume
@@ -161,7 +161,7 @@ Important constraints from the official docs:
 - builds must be produced on each target OS
 - one-file packaging is convenient, but PyInstaller notes that one-file macOS app-bundle workflows are less efficient because they unpack at runtime
 
-For Launchboard:
+For Questboard:
 
 - **Phase 1 recommendation:** use a PyInstaller-packaged sidecar because it is the fastest path to a working desktop release
 - **Caveat:** if notarization/performance of a one-file sidecar becomes painful on macOS, move the Python runtime to a resource-bundled directory layout instead of doubling down on one-file packaging
@@ -180,7 +180,7 @@ Ship:
 - notarized build
 - manual or lightweight in-app update check
 
-Do **not** target the Mac App Store first. Launchboard is a better fit for direct download while the product is still moving quickly.
+Do **not** target the Mac App Store first. Questboard is a better fit for direct download while the product is still moving quickly.
 
 This also matches how other open-source desktop AI tools tend to reach early adopters: direct download first, package manager distribution second, app store distribution later or never.
 
@@ -200,7 +200,7 @@ Add:
 
 ## Updates
 
-Best practice for Launchboard desktop:
+Best practice for Questboard desktop:
 
 - do **not** ship auto-update until signing is in place
 - once signing is ready, use the Tauri updater
@@ -219,7 +219,7 @@ Reference:
 
 ## Comparable projects
 
-These projects are not identical to Launchboard, but they are useful signals for the desktop strategy.
+These projects are not identical to Questboard, but they are useful signals for the desktop strategy.
 
 ### T3 Code
 
@@ -229,7 +229,7 @@ Useful takeaways:
 
 - it proves there is real user demand for downloadable AI-native desktop tooling
 - it distributes through direct releases and package managers like `winget`, `brew`, and `AUR`
-- it expects users to authenticate local AI/dev tools before use, which is acceptable for a technical audience but not the ideal first-run story for Launchboard
+- it expects users to authenticate local AI/dev tools before use, which is acceptable for a technical audience but not the ideal first-run story for Questboard
 
 Reference:
 
@@ -251,7 +251,7 @@ Reference:
 
 ### Python sidecar examples
 
-There are now multiple public examples of Tauri v2 apps running a Python backend as a sidecar, which is the closest architectural match to Launchboard.
+There are now multiple public examples of Tauri v2 apps running a Python backend as a sidecar, which is the closest architectural match to Questboard.
 
 Useful takeaways:
 
@@ -298,7 +298,7 @@ Desktop-first fits the open-source strategy much better than hosted-first.
 
 The open-source message becomes:
 
-- Launchboard is a local-first desktop app
+- Questboard is a local-first desktop app
 - your resume and AI setup stay on your computer
 - you can bring your own AI or use local models
 - hosted is a later optional layer, not the core requirement
@@ -350,4 +350,4 @@ What is intentionally still next:
 
 But the next major product milestone should be:
 
-**Launchboard desktop, not Launchboard SaaS.**
+**Questboard desktop, not Questboard SaaS.**

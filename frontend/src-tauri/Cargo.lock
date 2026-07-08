@@ -1712,7 +1712,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "launchboard-desktop"
+name = "questboard-desktop"
 version = "0.2.0"
 dependencies = [
  "tauri",

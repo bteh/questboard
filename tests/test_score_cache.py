@@ -9,7 +9,7 @@ scored against the same resume + weights. These tests pin:
 3. ``load_cached`` returns ``None`` on missing/corrupt/expired entries
    and the saved dict on a fresh hit.
 4. ``save_cached`` writes atomically and is a no-op for empty/non-dict input.
-5. ``LAUNCHBOARD_DISABLE_AI_SCORE_CACHE`` blocks both reads and writes.
+5. ``QUESTBOARD_DISABLE_AI_SCORE_CACHE`` blocks both reads and writes.
 """
 
 from __future__ import annotations
@@ -92,7 +92,7 @@ class ScoreCachePersistenceTest(unittest.TestCase):
         )
         self._patch.start()
         # Ensure env-var disable isn't leaking in from the host shell.
-        os.environ.pop("LAUNCHBOARD_DISABLE_AI_SCORE_CACHE", None)
+        os.environ.pop("QUESTBOARD_DISABLE_AI_SCORE_CACHE", None)
 
     def tearDown(self) -> None:
         self._patch.stop()
@@ -135,14 +135,14 @@ class ScoreCachePersistenceTest(unittest.TestCase):
         self.assertIsNone(self.mod.load_cached("bad"))
 
     def test_env_kill_switch_blocks_both_read_and_write(self) -> None:
-        os.environ["LAUNCHBOARD_DISABLE_AI_SCORE_CACHE"] = "1"
+        os.environ["QUESTBOARD_DISABLE_AI_SCORE_CACHE"] = "1"
         try:
             self.mod.save_cached("kdisabled", {"overall_score": 80})
             # Even though save was attempted, the kill switch blocked it
             # AND blocks subsequent reads.
             self.assertIsNone(self.mod.load_cached("kdisabled"))
         finally:
-            os.environ.pop("LAUNCHBOARD_DISABLE_AI_SCORE_CACHE", None)
+            os.environ.pop("QUESTBOARD_DISABLE_AI_SCORE_CACHE", None)
 
 
 if __name__ == "__main__":

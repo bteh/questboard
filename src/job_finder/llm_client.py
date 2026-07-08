@@ -542,7 +542,7 @@ class LLMClient:
         if "anthropic" in base:
             return True
         # cliproxyapi local proxies map 1:1 to Claude subscription.
-        # 8317 = launchboard's primary proxy; 3456/3457 = legacy ports.
+        # 8317 = questboard's primary proxy; 3456/3457 = legacy ports.
         if any(p in base for p in ("localhost:8317", "127.0.0.1:8317", "localhost:3456", "127.0.0.1:3456")):
             return True
         # Model name hint (catches custom base_urls pointed at Claude).

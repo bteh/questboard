@@ -12,7 +12,7 @@ help: ## Show this help
 # ── First-time setup ───────────────────────────────────────────────────
 
 setup: ## First-time setup (creates venv, installs deps, sets up AI)
-	@echo "\n  Launchboard — Setup\n"
+	@echo "\n  Questboard — Setup\n"
 	@echo "  [1/6] Checking Python version..."
 	@python3 -c "import sys; assert sys.version_info >= (3,11), f'Python 3.11+ required, got {sys.version}'" 2>/dev/null || \
 		(echo "  ERROR: Python 3.11+ required. Install from https://python.org" && exit 1)
@@ -37,7 +37,7 @@ install: ## Install all dependencies (Python + Node)
 	$(PIP) install -e ./backend
 	cd frontend && npm install
 
-reauth-claude: ## Re-authenticate cliproxyapi when Launchboard shows "AI disconnected"
+reauth-claude: ## Re-authenticate cliproxyapi when Questboard shows "AI disconnected"
 	@bash scripts/reauth-claude-proxy.sh
 
 setup-ai: ## Set up AI (install Ollama + download model)
@@ -45,9 +45,9 @@ setup-ai: ## Set up AI (install Ollama + download model)
 
 # ── Development ────────────────────────────────────────────────────────
 
-start: .venv ## Start Launchboard — local, one command (http://localhost:5173)
+start: .venv ## Start Questboard — local, one command (http://localhost:5173)
 	@echo ""
-	@echo "  Starting Launchboard (local)"
+	@echo "  Starting Questboard (local)"
 	@echo "  App:  http://localhost:5173"
 	@echo "  API:  http://localhost:8000"
 	@echo "  (Ctrl+C to stop)"
@@ -62,7 +62,7 @@ dev: .venv ## Alias for `start`
 	@$(MAKE) --no-print-directory start
 
 dev-hosted: .venv ## Start the hosted-like local sandbox with persona auth + worker
-	@echo "\n  Starting Launchboard hosted sandbox...\n"
+	@echo "\n  Starting Questboard hosted sandbox...\n"
 	@echo "  Backend:  http://localhost:8000"
 	@echo "  Frontend: http://localhost:5173"
 	@echo "  Mode:     hosted sandbox with test-account auth"
@@ -71,9 +71,9 @@ dev-hosted: .venv ## Start the hosted-like local sandbox with persona auth + wor
 	describe_pids() { for pid in $$*; do cmd=$$(ps -o command= -p "$$pid" 2>/dev/null | head -n 1); [ -n "$$cmd" ] || cmd="(process exited)"; echo "    $$pid $$cmd"; done; }; \
 	backend_pid=$$(normalize_pids "$$(lsof -tiTCP:8000 -sTCP:LISTEN 2>/dev/null || true)"); \
 	frontend_pid=$$(normalize_pids "$$(lsof -tiTCP:5173 -sTCP:LISTEN 2>/dev/null || true)"); \
-	worker_pid=$$(normalize_pids "$$(pgrep -f 'scripts/dev_hosted_worker.py' 2>/dev/null || true) $$(pgrep -f 'HOSTED_MODE=true DEV_HOSTED_AUTH=true' 2>/dev/null || true) $$(pgrep -f 'launchboard-dev-hosted-workspace-secret' 2>/dev/null || true)"); \
+	worker_pid=$$(normalize_pids "$$(pgrep -f 'scripts/dev_hosted_worker.py' 2>/dev/null || true) $$(pgrep -f 'HOSTED_MODE=true DEV_HOSTED_AUTH=true' 2>/dev/null || true) $$(pgrep -f 'questboard-dev-hosted-workspace-secret' 2>/dev/null || true)"); \
 	if [ -n "$$backend_pid" ] || [ -n "$$frontend_pid" ] || [ -n "$$worker_pid" ]; then \
-		echo "  Existing Launchboard process detected."; \
+		echo "  Existing Questboard process detected."; \
 		if [ -n "$$backend_pid" ]; then \
 			echo "  Port 8000 in use by:"; \
 			describe_pids $$backend_pid; \
@@ -93,8 +93,8 @@ dev-hosted: .venv ## Start the hosted-like local sandbox with persona auth + wor
 	fi
 	@mkdir -p data/dev-hosted/workspaces
 	@trap 'kill 0' EXIT; \
-		cd backend && HOSTED_MODE=true DEV_HOSTED_AUTH=true HOSTED_ALLOW_WORKSPACE_LLM_CONFIG=true LAUNCHBOARD_SECRET=launchboard-dev-hosted-workspace-secret MANAGE_SCHEMA_ON_STARTUP=true EMBEDDED_SCHEDULER_ENABLED=false DATA_DIR=$(CURDIR)/data/dev-hosted WORKSPACE_STORAGE_DIR=$(CURDIR)/data/dev-hosted/workspaces PYTHONPATH=../src $(CURDIR)/$(PYTHON) -m uvicorn app.main:app --reload --reload-dir . --reload-dir ../src --host 127.0.0.1 --port 8000 & \
-		HOSTED_MODE=true DEV_HOSTED_AUTH=true HOSTED_ALLOW_WORKSPACE_LLM_CONFIG=true LAUNCHBOARD_SECRET=launchboard-dev-hosted-workspace-secret MANAGE_SCHEMA_ON_STARTUP=true EMBEDDED_SCHEDULER_ENABLED=false DATA_DIR=$(CURDIR)/data/dev-hosted WORKSPACE_STORAGE_DIR=$(CURDIR)/data/dev-hosted/workspaces PYTHONPATH=$(CURDIR)/src $(CURDIR)/$(PYTHON) scripts/dev_hosted_worker.py & \
+		cd backend && HOSTED_MODE=true DEV_HOSTED_AUTH=true HOSTED_ALLOW_WORKSPACE_LLM_CONFIG=true QUESTBOARD_SECRET=questboard-dev-hosted-workspace-secret MANAGE_SCHEMA_ON_STARTUP=true EMBEDDED_SCHEDULER_ENABLED=false DATA_DIR=$(CURDIR)/data/dev-hosted WORKSPACE_STORAGE_DIR=$(CURDIR)/data/dev-hosted/workspaces PYTHONPATH=../src $(CURDIR)/$(PYTHON) -m uvicorn app.main:app --reload --reload-dir . --reload-dir ../src --host 127.0.0.1 --port 8000 & \
+		HOSTED_MODE=true DEV_HOSTED_AUTH=true HOSTED_ALLOW_WORKSPACE_LLM_CONFIG=true QUESTBOARD_SECRET=questboard-dev-hosted-workspace-secret MANAGE_SCHEMA_ON_STARTUP=true EMBEDDED_SCHEDULER_ENABLED=false DATA_DIR=$(CURDIR)/data/dev-hosted WORKSPACE_STORAGE_DIR=$(CURDIR)/data/dev-hosted/workspaces PYTHONPATH=$(CURDIR)/src $(CURDIR)/$(PYTHON) scripts/dev_hosted_worker.py & \
 		cd frontend && VITE_API_URL=http://localhost:8000/api/v1 VITE_HOSTED_MODE=true VITE_DEV_HOSTED_AUTH=true npm run dev -- --port 5173 & \
 		backend_ready=0; \
 		for attempt in $$(seq 1 30); do \
@@ -125,10 +125,10 @@ dev-hosted: .venv ## Start the hosted-like local sandbox with persona auth + wor
 		fi; \
 		wait
 
-stop-dev: ## Stop Launchboard dev servers started from this repo
+stop-dev: ## Stop Questboard dev servers started from this repo
 	@normalize_pids() { printf '%s\n' "$$*" | tr ' ' '\n' | sed '/^$$/d' | sort -u | xargs 2>/dev/null || true; }; \
 	pid_cwd() { lsof -a -p "$$1" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p' | head -n 1; }; \
-	is_launchboard_pid() { \
+	is_questboard_pid() { \
 		pid="$$1"; \
 		cwd=$$(pid_cwd "$$pid"); \
 		cmd=$$(ps -o command= -p "$$pid" 2>/dev/null | head -n 1); \
@@ -140,25 +140,25 @@ stop-dev: ## Stop Launchboard dev servers started from this repo
 		esac; \
 		return 1; \
 	}; \
-	filter_launchboard_pids() { \
+	filter_questboard_pids() { \
 		for pid in $$*; do \
 			[ -n "$$pid" ] || continue; \
-			if is_launchboard_pid "$$pid"; then \
+			if is_questboard_pid "$$pid"; then \
 				echo "$$pid"; \
 			fi; \
 		done | sort -u | xargs 2>/dev/null || true; \
 	}; \
-	candidates=$$(normalize_pids "$$(lsof -tiTCP:8000 -sTCP:LISTEN 2>/dev/null || true) $$(lsof -tiTCP:5173 -sTCP:LISTEN 2>/dev/null || true) $$(lsof -tiTCP:8765 -sTCP:LISTEN 2>/dev/null || true) $$(pgrep -f 'scripts/dev_hosted_worker.py' 2>/dev/null || true) $$(pgrep -f 'HOSTED_MODE=true DEV_HOSTED_AUTH=true' 2>/dev/null || true) $$(pgrep -f 'launchboard-dev-hosted-workspace-secret' 2>/dev/null || true) $$(pgrep -f 'launchboard-desktop' 2>/dev/null || true)"); \
-	pids=$$(filter_launchboard_pids $$candidates); \
+	candidates=$$(normalize_pids "$$(lsof -tiTCP:8000 -sTCP:LISTEN 2>/dev/null || true) $$(lsof -tiTCP:5173 -sTCP:LISTEN 2>/dev/null || true) $$(lsof -tiTCP:8765 -sTCP:LISTEN 2>/dev/null || true) $$(pgrep -f 'scripts/dev_hosted_worker.py' 2>/dev/null || true) $$(pgrep -f 'HOSTED_MODE=true DEV_HOSTED_AUTH=true' 2>/dev/null || true) $$(pgrep -f 'questboard-dev-hosted-workspace-secret' 2>/dev/null || true) $$(pgrep -f 'questboard-desktop' 2>/dev/null || true)"); \
+	pids=$$(filter_questboard_pids $$candidates); \
 	if [ -z "$$pids" ]; then \
-		echo "  No Launchboard dev servers found."; \
+		echo "  No Questboard dev servers found."; \
 		exit 0; \
 	fi; \
-	echo "  Stopping Launchboard dev servers: $$pids"; \
+	echo "  Stopping Questboard dev servers: $$pids"; \
 	kill $$pids 2>/dev/null || true; \
 	sleep 1; \
-	remaining_candidates=$$(normalize_pids "$$(lsof -tiTCP:8000 -sTCP:LISTEN 2>/dev/null || true) $$(lsof -tiTCP:5173 -sTCP:LISTEN 2>/dev/null || true) $$(lsof -tiTCP:8765 -sTCP:LISTEN 2>/dev/null || true) $$(pgrep -f 'scripts/dev_hosted_worker.py' 2>/dev/null || true) $$(pgrep -f 'HOSTED_MODE=true DEV_HOSTED_AUTH=true' 2>/dev/null || true) $$(pgrep -f 'launchboard-dev-hosted-workspace-secret' 2>/dev/null || true) $$(pgrep -f 'launchboard-desktop' 2>/dev/null || true)"); \
-	remaining=$$(filter_launchboard_pids $$remaining_candidates); \
+	remaining_candidates=$$(normalize_pids "$$(lsof -tiTCP:8000 -sTCP:LISTEN 2>/dev/null || true) $$(lsof -tiTCP:5173 -sTCP:LISTEN 2>/dev/null || true) $$(lsof -tiTCP:8765 -sTCP:LISTEN 2>/dev/null || true) $$(pgrep -f 'scripts/dev_hosted_worker.py' 2>/dev/null || true) $$(pgrep -f 'HOSTED_MODE=true DEV_HOSTED_AUTH=true' 2>/dev/null || true) $$(pgrep -f 'questboard-dev-hosted-workspace-secret' 2>/dev/null || true) $$(pgrep -f 'questboard-desktop' 2>/dev/null || true)"); \
+	remaining=$$(filter_questboard_pids $$remaining_candidates); \
 	if [ -n "$$remaining" ]; then \
 		echo "  Force stopping stubborn processes: $$remaining"; \
 		kill -9 $$remaining 2>/dev/null || true; \
@@ -170,7 +170,7 @@ backend: .venv ## Start only the backend (FastAPI)
 frontend: ## Start only the frontend (Vite)
 	cd frontend && npm run dev
 
-desktop-dev: .venv ## Start Launchboard in Tauri desktop dev mode
+desktop-dev: .venv ## Start Questboard in Tauri desktop dev mode
 	@CARGO_BIN=$$(command -v cargo 2>/dev/null || printf '%s/.cargo/bin/cargo' "$$HOME"); \
 	if [ ! -x "$$CARGO_BIN" ]; then \
 		echo "  Rust toolchain not found. Install rustup from https://rustup.rs first."; \
@@ -207,7 +207,7 @@ desktop-build: .venv ## Build the Tauri desktop app
 	export PATH="$$(dirname "$$CARGO_BIN"):$${PATH}"; \
 	cd frontend && npm run desktop:build
 
-desktop-install: .venv desktop-build ## Install the latest built Launchboard.app into /Applications
+desktop-install: .venv desktop-build ## Install the latest built Questboard.app into /Applications
 	$(PYTHON) scripts/install_desktop_app.py
 
 desktop-smoke: .venv ## Run the desktop UX smoke test against the local runtime + web UI
@@ -256,7 +256,7 @@ doctor: doctor-env ## Run full health check (env + runtime app state)
 	@.venv/bin/python scripts/doctor.py 2>/dev/null || python3 scripts/doctor.py
 
 doctor-env: ## Check your dev environment for common install/setup issues
-	@echo "\n  Launchboard — Doctor (env)\n"
+	@echo "\n  Questboard — Doctor (env)\n"
 	@failed=0; \
 	printf "  Python:         "; \
 	if .venv/bin/python --version 2>/dev/null | sed 's/Python //'; then \
@@ -348,8 +348,8 @@ doctor-env: ## Check your dev environment for common install/setup issues
 
 clean: ## Remove caches + build artifacts (keeps your local job data)
 	rm -rf .desktop-build
-	rm -f frontend/src-tauri/resources/sidecars/launchboard-runtime frontend/src-tauri/resources/sidecars/launchboard-runtime.exe
-	rm -f .desktop-build/tauri-sidecars/launchboard-runtime .desktop-build/tauri-sidecars/launchboard-runtime.exe
+	rm -f frontend/src-tauri/resources/sidecars/questboard-runtime frontend/src-tauri/resources/sidecars/questboard-runtime.exe
+	rm -f .desktop-build/tauri-sidecars/questboard-runtime .desktop-build/tauri-sidecars/questboard-runtime.exe
 	rm -rf src/job_finder/output/*
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 

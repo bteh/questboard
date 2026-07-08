@@ -47,8 +47,8 @@ export function Sidebar() {
   // Open health panel via global event (fired by diagnostic modal)
   useEffect(() => {
     const handler = () => setHealthPanelOpen(true);
-    window.addEventListener('launchboard:open-health', handler);
-    return () => window.removeEventListener('launchboard:open-health', handler);
+    window.addEventListener('questboard:open-health', handler);
+    return () => window.removeEventListener('questboard:open-health', handler);
   }, []);
 
   return (
@@ -59,7 +59,7 @@ export function Sidebar() {
           <BrandMark className="h-4 w-4 text-white" />
         </div>
         <div>
-          <span className="text-sm font-semibold text-text-primary tracking-tight">Launchboard</span>
+          <span className="text-sm font-semibold text-text-primary tracking-tight">Questboard</span>
           <p className="text-[11px] text-text-muted leading-none mt-0.5">AI Job Agent</p>
         </div>
       </Link>
@@ -109,7 +109,7 @@ export function Sidebar() {
               {currentPersona?.full_name || 'Hosted account'}
             </p>
             <p className="text-[11px] text-text-muted">
-              {currentPersona?.headline || 'Signed in to Launchboard hosted mode'}
+              {currentPersona?.headline || 'Signed in to Questboard hosted mode'}
             </p>
           </div>
           <div className="mt-3 flex gap-2">

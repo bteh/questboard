@@ -18,7 +18,7 @@ Cache files live at ``data/cache/ai_scores/<key>.json`` and are atomically
 written. A 30-day TTL guards against the (rare) case where a model upgrade
 silently shifts scoring distributions; users can also blow away the dir.
 
-Disable via ``LAUNCHBOARD_DISABLE_AI_SCORE_CACHE=1``.
+Disable via ``QUESTBOARD_DISABLE_AI_SCORE_CACHE=1``.
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ _CACHE_DIR = Path(__file__).resolve().parents[2] / "data" / "cache" / "ai_scores
 
 
 def _cache_disabled() -> bool:
-    return os.environ.get("LAUNCHBOARD_DISABLE_AI_SCORE_CACHE", "").strip().lower() in {
+    return os.environ.get("QUESTBOARD_DISABLE_AI_SCORE_CACHE", "").strip().lower() in {
         "1", "true", "yes",
     }
 

@@ -1,4 +1,4 @@
-"""Profile + archetype helpers for Launchboard.
+"""Profile + archetype helpers for Questboard.
 
 This module is intentionally separate from `src/job_finder/config/` (which
 holds raw YAML data + the existing `profile_schema.py`) so the higher-level

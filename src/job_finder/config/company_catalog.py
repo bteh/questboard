@@ -1,7 +1,7 @@
 """Curated company catalog for direct ATS career page scraping.
 
 These companies are pre-configured with their ATS platform and career
-page slug so Launchboard can scrape their career pages directly —
+page slug so Questboard can scrape their career pages directly —
 catching jobs that may not appear on Indeed or LinkedIn yet.
 
 The catalog is organized by category and merged with the user's

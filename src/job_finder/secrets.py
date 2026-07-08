@@ -8,7 +8,7 @@ Uses the `keyring` library to store secrets in:
 Falls back to .env if keyring is unavailable (e.g., headless servers).
 
 For hosted/DB storage, provides Fernet encryption using a key from
-the LAUNCHBOARD_SECRET env var or auto-generated and stored in keychain.
+the QUESTBOARD_SECRET env var or auto-generated and stored in keychain.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ import os
 
 logger = logging.getLogger(__name__)
 
-_SERVICE_NAME = "launchboard"
+_SERVICE_NAME = "questboard"
 
 
 def _keyring():
@@ -89,12 +89,12 @@ def is_available() -> bool:
 
 
 def _get_fernet_key() -> bytes:
-    """Derive a Fernet key from LAUNCHBOARD_SECRET env var.
+    """Derive a Fernet key from QUESTBOARD_SECRET env var.
 
     Falls back to a machine-specific default (not ideal, but prevents
     plaintext storage even without explicit config).
     """
-    secret = os.getenv("LAUNCHBOARD_SECRET", "")
+    secret = os.getenv("QUESTBOARD_SECRET", "")
     if not secret:
         # Try keychain
         secret = get_secret("encryption_key")

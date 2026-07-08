@@ -70,19 +70,19 @@ jobs:
       - name: Archive app bundle
         run: |
           ditto -c -k --keepParent \
-            frontend/src-tauri/target/release/bundle/macos/Launchboard.app \
-            frontend/src-tauri/target/release/bundle/macos/Launchboard.app.zip
+            frontend/src-tauri/target/release/bundle/macos/Questboard.app \
+            frontend/src-tauri/target/release/bundle/macos/Questboard.app.zip
       - name: Upload desktop artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: launchboard-macos-desktop
+          name: questboard-macos-desktop
           path: |
             frontend/src-tauri/target/release/bundle/dmg/*.dmg
-            frontend/src-tauri/target/release/bundle/macos/Launchboard.app.zip
+            frontend/src-tauri/target/release/bundle/macos/Questboard.app.zip
       - name: Publish GitHub release assets
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: |
             frontend/src-tauri/target/release/bundle/dmg/*.dmg
-            frontend/src-tauri/target/release/bundle/macos/Launchboard.app.zip
+            frontend/src-tauri/target/release/bundle/macos/Questboard.app.zip

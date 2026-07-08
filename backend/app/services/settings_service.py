@@ -249,7 +249,7 @@ def detect_local_ai() -> dict:
 def _auto_detect_marker_path() -> str:
     """Location of the one-time auto-detect marker file."""
     home = os.path.expanduser("~")
-    marker_dir = os.path.join(home, ".launchboard")
+    marker_dir = os.path.join(home, ".questboard")
     os.makedirs(marker_dir, exist_ok=True)
     return os.path.join(marker_dir, "auto_detect_done")
 
@@ -1055,7 +1055,7 @@ def setup_ollama() -> dict:
                         import urllib.request
                         # The archive URL Ollama publishes for macOS:
                         url = "https://ollama.com/download/Ollama-darwin.tgz"
-                        install_dir = os.path.expanduser("~/.launchboard/ollama")
+                        install_dir = os.path.expanduser("~/.questboard/ollama")
                         os.makedirs(install_dir, exist_ok=True)
                         tgz_path = os.path.join(install_dir, "ollama.tgz")
                         urllib.request.urlretrieve(url, tgz_path)
@@ -1185,7 +1185,7 @@ def setup_ollama() -> dict:
                 _update("error", "Model download failed", error=str(pull_err)[:300])
                 return _ollama_setup_state
 
-        _update("configuring", "Configuring Launchboard to use local AI...", 0.95)
+        _update("configuring", "Configuring Questboard to use local AI...", 0.95)
 
         # Step 4: Configure LLM settings
         update_llm_config(

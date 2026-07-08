@@ -48,13 +48,13 @@ class HostedWorkspaceApiTest(unittest.TestCase):
             "MANAGE_SCHEMA_ON_STARTUP",
             "DATABASE_URL",
             "APP_RELEASE",
-            "LAUNCHBOARD_SECRET",
+            "QUESTBOARD_SECRET",
             "LLM_PROVIDER",
             "LLM_BASE_URL",
             "LLM_MODEL",
             "LLM_API_KEY",
         ]}
-        self.temp_dir = tempfile.mkdtemp(prefix="launchboard-hosted-test-")
+        self.temp_dir = tempfile.mkdtemp(prefix="questboard-hosted-test-")
         self.data_dir = os.path.join(self.temp_dir, "data")
         self.workspace_dir = os.path.join(self.temp_dir, "workspaces")
         self.db_path = os.path.join(self.data_dir, "job_tracker.db")
@@ -109,7 +109,7 @@ class HostedWorkspaceApiTest(unittest.TestCase):
         *,
         user_id: str,
         email: str,
-        full_name: str = "Launchboard User",
+        full_name: str = "Questboard User",
     ) -> str:
         now = datetime.now(timezone.utc)
         payload = {
@@ -1051,7 +1051,7 @@ class HostedWorkspaceApiTest(unittest.TestCase):
         self.assertFalse(payload["configured"])
         self.assertTrue(payload["runtime_configurable"])
 
-    def test_hosted_runtime_llm_requires_launchboard_secret(self) -> None:
+    def test_hosted_runtime_llm_requires_questboard_secret(self) -> None:
         os.environ["HOSTED_ALLOW_WORKSPACE_LLM_CONFIG"] = "true"
 
         headers = self._auth_headers()
@@ -1068,9 +1068,9 @@ class HostedWorkspaceApiTest(unittest.TestCase):
             },
         )
         self.assertEqual(missing_secret.status_code, 503)
-        self.assertIn("LAUNCHBOARD_SECRET", missing_secret.text)
+        self.assertIn("QUESTBOARD_SECRET", missing_secret.text)
 
-        os.environ["LAUNCHBOARD_SECRET"] = "workspace-keys-need-a-stable-secret"
+        os.environ["QUESTBOARD_SECRET"] = "workspace-keys-need-a-stable-secret"
         saved = self.client.put(
             "/api/v1/settings/llm",
             headers=headers,

@@ -32,14 +32,14 @@ class LocalSessionBootstrapTest(unittest.TestCase):
                 "HOSTED_MODE",
                 "MANAGE_SCHEMA_ON_STARTUP",
                 "DATABASE_URL",
-                "LAUNCHBOARD_DESKTOP_MODE",
+                "QUESTBOARD_DESKTOP_MODE",
                 "LLM_PROVIDER",
                 "LLM_BASE_URL",
                 "LLM_API_KEY",
                 "LLM_MODEL",
             ]
         }
-        self.temp_dir = tempfile.mkdtemp(prefix="launchboard-local-session-test-")
+        self.temp_dir = tempfile.mkdtemp(prefix="questboard-local-session-test-")
         self.data_dir = os.path.join(self.temp_dir, "data")
         self.workspace_dir = os.path.join(self.temp_dir, "workspaces")
         self.db_path = os.path.join(self.data_dir, "job_tracker.db")
@@ -131,7 +131,7 @@ class LocalSessionBootstrapTest(unittest.TestCase):
         self.assertNotEqual(workspace.slug, workspace.id)
 
     def test_desktop_mode_supports_header_based_workspace_session_and_resume_upload(self) -> None:
-        os.environ["LAUNCHBOARD_DESKTOP_MODE"] = "true"
+        os.environ["QUESTBOARD_DESKTOP_MODE"] = "true"
 
         desktop_client = TestClient(importlib.import_module("app.main").app)
         self.addCleanup(desktop_client.close)
@@ -143,12 +143,12 @@ class LocalSessionBootstrapTest(unittest.TestCase):
         self.assertTrue(payload["csrf_token"])
 
         headers = {
-            "X-Launchboard-Session": payload["session_token"],
+            "X-Questboard-Session": payload["session_token"],
             "X-CSRF-Token": payload["csrf_token"],
         }
 
         state = desktop_client.get("/api/v1/onboarding/state", headers={
-            "X-Launchboard-Session": payload["session_token"],
+            "X-Questboard-Session": payload["session_token"],
         })
         self.assertEqual(state.status_code, 200)
 
@@ -161,7 +161,7 @@ class LocalSessionBootstrapTest(unittest.TestCase):
         self.assertTrue(upload.json()["resume"]["exists"])
 
     def test_desktop_mode_can_resume_workspace_from_header_only_bootstrap(self) -> None:
-        os.environ["LAUNCHBOARD_DESKTOP_MODE"] = "true"
+        os.environ["QUESTBOARD_DESKTOP_MODE"] = "true"
 
         first_client = TestClient(importlib.import_module("app.main").app)
         second_client = TestClient(importlib.import_module("app.main").app)
@@ -174,7 +174,7 @@ class LocalSessionBootstrapTest(unittest.TestCase):
 
         resumed = second_client.post(
             "/api/v1/session/bootstrap",
-            headers={"X-Launchboard-Session": payload["session_token"]},
+            headers={"X-Questboard-Session": payload["session_token"]},
         )
         self.assertEqual(resumed.status_code, 200)
         resumed_payload = resumed.json()
@@ -184,7 +184,7 @@ class LocalSessionBootstrapTest(unittest.TestCase):
         self.assertTrue(resumed_payload["csrf_token"])
 
     def test_desktop_mode_header_session_powers_workspace_defaults(self) -> None:
-        os.environ["LAUNCHBOARD_DESKTOP_MODE"] = "true"
+        os.environ["QUESTBOARD_DESKTOP_MODE"] = "true"
 
         desktop_client = TestClient(importlib.import_module("app.main").app)
         self.addCleanup(desktop_client.close)
@@ -193,7 +193,7 @@ class LocalSessionBootstrapTest(unittest.TestCase):
         self.assertEqual(bootstrap.status_code, 200)
         payload = bootstrap.json()
         headers = {
-            "X-Launchboard-Session": payload["session_token"],
+            "X-Questboard-Session": payload["session_token"],
             "X-CSRF-Token": payload["csrf_token"],
         }
 
@@ -238,7 +238,7 @@ class LocalSessionBootstrapTest(unittest.TestCase):
 
         defaults = desktop_client.get(
             "/api/v1/search/defaults?profile=default",
-            headers={"X-Launchboard-Session": payload["session_token"]},
+            headers={"X-Questboard-Session": payload["session_token"]},
         )
         self.assertEqual(defaults.status_code, 200)
         data = defaults.json()
@@ -249,7 +249,7 @@ class LocalSessionBootstrapTest(unittest.TestCase):
         self.assertEqual(data["locations"], ["Los Angeles, CA"])
 
     def test_desktop_mode_does_not_inherit_global_llm_env(self) -> None:
-        os.environ["LAUNCHBOARD_DESKTOP_MODE"] = "true"
+        os.environ["QUESTBOARD_DESKTOP_MODE"] = "true"
         os.environ["LLM_PROVIDER"] = "custom"
         os.environ["LLM_BASE_URL"] = "http://localhost:8317/v1"
         os.environ["LLM_API_KEY"] = "desktop-env-key"
@@ -264,7 +264,7 @@ class LocalSessionBootstrapTest(unittest.TestCase):
 
         status = desktop_client.get(
             "/api/v1/settings/llm",
-            headers={"X-Launchboard-Session": payload["session_token"]},
+            headers={"X-Questboard-Session": payload["session_token"]},
         )
         self.assertEqual(status.status_code, 200, status.text)
         data = status.json()
@@ -272,7 +272,7 @@ class LocalSessionBootstrapTest(unittest.TestCase):
         self.assertTrue(data["runtime_configurable"])
 
     def test_desktop_mode_starts_with_blank_onboarding_preferences(self) -> None:
-        os.environ["LAUNCHBOARD_DESKTOP_MODE"] = "true"
+        os.environ["QUESTBOARD_DESKTOP_MODE"] = "true"
 
         desktop_client = TestClient(importlib.import_module("app.main").app)
         self.addCleanup(desktop_client.close)
@@ -283,7 +283,7 @@ class LocalSessionBootstrapTest(unittest.TestCase):
 
         state = desktop_client.get(
             "/api/v1/onboarding/state",
-            headers={"X-Launchboard-Session": payload["session_token"]},
+            headers={"X-Questboard-Session": payload["session_token"]},
         )
         self.assertEqual(state.status_code, 200, state.text)
         data = state.json()

@@ -31,7 +31,7 @@ function MobileHeader({ onMenuOpen }: { onMenuOpen: () => void }) {
         <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand shadow-sm">
           <BrandMark className="h-3.5 w-3.5 text-white" />
         </div>
-        <span className="text-sm font-semibold text-text-primary tracking-tight">Launchboard</span>
+        <span className="text-sm font-semibold text-text-primary tracking-tight">Questboard</span>
       </Link>
     </div>
   );
@@ -67,8 +67,8 @@ function HostedAuthScreen() {
     signInAsPersona,
     refresh,
   } = useWorkspace();
-  const [email, setEmail] = useState('test-user@launchboard.local');
-  const [fullName, setFullName] = useState('Launchboard Test User');
+  const [email, setEmail] = useState('test-user@questboard.local');
+  const [fullName, setFullName] = useState('Questboard Test User');
   const [emailSent, setEmailSent] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [showSampleUsers, setShowSampleUsers] = useState(false);
@@ -121,14 +121,14 @@ function HostedAuthScreen() {
                         <BrandMark className="h-5 w-5 text-white" />
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-text-primary tracking-tight">Launchboard</p>
+                        <p className="text-sm font-semibold text-text-primary tracking-tight">Questboard</p>
                         <p className="text-xs text-text-muted">Hosted onboarding, local machine</p>
                       </div>
                     </div>
 
                     <div className="space-y-2">
                       <h1 className="max-w-xl text-3xl font-semibold tracking-tight text-text-primary sm:text-4xl">
-                        Sign in to Launchboard
+                        Sign in to Questboard
                       </h1>
                       <p className="max-w-xl text-sm leading-6 text-text-secondary">
                         Create a blank account or pick a sample persona below.
@@ -250,7 +250,7 @@ function HostedAuthScreen() {
     <div className="flex min-h-screen items-center justify-center bg-bg-page px-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Sign in to Launchboard</CardTitle>
+          <CardTitle>Sign in to Questboard</CardTitle>
           <CardDescription>
             Hosted beta access uses Google sign-in, with email magic links as fallback.
           </CardDescription>
@@ -299,8 +299,8 @@ function AppShell() {
   // Update document title on route change
   useEffect(() => {
     const path = matches[matches.length - 1]?.fullPath || '/';
-    const title = PAGE_TITLES[path] || 'Launchboard';
-    document.title = `${title} — Launchboard`;
+    const title = PAGE_TITLES[path] || 'Questboard';
+    document.title = `${title}, Questboard`;
   }, [matches]);
 
   // Close mobile menu on route change

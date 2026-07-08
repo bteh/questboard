@@ -1,4 +1,4 @@
-const DEV_HOSTED_AUTH_STORAGE_KEY = 'launchboard-dev-hosted-session';
+const DEV_HOSTED_AUTH_STORAGE_KEY = 'questboard-dev-hosted-session';
 
 export const devHostedAuth = import.meta.env.VITE_DEV_HOSTED_AUTH === 'true';
 

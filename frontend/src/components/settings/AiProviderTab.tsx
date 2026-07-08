@@ -25,15 +25,15 @@ import type { LLMConfig, LLMStatus } from '@/types/settings';
 // ── Provider metadata for cards ──────────────────────────────────────
 // Maps backend preset names to user-friendly descriptions and key URLs.
 const PROVIDER_INFO: Record<string, { description: string; keyUrl?: string; keyLabel?: string; badge: string; badgeColor: string; recommended?: boolean }> = {
-  gemini:         { description: 'Gemini for Launchboard. Free tier available, but users still need a free Gemini API key.', keyUrl: 'https://aistudio.google.com/apikey', keyLabel: 'Get free Gemini key', badge: 'Free', badgeColor: 'text-success bg-success/10', recommended: true },
+  gemini:         { description: 'Gemini for Questboard. Free tier available, but users still need a free Gemini API key.', keyUrl: 'https://aistudio.google.com/apikey', keyLabel: 'Get free Gemini key', badge: 'Free', badgeColor: 'text-success bg-success/10', recommended: true },
   groq:           { description: 'Very fast — 1,000 uses/day', keyUrl: 'https://console.groq.com/keys', keyLabel: 'Get free key', badge: 'Free', badgeColor: 'text-success bg-success/10' },
   cerebras:       { description: 'Ultra-fast — generous free tier', keyUrl: 'https://cloud.cerebras.ai', keyLabel: 'Get free key', badge: 'Free', badgeColor: 'text-success bg-success/10' },
   openrouter:     { description: '29 free AI models through one key — 200 uses/day', keyUrl: 'https://openrouter.ai/keys', keyLabel: 'Get free key', badge: 'Free', badgeColor: 'text-success bg-success/10' },
   mistral:        { description: 'European AI provider — generous free tier', keyUrl: 'https://console.mistral.ai/api-keys', keyLabel: 'Get free key', badge: 'Free', badgeColor: 'text-success bg-success/10' },
   sambanova:      { description: 'Powerful AI — $5 free trial credits', keyUrl: 'https://cloud.sambanova.ai', keyLabel: 'Get free key', badge: 'Trial', badgeColor: 'text-amber-600 bg-amber-500/10' },
   deepseek:       { description: 'Strong AI — free signup bonus, then very cheap', keyUrl: 'https://platform.deepseek.com/api_keys', keyLabel: 'Get key', badge: 'Trial + cheap', badgeColor: 'text-amber-600 bg-amber-500/10' },
-  'openai-api':   { description: 'Supported today for GPT models in Launchboard. Requires an OpenAI API key.', keyUrl: 'https://platform.openai.com/api-keys', keyLabel: 'Get OpenAI API key', badge: 'Paid', badgeColor: 'text-amber-600 bg-amber-500/10' },
-  'anthropic-api': { description: 'Supported today for Claude models in Launchboard. Requires an Anthropic API key.', keyUrl: 'https://console.anthropic.com/settings/keys', keyLabel: 'Get Anthropic API key', badge: 'Paid', badgeColor: 'text-amber-600 bg-amber-500/10' },
+  'openai-api':   { description: 'Supported today for GPT models in Questboard. Requires an OpenAI API key.', keyUrl: 'https://platform.openai.com/api-keys', keyLabel: 'Get OpenAI API key', badge: 'Paid', badgeColor: 'text-amber-600 bg-amber-500/10' },
+  'anthropic-api': { description: 'Supported today for Claude models in Questboard. Requires an Anthropic API key.', keyUrl: 'https://console.anthropic.com/settings/keys', keyLabel: 'Get Anthropic API key', badge: 'Paid', badgeColor: 'text-amber-600 bg-amber-500/10' },
   ollama:         { description: 'Runs on your computer — completely private, no account needed', keyUrl: 'https://ollama.com', keyLabel: 'Install Ollama (free)', badge: 'No account', badgeColor: 'text-brand bg-brand/10' },
   custom:         { description: 'Connect your own local AI model or OpenAI-compatible server', badge: 'Custom', badgeColor: 'text-brand bg-brand/10' },
 };
@@ -41,7 +41,7 @@ const PROVIDER_INFO: Record<string, { description: string; keyUrl?: string; keyL
 /** Dev mode shows proxy/internal presets — requires explicit opt-in via localStorage */
 function isDevMode(): boolean {
   try {
-    return localStorage.getItem('launchboard-dev-mode') === 'true';
+    return localStorage.getItem('questboard-dev-mode') === 'true';
   } catch { return false; }
 }
 
@@ -134,9 +134,9 @@ function FlagshipDetectionWarning({ className }: FlagshipDetectionWarningProps) 
       <p className="mt-1">
         It looks like a third-party proxy (e.g. <code className="rounded bg-amber-100/60 px-1 py-0.5 text-[11px] dark:bg-amber-900/40">cliproxyapi</code>,
         <code className="ml-0.5 rounded bg-amber-100/60 px-1 py-0.5 text-[11px] dark:bg-amber-900/40">vibeproxy</code>) wrapping your
-        Claude Code, Codex CLI, or Gemini CLI OAuth subscription. Connecting Launchboard to it will charge each
+        Claude Code, Codex CLI, or Gemini CLI OAuth subscription. Connecting Questboard to it will charge each
         request against your consumer subscription quota and may violate Anthropic / OpenAI / Google's terms of service —
-        Launchboard runs many calls per search and you can be rate-limited or have the upstream account suspended.
+        Questboard runs many calls per search and you can be rate-limited or have the upstream account suspended.
       </p>
       <p className="mt-1.5 text-amber-800/80 dark:text-amber-200/80">
         If you have a real API key, use the Gemini / ChatGPT / Claude tabs above instead.
@@ -450,7 +450,7 @@ export function AiProviderTab() {
               <Shield className="h-3 w-3 shrink-0 text-success mt-0.5" />
               <p>
                 {hostedMode
-                  ? 'Your key is encrypted on Launchboard and only sent to that provider.'
+                  ? 'Your key is encrypted on Questboard and only sent to that provider.'
                   : 'Your key is stored on this computer and only sent to that provider.'}
               </p>
             </div>
@@ -494,8 +494,8 @@ export function AiProviderTab() {
           <div className="rounded-xl border border-border-default bg-bg-subtle/40 p-4">
             <p className="text-sm font-medium text-text-primary">Supported desktop AI paths today</p>
             <p className="mt-1 text-xs leading-relaxed text-text-muted">
-              Launchboard officially supports provider API keys, Ollama, and your own local OpenAI-compatible endpoint.
-              Direct sign-in with your ChatGPT account or Claude account is not available in Launchboard yet.
+              Questboard officially supports provider API keys, Ollama, and your own local OpenAI-compatible endpoint.
+              Direct sign-in with your ChatGPT account or Claude account is not available in Questboard yet.
             </p>
           </div>
         )}
@@ -551,11 +551,11 @@ export function AiProviderTab() {
               <div className="space-y-4">
                 {!hostedMode && (ollamaDetect?.detected || (localAI?.servers && localAI.servers.length > 0)) ? (
                   <p className="text-sm text-text-secondary">
-                    We found AI running on your machine. Connect it now if you want Launchboard to rank by resume fit and draft materials.
+                    We found AI running on your machine. Connect it now if you want Questboard to rank by resume fit and draft materials.
                   </p>
                 ) : (
                   <p className="text-sm text-text-secondary">
-                    Recommended: <strong>Gemini</strong>. You can search without AI, but this is what makes Launchboard feel tailored to the user.
+                    Recommended: <strong>Gemini</strong>. You can search without AI, but this is what makes Questboard feel tailored to the user.
                   </p>
                 )}
 
@@ -737,7 +737,7 @@ export function AiProviderTab() {
                     <Shield className="h-3 w-3 text-success shrink-0 mt-0.5" />
                     <p className="text-[10px] text-text-muted leading-relaxed">
                       {hostedMode
-                        ? 'Your key is sent to Launchboard over HTTPS, stored encrypted for your workspace, and used only to call Google.'
+                        ? 'Your key is sent to Questboard over HTTPS, stored encrypted for your workspace, and used only to call Google.'
                         : `Your key stays on your ${llm?.key_storage === 'keychain' ? 'OS keychain' : 'computer'} and is only sent to Google.`}
                     </p>
                   </div>
@@ -761,8 +761,8 @@ export function AiProviderTab() {
                         </div>
                         <p className="mt-0.5 text-xs text-text-muted">
                           {llmForm.provider === 'openai-api'
-                            ? 'Paste your OpenAI API key to use GPT models in Launchboard.'
-                            : 'Paste your Anthropic API key to use Claude models in Launchboard.'}
+                            ? 'Paste your OpenAI API key to use GPT models in Questboard.'
+                            : 'Paste your Anthropic API key to use Claude models in Questboard.'}
                         </p>
                       </div>
                     </div>
@@ -808,7 +808,7 @@ export function AiProviderTab() {
                       <Shield className="h-3 w-3 text-success shrink-0 mt-0.5" />
                       <p className="text-[10px] text-text-muted leading-relaxed">
                         {hostedMode
-                          ? 'Your key is sent to Launchboard over HTTPS, stored encrypted for your workspace, and used only to call that provider.'
+                          ? 'Your key is sent to Questboard over HTTPS, stored encrypted for your workspace, and used only to call that provider.'
                           : 'Your key is stored locally and sent only to that provider.'}
                       </p>
                     </div>
@@ -821,8 +821,8 @@ export function AiProviderTab() {
                     Why does this need an API key?
                   </summary>
                   <p className="mt-3 text-xs text-text-muted leading-relaxed">
-                    ChatGPT Plus and Claude Pro/Max are chat subscriptions, not direct Launchboard access today. For now,
-                    Launchboard officially supports provider API keys, Ollama, and your own local OpenAI-compatible endpoint.
+                    ChatGPT Plus and Claude Pro/Max are chat subscriptions, not direct Questboard access today. For now,
+                    Questboard officially supports provider API keys, Ollama, and your own local OpenAI-compatible endpoint.
                     If you want the easiest low-cost path, Gemini is still the simplest starting point.
                   </p>
                 </details>
@@ -1325,7 +1325,7 @@ export function AiProviderTab() {
                           <Shield className="h-3.5 w-3.5 text-success shrink-0 mt-0.5" />
                           <p className="text-[11px] text-text-muted leading-relaxed">
                             {hostedMode
-                              ? `Your key is sent to Launchboard over HTTPS, stored encrypted for your workspace, and used only to call ${selectedPreset?.label || 'that provider'}.`
+                              ? `Your key is sent to Questboard over HTTPS, stored encrypted for your workspace, and used only to call ${selectedPreset?.label || 'that provider'}.`
                               : llm?.key_storage === 'keychain'
                                 ? `Your key is stored in your OS keychain and sent only to ${selectedPreset?.label || 'the provider'}. It never touches disk as plaintext.`
                                 : `Your key is stored locally and sent only to ${selectedPreset?.label || 'the provider'}'s API.`}
@@ -1382,7 +1382,7 @@ export function AiProviderTab() {
                         </div>
                         <div className="flex items-start gap-3">
                           <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand/10 text-xs font-bold text-brand">3</span>
-                          <p className="text-sm text-text-muted">Click Save below — Launchboard connects automatically</p>
+                          <p className="text-sm text-text-muted">Click Save below — Questboard connects automatically</p>
                         </div>
                       </div>
                     )}

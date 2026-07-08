@@ -49,7 +49,7 @@ def main() -> None:
     os.environ["JOB_FINDER_DATA_DIR"] = settings.data_dir
     os.environ["JOB_FINDER_MANAGE_SCHEMA"] = "false"
     init_db()
-    logger.info("Launchboard worker started", extra={"worker_id": _worker_id()})
+    logger.info("Questboard worker started", extra={"worker_id": _worker_id()})
 
     while True:
         try:
@@ -60,7 +60,7 @@ def main() -> None:
         except KeyboardInterrupt:
             raise
         except Exception:
-            logger.exception("Launchboard worker loop failed", extra={"worker_id": _worker_id()})
+            logger.exception("Questboard worker loop failed", extra={"worker_id": _worker_id()})
             _tick_heartbeat("error")
             time.sleep(max(settings.worker_poll_interval_seconds, 0.5))
 

@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { getProfiles } from '@/api/settings';
 import { hostedMode } from '@/lib/supabase';
 
-const STORAGE_KEY = 'launchboard-profile';
+const STORAGE_KEY = 'questboard-profile';
 const HOSTED_PROFILE = 'workspace';
 
 interface ProfileContextValue {

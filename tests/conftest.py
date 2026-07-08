@@ -1,4 +1,4 @@
-"""Pytest fixtures for the launchboard test suite.
+"""Pytest fixtures for the questboard test suite.
 
 Centralises test isolation so individual modules don't have to worry about
 side-effects bleeding between runs (e.g. on-disk caches).

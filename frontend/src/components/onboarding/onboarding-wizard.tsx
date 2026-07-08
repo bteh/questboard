@@ -229,7 +229,7 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
     savePreferences.mutate(form, {
       onSuccess: () => {
         try {
-          window.localStorage.setItem('launchboard:onboarding-complete', '1');
+          window.localStorage.setItem('questboard:onboarding-complete', '1');
         } catch {
           // localStorage may be disabled in some sandboxed shells; non-fatal.
         }
@@ -444,7 +444,7 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
               </div>
               {resumeUploaded && form.roles.length === 0 && form.keywords.length === 0 && (
                 <p className="text-center text-[11px] text-text-muted">
-                  No roles entered. Launchboard will derive them from your resume for this first run.
+                  No roles entered. Questboard will derive them from your resume for this first run.
                 </p>
               )}
             </div>

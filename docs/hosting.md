@@ -2,9 +2,9 @@
 
 > Status: **deprioritized after the desktop-first decision on April 3, 2026.**
 >
-> This document is kept for future hosted work and for local hosted-sandbox testing, but Launchboard's next major product milestone is the desktop app plan in [docs/desktop-first.md](desktop-first.md).
+> This document is kept for future hosted work and for local hosted-sandbox testing, but Questboard's next major product milestone is the desktop app plan in [docs/desktop-first.md](desktop-first.md).
 
-Launchboard now supports two operating modes:
+Questboard now supports two operating modes:
 
 - `local/self-host`: SQLite, local files, optional user-configured AI providers
 - `hosted/public-beta`: Supabase Auth, Postgres, Supabase Storage, durable worker-backed search runs
@@ -24,13 +24,13 @@ Hosted mode needs:
 
 ```bash
 HOSTED_MODE=true
-DATABASE_URL=postgresql+psycopg://USER:PASSWORD@HOST:5432/launchboard
+DATABASE_URL=postgresql+psycopg://USER:PASSWORD@HOST:5432/questboard
 MANAGE_SCHEMA_ON_STARTUP=false
 
 SUPABASE_URL=https://YOUR_PROJECT.supabase.co
 SUPABASE_ANON_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...
-SUPABASE_STORAGE_BUCKET=launchboard-private
+SUPABASE_STORAGE_BUCKET=questboard-private
 SUPABASE_JWT_AUDIENCE=authenticated
 
 HOSTED_PLATFORM_MANAGED_AI=true
@@ -95,7 +95,7 @@ For integration testing against a hosted-style backend:
 ## Local hosted sandbox
 
 For daily development, you do not need a real Supabase project just to exercise hosted-mode behavior.
-Launchboard now has a local hosted sandbox that:
+Questboard now has a local hosted sandbox that:
 
 - uses bearer-authenticated hosted routes
 - starts the durable worker

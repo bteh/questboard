@@ -3,7 +3,7 @@ let accessToken: string | null = null;
 let localWorkspaceSessionToken: string | null = null;
 let localWorkspaceCsrfToken: string | null = null;
 const DESKTOP_LOCAL_API_PATTERN = /^https?:\/\/(127\.0\.0\.1|localhost):8765\/api\/v1$/;
-const LOCAL_WORKSPACE_STORAGE_KEY = `launchboard-local-workspace-session:${BASE_URL}`;
+const LOCAL_WORKSPACE_STORAGE_KEY = `questboard-local-workspace-session:${BASE_URL}`;
 
 function shouldPersistLocalWorkspaceSession(): boolean {
   return DESKTOP_LOCAL_API_PATTERN.test(BASE_URL);
@@ -102,7 +102,7 @@ function authHeaders(): Record<string, string> {
     return { Authorization: `Bearer ${accessToken}` };
   }
   if (localWorkspaceSessionToken) {
-    return { 'X-Launchboard-Session': localWorkspaceSessionToken };
+    return { 'X-Questboard-Session': localWorkspaceSessionToken };
   }
   return {};
 }

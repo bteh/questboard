@@ -408,7 +408,7 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
                     AI is not connected
                   </p>
                   <p className="mt-1 text-xs leading-relaxed text-text-secondary">
-                    Launchboard needs its own AI connection to score jobs against your resume.
+                    Questboard needs its own AI connection to score jobs against your resume.
                     ChatGPT Plus and Claude Pro subscriptions only work in their own apps — but
                     you can <span className="font-medium text-text-primary">get a free key in 30 seconds</span> below.
                   </p>
@@ -692,7 +692,7 @@ export function AiDiagnosticModal({ open, onOpenChange }: AiDiagnosticModalProps
             type="button"
             onClick={() => {
               onOpenChange(false);
-              window.dispatchEvent(new CustomEvent('launchboard:open-health'));
+              window.dispatchEvent(new CustomEvent('questboard:open-health'));
             }}
             className="text-[11px] text-text-muted hover:text-text-secondary"
           >

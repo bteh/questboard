@@ -1,14 +1,14 @@
-# Launchboard
+# Questboard
 
-**AI-powered job search agent.** Upload your resume, set your target roles, and Launchboard searches 14+ job boards, scores every listing against your background, drafts tailored cover letters, and tracks your pipeline — all on your own machine.
+**AI-powered job search agent.** Upload your resume, set your target roles, and Questboard searches 14+ job boards, scores every listing against your background, drafts tailored cover letters, and tracks your pipeline — all on your own machine.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![CI](https://github.com/bteh/launchboard/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/bteh/launchboard/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![CI](https://github.com/bteh/questboard/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/bteh/questboard/actions/workflows/ci.yml)
 
 ## Quick start
 
 ```bash
-git clone https://github.com/bteh/launchboard.git
-cd launchboard
+git clone https://github.com/bteh/questboard.git
+cd questboard
 make setup
 make dev
 ```
@@ -54,7 +54,7 @@ Runs the full stack with optional bundled Ollama. Configure your LLM in `.env`. 
 
 ## Desktop app
 
-Launchboard is moving toward a desktop-first experience (Tauri shell + Python sidecar runtime). Build locally:
+Questboard is moving toward a desktop-first experience (Tauri shell + Python sidecar runtime). Build locally:
 
 ```bash
 make desktop-dev      # dev mode against your local repo .venv

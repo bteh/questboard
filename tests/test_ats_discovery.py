@@ -253,13 +253,13 @@ class DiscoverAndCacheTest(unittest.TestCase):
         self.cache_dir = Path(self.tempdir)
         self.mod = _fresh_module(self.cache_dir)
         # Make sure no env override is leaking in.
-        os.environ.pop("LAUNCHBOARD_DISABLE_ATS_DISCOVERY", None)
+        os.environ.pop("QUESTBOARD_DISABLE_ATS_DISCOVERY", None)
 
     def tearDown(self) -> None:
         import shutil
 
         shutil.rmtree(self.tempdir, ignore_errors=True)
-        os.environ.pop("LAUNCHBOARD_DISABLE_ATS_DISCOVERY", None)
+        os.environ.pop("QUESTBOARD_DISABLE_ATS_DISCOVERY", None)
 
     def _write_cache(self, host: str, slugs: list[str], discovered_at: datetime) -> None:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -327,7 +327,7 @@ class DiscoverAndCacheTest(unittest.TestCase):
             ["cached-co"],
             datetime.now(timezone.utc) - timedelta(days=10),
         )
-        os.environ["LAUNCHBOARD_DISABLE_ATS_DISCOVERY"] = "1"
+        os.environ["QUESTBOARD_DISABLE_ATS_DISCOVERY"] = "1"
         with _mock_ddgs([{"href": "https://jobs.ashbyhq.com/skiprun/x"}]) as instance:
             result = self.mod.discover_and_cache("ashby", ["data engineer"])
         self.assertEqual(result, {"cached-co"})

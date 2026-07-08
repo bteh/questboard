@@ -8,7 +8,7 @@ interface ThemeContextValue {
   setTheme: (t: Theme) => void;
 }
 
-const STORAGE_KEY = 'launchboard-theme';
+const STORAGE_KEY = 'questboard-theme';
 
 const ThemeContext = createContext<ThemeContextValue>({
   theme: 'system',
