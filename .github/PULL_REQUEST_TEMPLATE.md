@@ -7,8 +7,9 @@
 ## Test plan
 <!-- How you verified this works -->
 - [ ] `pytest tests/ -q` green
-- [ ] `cd frontend && npm run typecheck` clean
-- [ ] `cd frontend && npm run lint` no new errors
+- [ ] `cd frontend && pnpm run typecheck` clean
+- [ ] `cd frontend && pnpm run lint` no new errors
+- [ ] `cd frontend && pnpm run test` green (if frontend changed)
 - [ ] Manually exercised the affected flow in `make dev` (if UI changed)
 
 ## Notes for reviewer

@@ -70,7 +70,8 @@ make setup              # installs Python + Node deps, creates .env
 
 # Tests
 pytest tests/
-cd frontend && npm run typecheck
+cd frontend && pnpm run typecheck
+cd frontend && pnpm run test   # vitest unit tests
 ```
 
 ## Development Conventions

@@ -116,15 +116,15 @@ if (tauriTarget) {
   }
 }
 
-const prepareArgs = ['run', 'desktop:prepare:sidecar', '--']
+const prepareArgs = ['run', 'desktop:prepare:sidecar']
 if (pyinstallerTargetArch) {
   prepareArgs.push('--target-arch', pyinstallerTargetArch)
 }
-runOrExit(commandName('npm'), prepareArgs, { cwd: path.join(repoRoot, 'frontend') })
+runOrExit(commandName('pnpm'), prepareArgs, { cwd: path.join(repoRoot, 'frontend') })
 
-const tauriArgs = ['exec', '--', 'tauri', 'build']
+const tauriArgs = ['exec', 'tauri', 'build']
 if (tauriTarget) {
   tauriArgs.push('--target', tauriTarget)
 }
-runOrExit(commandName('npm'), tauriArgs, { cwd: path.join(repoRoot, 'frontend') })
+runOrExit(commandName('pnpm'), tauriArgs, { cwd: path.join(repoRoot, 'frontend') })
 runOrExit(python, [path.join(repoRoot, 'scripts', 'verify_desktop_bundle.py')])

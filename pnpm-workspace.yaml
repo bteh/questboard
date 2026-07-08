@@ -1,0 +1,8 @@
+packages:
+  - frontend
+  - packages/*
+
+# pnpm 10 blocks dependency postinstall scripts by default; esbuild (vite's
+# bundler) needs its install script to place the platform binary.
+onlyBuiltDependencies:
+  - esbuild
