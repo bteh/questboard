@@ -122,7 +122,7 @@ const PERIOD_UNITS: Record<string, string> = {
   hourly: '/hr',
 };
 
-function payUnitFor(app: ApplicationResponse): string {
+export function payUnitFor(app: ApplicationResponse): string {
   const unit = PERIOD_UNITS[(app.salary_period || '').toLowerCase()] || '';
   // Match the existing salary_source standard: only parsed-from-description
   // pay gets the estimated marker; reported or unknown provenance stays bare.
@@ -197,7 +197,7 @@ export function questNeedsLine(vertical: BoardVertical, quest: Quest): string {
 }
 
 /** "taping Jul 14" for camera, "session Jul 14" for studies. */
-const EVENT_WORDS: Partial<Record<BoardVertical, string>> = {
+export const EVENT_WORDS: Partial<Record<BoardVertical, string>> = {
   camera: 'taping',
   study: 'session',
 };

@@ -2,7 +2,7 @@
   "name": "@questboard/frontend",
   "private": true,
   "version": "0.2.0",
-  "description": "Questboard web frontend — React + TanStack Router + Tailwind",
+  "description": "Questboard web frontend: React + TanStack Router + Tailwind",
   "license": "MIT",
   "type": "module",
   "scripts": {
@@ -28,6 +28,7 @@
     "@fontsource-variable/geist": "^5.2.8",
     "@fontsource-variable/inter": "^5.2.8",
     "@hookform/resolvers": "^5.2.2",
+    "@mlc-ai/web-llm": "^0.2.84",
     "@questboard/ui": "workspace:*",
     "@supabase/supabase-js": "^2.58.0",
     "@tailwindcss/vite": "^4.2.1",
