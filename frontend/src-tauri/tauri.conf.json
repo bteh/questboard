@@ -4,9 +4,9 @@
   "version": "0.2.0",
   "identifier": "com.questboard.desktop",
   "build": {
-    "beforeDevCommand": "npm run desktop:dev:web",
+    "beforeDevCommand": "pnpm run desktop:dev:web",
     "devUrl": "http://127.0.0.1:5173",
-    "beforeBuildCommand": "npm run desktop:build:web",
+    "beforeBuildCommand": "pnpm run desktop:build:web",
     "frontendDist": "../dist"
   },
   "app": {

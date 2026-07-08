@@ -22,7 +22,8 @@ setup: ## First-time setup (creates venv, installs deps, sets up AI)
 	@$(PIP) install -e . -q
 	@$(PIP) install -e ./backend -q
 	@echo "  [4/6] Installing frontend dependencies..."
-	@cd frontend && npm install --silent
+	@command -v pnpm >/dev/null 2>&1 || (echo "  ERROR: pnpm required. Enable it with 'corepack enable' or see https://pnpm.io/installation" && exit 1)
+	@pnpm install --silent
 	@echo "  [5/6] Creating directories and config..."
 	@mkdir -p data knowledge
 	@test -f .env || cp .env.example .env
@@ -35,7 +36,7 @@ setup: ## First-time setup (creates venv, installs deps, sets up AI)
 install: ## Install all dependencies (Python + Node)
 	$(PIP) install -e .
 	$(PIP) install -e ./backend
-	cd frontend && npm install
+	pnpm install
 
 reauth-claude: ## Re-authenticate cliproxyapi when Questboard shows "AI disconnected"
 	@bash scripts/reauth-claude-proxy.sh
@@ -55,7 +56,7 @@ start: .venv ## Start Questboard — local, one command (http://localhost:5173)
 	@$(MAKE) --no-print-directory stop-dev >/dev/null 2>&1 || true
 	@trap 'kill 0' EXIT; \
 		cd backend && PYTHONPATH=../src $(CURDIR)/$(PYTHON) -m uvicorn app.main:app --reload --reload-dir . --reload-dir ../src --host 127.0.0.1 --port 8000 & \
-		cd frontend && npm run dev & \
+		cd frontend && pnpm run dev & \
 		wait
 
 dev: .venv ## Alias for `start`
@@ -95,7 +96,7 @@ dev-hosted: .venv ## Start the hosted-like local sandbox with persona auth + wor
 	@trap 'kill 0' EXIT; \
 		cd backend && HOSTED_MODE=true DEV_HOSTED_AUTH=true HOSTED_ALLOW_WORKSPACE_LLM_CONFIG=true QUESTBOARD_SECRET=questboard-dev-hosted-workspace-secret MANAGE_SCHEMA_ON_STARTUP=true EMBEDDED_SCHEDULER_ENABLED=false DATA_DIR=$(CURDIR)/data/dev-hosted WORKSPACE_STORAGE_DIR=$(CURDIR)/data/dev-hosted/workspaces PYTHONPATH=../src $(CURDIR)/$(PYTHON) -m uvicorn app.main:app --reload --reload-dir . --reload-dir ../src --host 127.0.0.1 --port 8000 & \
 		HOSTED_MODE=true DEV_HOSTED_AUTH=true HOSTED_ALLOW_WORKSPACE_LLM_CONFIG=true QUESTBOARD_SECRET=questboard-dev-hosted-workspace-secret MANAGE_SCHEMA_ON_STARTUP=true EMBEDDED_SCHEDULER_ENABLED=false DATA_DIR=$(CURDIR)/data/dev-hosted WORKSPACE_STORAGE_DIR=$(CURDIR)/data/dev-hosted/workspaces PYTHONPATH=$(CURDIR)/src $(CURDIR)/$(PYTHON) scripts/dev_hosted_worker.py & \
-		cd frontend && VITE_API_URL=http://localhost:8000/api/v1 VITE_HOSTED_MODE=true VITE_DEV_HOSTED_AUTH=true npm run dev -- --port 5173 & \
+		cd frontend && VITE_API_URL=http://localhost:8000/api/v1 VITE_HOSTED_MODE=true VITE_DEV_HOSTED_AUTH=true pnpm run dev --port 5173 & \
 		backend_ready=0; \
 		for attempt in $$(seq 1 30); do \
 			if curl -fsS http://localhost:8000/health >/dev/null 2>&1; then \
@@ -168,7 +169,7 @@ backend: .venv ## Start only the backend (FastAPI)
 	cd backend && PYTHONPATH=../src $(CURDIR)/$(PYTHON) -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 frontend: ## Start only the frontend (Vite)
-	cd frontend && npm run dev
+	cd frontend && pnpm run dev
 
 desktop-dev: .venv ## Start Questboard in Tauri desktop dev mode
 	@CARGO_BIN=$$(command -v cargo 2>/dev/null || printf '%s/.cargo/bin/cargo' "$$HOME"); \
@@ -196,7 +197,7 @@ desktop-dev: .venv ## Start Questboard in Tauri desktop dev mode
 		exit 1; \
 	fi; \
 	export PATH="$$(dirname "$$CARGO_BIN"):$${PATH}"; \
-	cd frontend && npm run desktop:dev
+	cd frontend && pnpm run desktop:dev
 
 desktop-build: .venv ## Build the Tauri desktop app
 	@CARGO_BIN=$$(command -v cargo 2>/dev/null || printf '%s/.cargo/bin/cargo' "$$HOME"); \
@@ -205,13 +206,13 @@ desktop-build: .venv ## Build the Tauri desktop app
 		exit 1; \
 	fi; \
 	export PATH="$$(dirname "$$CARGO_BIN"):$${PATH}"; \
-	cd frontend && npm run desktop:build
+	cd frontend && pnpm run desktop:build
 
 desktop-install: .venv desktop-build ## Install the latest built Questboard.app into /Applications
 	$(PYTHON) scripts/install_desktop_app.py
 
 desktop-smoke: .venv ## Run the desktop UX smoke test against the local runtime + web UI
-	cd frontend && npm run desktop:smoke
+	cd frontend && pnpm run desktop:smoke
 
 dev-hosted-reset: ## Remove local hosted sandbox data after stopping dev processes
 	@$(MAKE) stop-dev >/dev/null 2>&1 || true
@@ -239,7 +240,10 @@ test: .venv ## Run Python tests
 	$(PYTHON) -m pytest tests/
 
 typecheck: ## Run TypeScript type checking
-	cd frontend && npx tsc --noEmit
+	cd frontend && pnpm run typecheck
+
+test-frontend: ## Run frontend unit tests (vitest)
+	cd frontend && pnpm run test
 
 # ── Docker ─────────────────────────────────────────────────────────────
 
@@ -294,7 +298,7 @@ doctor-env: ## Check your dev environment for common install/setup issues
 	if test -d frontend/node_modules; then \
 		echo "ok"; \
 	else \
-		echo "MISSING — run 'cd frontend && npm install'"; failed=1; \
+		echo "MISSING — run 'pnpm install'"; failed=1; \
 	fi; \
 	printf "  .env:           "; \
 	if test -f .env; then \
@@ -312,7 +316,7 @@ doctor-env: ## Check your dev environment for common install/setup issues
 	if test -x frontend/node_modules/.bin/playwright; then \
 		echo "installed"; \
 	else \
-		echo "OPTIONAL — run 'cd frontend && npm install' for desktop smoke tests"; \
+		echo "OPTIONAL — run 'pnpm install' for desktop smoke tests"; \
 	fi; \
 	printf "  Desktop target: "; \
 	if .venv/bin/python -c "import platform, sys; machine=platform.machine().lower(); system=sys.platform; mapping={('darwin','x86_64'):'x86_64-apple-darwin',('darwin','arm64'):'aarch64-apple-darwin',('darwin','aarch64'):'aarch64-apple-darwin'}; print(mapping.get((system,machine), machine))" 2>/dev/null; then \
@@ -358,5 +362,5 @@ clean-data: ## DESTRUCTIVE: delete local job database + hosted sandbox data
 	rm -rf data/dev-hosted
 
 reset: ## Full reset (removes venv + node_modules, then re-runs setup)
-	rm -rf .venv frontend/node_modules
+	rm -rf .venv node_modules frontend/node_modules packages/*/node_modules
 	$(MAKE) setup

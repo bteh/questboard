@@ -6,7 +6,7 @@
 #
 # Prerequisites:
 #   - Backend running at localhost:8000
-#   - npm dependencies installed (openapi-typescript)
+#   - frontend dependencies installed via pnpm (openapi-typescript)
 #
 # This script:
 #   1. Generates fresh types from the live backend OpenAPI spec
@@ -31,7 +31,7 @@ if ! curl -sf http://localhost:8000/health > /dev/null 2>&1; then
 fi
 
 echo "--- Generating types from OpenAPI spec ---"
-npx openapi-typescript http://localhost:8000/openapi.json -o "$TEMP_FILE" 2>/dev/null
+pnpm exec openapi-typescript http://localhost:8000/openapi.json -o "$TEMP_FILE" 2>/dev/null
 
 echo "--- Comparing with checked-in types ---"
 if [ -f "$GENERATED_FILE" ]; then
@@ -39,7 +39,7 @@ if [ -f "$GENERATED_FILE" ]; then
     echo "OK: Generated types are up to date"
   else
     echo "DRIFT DETECTED: api.generated.ts is out of date"
-    echo "Run: npm run generate-types"
+    echo "Run: pnpm run generate-types"
     diff "$GENERATED_FILE" "$TEMP_FILE" | head -30
     rm "$TEMP_FILE"
     exit 1
@@ -52,7 +52,7 @@ fi
 rm -f "$TEMP_FILE"
 
 echo "--- Running TypeScript check ---"
-npx tsc --noEmit
+pnpm exec tsc --noEmit
 echo "OK: All types compile"
 
 echo ""

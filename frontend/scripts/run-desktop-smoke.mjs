@@ -32,8 +32,8 @@ function ringPush(buffer, line, limit = 240) {
   }
 }
 
-function npmCommand() {
-  return process.platform === 'win32' ? 'npm.cmd' : 'npm';
+function pnpmCommand() {
+  return process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
 }
 
 async function fileExists(targetPath) {
@@ -469,7 +469,7 @@ async function main() {
     managedProcesses.push(
       startManagedProcess({
         name: 'desktop-web',
-        command: npmCommand(),
+        command: pnpmCommand(),
         args: ['run', 'desktop:dev:web'],
         cwd: frontendRoot,
         env: { ...process.env, VITE_API_URL: apiBaseUrl },
@@ -535,7 +535,7 @@ async function main() {
 
     const help =
       error instanceof Error && /Executable doesn't exist|browserType\.launchPersistentContext/i.test(error.message)
-        ? "\nInstall the Playwright browser once with 'npm run desktop:smoke:install'."
+        ? "\nInstall the Playwright browser once with 'pnpm run desktop:smoke:install'."
         : '';
 
     console.error(`desktop-smoke: failed\n${error instanceof Error ? error.stack || error.message : String(error)}${help}`);

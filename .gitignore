@@ -49,8 +49,8 @@ data/dev-hosted/
 src/job_finder/output/*.json
 src/job_finder/output/*.md
 
-# Frontend
-frontend/node_modules/
+# Frontend / pnpm workspace
+node_modules/
 frontend/dist/
 
 # OS
