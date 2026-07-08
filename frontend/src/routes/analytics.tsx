@@ -1,5 +1,6 @@
 import { createRoute } from '@tanstack/react-router';
-import { Route as rootRoute } from './__root';
+import { Route as appRoute } from './app';
+import { LegacyFrame } from '@/components/layout/legacy-frame';
 import { BarChart3, Target, TrendingUp, Briefcase, Star, Send } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,9 +14,13 @@ import { useScoreDistribution, useRecommendations, useFunnel, useSources, useDas
 import type { DashboardStats } from '@/types/analytics';
 
 export const Route = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => appRoute,
   path: '/analytics',
-  component: AnalyticsPage,
+  component: () => (
+    <LegacyFrame>
+      <AnalyticsPage />
+    </LegacyFrame>
+  ),
 });
 
 function ChartCard({ title, description, isLoading, isEmpty, children, className }: {
