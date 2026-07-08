@@ -37,29 +37,18 @@ def _add_missing_columns(engine, table_name: str, migrations: list[tuple[str, st
 def _migrate_db(engine) -> None:
     """Add missing columns to existing tables (lightweight migration).
 
-    Delegates to src's migration logic where possible, but also runs
-    any backend-specific migrations.
+    Applications migrations are delegated to src's ``_migrate_db``. It is the
+    single column list for that table, so the backend boot path and the src
+    path cannot drift apart (the old backend copy of the list was missing
+    columns like salary_source, which meant a legacy DB booted only through
+    the backend could 500 on the first applications query). Backend-specific
+    workspace-table migrations follow.
     """
-    insp = inspect(engine)
+    from job_finder.models.database import _migrate_db as _migrate_applications
 
-    if "applications" in insp.get_table_names():
-        _add_missing_columns(engine, "applications", [
-            ("profile", "ALTER TABLE applications ADD COLUMN profile VARCHAR(100) DEFAULT 'default'"),
-            ("company_type", "ALTER TABLE applications ADD COLUMN company_type VARCHAR(50) DEFAULT 'Unknown'"),
-            ("work_type", "ALTER TABLE applications ADD COLUMN work_type VARCHAR(20) DEFAULT ''"),
-            ("workspace_id", "ALTER TABLE applications ADD COLUMN workspace_id VARCHAR(64)"),
-            ("salary_currency", "ALTER TABLE applications ADD COLUMN salary_currency VARCHAR(16) DEFAULT ''"),
-            ("salary_period", "ALTER TABLE applications ADD COLUMN salary_period VARCHAR(20) DEFAULT ''"),
-            ("salary_min_annualized", "ALTER TABLE applications ADD COLUMN salary_min_annualized FLOAT"),
-            ("salary_max_annualized", "ALTER TABLE applications ADD COLUMN salary_max_annualized FLOAT"),
-            ("evaluation_report_json", "ALTER TABLE applications ADD COLUMN evaluation_report_json TEXT DEFAULT ''"),
-            # Trust & freshness (ghost-job defense): the job's true post date.
-            ("date_posted", "ALTER TABLE applications ADD COLUMN date_posted VARCHAR(40) DEFAULT ''"),
-            ("date_confidence", "ALTER TABLE applications ADD COLUMN date_confidence VARCHAR(20) DEFAULT ''"),
-        ])
-        with engine.begin() as conn:
-            # Convert empty job_url strings to NULL (allows multiple NULLs in unique column)
-            conn.execute(text("UPDATE applications SET job_url = NULL WHERE job_url = ''"))
+    _migrate_applications(engine)
+
+    insp = inspect(engine)
 
     _add_missing_columns(engine, "workspace_preferences", [
         ("llm_provider", "ALTER TABLE workspace_preferences ADD COLUMN llm_provider VARCHAR(100) DEFAULT ''"),

@@ -360,13 +360,19 @@ def finalize_scraper_jobs(jobs: list[dict]) -> list[dict]:
             if not job.get("salary_source"):
                 job["salary_source"] = "reported"
         elif not job.get("salary_source"):
-            lo, hi = extract_salary_range(job.get("description") or "")
-            if lo is not None or hi is not None:
-                job["salary_min"] = lo
-                job["salary_max"] = hi
-                job["salary_source"] = "parsed_from_description"
-            else:
+            if job.get("vertical") not in (None, "career"):
+                # Quest rows carry only pay their source states outright. A
+                # "$50 stipend" sentence in a study description must never
+                # become a promised pay figure.
                 job["salary_source"] = None
+            else:
+                lo, hi = extract_salary_range(job.get("description") or "")
+                if lo is not None or hi is not None:
+                    job["salary_min"] = lo
+                    job["salary_max"] = hi
+                    job["salary_source"] = "parsed_from_description"
+                else:
+                    job["salary_source"] = None
         if "work_type_confidence" not in job:
             job["work_type_confidence"] = (
                 "reported" if job.get("remote_flag_reported") else "inferred"

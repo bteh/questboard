@@ -81,6 +81,15 @@ export interface ApplicationBase {
 
 export interface ApplicationResponse extends ApplicationBase {
   id: number;
+  // Quest verticals (career|camera|study|lens|party, matching the UI tokens).
+  // Optional because records served before the quest schema lack them; absent
+  // always means the career shape.
+  vertical?: string;
+  event_start?: string | null;
+  event_end?: string | null;
+  is_rolling?: boolean;
+  first_quest_ok?: boolean;
+  quest_json?: string;
   overall_score: number | null;
   technical_score: number | null;
   leadership_score: number | null;
@@ -161,6 +170,8 @@ export interface StatusUpdate {
 }
 
 export interface ApplicationFilters {
+  /** Vertical(s) to list, single or comma list; the API defaults to career. */
+  vertical?: string;
   status?: string;
   recommendation?: string;
   company_type?: string;

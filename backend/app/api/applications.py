@@ -36,6 +36,13 @@ def _sanitize_optional_profile(profile: str | None) -> str | None:
     return sanitize_profile(profile) if profile else None
 
 
+def _parse_verticals(vertical: str | None) -> list[str] | None:
+    """'camera' or 'career,camera' -> list; None/'' -> None (career default)."""
+    if not vertical:
+        return None
+    return [v.strip() for v in vertical.split(",") if v.strip()]
+
+
 def _to_response(record) -> ApplicationResponse:
     strengths = []
     gaps = []
@@ -52,6 +59,12 @@ def _to_response(record) -> ApplicationResponse:
 
     return ApplicationResponse(
         id=record.id,
+        vertical=getattr(record, "vertical", "career") or "career",
+        event_start=getattr(record, "event_start", None),
+        event_end=getattr(record, "event_end", None),
+        is_rolling=getattr(record, "is_rolling", False) or False,
+        first_quest_ok=getattr(record, "first_quest_ok", False) or False,
+        quest_json=getattr(record, "quest_json", "") or "",
         job_title=record.job_title,
         company=record.company,
         location=record.location or "",
@@ -131,6 +144,10 @@ def list_applications(
     search_run_id: str | None = None,
     first_seen_run_id: str | None = None,
     include_dead: bool = Query(False, description="Include postings whose URL is confirmed dead"),
+    vertical: str | None = Query(
+        None,
+        description="Vertical(s) to list, single or comma list (career,camera,study,lens,party). Defaults to career",
+    ),
     sort_by: str = "overall_score",
     sort_dir: str = "desc",
     page: int = Query(1, ge=1),
@@ -138,27 +155,31 @@ def list_applications(
     workspace = Depends(get_active_workspace_context),
     db: Session = Depends(get_db),
 ):
-    items, total = application_service.get_applications(
-        db,
-        status=status,
-        min_score=min_score,
-        recommendation=recommendation,
-        source=source,
-        search=search,
-        company_type=company_type,
-        is_remote=is_remote,
-        work_type=work_type,
-        salary_min=salary_min,
-        profile=None if workspace else profile,
-        workspace_id=workspace.workspace.id if workspace else None,
-        search_run_id=search_run_id,
-        first_seen_run_id=first_seen_run_id,
-        exclude_dead=not include_dead,
-        sort_by=sort_by,
-        sort_dir=sort_dir,
-        page=page,
-        page_size=page_size,
-    )
+    try:
+        items, total = application_service.get_applications(
+            db,
+            status=status,
+            min_score=min_score,
+            recommendation=recommendation,
+            source=source,
+            search=search,
+            company_type=company_type,
+            is_remote=is_remote,
+            work_type=work_type,
+            salary_min=salary_min,
+            profile=None if workspace else profile,
+            workspace_id=workspace.workspace.id if workspace else None,
+            search_run_id=search_run_id,
+            first_seen_run_id=first_seen_run_id,
+            exclude_dead=not include_dead,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
+            page=page,
+            page_size=page_size,
+            verticals=_parse_verticals(vertical),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     return ApplicationListResponse(
         items=[_to_response(item) for item in items],
         total=total,
@@ -372,9 +393,12 @@ def deduplicate_applications(
     )
 
     profile = _sanitize_optional_profile(profile)
+    from job_finder.models.database import scoped_applications
     from app.models.application import ApplicationRecord
 
-    query = db.query(ApplicationRecord)
+    # Career rows only: two quests from the same org with the same title are
+    # different sessions, not duplicates, and must never be merged away.
+    query = scoped_applications(db.query(ApplicationRecord))
     if workspace:
         query = query.filter(ApplicationRecord.workspace_id == workspace.workspace.id)
     elif profile:

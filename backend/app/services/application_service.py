@@ -6,6 +6,9 @@ from datetime import datetime, timezone
 from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
+# The mandatory vertical scope. Every list-level read of applications goes
+# through it so quest rows never leak into career surfaces by omission.
+from job_finder.models.database import scoped_applications
 from app.models.application import ApplicationRecord
 
 _ALLOWED_SORT_BY = frozenset({
@@ -38,10 +41,14 @@ def get_applications(
     sort_dir: str = "desc",
     page: int = 1,
     page_size: int = 25,
+    verticals: list[str] | None = None,
 ) -> tuple[list[ApplicationRecord], int]:
     if sort_by not in _ALLOWED_SORT_BY:
         sort_by = "overall_score"
-    query = db.query(ApplicationRecord)
+    # Career by default: the classic page and its counts never see quest rows
+    # (which are unscored and would float to the top of the default
+    # overall_score desc nullsfirst sort) unless a caller opts in.
+    query = scoped_applications(db.query(ApplicationRecord), verticals)
 
     if status:
         query = query.filter(ApplicationRecord.status == status)

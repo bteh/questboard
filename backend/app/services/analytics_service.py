@@ -3,6 +3,7 @@ from __future__ import annotations
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from job_finder.models.database import scoped_applications
 from app.models.application import ApplicationRecord
 
 
@@ -12,8 +13,12 @@ def _base_query(
     workspace_id: str | None = None,
     search_run_id: str | None = None,
 ):
-    """Return a base query, optionally filtered by profile."""
-    q = db.query(ApplicationRecord)
+    """Return a base query, optionally filtered by profile.
+
+    Career rows only: analytics averages and funnels must never mix a $150
+    study session into $150k salary math.
+    """
+    q = scoped_applications(db.query(ApplicationRecord))
     if workspace_id:
         q = q.filter(ApplicationRecord.workspace_id == workspace_id)
     elif profile:
@@ -146,11 +151,13 @@ def get_top_companies(
     workspace_id: str | None = None,
     search_run_id: str | None = None,
 ) -> list[dict]:
-    """Top N companies by average overall score."""
-    query = db.query(
-        ApplicationRecord.company,
-        func.avg(ApplicationRecord.overall_score).label("avg_score"),
-        func.count(ApplicationRecord.id).label("job_count"),
+    """Top N companies by average overall score (career rows only)."""
+    query = scoped_applications(
+        db.query(
+            ApplicationRecord.company,
+            func.avg(ApplicationRecord.overall_score).label("avg_score"),
+            func.count(ApplicationRecord.id).label("job_count"),
+        )
     ).filter(ApplicationRecord.overall_score.isnot(None))
     if workspace_id:
         query = query.filter(ApplicationRecord.workspace_id == workspace_id)
@@ -177,11 +184,13 @@ def get_company_types(
     workspace_id: str | None = None,
     search_run_id: str | None = None,
 ) -> list[dict]:
-    """Jobs grouped by company type classification."""
-    query = db.query(
-        ApplicationRecord.company_type,
-        func.count(ApplicationRecord.id).label("count"),
-        func.avg(ApplicationRecord.overall_score).label("avg_score"),
+    """Jobs grouped by company type classification (career rows only)."""
+    query = scoped_applications(
+        db.query(
+            ApplicationRecord.company_type,
+            func.count(ApplicationRecord.id).label("count"),
+            func.avg(ApplicationRecord.overall_score).label("avg_score"),
+        )
     )
     if workspace_id:
         query = query.filter(ApplicationRecord.workspace_id == workspace_id)

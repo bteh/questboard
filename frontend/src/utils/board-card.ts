@@ -35,9 +35,10 @@ export interface BoardCardModel {
 
 /** Statuses that mean an application actually went out. */
 const APPLIED_STATUSES = new Set(['applied', 'interviewing', 'offer']);
-/** The closest thing the status enum has to "saved/shortlisted". */
-export const CLIP_STATUS = 'reviewed';
-const CLIPPED_STATUSES = new Set([CLIP_STATUS, 'applying']);
+/** The real saved/shortlisted status the board writes on Clip. */
+export const CLIP_STATUS = 'clipped';
+/** 'reviewed' stays recognized: rows clipped before 'clipped' existed keep rendering as clipped. */
+const CLIPPED_STATUSES = new Set([CLIP_STATUS, 'reviewed', 'applying']);
 
 /** "150k" -> 150000, "$1,500" -> 1500. Null when unparseable. */
 export function parseAmount(raw: string): number | null {

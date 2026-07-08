@@ -38,6 +38,15 @@ class ApplicationBase(BaseModel):
 
 class ApplicationResponse(ApplicationBase):
     id: int
+    # Quest verticals. vertical matches packages/ui/src/tokens.ts
+    # (career|camera|study|lens|party); every field defaults to the career
+    # shape so existing consumers deserialize unchanged.
+    vertical: str = "career"
+    event_start: datetime | None = None
+    event_end: datetime | None = None
+    is_rolling: bool = False
+    first_quest_ok: bool = False
+    quest_json: str = ""
     overall_score: float | None = None
     technical_score: float | None = None
     leadership_score: float | None = None
@@ -102,7 +111,15 @@ class ApplicationUpdate(BaseModel):
 
 
 class StatusUpdate(BaseModel):
-    status: Literal["found", "reviewed", "applying", "applied", "interviewing", "offer", "rejected", "withdrawn"]
+    # One shared lifecycle, widened additively for quests. 'clipped' is the
+    # real saved/shortlisted status (the board used to overload 'reviewed',
+    # which stays valid); booked/attended/paid_out/expired cover the quest
+    # lifecycle. Every pre-existing value stays valid.
+    status: Literal[
+        "found", "reviewed", "clipped", "applying", "applied", "interviewing",
+        "offer", "rejected", "withdrawn",
+        "booked", "attended", "paid_out", "expired",
+    ]
     notes: str | None = None
 
 
