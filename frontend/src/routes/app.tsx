@@ -1,6 +1,6 @@
 import { createRoute } from '@tanstack/react-router';
 import { Route as rootRoute } from './__root';
-import { AppShell } from '@/components/shell/app-shell';
+import { AppShell } from '@/features/shell/app-shell';
 import { HostedAuthScreen } from '@/components/auth/hosted-auth-screen';
 import { useWorkspace } from '@/contexts/workspace-context';
 import { markEntered } from '@/lib/entry';
