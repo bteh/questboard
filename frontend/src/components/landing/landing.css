@@ -1,94 +1,336 @@
-/* The landing page, ported from packages/ui/reference/quest-board-mock.html
-   (#landing). Values match the mock; depth is a darker bottom border,
-   never a shadow. Class names carry the qb- prefix like the rest of the
-   ported surfaces. */
+/* Landing redesign A: the board over the dawn field.
+   The world, hero, board-window frame, scenes, and demo choreography are
+   landing-owned. The quest cards inside the window are the real
+   @questboard/ui QuestCard fed real board rows, so card design and data
+   changes reflect here automatically (never a hardcoded fake). */
 
-.qb-landing { min-height: 100vh; overflow-x: clip; }
+.qb-landing {
+  --e: cubic-bezier(.22, 1, .36, 1);
+  --press: cubic-bezier(.2, .9, .3, 1);
+  --lift-1: 0 1px 2px rgba(28, 27, 23, .05), 0 8px 20px -10px rgba(63, 52, 24, .09);
+  --lift-2: 0 2px 4px rgba(28, 27, 23, .06), 0 16px 36px -14px rgba(63, 52, 24, .15);
+  position: relative;
+  min-height: 100vh;
+  overflow-x: clip;
+}
 
+/* ================= the world: dawn to morning ================= */
+.qb-world { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+.qb-sky { position: absolute; inset: 0; }
+.qb-sky-dawn {
+  background:
+    radial-gradient(140% 62% at 60% 82%, rgba(235, 180, 112, .42), rgba(235, 180, 112, 0) 60%),
+    linear-gradient(180deg, #F4ECDC 0%, #F5E9D0 44%, #F1DBBB 72%, #EED6B6 100%);
+}
+.qb-sky-morn {
+  opacity: 0;
+  background:
+    radial-gradient(130% 60% at 54% 34%, rgba(250, 242, 214, .62), rgba(250, 242, 214, 0) 58%),
+    linear-gradient(180deg, #F7F4EA 0%, #F7F1DE 52%, #F4EACC 100%);
+}
+.qb-haze {
+  position: absolute; left: -8%; right: -8%; bottom: 14vh; height: 42vh;
+  background: linear-gradient(180deg, rgba(249, 238, 210, 0) 0%, rgba(249, 236, 205, .5) 62%, rgba(247, 232, 197, .7) 100%);
+  filter: blur(10px);
+}
+.qb-wisp {
+  position: absolute; border-radius: 50%; mix-blend-mode: screen;
+  background: radial-gradient(50% 50% at 50% 50%, rgba(255, 250, 238, .6), rgba(255, 250, 238, 0) 70%);
+  filter: blur(8px);
+}
+.qb-wisp-1 { left: 14%; top: 20vh; width: 460px; height: 150px; opacity: .55; }
+.qb-wisp-2 { right: 8%; top: 30vh; width: 380px; height: 128px; opacity: .42; }
+.qb-sun {
+  position: absolute; left: 60%; bottom: 12vh; width: 270px; height: 270px; margin-left: -135px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 248, 226, .98) 0%, rgba(252, 236, 196, .9) 12%, rgba(246, 213, 146, .42) 28%, rgba(246, 213, 146, 0) 58%);
+}
+.qb-sun::after {
+  content: ''; position: absolute; left: 50%; top: 50%; width: 640px; height: 640px;
+  transform: translate(-50%, -50%); border-radius: 50%;
+  background: radial-gradient(circle, rgba(250, 232, 190, .28) 0%, rgba(250, 232, 190, 0) 62%);
+}
+.qb-ridge { position: absolute; left: 0; right: 0; bottom: 0; width: 100%; display: block; }
+.qb-ridge-far { height: 40vh; filter: blur(2.6px); opacity: .96; }
+.qb-ridge-mid { height: 30vh; filter: blur(.9px); }
+.qb-ridge-near { height: 22vh; }
+.qb-birdsvg { position: absolute; left: 0; right: 0; top: 15vh; width: 100%; height: 180px; }
+.qb-bird { opacity: .32; }
+
+.qb-land-page { position: relative; z-index: 1; }
 .qb-lwrap { max-width: 1120px; margin: 0 auto; padding: 0 44px; }
 
-/* hero */
-.qb-land-hero { position: relative; overflow: hidden; }
-.qb-land-brand { display: flex; align-items: center; gap: 10px; padding: 26px 0 0; }
-.qb-land-brand b { font-weight: 500; font-size: 15px; }
-.qb-land-tile { width: 32px; height: 32px; border-radius: 8px; background: var(--sage); display: grid; place-items: center; }
+/* ================= top bar ================= */
+.qb-land-topbar { display: flex; align-items: center; gap: 10px; padding: 24px 0 0; }
+.qb-land-topbar b { font-weight: 500; font-size: 15px; }
+.qb-land-tile { width: 32px; height: 32px; border-radius: 8px; background: var(--sage); display: grid; place-items: center; flex: none; }
 .qb-land-tile svg { width: 16px; height: 16px; }
+.qb-land-topbar .qb-topcta { margin-left: auto; }
+
+/* ================= hero ================= */
+.qb-land-hero { text-align: center; padding-top: 40px; padding-bottom: 6vh; }
 .qb-land-hero h1 {
   font-family: var(--serif); font-variation-settings: 'opsz' 144; font-weight: 560;
-  font-size: 78px; line-height: 1.04; letter-spacing: -.018em;
-  margin: 72px 0 0; max-width: 820px; text-wrap: balance;
+  font-size: 56px; line-height: 1.03; letter-spacing: -.018em;
+  margin: 26px auto 0; max-width: 760px; text-wrap: balance;
 }
-.qb-lsub { font-size: 17.5px; color: var(--soft); max-width: 620px; margin: 22px 0 0; line-height: 1.6; }
-.qb-land-cta { display: flex; align-items: center; gap: 18px; margin-top: 30px; flex-wrap: wrap; }
-.qb-lnote { font-size: 14px; color: var(--mute); }
-/* min-height reserves the row so the flaps arriving never shift the hero */
-.qb-land-hero .qb-flaprow { margin-top: 40px; min-height: 40px; }
-.qb-land-horizon { display: block; width: 100%; height: 210px; color: var(--ink); margin-top: 26px; }
+.qb-land-hero .qb-lsub { font-size: 16.5px; color: var(--soft); margin: 14px auto 0; max-width: 560px; }
+.qb-land-cta { margin-top: 22px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.qb-lnote { font-size: 13.5px; color: var(--mute); }
 
-/* three real cards pinned on the horizon; the reserved height keeps the
-   statement from shoving down when the cards arrive */
-.qb-land-cards { position: relative; z-index: 2; margin-top: -72px; }
-@media (min-width: 881px) {
-  .qb-land-cards { min-height: 170px; }
+/* the board window, floating over the field */
+.qb-winpersp { perspective: 1500px; max-width: 1060px; margin: 54px auto 0; position: relative; }
+.qb-board-window {
+  background: var(--paper);
+  border: 1px solid var(--hair); border-bottom-color: var(--edge);
+  border-radius: 14px;
+  box-shadow: 0 2px 4px rgba(28, 27, 23, .05), 0 40px 80px -30px rgba(94, 66, 24, .28);
+  transform: rotateX(3deg);
+  transform-style: preserve-3d;
+  text-align: left;
+  position: relative;
 }
-.qb-land-cards .qb-cardgrid { margin-top: 0; }
-.qb-cardgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.qb-win-ground {
+  position: absolute; left: 8%; right: 8%; bottom: -46px; height: 60px;
+  background: radial-gradient(50% 50% at 50% 50%, rgba(94, 66, 24, .2), rgba(94, 66, 24, 0) 72%);
+  filter: blur(6px); z-index: -1;
+}
+.qb-win-chrome {
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  padding: 13px 20px; border-bottom: 1px solid var(--hair);
+}
+.qb-win-title { font-family: var(--serif); font-variation-settings: 'opsz' 40; font-weight: 580; font-size: 16px; letter-spacing: -.005em; }
+.qb-win-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.qb-board-body {
+  position: relative;
+  background: #F3EFE4;
+  border-radius: 0 0 13px 13px;
+  padding: 18px;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+}
+.qb-land-slot { position: relative; min-width: 0; }
 
-/* centered statement */
-.qb-lstatement {
-  font-family: var(--serif); font-variation-settings: 'opsz' 80; font-weight: 560;
-  font-size: 34px; line-height: 1.2; letter-spacing: -.012em;
-  text-align: center; text-wrap: balance;
-  margin: 116px auto 96px; max-width: 700px;
+/* ghost cursor */
+.qb-ghost {
+  position: absolute; left: 0; top: 0; z-index: 6;
+  opacity: 0; pointer-events: none;
+  filter: drop-shadow(0 2px 4px rgba(28, 27, 23, .3));
+  transition: transform .9s cubic-bezier(.3, .7, .25, 1), opacity .35s var(--e);
+}
+.qb-ghost.gshow { opacity: .95; }
+.qb-ghost svg { display: block; transition: transform .1s var(--e); }
+.qb-ghost.gpress svg { transform: scale(.84); }
+
+/* the demo postmark that presses over a real card */
+.qb-demo-mark {
+  position: absolute; z-index: 5; pointer-events: none;
+  transform: rotate(-2deg);
+  font-family: var(--mono); font-size: 11px; font-weight: 500;
+  color: var(--ochre); border: 1.5px solid var(--ochre); border-radius: 3px;
+  padding: 2px 8px; opacity: 0; white-space: nowrap;
+}
+.qb-demo-ring { position: absolute; z-index: 5; border-radius: 4px; background: rgba(138, 106, 31, .08); opacity: 0; pointer-events: none; }
+
+/* explain sheet, floated over a real card */
+.qb-demo-sheet {
+  position: absolute; z-index: 7;
+  background: var(--paper); border: 1px solid var(--hair); border-bottom-color: var(--edge);
+  border-radius: 10px; box-shadow: var(--lift-2);
+  padding: 14px 16px 18px;
+  display: flex; flex-direction: column; gap: 6px;
+  overflow: hidden; visibility: hidden;
+}
+.qb-demo-sheet.open { visibility: visible; }
+.qb-sheet-kicker { font-size: 11.5px; color: var(--mute); font-family: var(--mono); }
+.qb-sheet-head { font-family: var(--serif); font-variation-settings: 'opsz' 30; font-weight: 580; font-size: 16px; letter-spacing: -.005em; }
+.qb-sheet-text { font-size: 14px; line-height: 1.55; color: var(--soft); }
+.qb-sheet-text .qb-num { color: var(--ink); font-weight: 500; }
+.qb-sheet-method { font-size: 11.5px; color: var(--mute); margin-top: auto; padding-top: 8px; }
+.qb-sheet-bar { position: absolute; left: 0; bottom: 0; height: 2px; width: 0; background: var(--ochre); opacity: .45; }
+
+/* ================= scenes on the field ================= */
+.qb-scene { min-height: 62vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; padding: 5vh 20px; }
+.qb-scap {
+  font-family: var(--serif); font-variation-settings: 'opsz' 90; font-weight: 552;
+  font-size: 31px; line-height: 1.1; letter-spacing: -.012em; margin: 0; text-align: center; text-wrap: balance;
+}
+.qb-on-field { position: relative; }
+.qb-on-field::after {
+  content: ''; position: absolute; left: 9%; right: 9%; bottom: -30px; height: 42px;
+  background: radial-gradient(50% 50% at 50% 50%, rgba(94, 66, 24, .17), rgba(94, 66, 24, 0) 72%);
+  filter: blur(7px); z-index: -1;
 }
 
-/* the 2x2 show-not-tell grid */
-.qb-lgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 80px 60px; margin-bottom: 130px; }
-.qb-lblock .qb-visual { margin-bottom: 20px; min-width: 0; min-height: 232px; display: flex; flex-direction: column; justify-content: flex-end; align-items: stretch; }
-.qb-lblock h3 { font-family: var(--serif); font-variation-settings: 'opsz' 60; font-weight: 560; font-size: 24px; letter-spacing: -.008em; margin: 0 0 6px; }
-.qb-lblock p { font-size: 15.5px; color: var(--soft); margin: 0; line-height: 1.6; max-width: 46ch; }
-.qb-chips-demo { display: flex; gap: 8px; flex-wrap: wrap; }
-
-/* the Done ledger demo fragment */
-.qb-ledger-demo { border: 1px solid var(--hair); border-bottom-color: var(--edge); border-radius: 10px; background: var(--paper); padding: 18px 22px; }
-.qb-done-label { font-size: 15px; font-weight: 500; margin-bottom: 8px; }
-.qb-dline { display: flex; gap: 14px; align-items: baseline; padding: 7px 0; font-size: 15px; }
-.qb-dline .qb-dd { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 13px; color: var(--mute); width: 64px; flex-shrink: 0; }
+/* ledger card */
+.qb-ledger-card {
+  background: var(--paper); border: 1px solid var(--hair); border-bottom-color: var(--edge);
+  border-radius: 12px; box-shadow: var(--lift-2);
+  padding: 26px 34px; width: min(690px, 92vw);
+  transform: rotate(-.5deg);
+}
+.qb-done-label { font-size: 16px; font-weight: 500; margin-bottom: 10px; }
+.qb-dline { display: flex; gap: 16px; align-items: baseline; padding: 9px 0; font-size: 16.5px; }
+.qb-dline .qb-dd { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 13.5px; color: var(--mute); width: 62px; flex-shrink: 0; }
 .qb-dline .qb-dt { color: var(--ink); }
-.qb-dline .qb-dn { color: var(--soft); }
-.qb-ledger-total { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--hair); font-size: 14px; color: var(--soft); }
-.qb-ledger-total .qb-num { font-weight: 500; color: var(--ink); }
+.qb-dline .qb-dn { color: var(--soft); margin-left: auto; }
+.qb-ledger-total { margin-top: 14px; padding-top: 14px; position: relative; font-size: 15px; color: var(--soft); }
+.qb-ledger-total::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: var(--hair); transform-origin: left; }
+.qb-ledger-total .qb-num { font-family: var(--mono); font-variant-numeric: tabular-nums; font-weight: 500; color: var(--ink); }
 
-/* the plain-words demo fragment */
-.qb-ai-demo { border: 1px solid var(--hair); border-bottom-color: var(--edge); border-radius: 10px; background: var(--paper); padding: 20px 22px; font-size: 15.5px; color: var(--soft); line-height: 1.6; }
-.qb-ai-demo .qb-num { color: var(--ink); font-weight: 500; }
-.qb-ai-demo .qb-price { border-top: 1px solid var(--hair); margin-top: 14px; padding-top: 12px; font-size: 14.5px; color: var(--mute); }
-.qb-ai-src { font-size: 12.5px; color: var(--mute); margin-bottom: 10px; }
-.qb-ai-out { color: var(--ink); }
-.qb-ai-hedge { font-size: 12.5px; color: var(--mute); margin-top: 10px; }
+/* counter card */
+.qb-odo-card {
+  background: var(--paper); border: 1px solid var(--hair); border-bottom-color: var(--edge);
+  border-radius: 12px; box-shadow: var(--lift-2);
+  padding: 38px 56px; display: flex; gap: 30px; flex-wrap: wrap; justify-content: center; align-items: stretch;
+  transform: rotate(.35deg);
+}
+.qb-odo-group { display: flex; flex-direction: column; align-items: center; gap: 15px; padding: 0 22px; }
+.qb-odo-group + .qb-odo-group { border-left: 1px solid var(--hair); }
+.qb-odo-cells { display: inline-flex; gap: 4px; }
+.qb-flapcell {
+  width: 58px; height: 80px;
+  background: linear-gradient(#FFFFFF, #ECE9E1);
+  border: 1px solid var(--hair); border-radius: 6px;
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-size: 44px; font-weight: 500; color: var(--ink);
+  display: grid; place-items: center; position: relative;
+  box-shadow: 0 1px 2px rgba(28, 27, 23, .05), 0 4px 10px -5px rgba(63, 52, 24, .1);
+}
+.qb-flapcell::after { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: rgba(28, 27, 23, .09); }
+.qb-odo-lab { font-size: 14.5px; color: var(--soft); }
 
-/* stamp strip */
-.qb-stampstrip { border-top: 1px solid var(--hair); border-bottom: 1px solid var(--hair); padding: 36px 0; display: flex; gap: 56px; justify-content: center; flex-wrap: wrap; }
-.qb-stampstrip .qb-st { text-align: center; font-size: 13px; font-weight: 500; }
-.qb-stampstrip .qb-st .qb-stamp { display: block; margin: 0 auto 8px; }
+/* stamp strip card */
+.qb-stamp-card {
+  background: var(--paper); border: 1px solid var(--hair); border-bottom-color: var(--edge);
+  border-radius: 12px; box-shadow: var(--lift-2);
+  padding: 34px 48px; display: flex; gap: 52px; flex-wrap: wrap; justify-content: center;
+}
+.qb-st { text-align: center; font-size: 13.5px; font-weight: 500; }
+.qb-st svg { width: 52px; height: 52px; display: block; margin: 0 auto 10px; transition: transform .15s var(--e); }
+.qb-st:hover svg { transform: rotate(-3deg) translateY(-1px); }
 
 /* foot */
-.qb-land-foot { padding: 56px 0 88px; display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
-.qb-land-foot .qb-t { font-size: 15px; color: var(--soft); }
-.qb-land-foot .qb-btn-sage { margin-left: auto; }
+.qb-land-foot { text-align: center; padding: 4vh 20px 10vh; display: flex; flex-direction: column; align-items: center; gap: 16px; min-height: 40vh; justify-content: center; }
+.qb-land-foot .qb-fnote { font-size: 14.5px; color: var(--soft); margin: 0; }
 
 @media (max-width: 880px) {
-  .qb-land-hero h1 { font-size: 46px; margin-top: 48px; }
   .qb-lwrap { padding: 0 18px; }
-  .qb-lgrid { grid-template-columns: 1fr; gap: 56px; margin-bottom: 80px; }
-  .qb-lblock .qb-visual { min-height: 0; }
-  .qb-lstatement { font-size: 26px; margin: 76px auto 64px; }
-  .qb-land-cards { margin-top: -40px; }
-  .qb-land-foot .qb-btn-sage { margin-left: 0; }
+  .qb-land-hero { padding-bottom: 5vh; }
+  .qb-land-hero h1 { font-size: 36px; margin-top: 20px; }
+  .qb-land-hero .qb-lsub { font-size: 15px; padding: 0 12px; }
+  .qb-winpersp { margin-top: 36px; }
+  .qb-board-window { transform: none; }
+  .qb-board-body { grid-template-columns: 1fr; }
+  .qb-win-chips { margin-left: 0; }
+  .qb-scene { min-height: 0; padding: 68px 16px; gap: 24px; }
+  .qb-scap { font-size: 23px; }
+  .qb-ledger-card { padding: 20px 22px; }
+  .qb-dline { font-size: 15px; }
+  .qb-dline .qb-dn { margin-left: 0; }
+  .qb-odo-card { gap: 8px; padding: 26px 20px; }
+  .qb-odo-group { padding: 0 14px; gap: 12px; }
+  .qb-flapcell { width: 42px; height: 58px; font-size: 30px; }
+  .qb-stamp-card { gap: 26px; padding: 26px 20px; }
+  .qb-land-foot { min-height: 0; padding: 60px 20px 90px; }
+  .qb-haze { bottom: 12vh; }
+  .qb-wisp-1 { width: 300px; top: 16vh; }
+  .qb-wisp-2 { width: 240px; top: 24vh; }
+  .qb-ridge-far { height: 32vh; }
+  .qb-ridge-mid { height: 24vh; }
+  .qb-ridge-near { height: 18vh; }
+  .qb-sun { width: 250px; height: 250px; margin-left: -125px; }
 }
 
-/* the card column must be allowed under 300px on the narrowest phones,
-   or the grid forces a horizontal scroll at 375 wide */
-@media (max-width: 420px) {
-  .qb-cardgrid { grid-template-columns: 1fr; }
+/* ============================================================
+   MOTION. Base CSS above is the finished page; hidden pre-states
+   exist only under html.qb-motion inside no-preference.
+   ============================================================ */
+@media (prefers-reduced-motion: no-preference) {
+  html.qb-motion .qb-land-hero:not(.go) h1,
+  html.qb-motion .qb-land-hero:not(.go) .qb-lsub,
+  html.qb-motion .qb-land-hero:not(.go) .qb-land-cta,
+  html.qb-motion .qb-land-hero:not(.go) .qb-land-topbar { opacity: 0; }
+  html.qb-motion .qb-land-hero:not(.win-go) .qb-winpersp { opacity: 0; }
+
+  .qb-land-hero.go .qb-land-topbar { animation: qb-fade .5s var(--e) both; }
+  .qb-land-hero.go h1 { animation: qb-register6 .8s var(--e) .05s both; }
+  .qb-land-hero.go .qb-lsub { animation: qb-fadeup10 .5s var(--e) .25s both; }
+  .qb-land-hero.go .qb-land-cta { animation: qb-fadeup8 .45s var(--e) .36s both; }
+  .qb-land-hero.win-go .qb-winpersp { animation: qb-winrise .8s var(--e) both; }
+  @keyframes qb-winrise { from { opacity: 0; transform: translateY(26px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes qb-register6 { from { opacity: 0; transform: translateY(14px); filter: blur(6px); } to { opacity: 1; transform: translateY(0); filter: blur(0); } }
+  @keyframes qb-fadeup10 { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes qb-fadeup8 { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes qb-fade { from { opacity: 0; } to { opacity: 1; } }
+
+  /* demo: clip press */
+  .qb-demo-mark.stamped { animation: qb-postmark .28s var(--press) both; }
+  .qb-demo-ring.stamped { animation: qb-ink .45s ease-out both; }
+  .qb-land-slot.dip { animation: qb-dip .18s var(--e) both; }
+  @keyframes qb-dip { 0% { transform: translateY(0); } 33% { transform: translateY(1.5px); } 100% { transform: translateY(0); } }
+  @keyframes qb-postmark { from { transform: rotate(-5deg) scale(1.14); opacity: 0; } to { transform: rotate(-2deg) scale(1); opacity: .85; } }
+  @keyframes qb-ink { 0% { transform: scale(.95); opacity: .9; } 100% { transform: scale(1.16); opacity: 0; } }
+
+  /* demo: explain sheet */
+  html.qb-motion .qb-demo-sheet { opacity: 0; transform: translateY(16px); }
+  html.qb-motion .qb-demo-sheet.open { opacity: 1; transform: translateY(0); transition: opacity .3s var(--e), transform .35s var(--e); }
+  html.qb-motion .qb-demo-sheet.closing { opacity: 0; transform: translateY(10px); visibility: visible; transition: opacity .28s var(--e), transform .28s var(--e); }
+  .qb-demo-sheet.hold .qb-sheet-bar { width: 100%; transition: width var(--holdms, 2.6s) linear; }
+  .qb-sheet-text.typing::after { content: ''; display: inline-block; width: 2px; height: .95em; margin-left: 2px; vertical-align: -2px; background: var(--ochre); animation: qb-blink .9s steps(1) infinite; }
+  @keyframes qb-blink { 50% { opacity: 0; } }
+
+  /* scene reveals */
+  html.qb-motion .qb-scene:not(.go) .qb-scap { opacity: 0; }
+  html.qb-motion .qb-scene:not(.go) .qb-scene-obj { opacity: 0; }
+  .qb-scene.go .qb-scene-obj { animation: qb-rise18 .6s var(--e) both; }
+  .qb-scene.go .qb-scap { animation: qb-register4 .55s var(--e) .18s both; }
+  @keyframes qb-rise18 { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes qb-register4 { from { opacity: 0; transform: translateY(12px); filter: blur(4px); } to { opacity: 1; transform: translateY(0); filter: blur(0); } }
+
+  /* ledger prints */
+  html.qb-motion .qb-scene-ledger:not(.go) .qb-dline,
+  html.qb-motion .qb-scene-ledger:not(.go) .qb-total-text { opacity: 0; }
+  html.qb-motion .qb-scene-ledger:not(.go) .qb-ledger-total::before { transform: scaleX(0); }
+  .qb-scene-ledger.go .qb-dline { animation: qb-print .45s var(--e) var(--pd, .35s) both; }
+  .qb-scene-ledger.go .qb-dline:nth-child(2) { --pd: .5s; }
+  .qb-scene-ledger.go .qb-dline:nth-child(3) { --pd: .65s; }
+  @keyframes qb-print { from { clip-path: inset(0 100% 0 0); opacity: 1; } to { clip-path: inset(0 0 0 0); opacity: 1; } }
+  .qb-scene-ledger.go .qb-ledger-total::before { animation: qb-rulex .4s var(--e) 1.05s both; }
+  .qb-scene-ledger.go .qb-total-text { animation: qb-fade .45s var(--e) 1.3s both; }
+  @keyframes qb-rulex { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+  /* counter seat */
+  .qb-flapcell.qb-seat { animation: qb-seatk .14s var(--e); }
+  @keyframes qb-seatk { 0% { transform: translateY(0); } 55% { transform: translateY(1.5px); } 100% { transform: translateY(0); } }
+
+  /* stamps thump in */
+  html.qb-motion .qb-scene-stamps:not(.go) .qb-st svg,
+  html.qb-motion .qb-scene-stamps:not(.go) .qb-st .qb-lab { opacity: 0; }
+  .qb-scene-stamps.go .qb-st svg { animation: qb-stampin .24s var(--press) var(--sd, 0s) both; }
+  .qb-scene-stamps.go .qb-st .qb-lab { animation: qb-fade .2s var(--e) calc(var(--sd, 0s) + .12s) both; }
+  .qb-scene-stamps.go .qb-st:nth-child(1) { --sd: .15s; }
+  .qb-scene-stamps.go .qb-st:nth-child(2) { --sd: .24s; }
+  .qb-scene-stamps.go .qb-st:nth-child(3) { --sd: .33s; }
+  .qb-scene-stamps.go .qb-st:nth-child(4) { --sd: .42s; }
+  .qb-scene-stamps.go .qb-st:nth-child(5) { --sd: .51s; }
+  @keyframes qb-stampin { from { transform: scale(1.12) rotate(-5deg); opacity: 0; } to { transform: scale(1) rotate(0deg); opacity: 1; } }
+
+  /* birds, the one infinite drift */
+  .qb-bird-a { animation: qb-drift-a 75s linear infinite alternate; }
+  .qb-bird-b { animation: qb-drift-b 90s linear infinite alternate; }
+  .qb-bird path { animation: qb-bob 11s ease-in-out infinite alternate; }
+  .qb-bird-b path { animation-duration: 13s; }
+  @keyframes qb-drift-a { to { transform: translateX(40px); } }
+  @keyframes qb-drift-b { to { transform: translateX(-30px); } }
+  @keyframes qb-bob { to { transform: translateY(2px); } }
+  .qb-wisp-1 { animation: qb-wisp-a 120s ease-in-out infinite alternate; }
+  .qb-wisp-2 { animation: qb-wisp-b 150s ease-in-out infinite alternate; }
+  @keyframes qb-wisp-a { to { transform: translate(46px, -8px); } }
+  @keyframes qb-wisp-b { to { transform: translate(-38px, 6px); } }
+  .qb-paused .qb-bird, .qb-paused .qb-bird path, .qb-paused .qb-wisp { animation-play-state: paused; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qb-ghost { display: none; }
+  .qb-sheet-bar { display: none; }
 }
