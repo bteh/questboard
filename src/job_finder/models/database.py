@@ -25,12 +25,17 @@ from sqlalchemy import (
 from sqlalchemy.orm import DeclarativeBase, Query, Session, scoped_session, sessionmaker
 
 # Vertical vocabulary stored on applications rows. Must stay identical to the
-# UI tokens (packages/ui/src/tokens.ts). 'personal' is the log's own lane:
-# quests the user writes themselves. It is storable and readable here, but the
-# quest scrapers never produce it (/quests/refresh validates against
-# job_finder.quests.QUEST_VERTICALS, which excludes it) and every career
-# surface stays scoped away from it by scoped_applications' career default.
-APPLICATION_VERTICALS = ("career", "camera", "study", "lens", "party", "personal")
+# The storable vertical vocabulary derives from the kinds registry
+# (packages/kinds/kinds.json): every kind id plus every legacy vertical
+# spelling, so old rows and new kind-id rows are both valid. 'personal' is
+# the log's own lane: quests the user writes themselves. It is storable and
+# readable here, but the quest scrapers never produce it (/quests/refresh
+# validates against job_finder.quests.QUEST_VERTICALS, which excludes it)
+# and every career surface stays scoped away from it by
+# scoped_applications' career default.
+from job_finder.kinds import known_vertical_values as _known_vertical_values
+
+APPLICATION_VERTICALS = tuple(sorted(_known_vertical_values() | {"personal"}))
 
 
 def _utcnow() -> datetime:

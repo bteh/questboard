@@ -172,3 +172,93 @@
 }
 .qb-fcap { font-size: 14px; color: var(--soft); }
 @media (prefers-reduced-motion: reduce) { .qb-flap.qb-tick { animation: none; } }
+
+/* ---------- the quest poster: paper pinned to the felt ---------- */
+/* each poster sits in a slot so the pin stays inside the layout box and
+   upright while the paper tilts under it, like a real board */
+.qb-slot { position: relative; break-inside: avoid; padding-top: 9px; }
+.qb-pin {
+  position: absolute; top: 0; left: 50%; margin-left: -9px;
+  width: 18px; height: 18px; border-radius: 50%; z-index: 6;
+  background: radial-gradient(circle at 34% 30%, #fff 0%, var(--qb-hue, var(--sage)) 34%, color-mix(in srgb, var(--qb-hue, var(--sage)) 62%, #000) 100%);
+  box-shadow: 0 3px 4px -1px rgba(30, 20, 8, .5), inset 0 -2px 3px rgba(0, 0, 0, .35);
+}
+.qb-poster {
+  position: relative; width: 100%;
+  background: var(--paper);
+  padding: 26px 17px 0;
+  transform: rotate(var(--qb-rot, 0deg));
+  transition: transform .16s cubic-bezier(.22, 1, .36, 1), box-shadow .16s cubic-bezier(.22, 1, .36, 1);
+  box-shadow: 0 1px 1px rgba(28, 27, 23, .05), 0 14px 26px -16px rgba(40, 30, 12, .5), 0 3px 8px -5px rgba(40, 30, 12, .4);
+}
+.qb-poster::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgba(28, 27, 23, .05);
+}
+.qb-slot:hover .qb-poster {
+  transform: rotate(0deg) translateY(-3px);
+  box-shadow: 0 2px 2px rgba(28, 27, 23, .06), 0 26px 44px -18px rgba(40, 30, 12, .55), 0 6px 14px -6px rgba(40, 30, 12, .4);
+}
+.qb-slot:hover { z-index: 5; }
+@media (prefers-reduced-motion: reduce) { .qb-poster { transition: none; } }
+
+.qb-poster-clip {
+  position: absolute; top: 11px; right: 15px;
+  font-size: 11.5px; color: var(--mute);
+  background: var(--paper); border: 1px solid var(--hair); border-radius: 6px;
+  padding: 3px 8px; cursor: pointer; font-family: inherit;
+}
+.qb-poster-clipped { color: var(--sage); border-color: transparent; cursor: default; }
+
+.qb-p-head { display: flex; align-items: center; gap: 8px; margin-bottom: 11px; }
+.qb-p-head svg { flex: none; }
+.qb-p-kind { font-size: 11.5px; font-weight: 700; letter-spacing: .01em; }
+.qb-p-posted { margin-left: auto; font-family: var(--mono); font-size: 10.5px; color: var(--mute); }
+.qb-p-title { font-family: var(--serif); font-variation-settings: 'opsz' 40; font-weight: 560; font-size: 19px; line-height: 1.18; letter-spacing: -.01em; margin: 0 0 6px; }
+.qb-p-title a { color: var(--ink); text-decoration: none; }
+.qb-p-title a:hover { text-decoration: underline; text-decoration-thickness: 1px; }
+.qb-p-giver { font-family: var(--mono); font-size: 11.5px; color: var(--mute); margin-bottom: 10px; display: flex; align-items: baseline; gap: 10px; }
+.qb-p-explain { margin-left: auto; background: none; border: 0; padding: 0; font-family: inherit; font-size: 11.5px; color: var(--mute); cursor: pointer; text-decoration: underline; text-decoration-color: var(--edge); }
+.qb-p-explain:hover { color: var(--ink); }
+.qb-p-desc { font-size: 13px; color: var(--soft); line-height: 1.5; margin: 0 0 11px; }
+.qb-p-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.qb-p-tag { font-size: 11px; color: var(--soft); background: rgba(28, 27, 23, .05); border-radius: 4px; padding: 3px 8px; }
+
+.qb-p-bring {
+  display: flex; gap: 8px; align-items: baseline;
+  font-size: 11.5px; line-height: 1.45; color: var(--ink);
+  border-top: 1px dashed var(--hair); padding: 9px 2px 0; margin-bottom: 11px;
+}
+.qb-p-bring-label { flex: none; font-weight: 700; color: rgba(28, 27, 23, .5); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; position: relative; top: .5px; }
+.qb-p-bring-free { color: var(--sage); font-weight: 600; }
+.qb-p-catch {
+  display: flex; gap: 8px; align-items: baseline;
+  font-size: 11.5px; line-height: 1.45; color: var(--soft);
+  background: rgba(28, 27, 23, .045); border-radius: 6px; padding: 8px 10px; margin-bottom: 14px;
+}
+.qb-p-catch-label { flex: none; font-weight: 700; color: var(--clay); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; position: relative; top: .5px; }
+
+/* the tear-off reward tab: perforated top edge, ticket-stub notches */
+.qb-p-tear {
+  position: relative; margin: 0 -17px; padding: 12px 17px 14px;
+  background: color-mix(in srgb, var(--paper) 88%, var(--ground));
+  border-top: 1.5px dashed var(--step4);
+  display: flex; align-items: center; gap: 10px;
+}
+.qb-p-tear::before, .qb-p-tear::after {
+  content: ''; position: absolute; top: -9px; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--qb-felt, var(--ground)); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .22);
+}
+.qb-p-tear::before { left: -8px; }
+.qb-p-tear::after { right: -8px; }
+.qb-p-reward { display: flex; flex-direction: column; line-height: 1.05; }
+.qb-p-reward-label { font-size: 10px; letter-spacing: .05em; text-transform: uppercase; color: var(--mute); margin-bottom: 3px; }
+.qb-p-reward-value { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 19px; font-weight: 600; letter-spacing: -.01em; color: var(--ink); }
+.qb-p-reward-value em { font-style: normal; font-size: 11px; color: var(--mute); font-weight: 400; }
+.qb-p-take {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 600; color: #fff; text-decoration: none;
+  background: var(--qb-hue, var(--sage)); padding: 8px 13px; border-radius: 7px;
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--qb-hue, var(--sage)) 60%, #000), 0 4px 10px -4px color-mix(in srgb, var(--qb-hue, var(--sage)) 55%, #000);
+}
+.qb-p-reward-unstated { font-size: 13px; font-weight: 400; color: var(--mute); }
