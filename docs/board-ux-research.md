@@ -100,7 +100,7 @@ Instawork help, Rover support, FTC). Cards must never cross-contaminate kinds.
 | Odd jobs (person-posted) | nothing, just show up | shift apps differ: Instawork background-checks every worker before the first shift |
 | Deliver & drive | 4-door car (Flex rejects 2-door hatchbacks), license, insurance, 21+, background check | personal auto policies often exclude delivery; checks take days |
 | Tell them what you think | honest screener answers; mic + webcam for remote | no audio = unpaid (UserTesting); NEVER a resume; mystery-shop signup fees are always a scam (FTC) |
-| Lend your body | government ID + address proof + health screen | tattoo/piercing in last 4 months disqualifies (CSL); FDA cap 2x/week; new-donor bonuses are time-limited; taxable |
+| Join a study | government ID + address proof + health screen | tattoo/piercing in last 4 months disqualifies (CSL); FDA cap 2x/week; new-donor bonuses are time-limited; taxable |
 | Perform & entertain | casting/extras: current UNEDITED photo + sizes + availability; VO: mic + interface + quiet room + short demo | a retouched headshot gets you REJECTED for background work; principal roles want a theatrical credits sheet, never a corporate resume |
 | Look after | informal: references; platform: profile + mandatory background check | Rover: $40 non-refundable application fee, 10-20 business days to approval |
 | Flip & rent | cash upfront or an ELIGIBLE asset | Turo: car must be 12 years or newer, under 130k miles, clean title; the host gets vetted too |

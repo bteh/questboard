@@ -18,7 +18,7 @@ shows pay the source states.
 
 Job boards sort by role and industry (Software / Marketing / Sales). That framing is the thing that
 makes them feel like job boards. Every finder independently landed on the same anti-slop move: sort
-by the verb, by what you actually do with yourself. "Tell them what you think." "Lend your body."
+by the verb, by what you actually do with yourself. "Tell them what you think." "Join a study."
 "Perform." "Beat the house." That reframe alone is most of the differentiation, and it's show-don't-tell:
 the category name tells you the experience, not the sector.
 
@@ -40,7 +40,7 @@ lowest first.
 | **Odd jobs & day labor** | umber | Help-me-move bounties, on-demand shift apps (Instawork/Wonolo/Veryable), moving & hauling, seasonal one-days (Santa, tree lots, gift wrap), line-sitting, promo/sampling shifts, poll worker. The first notice a new user pulls. |
 | **Deliver & drive** | slate | Rideshare, food & grocery delivery, package delivery (Amazon Flex, Roadie), courier runs, scooter charging. The most job-like end; its own lane so its honest "thin after gas" story stays contained. |
 | **Tell them what you think** | ochre | Focus groups, mock juries, surveys/Prolific, usability testing, software QA bug-testing, sensory/taste panels, standardized patient, mystery shopping, field-agent shelf checks, AI data & voice gigs. Best pay-per-hour on the casual tier. |
-| **Lend your body** | wine | Plasma / sperm / egg / breast milk / hair, clinical & sleep studies, life-drawing figure modeling, hair/makeup/tattoo practice models. High-value but eligibility-gated and sometimes medically real. |
+| **Join a study** | wine | (renamed from "Lend your body" Jul 9: provocative, unclear to new users) Plasma / sperm / egg / breast milk / hair, clinical & sleep studies, life-drawing figure modeling, hair/makeup/tattoo practice models. High-value but eligibility-gated and sometimes medically real. |
 | **Perform & entertain** | clay | Voice-over, session & live music, film/TV extra & stand-in, on-camera acting, modeling, mascot, scare/escape-room/immersive actors, party entertainers, DJ, tour guide, sign spinning. The most natively quest-shaped vertical. |
 | **Bring a skill** | sage | Fiverr digital gigs (design/edit/write), UGC for brands, maker & craft & print-on-demand commissions, freelance photo/drone, tutoring & lessons, coaching, notary/officiant, **and career jobs one commitment tier up.** The hinge that lets a $50 quest and a full job live on one board. |
 | **Look after** | moss | Pet sitting & dog walking, dog training, house & plant sitting, cleaning & Airbnb turnover, babysitting & date-night sitting, senior companion & respite care. Trust-based, hyper-local, map-pin "near you." |
@@ -109,7 +109,7 @@ Condensed from the finders. Pay = real stated figures. Catch = the honest trap t
   farming, gift-card "favors," crypto-only pay). This is the vein to police, not celebrate.
 - **Deliver & drive.** The most-named side hustle. Catch: "thin after gas and insurance"; one poster
   netted ~$350 over months on Instacart; rideshare triggers an insurance surcharge.
-- **Lend your body.** Plasma/donation and clinical studies are real high-value but eligibility- and
+- **Join a study.** Plasma/donation and clinical studies are real high-value but eligibility- and
   medically-gated. Catch: screening, health risk, gating. Be blunt, don't bury it next to a $40 errand.
 - **Perform & entertain.** Split sharply. Indie VO $10–200/project ("$100 for a 9-year-old child VO"),
   session player "$750 flat for a hook," body double "$500/day," non-union background near minimum for
