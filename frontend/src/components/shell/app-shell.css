@@ -19,7 +19,7 @@
   font-family: inherit; text-align: left; text-decoration: none;
 }
 .qb-brand-tile { width: 32px; height: 32px; border-radius: 8px; background: var(--sage); display: grid; place-items: center; }
-.qb-brand-tile svg { width: 16px; height: 16px; }
+.qb-brand-tile svg { width: 28px; height: 28px; }
 .qb-brand b { font-weight: 500; font-size: 15px; color: var(--ink); display: block; line-height: 1.2; }
 .qb-nav-item {
   display: flex; align-items: center; gap: 11px;
