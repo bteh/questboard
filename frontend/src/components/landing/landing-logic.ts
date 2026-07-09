@@ -1,7 +1,8 @@
-import { boardVertical } from '@/utils/board-card';
+import { boardVertical, toBoardCard } from '@/utils/board-card';
 import { postedAgoLabel } from '@/utils/job-trust';
 import { markEntered } from '@/lib/entry';
 import type { ApplicationResponse } from '@/types/application';
+import type { Vertical } from '@questboard/ui';
 
 type EnterNavigate = (opts: { to: '/board' }) => void | Promise<void>;
 
@@ -38,6 +39,34 @@ export function pickLandingCards(items: ApplicationResponse[]): ApplicationRespo
     }
   }
   return picks;
+}
+
+const QUEST_NOUN: Record<Vertical, string> = {
+  career: 'job posting',
+  camera: 'casting call',
+  study: 'study listing',
+  lens: 'gig',
+  party: 'party quest',
+  personal: 'quest',
+};
+
+/* The explain-sheet content for a card, built only from the card's own
+   stated fields (title, pay, source, place, true post date). It never adds
+   a number or claim the posting does not carry, so it stays honest as the
+   real data changes. */
+export function plainWords(
+  app: ApplicationResponse,
+  sourceLabel: string,
+): { kicker: string; text: string } {
+  const card = toBoardCard(app, sourceLabel);
+  const noun = QUEST_NOUN[card.vertical] ?? 'quest';
+  const pay = card.pay
+    ? ` It pays ${card.pay}${card.payUnit ? ` ${card.payUnit}` : ''}.`
+    : '';
+  return {
+    kicker: `That ${noun}, boiled down:`,
+    text: `${card.title}.${pay} ${card.meta}.`,
+  };
 }
 
 /* The trust block's card sells the true post date, so a spare row that can
