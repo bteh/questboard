@@ -21,9 +21,11 @@ function BrandMark() {
     <div className="qb-land-topbar">
       <span className="qb-land-tile">
         <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-          <circle cx="4" cy="12" r="1.5" fill="#fff" />
-          <path d="M5.2 10.8 10.8 5.2" stroke="#fff" strokeWidth="1.9" strokeLinecap="round" />
-          <path d="M7.4 5H11V8.6" stroke="#fff" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+          <g transform="rotate(-4 8 6.3)">
+            <rect x="6.6" y="2.8" width="2.8" height="6.7" rx="1.4" fill="#FFFDF8" />
+          </g>
+          <circle cx="8" cy="12" r="1.7" fill="#FFFDF8" />
+          <circle cx="8" cy="12" r="0.75" fill="#A6522E" />
         </svg>
       </span>
       <b>Questboard</b>
