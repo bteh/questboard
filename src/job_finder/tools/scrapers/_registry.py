@@ -21,8 +21,9 @@ class ScraperMeta:
     category: str            # "remote" | "ats" | "startup" | "crypto" | "community" | "jobspy"
     enabled_by_default: bool
     search_fn: Callable | None  # None for jobspy metadata-only entries
-    # Board lane this source feeds (matches packages/ui tokens: career, camera,
-    # study, lens, party). The career pipeline only ever runs career sources.
+    # Board lane this source feeds. Validated against packages/kinds/kinds.json
+    # (kind ids or their legacy vertical spellings). The career pipeline only
+    # ever runs sources registered with the literal "career" lane.
     vertical: str = "career"
 
 
@@ -37,8 +38,24 @@ def register_scraper(
     category: str = "general",
     enabled_by_default: bool = True,
     vertical: str = "career",
+    kind: str | None = None,
 ) -> Callable:
-    """Decorator that registers a scraper function with its metadata."""
+    """Decorator that registers a scraper function with its metadata.
+
+    `kind` is the canonical quest-kind id from packages/kinds/kinds.json and is
+    what new sources should pass. `vertical` remains as the legacy spelling for
+    existing sources; both are validated against the kinds registry so a typo
+    fails at import time instead of silently miscategorizing a source.
+    """
+    from job_finder.kinds import known_vertical_values
+
+    lane = kind or vertical
+    if lane not in known_vertical_values():
+        raise ValueError(
+            f"scraper {name!r} declares unknown kind/vertical {lane!r}; "
+            "add it to packages/kinds/kinds.json first"
+        )
+
     def decorator(fn: Callable) -> Callable:
         _REGISTRY[name] = ScraperMeta(
             name=name,
@@ -48,7 +65,7 @@ def register_scraper(
             category=category,
             enabled_by_default=enabled_by_default,
             search_fn=fn,
-            vertical=vertical,
+            vertical=lane,
         )
         return fn
     return decorator
