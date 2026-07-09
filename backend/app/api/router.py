@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api import (
     analytics,
     applications,
+    board,
     dev_auth,
     health,
     locations,
@@ -25,6 +26,7 @@ api_router.include_router(health.router)
 # API v1 routes
 api_router.include_router(applications.router, prefix="/api/v1")
 api_router.include_router(analytics.router, prefix="/api/v1")
+api_router.include_router(board.router, prefix="/api/v1")
 api_router.include_router(dev_auth.router, prefix="/api/v1")
 api_router.include_router(me.router, prefix="/api/v1")
 api_router.include_router(search.router, prefix="/api/v1")
