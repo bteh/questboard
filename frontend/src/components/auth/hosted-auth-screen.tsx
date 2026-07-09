@@ -69,7 +69,7 @@ export function HostedAuthScreen() {
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand shadow-sm">
-                        <BrandMark className="h-5 w-5 text-white" />
+                        <BrandMark className="h-10 w-10 text-white" />
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-text-primary tracking-tight">Questboard</p>
