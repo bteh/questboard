@@ -7,11 +7,11 @@
 export function BrandMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 16 16" fill="none" className={className} aria-hidden="true">
-      <g transform="rotate(-4 8 6.3)">
-        <rect x="6.6" y="2.8" width="2.8" height="6.7" rx="1.4" fill="currentColor" />
+      <g transform="rotate(-4 8 5.8)">
+        <rect x="6.35" y="1.9" width="3.3" height="7.8" rx="1.65" fill="currentColor" />
       </g>
-      <circle cx="8" cy="12" r="1.7" fill="currentColor" />
-      <circle cx="8" cy="12" r="0.75" fill="#A6522E" />
+      <circle cx="8" cy="12.5" r="1.95" fill="currentColor" />
+      <circle cx="8" cy="12.5" r="0.85" fill="#A6522E" />
     </svg>
   );
 }

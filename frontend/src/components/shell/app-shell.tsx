@@ -57,11 +57,11 @@ function BrandTile() {
   return (
     <span className="qb-brand-tile">
       <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-        <g transform="rotate(-4 8 6.3)">
-          <rect x="6.6" y="2.8" width="2.8" height="6.7" rx="1.4" fill="#FFFDF8" />
+        <g transform="rotate(-4 8 5.8)">
+          <rect x="6.35" y="1.9" width="3.3" height="7.8" rx="1.65" fill="#FFFDF8" />
         </g>
-        <circle cx="8" cy="12" r="1.7" fill="#FFFDF8" />
-        <circle cx="8" cy="12" r="0.75" fill="#A6522E" />
+        <circle cx="8" cy="12.5" r="1.95" fill="#FFFDF8" />
+        <circle cx="8" cy="12.5" r="0.85" fill="#A6522E" />
       </svg>
     </span>
   );
