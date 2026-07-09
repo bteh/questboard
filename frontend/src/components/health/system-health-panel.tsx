@@ -75,7 +75,7 @@ export function SystemHealthPanel({ open, onOpenChange, onOpenDiagnostic }: Syst
         navigate({ to: '/settings', search: { tab: 'ai' } });
         break;
       case 'open_search':
-        navigate({ to: '/search' });
+        navigate({ to: '/restock' });
         break;
       case 'open_quick_start':
         navigate({ to: '/' });

@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cx } from '@questboard/ui';
 import type { MatchStrictness } from '@/types/search';
 import { compactList } from './search-leaf-helpers';
+import './restock.css';
 
 const STRICTNESS_OPTIONS: { value: MatchStrictness; label: string; hint: string }[] = [
-  { value: 'loose', label: 'Loose', hint: 'Wider net — more results, looser matches' },
-  { value: 'balanced', label: 'Balanced', hint: 'Default behavior — matches most users' },
-  { value: 'strict', label: 'Strict', hint: 'Tight matches only — fewer, more relevant results' },
+  { value: 'loose', label: 'Loose', hint: 'Wider net: more results, looser matches' },
+  { value: 'balanced', label: 'Balanced', hint: 'The default; fits most people' },
+  { value: 'strict', label: 'Strict', hint: 'Tight matches only, fewer results' },
 ];
 
 export function MatchStrictnessControl({
@@ -18,11 +18,7 @@ export function MatchStrictnessControl({
   onChange: (value: MatchStrictness) => void;
 }) {
   return (
-    <div
-      role="radiogroup"
-      aria-label="Match strictness"
-      className="grid grid-cols-3 gap-1 rounded-lg border border-border-default bg-bg-card p-1"
-    >
+    <div role="radiogroup" aria-label="Match strictness" className="qb-seg">
       {STRICTNESS_OPTIONS.map((opt) => {
         const selected = opt.value === value;
         return (
@@ -33,13 +29,7 @@ export function MatchStrictnessControl({
             aria-checked={selected}
             title={opt.hint}
             onClick={() => onChange(opt.value)}
-            className={cn(
-              'rounded-md px-2 py-1.5 text-xs font-medium transition-colors',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
-              selected
-                ? 'bg-brand-light/60 text-brand'
-                : 'text-text-tertiary hover:text-text-secondary',
-            )}
+            className={cx(selected && 'qb-active')}
           >
             {opt.label}
           </button>
@@ -59,14 +49,9 @@ export function SnapshotField({
   hint?: string;
 }) {
   return (
-    <div className="rounded-lg border border-border-default bg-bg-card/70 px-3 py-2">
-      <p
-        className="text-[11px] font-medium text-text-muted"
-        title={hint}
-      >
-        {label}
-      </p>
-      <p className="mt-0.5 text-sm text-text-primary tabular-nums">{value}</p>
+    <div className="qb-snaprow">
+      <div className="qb-snaplabel" title={hint}>{label}</div>
+      <div className="qb-snapval">{value}</div>
     </div>
   );
 }
@@ -86,29 +71,13 @@ export function SnapshotList({
   const { visible, hidden } = compactList(filtered);
 
   return (
-    <div className="space-y-1.5">
-      <p className="text-[11px] font-medium text-text-muted" title={hint}>
-        {label}
-      </p>
-      {visible.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5">
-          {visible.map((value) => (
-            <span
-              key={value}
-              className="inline-flex items-center rounded-full bg-bg-card px-2.5 py-1 text-[11px] text-text-secondary ring-1 ring-border-default"
-            >
-              {value}
-            </span>
-          ))}
-          {hidden > 0 && (
-            <span className="inline-flex items-center rounded-full bg-bg-subtle px-2.5 py-1 text-[11px] text-text-muted ring-1 ring-border-default">
-              +{hidden} more
-            </span>
-          )}
-        </div>
-      ) : (
-        <p className="text-xs text-text-muted">{emptyLabel}</p>
-      )}
+    <div className="qb-snaprow">
+      <div className="qb-snaplabel" title={hint}>{label}</div>
+      <div className="qb-snapval">
+        {visible.length > 0
+          ? `${visible.join(', ')}${hidden > 0 ? ` and ${hidden} more` : ''}`
+          : emptyLabel}
+      </div>
     </div>
   );
 }
@@ -122,18 +91,16 @@ export function SuggestLoadingState() {
   const hint = elapsed < 10
     ? 'Reading your resume...'
     : elapsed < 25
-      ? 'Identifying roles, keywords, and target companies...'
+      ? 'Picking out roles, keywords, and target companies...'
       : elapsed < 60
-        ? 'Generating suggestions — speed depends on your AI provider...'
-        : 'Still working — slower models may take a couple minutes...';
+        ? 'Writing suggestions; speed depends on your AI provider...'
+        : 'Still working; slower models can take a couple of minutes...';
   return (
-    <div className="w-full rounded-xl border-2 border-dashed border-brand/25 bg-gradient-to-br from-brand-light/40 to-brand-light/20 p-6 text-center">
-      <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-xl bg-brand/10">
-        <Loader2 className="h-5 w-5 text-brand animate-spin" />
+    <div className="qb-restock-note" role="status">
+      <b>Reading your resume...</b>
+      <div className="qb-notefoot">
+        {hint} <span className="qb-num">{elapsed}s</span>
       </div>
-      <p className="text-sm font-semibold text-brand">Analyzing your resume...</p>
-      <p className="text-xs text-text-muted mt-1">{hint}</p>
-      <p className="text-[11px] text-text-muted/60 mt-2 tabular-nums">{elapsed}s</p>
     </div>
   );
 }

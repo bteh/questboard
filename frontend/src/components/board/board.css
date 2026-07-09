@@ -1,0 +1,100 @@
+/* The board (/board): page chrome that outgrew inline styles. The restock
+   line under the head, the first-run notice, and the phone pass. */
+
+.qb-board-wrap {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 44px 96px;
+}
+
+.qb-board-head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 52px 0 4px;
+}
+.qb-board-head h1 {
+  font-family: var(--serif);
+  font-variation-settings: 'opsz' 80;
+  font-weight: 560;
+  font-size: 26px;
+  letter-spacing: -.01em;
+  margin: 0;
+}
+.qb-board-head .qb-live {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: var(--mute);
+}
+.qb-board-head .qb-sort {
+  margin-left: auto;
+  font-size: 14px;
+  color: var(--soft);
+  background: none;
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
+}
+.qb-board-head .qb-sort b { font-weight: 500; color: var(--ink); }
+
+/* the restock line, under the head per the spec */
+.qb-restockline {
+  font-size: 13.5px;
+  color: var(--mute);
+  margin: 0 0 22px;
+}
+
+/* the first-run notice line, mock grammar: hairline top and bottom */
+.qb-board-notice {
+  border-top: 1px solid var(--hair);
+  border-bottom: 1px solid var(--hair);
+  padding: 10px 4px;
+  margin-top: 18px;
+  font-size: 14px;
+  color: var(--soft);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.qb-board-notice .qb-dismiss {
+  margin-left: auto;
+  background: none;
+  border: 0;
+  color: var(--mute);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 6px 8px;
+}
+.qb-board-notice .qb-dismiss:hover { color: var(--ink); }
+
+/* filter inputs row */
+.qb-board-filter {
+  border: 1px solid var(--hair);
+  background: var(--paper);
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-family: inherit;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+.qb-board-filter::placeholder { color: var(--mute); }
+.qb-board-search { width: 240px; }
+.qb-board-pay { width: 118px; }
+
+/* phone pass: no horizontal scroll, 44px targets, the filter row usable */
+@media (max-width: 700px) {
+  .qb-board-wrap { padding: 0 18px 64px; }
+  .qb-board-head { padding-top: 26px; flex-wrap: wrap; }
+  .qb-board-head .qb-sort { min-height: 44px; }
+  .qb-board-wrap .qb-chip,
+  .qb-board-wrap .qb-pchip { min-height: 44px; }
+  .qb-board-filter { min-height: 44px; }
+  .qb-board-search { width: 100%; }
+  .qb-board-pay { width: calc(50% - 22px); }
+  .qb-board-notice .qb-textlink,
+  .qb-board-notice .qb-dismiss { min-height: 44px; }
+  .qb-restockline .qb-textlink { display: inline-block; padding: 8px 0; }
+}

@@ -241,17 +241,17 @@ function LedgerPage() {
                 <>
                   {total}{' '}
                   {isNewOnly
-                    ? 'new in your latest search'
+                    ? 'new in your latest restock'
                     : effectiveRunId
-                      ? (isExplicitRunScope ? 'jobs from this search' : 'jobs from your latest search')
+                      ? (isExplicitRunScope ? 'jobs from this restock' : 'jobs from your latest restock')
                       : 'jobs tracked'}
                   {hasActiveFilters && <span>, {items.length} matching filters</span>}
                 </>
               ) : (
                 isNewOnly
-                  ? 'No new jobs in your latest search'
+                  ? 'No new jobs in your latest restock'
                   : effectiveRunId
-                    ? (isExplicitRunScope ? 'No jobs found in this search' : 'No jobs found in your latest search')
+                    ? (isExplicitRunScope ? 'No jobs found in this restock' : 'No jobs found in your latest restock')
                     : 'No jobs tracked yet'
               )}
             </p>
@@ -290,12 +290,12 @@ function LedgerPage() {
                           : { run: undefined, scope: undefined },
                   });
                 const label =
-                  value === 'new' ? 'New' : value === 'latest' ? 'Latest search' : 'All tracked';
+                  value === 'new' ? 'New' : value === 'latest' ? 'Latest restock' : 'All tracked';
                 const hint =
                   value === 'new'
-                    ? 'Jobs first surfaced by your latest search'
+                    ? 'Jobs first surfaced by your latest restock'
                     : value === 'latest'
-                      ? 'Every job the latest search returned (new + re-discoveries)'
+                      ? 'Every job the latest restock returned (new + re-discoveries)'
                       : 'Every tracked job, regardless of which run found it';
                 return (
                   <button
@@ -517,7 +517,7 @@ function LedgerPage() {
             description={
               hasActiveFilters
                 ? 'Loosen a filter or clear the search.'
-                : 'Run a search and tracked jobs land here.'
+                : 'Restock the board and tracked jobs land here.'
             }
           >
             {hasActiveFilters ? (
@@ -526,8 +526,8 @@ function LedgerPage() {
                 Clear all filters
               </Button>
             ) : (
-              <Link to="/search" className="qb-textlink">
-                Run your first search
+              <Link to="/restock" className="qb-textlink">
+                Restock the board
               </Link>
             )}
           </EmptyState>

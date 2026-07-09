@@ -9,7 +9,7 @@ import './app-shell.css';
 
 const PAGE_TITLES: Record<string, string> = {
   '/home': 'Home',
-  '/search': 'Search',
+  '/restock': 'Restock',
   '/log': 'Your log',
   '/log/ledger': 'The full ledger',
   '/log/numbers': 'Your numbers',
@@ -93,10 +93,11 @@ function AvatarDisc() {
 function SearchBox() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
-  /* PR 6 wires ?q=; for now submitting lands on the board itself */
+  /* submits into the board's own ?q= filter; explicit params beat the
+     board's saved state, so this always lands on the typed search */
   function submit(event: FormEvent) {
     event.preventDefault();
-    void navigate({ to: '/board' });
+    void navigate({ to: '/board', search: { q: query.trim() || undefined } });
   }
   return (
     <form className="qb-search" role="search" onSubmit={submit}>
