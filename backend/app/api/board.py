@@ -12,7 +12,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import case, func
+from sqlalchemy import case, func, or_
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_active_workspace_context
@@ -34,7 +34,8 @@ def board_summary(
     db: Session = Depends(get_db),
 ):
     """Counts per kind plus how many arrived in the last 24 hours."""
-    day_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=24)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    day_ago = now - timedelta(hours=24)
 
     query = (
         db.query(
@@ -46,6 +47,14 @@ def board_summary(
         )
         .filter(ApplicationRecord.vertical != "personal")
         .filter(ApplicationRecord.url_status != "dead")
+        # same upcoming semantics as the board list: a taping that already
+        # happened is off the board, rows with no event date pass
+        .filter(
+            or_(
+                ApplicationRecord.event_start.is_(None),
+                ApplicationRecord.event_start >= now,
+            )
+        )
     )
     if workspace:
         query = query.filter(ApplicationRecord.workspace_id == workspace.workspace.id)
