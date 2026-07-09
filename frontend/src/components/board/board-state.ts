@@ -8,14 +8,14 @@
    Storage access follows lib/entry.ts: every read and write in try/catch,
    a locked-down browser just gets the default board. */
 
-import { VERTICAL_KEYS, type VerticalKey } from '@/utils/board-verticals';
+import { normalizeKindKey, type KindKey } from '@/features/board/kind-params';
 
 export const BOARD_STATE_KEY = 'questboard:board.v1';
 export const BOARD_NOTICE_KEY = 'questboard:board-notice';
 
 export interface BoardParams {
-  /** Vertical chip; absent means All. */
-  v?: VerticalKey;
+  /** Kind tag; absent means All. Legacy vertical values normalize on read. */
+  v?: KindKey;
   /** Board search text. */
   q?: string;
   /** Typed pay floor, as typed ("150k"). */
@@ -38,7 +38,7 @@ function cleanString(value: unknown): string | undefined {
 export function validateBoardSearch(search: Record<string, unknown>): BoardParams {
   const v = cleanString(search.v);
   return {
-    v: v && v !== 'all' && (VERTICAL_KEYS as string[]).includes(v) ? (v as VerticalKey) : undefined,
+    v: normalizeKindKey(v),
     q: cleanString(search.q),
     from: cleanString(search.from),
     to: cleanString(search.to),

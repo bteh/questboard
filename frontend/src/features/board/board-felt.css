@@ -1,0 +1,79 @@
+/* The board page: kind rail, filters, and the felt itself. The posters and
+   pins live in @questboard/ui; this file owns the page around them. */
+
+/* kind rail: labeled, even, counts aligned */
+.qb-rail-top { display: flex; align-items: center; gap: 12px; margin: 14px 0 9px; }
+.qb-rail-label { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--mute); font-weight: 600; }
+.qb-rail-new { font-family: var(--mono); font-size: 12px; color: var(--sage); }
+.qb-rail { display: grid; grid-template-columns: repeat(auto-fill, minmax(236px, 1fr)); gap: 8px; margin-bottom: 13px; }
+.qb-ktag {
+  position: relative; display: flex; align-items: center; gap: 7px;
+  padding: 7px 11px 7px 26px;
+  background: var(--paper); border: 1px solid var(--hair); border-bottom: 2px solid var(--edge);
+  border-radius: 5px 10px 10px 5px;
+  cursor: pointer; font-size: 12.5px; font-family: inherit; text-align: left; color: inherit;
+  transition: transform .12s cubic-bezier(.22, 1, .36, 1);
+}
+.qb-rail-top .qb-ktag { display: inline-flex; padding-left: 26px; }
+.qb-ktag:hover { transform: translateY(-1px) rotate(-.4deg); }
+.qb-ktag::before {
+  content: ''; position: absolute; left: 8px; top: 50%; margin-top: -4.5px;
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--ground);
+  box-shadow: inset 0 0 0 2px var(--step4), inset 0 1px 1px rgba(0, 0, 0, .14);
+}
+.qb-ktag-stamp { flex: none; }
+.qb-ktag-dot {
+  width: 12px; height: 12px; border-radius: 50%; flex: none;
+  background: conic-gradient(from 210deg, var(--sage), var(--ochre), var(--clay), var(--wine), #6B5081, #33302A, var(--slate), var(--sage));
+  box-shadow: inset 0 -1px 1px rgba(0, 0, 0, .22), 0 0 0 2px rgba(255, 255, 255, .65);
+}
+.qb-ktag-col { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; gap: 1px; }
+.qb-ktag-col b { font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qb-ktag-sub { font-size: 10.5px; color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qb-ktag-count { margin-left: auto; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 11px; color: var(--mute); white-space: nowrap; }
+.qb-ktag-on { background: var(--ink); border-color: var(--ink); }
+.qb-ktag-on .qb-ktag-col b { color: #fff; }
+.qb-ktag-on .qb-ktag-sub, .qb-ktag-on .qb-ktag-count { color: rgba(255, 255, 255, .62); }
+.qb-ktag-on::before { box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .42), inset 0 1px 1px rgba(0, 0, 0, .3); }
+@media (prefers-reduced-motion: reduce) { .qb-ktag { transition: none; } }
+
+/* the felt: a linen backing in a wood frame; posters get tacked to it */
+.qb-felt {
+  --qb-felt: #C9C4B4;
+  position: relative; margin-top: 18px; border-radius: 10px;
+  padding: 34px 30px 40px;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(255, 255, 255, .14), rgba(255, 255, 255, 0) 46%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='120' height='120' filter='url(%23n)' opacity='0.05'/></svg>"),
+    linear-gradient(160deg, #C9C4B4 0%, #C2BCA9 100%);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, .14), inset 0 -2px 4px rgba(0, 0, 0, .08),
+    inset 0 0 0 1px rgba(90, 74, 52, .16);
+  border: 7px solid #5A4A34;
+  outline: 1px solid rgba(0, 0, 0, .22); outline-offset: -8px;
+}
+.qb-felt::before {
+  content: ''; position: absolute; inset: -7px; border-radius: 10px; pointer-events: none;
+  box-shadow: inset 0 1px 0 #6E5B41, inset 0 -2px 3px rgba(0, 0, 0, .3);
+}
+.qb-wall { columns: 3; column-gap: 26px; }
+.qb-wall .qb-slot { margin-bottom: 30px; }
+@media (max-width: 1180px) { .qb-wall { columns: 2; } }
+@media (max-width: 720px) { .qb-wall { columns: 1; } .qb-felt { padding: 24px 16px 28px; } }
+
+/* the house rules, pinned to the felt like everything else */
+.qb-house {
+  position: relative; break-inside: avoid; margin-bottom: 30px;
+  padding: 24px 17px 17px;
+  background: #F1EADA;
+  transform: rotate(.9deg);
+  box-shadow: 0 1px 1px rgba(28, 27, 23, .05), 0 12px 22px -15px rgba(40, 30, 12, .48);
+  font-size: 12.5px; color: var(--soft); line-height: 1.6;
+}
+.qb-house h4 { font-family: var(--serif); font-weight: 600; font-size: 15px; margin: 0 0 7px; color: var(--ink); }
+.qb-house p { margin: 0 0 7px; }
+.qb-house .qb-house-sig { font-weight: 700; color: var(--ink); }
+
+.qb-board-legend { margin-top: 24px; font-size: 12px; color: var(--mute); text-align: center; line-height: 1.6; }
+.qb-board-legend b { color: var(--soft); font-weight: 600; }

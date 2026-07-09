@@ -48,7 +48,11 @@ const PRESET_ORDER = ['noexp', 'remote', 'strong', 'score50', 'early', 'bigtech'
 
 describe('validateBoardSearch', () => {
   it('keeps known verticals and drops junk', () => {
-    expect(validateBoardSearch({ v: 'camera' }).v).toBe('camera');
+    expect(validateBoardSearch({ v: 'perform' }).v).toBe('perform');
+    /* legacy vertical values from old URLs and saved state keep working */
+    expect(validateBoardSearch({ v: 'camera' }).v).toBe('perform');
+    expect(validateBoardSearch({ v: 'career' }).v).toBe('skill');
+    expect(validateBoardSearch({ v: 'lens' }).v).toBe('skill');
     expect(validateBoardSearch({ v: 'party-bus' }).v).toBeUndefined();
     expect(validateBoardSearch({ v: 42 }).v).toBeUndefined();
   });
@@ -101,9 +105,9 @@ describe('preset keys round-trip', () => {
 describe('board state persistence', () => {
   it('round-trips through localStorage', () => {
     stubStorage();
-    saveBoardState({ v: 'camera', q: 'seat', p: 'noexp', sort: 'score' });
+    saveBoardState({ v: 'perform', q: 'seat', p: 'noexp', sort: 'score' });
     expect(readSavedBoardState()).toEqual({
-      v: 'camera',
+      v: 'perform',
       q: 'seat',
       from: undefined,
       to: undefined,

@@ -5,11 +5,10 @@ import {
   Chip,
   LedgerRow,
   PlainButton,
-  QuestCard,
+  Poster,
   Sheet,
   StampDefs,
   TextLink,
-  verticals,
 } from '@questboard/ui';
 import { useApplications, useUpdateStatus } from '@/hooks/use-applications';
 import { useSourceLabels, resolveSourceLabel } from '@/hooks/use-scrapers';
@@ -32,9 +31,12 @@ import {
   toBoardCard,
   withinPayCeiling,
 } from '@/utils/board-card';
-import { VERTICAL_KEYS, verticalParams, type VerticalKey } from '@/utils/board-verticals';
+import { kindParams, type KindKey } from '@/features/board/kind-params';
+import { KindRail } from '@/features/board/kind-rail';
+import { toPoster } from '@/features/board/poster-model';
 import type { ApplicationFilters, ApplicationResponse, RequirementMatch } from '@/types/application';
 import '@/components/board/board.css';
+import '@/features/board/board-felt.css';
 
 /* Filter state lives in the URL (?v, ?q, ?from, ?to, ?p): a filtered board
    is a shareable address, back/forward walks chip changes, and the topbar
@@ -68,10 +70,9 @@ const PAGE_SIZE = 24;
 /* Preset chips. Each one maps 1:1 onto a real API filter param, so its
    count is the API's own total for that query, never a guess. Chips that
    share a group write the same param and stay mutually exclusive.
-   careerOnly presets lean on scoring/company fields quest rows never have,
-   so they hide when a single quest vertical is selected. noexp keeps only
-   rows whose source stated a beginner-friendly signal; career rows carry
-   no such signal, so they drop rather than get guessed in. */
+   careerOnly presets lean on scoring/company fields quest rows never have;
+   career rows live under the skill kind, so they hide on the other kinds.
+   noexp keeps only rows whose source stated a beginner-friendly signal. */
 interface Preset {
   key: string;
   label: string;
@@ -83,6 +84,7 @@ interface Preset {
 const PRESETS: Preset[] = [
   { key: 'noexp', label: 'no experience needed', params: { first_quest_ok: true } },
   { key: 'remote', label: 'remote', params: { is_remote: true } },
+  { key: 'fresh', label: 'new this week', params: { posted_within_days: 7 } },
   { key: 'strong', label: 'strong apply', params: { recommendation: 'STRONG_APPLY' }, careerOnly: true },
   { key: 'score50', label: 'scored 50 or better', params: { min_score: 50 }, careerOnly: true },
   { key: 'early', label: 'early startup', params: { company_type: 'Early Startup' }, group: 'company', careerOnly: true },
@@ -130,30 +132,18 @@ function PresetChip({
   return <Chip label={preset.label} count={data?.total} active={active} onClick={onToggle} />;
 }
 
-function VerticalChip({
-  verticalKey,
-  active,
-  onSelect,
-}: {
-  verticalKey: VerticalKey;
-  active: boolean;
-  onSelect: () => void;
-}) {
-  /* the count is the whole vertical's live total, independent of presets:
-     the chip says what is behind the door, not what the filters keep */
-  const { data } = useApplications({ ...verticalParams(verticalKey), page: 1, page_size: 1 });
+function HouseRules() {
   return (
-    <Chip
-      vertical={verticalKey === 'all' ? 'all' : verticalKey}
-      label={verticalKey === 'all' ? 'All' : verticals[verticalKey].label}
-      count={data?.total}
-      active={active}
-      onClick={onSelect}
-    />
+    <aside className="qb-house">
+      <h4>House rules</h4>
+      <p>Every quest links to its source. Pay is only what the poster states, never a guess.</p>
+      <p>No MLMs, no pay-to-start, nothing adult. The risky ones carry their catch in plain words.</p>
+      <p className="qb-house-sig">If it's pinned here, it's real.</p>
+    </aside>
   );
 }
 
-function BoardCards({
+function BoardPosters({
   filters,
   payCeiling,
   labels,
@@ -175,36 +165,46 @@ function BoardCards({
   return (
     <>
       {items.map((app) => {
-        const card = toBoardCard(app, resolveSourceLabel(app.source, labels));
-        const needs =
-          card.fit && card.fit.missing > 0 ? (
-            <>
-              {card.needs}{' '}
-              <button
-                type="button"
-                className="qb-textlink"
-                style={{ fontSize: 13 }}
-                onClick={() => onOpenSheet(app)}
-              >
-                see the {card.fit.missing} missing
-              </button>
-            </>
-          ) : (
-            card.needs
-          );
+        const poster = toPoster(app, resolveSourceLabel(app.source, labels));
+        const { card } = poster;
+        /* career rows bring their real resume fit; the kind template yields */
+        const bring: ReactNode = poster.hasFit ? (
+          <>
+            a resume. this one covers {card.fit!.strong} of the {card.fit!.total} things they ask for
+            {card.fit!.missing > 0 && (
+              <>
+                {' '}
+                <button
+                  type="button"
+                  className="qb-textlink"
+                  style={{ fontSize: 'inherit' }}
+                  onClick={() => onOpenSheet(app)}
+                >
+                  see the {card.fit!.missing} missing
+                </button>
+              </>
+            )}
+          </>
+        ) : (
+          poster.copy.bring
+        );
         return (
-          <QuestCard
+          <Poster
             key={app.id}
-            vertical={card.vertical}
+            kind={poster.kind}
             title={card.title}
             href={card.href}
-            meta={card.meta}
-            needs={needs}
-            firstQuest={card.firstQuest}
+            giver={card.meta}
+            desc={poster.desc}
+            bring={bring}
+            bringFree={poster.copy.bringFree && !poster.hasFit}
+            catchLine={poster.copy.catchLine}
+            tags={poster.tags}
             pay={card.pay}
             payUnit={card.payUnit}
             applied={card.applied}
             clippedDate={card.clippedDate}
+            rotateDeg={poster.rotateDeg}
             showExplain
             onExplain={() => onExplain(app)}
             onClip={() => updateStatus.mutate({ id: app.id, data: { status: CLIP_STATUS } })}
@@ -317,8 +317,8 @@ function BoardPage() {
   const navigate = useNavigate();
   const params = Route.useSearch();
 
-  /* the URL is the one truth for chips and presets */
-  const verticalKey: VerticalKey = params.v ?? 'all';
+  /* the URL is the one truth for the kind tag and presets */
+  const kindKey: KindKey = params.v ?? 'all';
   const activeKeys = useMemo(() => presetKeysFrom(params.p, PRESET_KEYS), [params.p]);
 
   /* text inputs buffer locally, debounce into the URL with replace so
@@ -385,7 +385,7 @@ function BoardPage() {
 
   const baseFilters = useMemo<ApplicationFilters>(
     () => ({
-      ...verticalParams(verticalKey),
+      ...kindParams(kindKey),
       ...presetParams(activeKeys),
       search: search || undefined,
       salary_min: payFloor ?? undefined,
@@ -393,7 +393,7 @@ function BoardPage() {
       sort_order: 'desc',
       page_size: PAGE_SIZE,
     }),
-    [verticalKey, activeKeys, search, payFloor, sortNewest],
+    [kindKey, activeKeys, search, payFloor, sortNewest],
   );
 
   const filtersKey = JSON.stringify(baseFilters);
@@ -402,15 +402,17 @@ function BoardPage() {
   const firstPage = useApplications({ ...baseFilters, page: 1 });
   const total = firstPage.data?.total;
 
-  const questScoped = verticalKey !== 'all' && verticalKey !== 'career';
+  /* careerOnly presets lean on fields only career rows carry; career lives
+     under the skill kind, so they hide everywhere else */
+  const questScoped = kindKey !== 'all' && kindKey !== 'skill';
   const visiblePresets = PRESETS.filter((p) => !p.careerOnly || !questScoped);
 
-  function selectVertical(key: VerticalKey) {
+  function selectKind(key: KindKey) {
     void navigate({
       to: '/board',
       search: (prev: BoardParams) => {
         let keys = presetKeysFrom(prev.p, PRESET_KEYS);
-        if (key !== 'all' && key !== 'career') {
+        if (key !== 'all' && key !== 'skill') {
           /* a hidden careerOnly preset must not keep silently filtering the feed */
           keys = new Set([...keys].filter((k) => !PRESETS.find((p) => p.key === k)?.careerOnly));
         }
@@ -459,7 +461,7 @@ function BoardPage() {
     }
     probe.add(preset.key);
     return {
-      ...verticalParams(verticalKey),
+      ...kindParams(kindKey),
       ...presetParams(probe),
       search: search || undefined,
       salary_min: payFloor ?? undefined,
@@ -482,18 +484,9 @@ function BoardPage() {
 
         <RestockLine />
 
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-          {VERTICAL_KEYS.map((key) => (
-            <VerticalChip
-              key={key}
-              verticalKey={key}
-              active={verticalKey === key}
-              onSelect={() => selectVertical(key)}
-            />
-          ))}
-        </div>
+        <KindRail selected={kindKey} onSelect={selectKind} />
 
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 12 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           {visiblePresets.map((preset) => (
             <PresetChip
               key={preset.key}
@@ -552,39 +545,37 @@ function BoardPage() {
           </p>
         )}
 
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-            gap: 16,
-            marginTop: 22,
-          }}
-        >
-          {Array.from({ length: pages }, (_, i) => (
-            <BoardCards
-              key={i + 1}
-              filters={{ ...baseFilters, page: i + 1 }}
-              payCeiling={payCeiling}
-              labels={labels}
-              onOpenSheet={setSheetApp}
-              onExplain={setExplainApp}
-            />
-          ))}
-        </div>
-
-        {total !== undefined && pages * PAGE_SIZE < total && (
-          <div style={{ display: 'flex', justifyContent: 'center', marginTop: 28 }}>
-            <button
-              type="button"
-              className="qb-textlink"
-              onClick={() => setPageState({ key: filtersKey, pages: pages + 1 })}
-            >
-              more
-            </button>
+        {total !== undefined && total > 0 && (
+          <div className="qb-felt">
+            <div className="qb-wall">
+              {Array.from({ length: pages }, (_, i) => (
+                <BoardPosters
+                  key={i + 1}
+                  filters={{ ...baseFilters, page: i + 1 }}
+                  payCeiling={payCeiling}
+                  labels={labels}
+                  onOpenSheet={setSheetApp}
+                  onExplain={setExplainApp}
+                />
+              ))}
+              <HouseRules />
+            </div>
+            {pages * PAGE_SIZE < total && (
+              <div style={{ display: 'flex', justifyContent: 'center', marginTop: 6 }}>
+                <button
+                  type="button"
+                  className="qb-textlink"
+                  onClick={() => setPageState({ key: filtersKey, pages: pages + 1 })}
+                >
+                  more
+                </button>
+              </div>
+            )}
           </div>
         )}
 
-        <p style={{ padding: '40px 0 64px', fontSize: 13, color: 'var(--mute)', margin: 0 }}>
+        <p className="qb-board-legend">
+          Pull <b>take it</b> to go straight to the source. <b>The colour of the pin tells you the kind of quest.</b>{' '}
           Every date on this board is the true post date; postings with no verifiable date say nothing.
         </p>
       </div>
