@@ -188,11 +188,26 @@ def run_scrapers(
         "include_founding": _filters.get("include_founding_titles", True),
     }
 
-    def _run_one(name: str) -> tuple[str, list[dict]]:
+    def _run_one(name: str) -> tuple[str, list[dict], dict]:
+        import time as _time
+        from datetime import datetime as _dt, timezone as _tz
+
         meta = _REGISTRY.get(name)
+        outcome: dict[str, Any] = {
+            "source": name,
+            "vertical": meta.vertical if meta else "career",
+            "started_at": _dt.now(_tz.utc).replace(tzinfo=None),
+            "duration_s": 0.0,
+            "finish_reason": "ok",
+            "rows_found": 0,
+            "error_sample": "",
+        }
         if not meta or not meta.search_fn:
             logger.warning("Unknown or metadata-only source: %s", name)
-            return name, []
+            outcome["finish_reason"] = "exception"
+            outcome["error_sample"] = "unknown or metadata-only source"
+            return name, [], outcome
+        t0 = _time.monotonic()
         try:
             kwargs: dict[str, Any] = dict(role_match_kwargs)
             if name in _ats_scrapers:
@@ -201,18 +216,28 @@ def run_scrapers(
                     kwargs["watchlist_companies"] = extra
             if scraper_kwargs and name in scraper_kwargs:
                 kwargs.update(scraper_kwargs[name])
-            return name, meta.search_fn(
+            jobs = meta.search_fn(
                 roles=roles,
                 max_results=max_results,
                 locations=locations,
                 max_days_old=max_days_old,
                 **kwargs,
             )
+            outcome["duration_s"] = round(_time.monotonic() - t0, 2)
+            outcome["rows_found"] = len(jobs or [])
+            if not jobs:
+                outcome["finish_reason"] = "zero_rows"
+            return name, jobs or [], outcome
         except Exception as e:
             logger.warning("Scraper %s failed (non-fatal): %s", name, e)
-            return name, []
+            outcome["duration_s"] = round(_time.monotonic() - t0, 2)
+            outcome["finish_reason"] = "exception"
+            outcome["error_sample"] = str(e)[:500]
+            return name, [], outcome
 
     all_jobs: list[dict] = []
+    outcomes: list[dict] = []
+    seen_sources: set[str] = set()
     workers = min(len(runnable), 8)
     # Per-scraper timeout prevents a single slow/hung scraper from blocking
     # the entire pipeline.  Scrapers that exceed this are logged and skipped.
@@ -223,7 +248,7 @@ def run_scrapers(
         try:
             for future in as_completed(futures, timeout=scraper_timeout * 2):
                 try:
-                    name, jobs = future.result(timeout=scraper_timeout)
+                    name, jobs, outcome = future.result(timeout=scraper_timeout)
                 except FuturesTimeout:
                     name = futures.get(future, "unknown")
                     logger.warning("Scraper %s timed out after %ds", name, scraper_timeout)
@@ -235,6 +260,8 @@ def run_scrapers(
                 except Exception as e:
                     logger.warning("Scraper result error: %s", e)
                     continue
+                seen_sources.add(name)
+                outcomes.append(outcome)
                 meta = _REGISTRY.get(name)
                 display = meta.display_name if meta else name
                 if jobs:
@@ -247,6 +274,26 @@ def run_scrapers(
             logger.warning("Scraper pool timed out after %ds — using partial results", scraper_timeout * 2)
             if progress:
                 progress("Warning: some scrapers timed out, using partial results")
+
+    # A hung source must not vanish from the record: it looks exactly like a
+    # healthy quiet day otherwise. Every runnable source gets a run-log row.
+    for name in runnable:
+        if name in seen_sources:
+            continue
+        meta = _REGISTRY.get(name)
+        outcomes.append({
+            "source": name,
+            "vertical": meta.vertical if meta else "career",
+            "duration_s": float(scraper_timeout),
+            "finish_reason": "timeout",
+            "rows_found": 0,
+            "error_sample": f"no result within {scraper_timeout}s",
+        })
+    try:
+        from job_finder.models.database import record_scrape_runs
+        record_scrape_runs(outcomes)
+    except Exception as exc:
+        logger.warning("scrape run log unavailable (non-fatal): %s", exc)
 
     # Shared post-processing: guarantee the contract fields (date_confidence,
     # salary_source, work_type_confidence) on every job from every plugin.

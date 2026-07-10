@@ -197,6 +197,85 @@ class ApplicationRecord(Base):
         return None
 
 
+class ScrapeRunRecord(Base):
+    """One row per source per fetch: the run log the trust layer reads.
+
+    A source that silently breaks (site redesign, soft block, schema drift)
+    looks identical to a quiet day unless every fetch is recorded. Triage is
+    one query against this table; health verdicts live in
+    job_finder.source_health.
+    """
+
+    __tablename__ = "scrape_runs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    source = Column(String(64), nullable=False, index=True)
+    vertical = Column(String(32), default="career")
+    started_at = Column(DateTime, default=_utcnow, index=True)
+    duration_s = Column(Float, default=0.0)
+    # ok (rows came back) | zero_rows | exception | timeout
+    finish_reason = Column(String(32), default="ok")
+    rows_found = Column(Integer, default=0)
+    # first line of the failure, truncated; empty when the run finished
+    error_sample = Column(Text, default="")
+
+    def __repr__(self) -> str:
+        return f"<ScrapeRun {self.source} {self.finish_reason} rows={self.rows_found}>"
+
+
+def record_scrape_runs(runs: list[dict]) -> None:
+    """Persist run-log rows; never raises (a broken log must not kill a scrape)."""
+    if not runs:
+        return
+    try:
+        session = get_session()
+    except Exception:
+        logger.warning("scrape run log: no database session, dropping %d rows", len(runs))
+        return
+    try:
+        for run in runs:
+            session.add(
+                ScrapeRunRecord(
+                    source=str(run.get("source", ""))[:64],
+                    vertical=str(run.get("vertical", "career"))[:32],
+                    started_at=run.get("started_at") or _utcnow(),
+                    duration_s=float(run.get("duration_s") or 0.0),
+                    finish_reason=str(run.get("finish_reason", "ok"))[:32],
+                    rows_found=int(run.get("rows_found") or 0),
+                    error_sample=str(run.get("error_sample", ""))[:500],
+                )
+            )
+        session.commit()
+    except Exception:
+        logger.warning("scrape run log: failed to persist rows", exc_info=True)
+        session.rollback()
+    finally:
+        session.close()
+
+
+def get_recent_scrape_runs(days: int = 14) -> list[ScrapeRunRecord]:
+    """Run-log rows from the last N days, newest first. Empty on any failure."""
+    try:
+        session = get_session()
+    except Exception:
+        return []
+    try:
+        from datetime import timedelta
+
+        cutoff = _utcnow() - timedelta(days=days)
+        return (
+            session.query(ScrapeRunRecord)
+            .filter(ScrapeRunRecord.started_at >= cutoff)
+            .order_by(ScrapeRunRecord.started_at.desc())
+            .all()
+        )
+    except Exception:
+        logger.warning("scrape run log: read failed", exc_info=True)
+        return []
+    finally:
+        session.close()
+
+
 def scoped_applications(
     query_or_session,
     verticals: list[str] | tuple[str, ...] | None = None,
