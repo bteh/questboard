@@ -87,6 +87,8 @@ def _normalize_post(post: dict) -> dict | None:
     description="Recruiter-posted paid clinical research studies from the JALR community's listing site",
     category="body",
     kind="body",
+    # matches the 60-day fetch window: older posts fall out of the fetch
+    stale_after_days=60,
     enabled_by_default=False,
 )
 def search_studyscavenger(

@@ -125,6 +125,8 @@ def _fetch_city(path: str) -> list:
     description="Babysitting and sitting one-offs with the family's own posted hourly rate, by city",
     category="lookafter",
     kind="lookafter",
+    # sits get filled fast and fall off the city page
+    stale_after_days=10,
     enabled_by_default=False,
 )
 def search_sittercity(

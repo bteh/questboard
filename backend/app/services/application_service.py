@@ -105,7 +105,9 @@ def get_applications(
         query = query.filter(ApplicationRecord.first_seen_run_id == first_seen_run_id)
     if exclude_dead:
         # Hide only CONFIRMED-dead postings; unknown/alive/never-checked stay.
-        query = query.filter(ApplicationRecord.url_status != "dead")
+        # expired rows (source stopped listing them) hide with the dead ones;
+        # include_dead=true still surfaces both tombstone shapes
+        query = query.filter(ApplicationRecord.url_status.notin_(("dead", "expired")))
     if upcoming_only:
         # Drop quests whose taping/session already happened. NULL event_start
         # (career rows, rolling signups) always passes: "no date" is not

@@ -215,6 +215,8 @@ def _normalize_card(card: dict) -> dict | None:
     category="study",
     enabled_by_default=False,
     vertical="study",
+    # focus groups recruit for a few weeks at most
+    stale_after_days=30,
 )
 def search_focusgroups_org(
     roles: list[str] | None = None,

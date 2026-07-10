@@ -31,9 +31,11 @@ import {
   toBoardCard,
   withinPayCeiling,
 } from '@/utils/board-card';
+import { checkedAgoLabel } from '@/features/board/freshness';
 import { kindParams, type KindKey } from '@/features/board/kind-params';
 import { KindRail } from '@/features/board/kind-rail';
 import { toPoster } from '@/features/board/poster-model';
+import { useBoardSummary } from '@/hooks/use-board-summary';
 import type { ApplicationFilters, ApplicationResponse, RequirementMatch } from '@/types/application';
 import '@/components/board/board.css';
 import '@/features/board/board-felt.css';
@@ -316,6 +318,7 @@ function BoardPage() {
   const labels = useSourceLabels();
   const navigate = useNavigate();
   const params = Route.useSearch();
+  const checkedAgo = checkedAgoLabel(useBoardSummary().data?.checked_at);
 
   /* the URL is the one truth for the kind tag and presets */
   const kindKey: KindKey = params.v ?? 'all';
@@ -577,6 +580,7 @@ function BoardPage() {
         <p className="qb-board-legend">
           Pull <b>take it</b> to go straight to the source. <b>The colour of the pin tells you the kind of quest.</b>{' '}
           Every date on this board is the true post date; postings with no verifiable date say nothing.
+          {checkedAgo && <> Quests the sources stop listing come down on their own. <b>{checkedAgo}.</b></>}
         </p>
       </div>
 

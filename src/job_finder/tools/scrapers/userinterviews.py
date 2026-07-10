@@ -113,6 +113,8 @@ def _normalize_listing(item: dict) -> dict | None:
     description="Paid research studies with stated per-session compensation from the public listings API",
     category="think",
     kind="think",
+    # studies fill within days to weeks; run windows also set event_end
+    stale_after_days=14,
     enabled_by_default=False,
 )
 def search_userinterviews(

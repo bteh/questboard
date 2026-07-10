@@ -25,6 +25,14 @@ class ScraperMeta:
     # (kind ids or their legacy vertical spellings). The career pipeline only
     # ever runs sources registered with the literal "career" lane.
     vertical: str = "career"
+    # Expiry contract, declared by each source about ITSELF (see
+    # job_finder.expiry). full_snapshot means one fetch IS the source's
+    # entire current set, so absence from two consecutive healthy runs
+    # proves an offer is gone. Windowed fetches (newest-N) must never use
+    # absence; they declare stale_after_days instead: how long an
+    # unconfirmed row may honestly stay on the board.
+    full_snapshot: bool = False
+    stale_after_days: int | None = None
 
 
 _REGISTRY: dict[str, ScraperMeta] = {}
@@ -39,6 +47,8 @@ def register_scraper(
     enabled_by_default: bool = True,
     vertical: str = "career",
     kind: str | None = None,
+    full_snapshot: bool = False,
+    stale_after_days: int | None = None,
 ) -> Callable:
     """Decorator that registers a scraper function with its metadata.
 
@@ -66,6 +76,8 @@ def register_scraper(
             enabled_by_default=enabled_by_default,
             search_fn=fn,
             vertical=lane,
+            full_snapshot=full_snapshot,
+            stale_after_days=stale_after_days,
         )
         return fn
     return decorator

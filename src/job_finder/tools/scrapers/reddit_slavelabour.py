@@ -91,6 +91,8 @@ def _normalize_post(post: dict) -> dict | None:
     description="Paid [Task] one-offs from r/slavelabour via the arctic-shift mirror",
     category="odd",
     kind="odd",
+    # tasks fill in days; a task unseen for 10 days is gone
+    stale_after_days=10,
     enabled_by_default=False,
 )
 def search_reddit_slavelabour(
