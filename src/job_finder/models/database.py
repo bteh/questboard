@@ -58,7 +58,11 @@ class ApplicationRecord(Base):
     job_title = Column(String(500), nullable=False)
     company = Column(String(300), nullable=False)
     location = Column(String(300), default="")
-    job_url = Column(String(2000), nullable=True, unique=True)
+    # Uniqueness is per POOL, not global (see __table_args__): the hosted
+    # shared board keeps one row per URL in the NULL-workspace pool, and a
+    # workspace's clone-on-touch copy of a shared quest row may carry the
+    # same URL as the original.
+    job_url = Column(String(2000), nullable=True)
     source = Column(String(100), default="")  # LinkedIn, Indeed, etc.
     description = Column(Text, default="")
     is_remote = Column(Boolean, default=False)
@@ -169,6 +173,17 @@ class ApplicationRecord(Base):
         Index("ix_applications_vertical", "vertical"),
         Index("ix_applications_vertical_status", "vertical", "status"),
         Index("ix_applications_event_start", "event_start"),
+        # one row per URL inside a workspace (NULLs compare distinct, so
+        # the shared pool needs its own partial index below)
+        Index("uq_applications_url_workspace", "job_url", "workspace_id", unique=True),
+        # one row per URL in the shared/local pool
+        Index(
+            "uq_applications_shared_url",
+            "job_url",
+            unique=True,
+            sqlite_where=_sql_text("workspace_id IS NULL"),
+            postgresql_where=_sql_text("workspace_id IS NULL"),
+        ),
     )
 
     def __repr__(self) -> str:

@@ -116,7 +116,8 @@ function BountyPoster({ app, labels }: { app: ApplicationResponse; labels: Recor
 }
 
 function useTotal(filters: Parameters<typeof useApplications>[0]): number | undefined {
-  return useApplications({ ...filters, page: 1, page_size: 1 }).data?.total;
+  /* home reads the felt, not the log: hosted mode adds the shared pool */
+  return useApplications({ ...filters, page: 1, page_size: 1, scope: 'board' }).data?.total;
 }
 
 function HomePage() {
@@ -145,6 +146,7 @@ function HomePage() {
     sort_order: 'desc',
     page: 1,
     page_size: 24,
+    scope: 'board',
   });
   const recent = useApplications({
     ...verticalParams('all'),
@@ -153,6 +155,7 @@ function HomePage() {
     sort_order: 'desc',
     page: 1,
     page_size: 100,
+    scope: 'board',
   });
 
   /* the log strip counts, from real statuses */

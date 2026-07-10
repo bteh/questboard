@@ -205,4 +205,9 @@ export interface ApplicationFilters {
   profile?: string;
   search_run_id?: string;
   first_seen_run_id?: string;
+  /**
+   * mine = your rows only (the log). board = the felt: hosted mode adds
+   * the shared quest pool alongside your rows; identical in local mode.
+   */
+  scope?: 'mine' | 'board';
 }

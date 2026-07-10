@@ -9,8 +9,9 @@ trust machinery: snapshot before writes, run logging, dedup, expiry.
 Design constraints:
 - One sweep at a time. A tick that lands while a sweep is running is
   skipped, not queued; the next tick recomputes due-ness from the log.
-- Local pool only (workspace_id=None). Hosted mode never starts the loop;
-  hosted sweeps need the shared-pool design that lands with hosting.
+- Sweeps write the shared pool (workspace_id=None) in every mode: local
+  owns one pool outright, and the hosted board is one shared felt that
+  every visitor reads (app.services.row_scope).
 - The first check waits scheduler_initial_delay_seconds so short-lived
   app contexts (tests, smoke runs) never fire a sweep.
 - Scrapers are sync code; the sweep runs in a worker thread so the event
@@ -105,9 +106,6 @@ def build_scheduler() -> BoardScheduler | None:
     settings = get_settings()
     if not settings.scheduler_enabled:
         logger.info("board scheduler: disabled by configuration")
-        return None
-    if settings.hosted_mode:
-        logger.info("board scheduler: hosted mode, not starting (see hosting build)")
         return None
     return BoardScheduler(
         tick_seconds=settings.scheduler_tick_seconds,

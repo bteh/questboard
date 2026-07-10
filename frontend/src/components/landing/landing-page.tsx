@@ -109,7 +109,7 @@ function LandingPoster({ app, labels }: { app: ApplicationResponse; labels: Reco
 
 /* A window-chrome chip whose count is the query's true total. */
 function ChromeChip({ label, filters }: { label: string; filters: Partial<ApplicationFilters> }) {
-  const { data } = useApplications({ ...filters, page: 1, page_size: 1 });
+  const { data } = useApplications({ ...filters, page: 1, page_size: 1, scope: 'board' });
   return <Chip label={label} count={data?.total} dim={data !== undefined && data.total < 3} />;
 }
 
@@ -160,6 +160,7 @@ export function LandingPage() {
     salary_min: 500,
     page: 1,
     page_size: 1,
+    scope: 'board',
   }).data?.total;
 
   /* one board page of the newest rows: enough spread for mixed kinds */
@@ -169,6 +170,7 @@ export function LandingPage() {
     sort_order: 'desc',
     page: 1,
     page_size: 24,
+    scope: 'board',
   });
   const items = newest.data?.items ?? [];
   const pinned = pickLandingCards(items);

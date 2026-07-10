@@ -139,3 +139,24 @@ def reject_legacy_route_in_hosted_mode(detail: str = "Route not available in hos
     """Block legacy single-user routes when hosted mode is enabled."""
     if get_settings().hosted_mode:
         raise HTTPException(status_code=404, detail=detail)
+
+
+def require_ops_access(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> None:
+    """The ops surfaces (scraper health, run log, schedule) are open on
+    your own machine and admin-only when hosted: run internals and error
+    samples are for whoever runs the board, not for browsing."""
+    settings = get_settings()
+    if not settings.hosted_mode:
+        return
+    admins = {e.strip().lower() for e in settings.admin_emails.split(",") if e.strip()}
+    if not admins:
+        raise HTTPException(status_code=403, detail="Ops access is not configured")
+    from app.services import workspace_service
+
+    context = workspace_service.require_workspace_context(db, request, validate_csrf=False)
+    email = (getattr(context.profile, "email", None) or "").lower()
+    if email not in admins:
+        raise HTTPException(status_code=403, detail="Ops access required")

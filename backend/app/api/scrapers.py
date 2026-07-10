@@ -1,8 +1,15 @@
-"""Scraper sources endpoints: registry metadata and per-source health."""
+"""Scraper sources endpoints: registry metadata and per-source health.
+
+/sources is app furniture (settings reads it) and stays open; the ops
+surfaces (/health, /runs, /schedule) are admin-only in hosted mode via
+require_ops_access.
+"""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
+
+from app.dependencies import require_ops_access
 
 from app.schemas.scrapers import (
     BoardScheduleResponse,
@@ -46,7 +53,7 @@ async def list_sources(
     ]
 
 
-@router.get("/health", response_model=SourceHealthResponse)
+@router.get("/health", response_model=SourceHealthResponse, dependencies=[Depends(require_ops_access)])
 async def sources_health(
     days: int = Query(14, ge=1, le=90, description="Run-log window in days"),
 ) -> SourceHealthResponse:
@@ -79,7 +86,7 @@ async def sources_health(
     return SourceHealthResponse(sources=entries, needs_attention=attention)
 
 
-@router.get("/runs", response_model=ScrapeRunsResponse)
+@router.get("/runs", response_model=ScrapeRunsResponse, dependencies=[Depends(require_ops_access)])
 async def scrape_runs(
     source: str | None = Query(None, max_length=64, description="Limit to one source"),
     days: int = Query(14, ge=1, le=90, description="Run-log window in days"),
@@ -108,7 +115,7 @@ async def scrape_runs(
     )
 
 
-@router.get("/schedule", response_model=BoardScheduleResponse)
+@router.get("/schedule", response_model=BoardScheduleResponse, dependencies=[Depends(require_ops_access)])
 async def board_schedule(request: Request) -> BoardScheduleResponse:
     """Every schedulable source with its cadence and due state, soonest first.
 
