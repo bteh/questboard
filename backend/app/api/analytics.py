@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from app.dependencies import get_active_workspace_context
+from app.dependencies import get_active_workspace_context, workspace_scope_id
 from app.models.database import get_db
 from app.schemas.analytics import ChartDataPoint, DashboardStats
 from app.services import analytics_service
@@ -20,8 +20,8 @@ def get_stats(
 ):
     return analytics_service.get_dashboard_stats(
         db,
-        profile=None if workspace else profile,
-        workspace_id=workspace.workspace.id if workspace else None,
+        profile=None if workspace_scope_id(workspace) else profile,
+        workspace_id=workspace_scope_id(workspace),
         search_run_id=search_run_id,
     )
 
@@ -35,8 +35,8 @@ def get_score_distribution(
 ):
     return analytics_service.get_score_distribution(
         db,
-        profile=None if workspace else profile,
-        workspace_id=workspace.workspace.id if workspace else None,
+        profile=None if workspace_scope_id(workspace) else profile,
+        workspace_id=workspace_scope_id(workspace),
         search_run_id=search_run_id,
     )
 
@@ -50,8 +50,8 @@ def get_recommendations(
 ):
     return analytics_service.get_recommendation_breakdown(
         db,
-        profile=None if workspace else profile,
-        workspace_id=workspace.workspace.id if workspace else None,
+        profile=None if workspace_scope_id(workspace) else profile,
+        workspace_id=workspace_scope_id(workspace),
         search_run_id=search_run_id,
     )
 
@@ -65,8 +65,8 @@ def get_sources(
 ):
     return analytics_service.get_source_breakdown(
         db,
-        profile=None if workspace else profile,
-        workspace_id=workspace.workspace.id if workspace else None,
+        profile=None if workspace_scope_id(workspace) else profile,
+        workspace_id=workspace_scope_id(workspace),
         search_run_id=search_run_id,
     )
 
@@ -80,8 +80,8 @@ def get_funnel(
 ):
     return analytics_service.get_pipeline_funnel(
         db,
-        profile=None if workspace else profile,
-        workspace_id=workspace.workspace.id if workspace else None,
+        profile=None if workspace_scope_id(workspace) else profile,
+        workspace_id=workspace_scope_id(workspace),
         search_run_id=search_run_id,
     )
 
@@ -96,7 +96,7 @@ def get_top_companies(
     return analytics_service.get_top_companies(
         db,
         limit=limit,
-        workspace_id=workspace.workspace.id if workspace else None,
+        workspace_id=workspace_scope_id(workspace),
         search_run_id=search_run_id,
     )
 
@@ -109,6 +109,6 @@ def get_company_types(
 ):
     return analytics_service.get_company_types(
         db,
-        workspace_id=workspace.workspace.id if workspace else None,
+        workspace_id=workspace_scope_id(workspace),
         search_run_id=search_run_id,
     )

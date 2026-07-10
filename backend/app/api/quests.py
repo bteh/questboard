@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.dependencies import get_active_workspace_context_csrf
+from app.dependencies import get_active_workspace_context_csrf, workspace_scope_id
 from app.models.database import get_db
 from app.schemas.quests import QuestRefreshRequest, QuestRefreshSummary
 from app.security import enforce_rate_limit, request_identity
@@ -56,6 +56,7 @@ def refresh_quests(
         lat=req.lat,
         lon=req.lon,
         radius_miles=req.radius_miles,
-        workspace_id=workspace.workspace.id if workspace else None,
+        # hosted rows scope to the visitor; local rows join the one pool
+        workspace_id=workspace_scope_id(workspace),
     )
     return QuestRefreshSummary(**summary)

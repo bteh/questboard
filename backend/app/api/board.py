@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import case, func, or_
 from sqlalchemy.orm import Session
 
-from app.dependencies import get_active_workspace_context
+from app.dependencies import get_active_workspace_context, workspace_scope_id
 from app.models.database import get_db
 from app.schemas.board import BoardSummaryResponse, KindSummary
 
@@ -56,8 +56,9 @@ def board_summary(
             )
         )
     )
-    if workspace:
-        query = query.filter(ApplicationRecord.workspace_id == workspace.workspace.id)
+    scope = workspace_scope_id(workspace)
+    if scope:
+        query = query.filter(ApplicationRecord.workspace_id == scope)
     elif profile:
         query = query.filter(ApplicationRecord.profile == profile)
     rows = query.group_by(ApplicationRecord.vertical).all()

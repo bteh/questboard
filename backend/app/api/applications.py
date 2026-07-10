@@ -27,6 +27,7 @@ from app.dependencies import (
     get_active_workspace_context_csrf,
     reject_legacy_route_in_hosted_mode,
     sanitize_profile,
+    workspace_scope_id,
 )
 
 router = APIRouter(prefix="/applications", tags=["applications"])
@@ -207,8 +208,8 @@ def list_applications(
             is_remote=is_remote,
             work_type=work_type,
             salary_min=salary_min,
-            profile=None if workspace else profile,
-            workspace_id=workspace.workspace.id if workspace else None,
+            profile=None if workspace_scope_id(workspace) else profile,
+            workspace_id=workspace_scope_id(workspace),
             search_run_id=search_run_id,
             first_seen_run_id=first_seen_run_id,
             exclude_dead=not include_dead,
@@ -243,7 +244,7 @@ def create_application(
         record = application_service.create_application(
             db,
             body,
-            workspace_id=workspace.workspace.id if workspace else None,
+            workspace_id=workspace_scope_id(workspace),
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
@@ -277,8 +278,8 @@ def export_csv(
         company_type=company_type,
         is_remote=is_remote,
         work_type=work_type,
-        profile=None if workspace else profile,
-        workspace_id=workspace.workspace.id if workspace else None,
+        profile=None if workspace_scope_id(workspace) else profile,
+        workspace_id=workspace_scope_id(workspace),
         sort_by=sort_by,
         sort_dir=sort_dir,
         page=1,
@@ -315,7 +316,7 @@ def get_application(
     record = application_service.get_application(
         db,
         app_id,
-        workspace_id=workspace.workspace.id if workspace else None,
+        workspace_id=workspace_scope_id(workspace),
     )
     if not record:
         raise HTTPException(status_code=404, detail="Application not found")
@@ -332,7 +333,7 @@ def update_application(
     record = application_service.update_application(
         db,
         app_id,
-        workspace_id=workspace.workspace.id if workspace else None,
+        workspace_id=workspace_scope_id(workspace),
         **update.model_dump(exclude_unset=True),
     )
     if not record:
@@ -353,7 +354,7 @@ def update_status(
     record = application_service.update_application(
         db,
         app_id,
-        workspace_id=workspace.workspace.id if workspace else None,
+        workspace_id=workspace_scope_id(workspace),
         **kwargs,
     )
     if not record:
@@ -375,7 +376,7 @@ def update_feedback(
     record = application_service.update_application(
         db,
         app_id,
-        workspace_id=workspace.workspace.id if workspace else None,
+        workspace_id=workspace_scope_id(workspace),
         **kwargs,
     )
     if not record:
@@ -392,7 +393,7 @@ def delete_application(
     deleted = application_service.delete_application(
         db,
         app_id,
-        workspace_id=workspace.workspace.id if workspace else None,
+        workspace_id=workspace_scope_id(workspace),
     )
     if not deleted:
         raise HTTPException(status_code=404, detail="Application not found")
@@ -416,7 +417,7 @@ def check_urls(
         db,
         ids=body.ids,
         limit=body.limit,
-        workspace_id=workspace.workspace.id if workspace else None,
+        workspace_id=workspace_scope_id(workspace),
     )
 
 
@@ -655,7 +656,7 @@ def _reject_non_career_row(db: Session, app_id: int, workspace) -> None:
     path is a frontend bug, not a 404.
     """
     record = application_service.get_application(
-        db, app_id, workspace_id=workspace.workspace.id if workspace else None,
+        db, app_id, workspace_id=workspace_scope_id(workspace),
     )
     if record and (getattr(record, "vertical", "career") or "career") != "career":
         raise HTTPException(
@@ -679,7 +680,7 @@ def prepare_application(
     _reject_non_career_row(db, app_id, workspace)
     result = apply_service.prepare_application(
         db, app_id, profile=profile,
-        workspace_id=workspace.workspace.id if workspace else None,
+        workspace_id=workspace_scope_id(workspace),
     )
     if result is None:
         raise HTTPException(status_code=404, detail="Application not found")
@@ -706,7 +707,7 @@ def submit_application(
         cover_letter=body.cover_letter,
         dry_run=body.dry_run,
         profile=profile,
-        workspace_id=workspace.workspace.id if workspace else None,
+        workspace_id=workspace_scope_id(workspace),
     )
     if result is None:
         raise HTTPException(status_code=404, detail="Application not found")
