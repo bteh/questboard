@@ -200,6 +200,8 @@ def _normalize_study(
     category="body",
     # recruiting statuses move slowly
     refresh_hours=24,
+    allowed_url_hosts=("clinicaltrials.gov",),
+    allowed_url_paths=("/study/",),
     enabled_by_default=False,
     # A clinical trial rents your BODY (screenings, confinement, doses);
     # focus groups and interviews sell your opinion. The communities have

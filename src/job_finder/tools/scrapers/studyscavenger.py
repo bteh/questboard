@@ -91,6 +91,7 @@ def _normalize_post(post: dict) -> dict | None:
     stale_after_days=60,
     # listings arrive a few per week
     refresh_hours=24,
+    allowed_url_hosts=("studyscavenger.com",),
     enabled_by_default=False,
 )
 def search_studyscavenger(

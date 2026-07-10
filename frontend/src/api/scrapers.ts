@@ -43,6 +43,8 @@ export interface ScrapeRunEntry {
   /** ok | zero_rows | exception | timeout */
   finish_reason: string;
   rows_found: number;
+  /** rows the row contract rejected before they could land */
+  rows_invalid: number;
   error_sample: string;
 }
 

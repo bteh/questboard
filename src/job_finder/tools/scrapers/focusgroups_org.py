@@ -215,6 +215,7 @@ def _normalize_card(card: dict) -> dict | None:
     category="study",
     # new groups post on business days
     refresh_hours=24,
+    allowed_url_hosts=("focusgroups.org",),
     enabled_by_default=False,
     vertical="study",
     # focus groups recruit for a few weeks at most

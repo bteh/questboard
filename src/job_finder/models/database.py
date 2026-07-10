@@ -237,6 +237,10 @@ class ScrapeRunRecord(Base):
     # ok (rows came back) | zero_rows | exception | timeout
     finish_reason = Column(String(32), default="ok")
     rows_found = Column(Integer, default=0)
+    # rows the row contract rejected before anything landed
+    # (job_finder.row_contract); a spike here means selector drift or an
+    # over-tight contract, both worth a human look
+    rows_invalid = Column(Integer, default=0)
     # first line of the failure, truncated; empty when the run finished
     error_sample = Column(Text, default="")
 
@@ -263,6 +267,7 @@ def record_scrape_runs(runs: list[dict]) -> None:
                     duration_s=float(run.get("duration_s") or 0.0),
                     finish_reason=str(run.get("finish_reason", "ok"))[:32],
                     rows_found=int(run.get("rows_found") or 0),
+                    rows_invalid=int(run.get("rows_invalid") or 0),
                     error_sample=str(run.get("error_sample", ""))[:500],
                 )
             )
@@ -533,6 +538,16 @@ def _migrate_db(engine) -> None:
         ))
         # Convert empty job_url strings to NULL (allows multiple NULLs in unique column)
         conn.execute(text("UPDATE applications SET job_url = NULL WHERE job_url = ''"))
+
+    # the run log grows columns too (created via create_all on fresh DBs,
+    # added here for existing local DBs; hosted uses alembic)
+    if "scrape_runs" in inspector.get_table_names():
+        run_cols = {c["name"] for c in inspector.get_columns("scrape_runs")}
+        if "rows_invalid" not in run_cols:
+            with engine.begin() as conn:
+                conn.execute(
+                    text("ALTER TABLE scrape_runs ADD COLUMN rows_invalid INTEGER DEFAULT 0")
+                )
 
 
 def init_db(db_path: str | None = None) -> None:

@@ -46,6 +46,13 @@ class ScraperMeta:
     # publishing rhythm, not "as fast as possible": politeness is part
     # of the trust posture.
     refresh_hours: int | None = None
+    # Row contract (job_finder.row_contract): where this source's rows
+    # may point. Hosts are registered domains (subdomains pass); paths
+    # are required prefixes. None means no gate: bankrewards points at
+    # each bank's own offer page by design. Shared structural rules
+    # (real title, parseable URL, no future dates) apply regardless.
+    allowed_url_hosts: tuple[str, ...] | None = None
+    allowed_url_paths: tuple[str, ...] | None = None
 
 
 _REGISTRY: dict[str, ScraperMeta] = {}
@@ -64,6 +71,8 @@ def register_scraper(
     stale_after_days: int | None = None,
     research_only: bool = False,
     refresh_hours: int | None = None,
+    allowed_url_hosts: tuple[str, ...] | None = None,
+    allowed_url_paths: tuple[str, ...] | None = None,
 ) -> Callable:
     """Decorator that registers a scraper function with its metadata.
 
@@ -95,6 +104,8 @@ def register_scraper(
             stale_after_days=stale_after_days,
             research_only=research_only,
             refresh_hours=refresh_hours,
+            allowed_url_hosts=allowed_url_hosts,
+            allowed_url_paths=allowed_url_paths,
         )
         return fn
     return decorator
@@ -255,10 +266,25 @@ def run_scrapers(
                 **kwargs,
             )
             outcome["duration_s"] = round(_time.monotonic() - t0, 2)
-            outcome["rows_found"] = len(jobs or [])
+            # The row contract: a row publishes only when it is actionable
+            # (job_finder.row_contract). Rejects are counted, never silent,
+            # so a validator that suddenly rejects everything is as visible
+            # in the run log as a source that broke.
+            from job_finder.row_contract import validate_rows
+
+            jobs, rejected = validate_rows(jobs or [], meta)
+            if rejected:
+                outcome["rows_invalid"] = len(rejected)
+                sample_row, sample_reason = rejected[0]
+                logger.warning(
+                    "%s: %d row(s) failed the row contract (first: %s %r)",
+                    name, len(rejected), sample_reason,
+                    str(sample_row.get("title", ""))[:80],
+                )
+            outcome["rows_found"] = len(jobs)
             if not jobs:
                 outcome["finish_reason"] = "zero_rows"
-            return name, jobs or [], outcome
+            return name, jobs, outcome
         except Exception as e:
             logger.warning("Scraper %s failed (non-fatal): %s", name, e)
             outcome["duration_s"] = round(_time.monotonic() - t0, 2)

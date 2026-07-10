@@ -244,6 +244,7 @@ def _normalize_page(page: dict, today: date) -> dict | None:
     vertical="camera",
     # audience calls post days ahead
     refresh_hours=24,
+    allowed_url_hosts=("standingroomonly.tv",),
     enabled_by_default=False,
 )
 def search_standingroomonly(

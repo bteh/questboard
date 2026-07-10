@@ -350,6 +350,8 @@ def _rows_from_item(item: dict) -> list[dict]:
     category="quest",
     # calls post daily; deadlines run in days
     refresh_hours=24,
+    allowed_url_hosts=("projectcasting.com",),
+    allowed_url_paths=("/job/",),
     enabled_by_default=False,
     vertical="camera",
 )

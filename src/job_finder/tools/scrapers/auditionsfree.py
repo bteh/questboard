@@ -280,6 +280,7 @@ def _normalize_post(post: object) -> dict | None:
     category="quest",
     # calls post daily
     refresh_hours=24,
+    allowed_url_hosts=("auditionsfree.com",),
     enabled_by_default=False,
     vertical="camera",
 )
