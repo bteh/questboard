@@ -177,11 +177,13 @@ one still leaves results.
 sources (Remotive, Himalayas, We Work Remotely, HN Who's Hiring, RemoteOK, CryptoJobsList,
 Getro, Consider, Arbeitnow, The Muse, YC Work at a Startup, plus ATS scrapers for Greenhouse,
 Lever, Ashby, and Workday driven by user watchlist) and quest-kind sources (focus groups,
-casting, paid research, bank bonuses, tasks, sitting, TCG drops; subreddit sources share
-`_reddit.py`). The per-kind lineup, research verdicts, and the declined-with-reasons list
-live in `docs/source-coverage.md`. Adding a scraper = one decorated file with a `kind` id
-validated at import; every run lands in `scrape_runs` and is judged by
-`GET /api/v1/scrapers/health`.
+casting, paid research, bank bonuses, sitting). **Reddit is research-only, never board
+content** (curation verdict 2026-07-10): the three subreddit scrapers carry
+`research_only=True` and no sweep or refresh runs them; they share `_reddit.py` as research
+tooling. The per-kind lineup, the curation verdict, research verdicts, and the
+declined-with-reasons list live in `docs/source-coverage.md`. Adding a scraper = one
+decorated file with a `kind` id validated at import; every run lands in `scrape_runs` and
+is judged by `GET /api/v1/scrapers/health`.
 
 ## Key Patterns to Reuse
 

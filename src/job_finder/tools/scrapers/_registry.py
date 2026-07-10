@@ -33,6 +33,12 @@ class ScraperMeta:
     # unconfirmed row may honestly stay on the board.
     full_snapshot: bool = False
     stale_after_days: int | None = None
+    # Research tooling, never board content. A research_only source is
+    # visible in the registry (so /scrapers/sources and internal tools can
+    # use it) but no selection path may run it in a sweep or refresh:
+    # reddit tells us WHERE to crawl, it is never itself the content
+    # (curation verdict, docs/source-coverage.md).
+    research_only: bool = False
 
 
 _REGISTRY: dict[str, ScraperMeta] = {}
@@ -49,6 +55,7 @@ def register_scraper(
     kind: str | None = None,
     full_snapshot: bool = False,
     stale_after_days: int | None = None,
+    research_only: bool = False,
 ) -> Callable:
     """Decorator that registers a scraper function with its metadata.
 
@@ -78,6 +85,7 @@ def register_scraper(
             vertical=lane,
             full_snapshot=full_snapshot,
             stale_after_days=stale_after_days,
+            research_only=research_only,
         )
         return fn
     return decorator
@@ -96,7 +104,9 @@ def default_scraper_names() -> list[str]:
     """
     return [
         name for name, meta in _REGISTRY.items()
-        if meta.search_fn is not None and meta.vertical == "career"
+        if meta.search_fn is not None
+        and meta.vertical == "career"
+        and not meta.research_only
     ]
 
 

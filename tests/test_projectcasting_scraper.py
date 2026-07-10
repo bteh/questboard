@@ -56,9 +56,11 @@ class ProjectCastingSearchTest(unittest.TestCase):
 
     def test_one_row_per_job_deep_link(self) -> None:
         rows = self._search()
-        # SLIP article carries 2 /job/ links; Intel Pink and Lizard Music
-        # carry none and fall back to one article row each.
-        self.assertEqual(len(rows), 4)
+        # SLIP article carries 2 /job/ links -> 2 rows. Intel Pink and
+        # Lizard Music carry none -> no rows at all: an article is not a
+        # casting call (a scam-alert blog post reached the live board
+        # through the old article fallback, 2026-07-10).
+        self.assertEqual(len(rows), 2)
         urls = [r["url"] for r in rows]
         self.assertIn(_KID_ACTORS_URL, urls)
         self.assertIn(_GOLFERS_URL, urls)
@@ -104,16 +106,14 @@ class ProjectCastingSearchTest(unittest.TestCase):
         self.assertEqual(row["company"], "Project Casting")
         self.assertNotIn("first_quest_ok", row)
 
-    def test_article_fallback_row(self) -> None:
+    def test_article_without_job_link_produces_no_row(self) -> None:
+        # Every row must point at a /job/ page. An article with no deep
+        # link is journalism, not a posting; it gets no row, never a
+        # fallback row pointing at itself.
         rows = self._search()
-        row = next(r for r in rows if "intel-pink" in r["url"])
-        self.assertIn("Intel Pink", row["title"])
-        self.assertEqual(row["company"], "Project Casting")
-        self.assertEqual(row["location"], "Toronto")   # from the post's own tags
-        self.assertTrue(row["date_posted"].startswith("2026-07-07"))
-        self.assertIn("Billie Eilish", row["description"])
-        self.assertNotIn("The post", row["description"])
-        self.assertIn("Billie Eilish", row["quest"]["tags"])
+        for r in rows:
+            self.assertIn("/job/", r["url"])
+        self.assertFalse(any("intel-pink" in r["url"] for r in rows))
 
     def test_expired_deadline_drops_row(self) -> None:
         # Past the fixture posting's validThrough: the enriched row must go,
@@ -122,11 +122,11 @@ class ProjectCastingSearchTest(unittest.TestCase):
         urls = [r["url"] for r in rows]
         self.assertNotIn(_KID_ACTORS_URL, urls)
         self.assertIn(_GOLFERS_URL, urls)
-        self.assertEqual(len(rows), 3)
+        self.assertEqual(len(rows), 1)
 
     def test_max_results_caps_rows(self) -> None:
-        rows = self._search(max_results=2)
-        self.assertEqual(len(rows), 2)
+        rows = self._search(max_results=1)
+        self.assertEqual(len(rows), 1)
 
     def test_bad_feed_returns_empty(self) -> None:
         for bad in (None, "", "not xml <"):

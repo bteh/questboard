@@ -301,8 +301,9 @@ def _enrich_row(row: dict) -> None:
 def _rows_from_item(item: dict) -> list[dict]:
     """Base row(s) for one casting-call feed item.
 
-    One row per distinct /job/ deep link in the article body; a single row
-    pointing at the article when it carries no deep link.
+    One row per distinct /job/ deep link in the article body. An article
+    with no deep link is journalism, not a posting, and produces no row:
+    the old fallback published a scam-alert blog post as a casting call.
     """
     tags = _topical_tags(item["categories"])
     base = {
@@ -329,7 +330,7 @@ def _rows_from_item(item: dict) -> list[dict]:
         if slug.lower() not in slugs:
             slugs.append(slug.lower())
     if not slugs:
-        return [{**_clone(), "title": item["title"], "url": item["link"]}]
+        return []
     rows: list[dict] = []
     for slug in slugs:
         row = _clone()

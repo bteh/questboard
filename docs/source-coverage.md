@@ -8,15 +8,58 @@ The operating contract for keeping sources healthy is
 `docs/source-reliability.md`; the one-file recipe is
 `docs/adding-a-source.md`.
 
-## Live sources per kind (2026-07-09)
+## THE CURATION VERDICT (2026-07-10): reddit is research, never content
+
+A live audit found the board's promise broken three ways: r/PKMNTCGDeals
+bot announcements ("Rumored Target drop tonight", a literal
+"[ Removed by moderator ]") pinned as quests, a Project Casting scam-alert
+BLOG POST published as a casting call through the article fallback, and
+scam-shaped posts ("TikToks $100-1600/month") among real r/slavelabour
+tasks. Deep research (6 probes) plus a three-model debate (Codex, Sonnet,
+Fable; blinded round) settled it:
+
+- **Reddit is demoted to research-only, product-wide** (`research_only=True`
+  on the registry entry; no sweep or refresh may run one). Two structural
+  reasons beat per-lane gating: the arctic-shift mirror cannot see mod
+  removals, and on marketplace subs mod removal IS the scam filter, so a
+  removed scam would stay pinned for days; and gate regexes lose to an
+  adaptive adversary (two gate patches shipped in two days; a new scam
+  shape appeared anyway). Legal reinforces it: a monetized product
+  republishing reddit content via an unauthorized mirror is the shape
+  Reddit acted against with Pushshift (2024). Reddit's job here is what
+  it was always best at: telling us WHERE to crawl.
+  Re-entry bar: authorized Reddit API access with live post state, plus a
+  validator that rejects removed/locked/deleted posts.
+- **The flip lane is paused** (unanimous verdict). Drop freshness is
+  minutes; the board restocks manually today, so even a verified retailer
+  URL goes stale dishonestly fast, and "verified at scrape time" would be
+  a false badge. Re-entry bar: the scheduler with minute-capable cadence,
+  plus at least one sanctioned source (Best Buy Products API, TCGplayer
+  API, or Pokemon Center poll-and-diff), plus a minutes-scale TTL.
+- **The odd lane goes honestly empty** (r/slavelabour was its only
+  supply). Same state as deliver: a lane with no live sources renders
+  empty rather than filling with rows we can't stand behind.
+  r/DoneDirtCheap inherits the reddit verdict; finding crawlable
+  odd-jobs sources with real counterparties is an open research task.
+- **Every row must terminate at a place you can act** (the projectcasting
+  fallback that turned articles into rows is deleted). The per-row
+  actionability contract (specific ask, way to act, real counterparty,
+  real date) is the next trust build; rejects will land in the run log
+  as rows_invalid.
+
+Principle, from the debate synthesis: scarcity is less damaging than
+false actionability. Debate record:
+`~/.claude-octopus/debates/.../001-board-curation/synthesis.md`.
+
+## Live sources per kind (2026-07-10, post-curation)
 
 | kind | sources | pay shape |
 |---|---|---|
-| skill | 18 career scrapers + JobSpy boards, r/forhire gigs | stated ranges |
+| skill | 18 career scrapers + JobSpy boards | stated ranges |
 | think | FocusGroups.org, **User Interviews** | per-session, stated |
 | perform | AuditionsFree, Casting Networks, 1iota, Project Casting, Standing Room Only | stated when posted |
-| odd | **r/slavelabour** | stated in titles, note-first |
-| flip | **r/PKMNTCGDeals** | never (a price is not a payout) |
+| odd | none, by curation verdict (was r/slavelabour) | n/a |
+| flip | none, paused by curation verdict (was r/PKMNTCGDeals) | n/a |
 | deliver | none, by verdict (see below) | n/a |
 | lookafter | **Sittercity** | poster-set hourly ranges |
 | house | **Doctor of Credit**, **BankRewards.io** | exact stated bonuses |
@@ -25,7 +68,8 @@ The operating contract for keeping sources healthy is
 
 Bold = added in the kind-sources push. Every source is one decorated
 file under `src/job_finder/tools/scrapers/`, lane-validated at import,
-and judged per run by `GET /api/v1/scrapers/health`.
+and judged per run by `GET /api/v1/scrapers/health`. The three reddit
+scrapers stay in the tree as research tooling (`research_only=True`).
 
 ## Verdicts that shaped the lineup
 
