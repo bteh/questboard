@@ -129,6 +129,7 @@ def _fetch_city(path: str) -> list:
     stale_after_days=10,
     # the site 429s bursts; one polite sweep a day
     refresh_hours=24,
+    allowed_url_hosts=("sittercity.com",),
     enabled_by_default=False,
 )
 def search_sittercity(

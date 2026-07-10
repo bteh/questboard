@@ -196,6 +196,7 @@ def _normalize_post(post: dict) -> dict | None:
     stale_after_days=45,
     # DoC posts new offers through the day
     refresh_hours=12,
+    allowed_url_hosts=("doctorofcredit.com",),
     enabled_by_default=False,
 )
 def search_doctorofcredit(

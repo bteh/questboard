@@ -283,6 +283,7 @@ def _fetch_role(url: str) -> dict | None:
     category="quest",
     # open calls page shifts daily
     refresh_hours=24,
+    allowed_url_hosts=("castingnetworks.com",),
     enabled_by_default=False,
     vertical="camera",
 )

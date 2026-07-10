@@ -79,6 +79,11 @@ function RunRow({ run }: { run: ScrapeRunEntry }) {
       <td className="qb-health-source">{run.display_name}</td>
       <td><Chip label={label} tone={tone} /></td>
       <td className="qb-health-num">{run.rows_found}</td>
+      <td className="qb-health-num">
+        {run.rows_invalid > 0
+          ? <span className="qb-health-chip" data-tone="warn">{run.rows_invalid}</span>
+          : <span className="qb-health-median">0</span>}
+      </td>
       <td className="qb-health-num">{durationLabel(run.duration_s)}</td>
       <td className="qb-health-err" title={run.error_sample || undefined}>
         {run.error_sample}
@@ -246,6 +251,7 @@ function HealthPage() {
                     <th>Source</th>
                     <th>Outcome</th>
                     <th>Rows</th>
+                    <th>Rejected</th>
                     <th>Took</th>
                     <th>Error</th>
                   </tr>

@@ -171,7 +171,8 @@ def test_run_scrapers_stamps_contract_fields():
         url="https://example.com",
     )
     def _fake(**kwargs):
-        return [{"title": "x", "company": "y", "url": "u", "source": "_test_dates_fake"}]
+        # a real URL shape: the row contract rejects malformed ones now
+        return [{"title": "x", "company": "y", "url": "https://example.com/job/x", "source": "_test_dates_fake"}]
 
     jobs = run_scrapers(names=["_test_dates_fake"], roles=None)
     assert len(jobs) == 1

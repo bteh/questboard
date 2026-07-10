@@ -117,6 +117,7 @@ def _normalize_listing(item: dict) -> dict | None:
     stale_after_days=14,
     # studies fill fast; twice a day keeps slots real
     refresh_hours=12,
+    allowed_url_hosts=("userinterviews.com",),
     enabled_by_default=False,
 )
 def search_userinterviews(

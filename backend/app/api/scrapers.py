@@ -108,6 +108,7 @@ async def scrape_runs(
                 duration_s=r.duration_s or 0.0,
                 finish_reason=r.finish_reason,
                 rows_found=r.rows_found or 0,
+                rows_invalid=getattr(r, "rows_invalid", 0) or 0,
                 error_sample=r.error_sample or "",
             )
             for r in rows

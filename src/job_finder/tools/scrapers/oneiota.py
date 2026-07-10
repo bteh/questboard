@@ -97,6 +97,7 @@ def _normalize_event(event: dict) -> dict | None:
     vertical="camera",
     # tapings announce days ahead
     refresh_hours=24,
+    allowed_url_hosts=("1iota.com",),
     enabled_by_default=False,
 )
 def search_oneiota(
