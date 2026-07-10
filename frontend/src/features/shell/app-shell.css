@@ -154,6 +154,8 @@ button.qb-prof-card { cursor: pointer; }
   color: var(--mute);
 }
 .qb-nav-item:hover { background: rgba(255, 255, 255, .6); }
+/* thin rule before the local-only ops zone (source health) */
+.qb-nav-hr { height: 1px; background: var(--hair); margin: 8px 10px; }
 .qb-nav-item.qb-active {
   background: var(--paper); color: var(--ink);
   border-color: var(--hair); border-bottom-color: var(--edge);
