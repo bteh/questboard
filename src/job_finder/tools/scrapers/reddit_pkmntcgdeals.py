@@ -67,6 +67,10 @@ def _normalize_post(post: dict) -> dict | None:
     # drops happen the same night; two days later the lead is dead
     stale_after_days=2,
     enabled_by_default=False,
+    # curation verdict 2026-07-10: a reddit thread about a drop is not a
+    # place to act; the flip lane is paused until sanctioned retailer
+    # sources + the scheduler exist (see docs/source-coverage.md)
+    research_only=True,
 )
 def search_reddit_pkmntcgdeals(
     roles: list[str] | None = None,

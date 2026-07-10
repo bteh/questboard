@@ -104,6 +104,11 @@ def _normalize_post(post: dict) -> dict | None:
     # tasks fill in days; a task unseen for 10 days is gone
     stale_after_days=10,
     enabled_by_default=False,
+    # curation verdict 2026-07-10: reddit is research, never board content.
+    # The sub's scam filter is mod removal, which the arctic-shift mirror
+    # cannot see, so a removed scam would stay pinned for days
+    # (see docs/source-coverage.md)
+    research_only=True,
 )
 def search_reddit_slavelabour(
     roles: list[str] | None = None,

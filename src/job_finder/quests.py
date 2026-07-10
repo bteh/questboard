@@ -93,7 +93,9 @@ def run_quest_search(
     names = [
         name
         for name, meta in registry.items()
-        if meta.search_fn is not None and meta.vertical in requested
+        if meta.search_fn is not None
+        and meta.vertical in requested
+        and not meta.research_only
     ]
 
     summary: dict[str, Any] = {

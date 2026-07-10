@@ -107,6 +107,9 @@ def _normalize_post(post: dict) -> dict | None:
     enabled_by_default=False,
     # gigs are hired out within weeks; the fetch is a newest-100 window
     stale_after_days=21,
+    # curation verdict 2026-07-10: reddit is research, never board content
+    # (mirror can't see mod removals; see docs/source-coverage.md)
+    research_only=True,
 )
 def search_reddit_forhire(
     roles: list[str] | None = None,
