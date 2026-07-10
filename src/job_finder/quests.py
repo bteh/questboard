@@ -79,6 +79,7 @@ def run_quest_search(
     radius_miles: int | None = None,
     workspace_id: str | None = None,
     progress: Callable[[str], None] | None = None,
+    only_sources: list[str] | None = None,
 ) -> dict:
     """Run the quest scrapers for the requested verticals and persist rows.
 
@@ -87,6 +88,10 @@ def run_quest_search(
     run_scrapers, then saves each emitted row with the quest kwargs. Rows
     whose event_start is already in the past are skipped as stale. Returns a
     summary with totals and per-source counts.
+
+    ``only_sources`` narrows the selection further (the scheduler sweeps
+    exactly the sources that are due, not a vertical's whole roster); it
+    can only narrow, never bypass the vertical/research_only gates.
     """
     requested = {v for v in verticals if v != "career"}
     registry = get_registry()
@@ -96,6 +101,7 @@ def run_quest_search(
         if meta.search_fn is not None
         and meta.vertical in requested
         and not meta.research_only
+        and (only_sources is None or name in only_sources)
     ]
 
     summary: dict[str, Any] = {

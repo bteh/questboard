@@ -139,6 +139,8 @@ def _normalize_offer(offer: dict) -> dict | None:
     kind="house",
     # one POST returns the entire active set, so absence proves removal
     full_snapshot=True,
+    # bonus set shifts daily at most
+    refresh_hours=24,
     enabled_by_default=False,
 )
 def search_bankrewards(

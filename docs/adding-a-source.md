@@ -18,6 +18,10 @@ from job_finder.tools.scrapers._registry import register_scraper
     url="https://www.roadie.com",
     description="Package delivery gigs along routes you already drive",
     kind="deliver",          # canonical kind id from packages/kinds/kinds.json
+    refresh_hours=24,        # the scheduler sweeps it this often; pick the
+                             # source's real publishing rhythm, stay polite
+    stale_after_days=10,     # expiry contract; full_snapshot=True instead
+                             # when one fetch is the source's entire set
 )
 def search(config: dict, progress=None) -> list[dict]:
     ...

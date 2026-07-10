@@ -115,6 +115,8 @@ def _normalize_listing(item: dict) -> dict | None:
     kind="think",
     # studies fill within days to weeks; run windows also set event_end
     stale_after_days=14,
+    # studies fill fast; twice a day keeps slots real
+    refresh_hours=12,
     enabled_by_default=False,
 )
 def search_userinterviews(

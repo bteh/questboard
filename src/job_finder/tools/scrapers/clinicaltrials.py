@@ -198,6 +198,8 @@ def _normalize_study(
     url="https://clinicaltrials.gov",
     description="Research studies recruiting healthy volunteers via the ClinicalTrials.gov v2 API",
     category="body",
+    # recruiting statuses move slowly
+    refresh_hours=24,
     enabled_by_default=False,
     # A clinical trial rents your BODY (screenings, confinement, doses);
     # focus groups and interviews sell your opinion. The communities have

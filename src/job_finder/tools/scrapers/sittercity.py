@@ -127,6 +127,8 @@ def _fetch_city(path: str) -> list:
     kind="lookafter",
     # sits get filled fast and fall off the city page
     stale_after_days=10,
+    # the site 429s bursts; one polite sweep a day
+    refresh_hours=24,
     enabled_by_default=False,
 )
 def search_sittercity(

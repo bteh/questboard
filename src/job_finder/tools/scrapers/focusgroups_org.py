@@ -213,6 +213,8 @@ def _normalize_card(card: dict) -> dict | None:
     url="https://focusgroups.org",
     description="Paid focus groups, interviews and consumer research studies",
     category="study",
+    # new groups post on business days
+    refresh_hours=24,
     enabled_by_default=False,
     vertical="study",
     # focus groups recruit for a few weeks at most

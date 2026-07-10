@@ -348,6 +348,8 @@ def _rows_from_item(item: dict) -> list[dict]:
     url="https://www.projectcasting.com",
     description="Casting calls and auditions from Project Casting",
     category="quest",
+    # calls post daily; deadlines run in days
+    refresh_hours=24,
     enabled_by_default=False,
     vertical="camera",
 )

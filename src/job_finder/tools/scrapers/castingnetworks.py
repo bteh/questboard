@@ -281,6 +281,8 @@ def _fetch_role(url: str) -> dict | None:
     url="https://www.castingnetworks.com",
     description="Public casting calls from Casting Networks role pages",
     category="quest",
+    # open calls page shifts daily
+    refresh_hours=24,
     enabled_by_default=False,
     vertical="camera",
 )
