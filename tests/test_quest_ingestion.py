@@ -279,9 +279,16 @@ def api_client(tmp_path, monkeypatch):
 
 def test_refresh_endpoint_validates_verticals(api_client):
     client, _jf_db = api_client
-    for bad in (["bogus"], ["career"], [], ["camera", "bogus"], ["party"]):
+    for bad in (["bogus"], ["career"], [], ["camera", "bogus"]):
         resp = client.post("/api/v1/quests/refresh", json={"verticals": bad})
         assert resp.status_code == 400, f"{bad}: {resp.text}"
+
+    # The vocabulary derives from the kinds registry, never a hand list: a
+    # lane with no scrapers yet (party) is a valid no-op refresh, so a new
+    # kind is refreshable the moment its first scraper ships.
+    resp = client.post("/api/v1/quests/refresh", json={"verticals": ["party"]})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["sources"] == {}
 
 
 def test_refresh_endpoint_runs_and_returns_summary(api_client, monkeypatch):

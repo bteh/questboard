@@ -36,8 +36,11 @@ const COPY: Record<string, KindCopy> = {
     catchLine: 'grading and resale fees eat the spread; comps first',
   },
   house: {
-    bring: '21+, a KYC ID before you can bet, a funded bank account',
-    catchLine: 'the book limits you the moment you start winning (gubbing)',
+    /* the live supply is bank and brokerage bonuses (Doctor of Credit,
+       BankRewards), so the copy leads with that reality; sportsbook lines
+       (21+, gubbing) return if a betting source ever ships */
+    bring: 'an ID and money to park; some banks check ChexSystems first',
+    catchLine: 'the bonus is taxable income, and closing the account early can claw it back',
   },
   body: {
     bring: 'a government ID and a health screen',

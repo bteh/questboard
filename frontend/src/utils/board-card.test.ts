@@ -336,6 +336,27 @@ describe('quest rows', () => {
     expect(toBoardCard(makeApp({ vertical: 'weird' })).vertical).toBe('career');
     expect(toBoardCard(makeApp({ vertical: 'camera' })).vertical).toBe('camera');
   });
+
+  it('gives every registry-known lane the quest shape, never a hand list', () => {
+    /* regression: house/odd/flip once collapsed to career and rendered a
+       degenerate "$300–300" range through the career pay formatter */
+    const bonus = toBoardCard(
+      makeApp({
+        vertical: 'house',
+        job_title: 'Chase $300 Bonus',
+        company: 'Doctor of Credit',
+        salary_min: 300,
+        salary_max: 300,
+      }),
+    );
+    expect(bonus.vertical).toBe('house');
+    expect(bonus.pay).toBe('$300');
+    expect(bonus.fit).toBeNull();
+
+    const task = toBoardCard(makeApp({ vertical: 'odd', job_title: 'Assemble a desk' }));
+    expect(task.vertical).toBe('odd');
+    expect(task.needs).not.toContain('resume');
+  });
 });
 
 describe('typed pay range helpers', () => {

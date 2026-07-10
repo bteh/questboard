@@ -186,9 +186,11 @@ class RedditForhireParseTest(unittest.TestCase):
 
 
 class RedditForhirePayExtractionTest(unittest.TestCase):
+    """The stated-pay extractor, now shared by every subreddit source."""
+
     def setUp(self) -> None:
-        from job_finder.tools.scrapers import reddit_forhire as mod
-        self.extract = mod._extract_pay
+        from job_finder.tools.scrapers import _reddit as mod
+        self.extract = mod.extract_pay
 
     def test_dollar_amount_with_letter_suffix_is_not_pay(self) -> None:
         note, fields = self.extract("Our channel has $1M views potential")

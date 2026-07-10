@@ -3,7 +3,6 @@ import { boardVertical, toBoardCard } from '@/utils/board-card';
 import { postedAgoLabel } from '@/utils/job-trust';
 import { markEntered } from '@/lib/entry';
 import type { ApplicationResponse } from '@/types/application';
-import type { Vertical } from '@questboard/ui';
 
 type EnterNavigate = (opts: { to: '/board' }) => void | Promise<void>;
 
@@ -43,7 +42,9 @@ export function pickLandingCards(items: ApplicationResponse[]): ApplicationRespo
   return picks;
 }
 
-const QUEST_NOUN: Record<Vertical, string> = {
+/* keyed by the legacy verticals that earn a specific noun; every other
+   lane (house, odd, flip, body, ...) falls back to plain "quest" */
+const QUEST_NOUN: Record<string, string> = {
   career: 'job posting',
   camera: 'casting call',
   study: 'study listing',

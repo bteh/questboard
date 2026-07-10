@@ -1,0 +1,222 @@
+{
+ "data": [
+  {
+   "id": "435186",
+   "type": "projectListing",
+   "attributes": {
+    "accessCode": "yj9ug1YGww",
+    "applyUrl": "/projects/yj9ug1YGww/apply",
+    "deviceRequirements": [
+     "Computer with webcam"
+    ],
+    "estimatedTime": "45 minutes",
+    "interviewTypeId": 4,
+    "studyTypeId": 1,
+    "participantCompensationAmount": 45.0,
+    "publicDescription": "We're talking to Flight Centre customers about their recent travel experiences \u2014 planning, booking, and everything in between. It's a relaxed 45 minute conversation about what worked, what didn't, and how you go about organising trips. No right or wrong answers, just your honest experience.",
+    "publicTitle": "Share Your Flight Centre Travel Experience",
+    "runDateRangeString": "10 Jul 2026 - 29 Jul 2026",
+    "locationShortString": null,
+    "latitude": null,
+    "longitude": null,
+    "compensationType": "choice of dozens of digital gift cards",
+    "advancedScreening": false,
+    "displayIncentive": true,
+    "interviewTypeName": "Online",
+    "studyTypeName": "1-on-1 Interview",
+    "wePay": true,
+    "isPrivate": false,
+    "noIncentive": false,
+    "incentive": "$45.00 via choice of dozens of digital gift cards",
+    "preStudyMfeScreenerEnabled": false,
+    "quickApply": true,
+    "hasDocumentSigning": false,
+    "teamName": "Great Question"
+   }
+  },
+  {
+   "id": "435184",
+   "type": "projectListing",
+   "attributes": {
+    "accessCode": "5GOfLcEZlQ",
+    "applyUrl": "/projects/5GOfLcEZlQ/apply",
+    "deviceRequirements": [
+     "Computer with webcam",
+     "Google Chrome"
+    ],
+    "estimatedTime": "20 minutes",
+    "interviewTypeId": 4,
+    "studyTypeId": 4,
+    "participantCompensationAmount": 35.0,
+    "publicDescription": "We're inviting you to come take a brief study on key voter issues and political perceptions!",
+    "publicTitle": "Study on Political Perceptions",
+    "runDateRangeString": "12 Jul 2026",
+    "locationShortString": null,
+    "latitude": null,
+    "longitude": null,
+    "compensationType": "choice of dozens of digital gift cards",
+    "advancedScreening": false,
+    "displayIncentive": true,
+    "interviewTypeName": "Online",
+    "studyTypeName": "Unmoderated Task",
+    "wePay": true,
+    "isPrivate": false,
+    "noIncentive": false,
+    "incentive": "$35.00 via choice of dozens of digital gift cards",
+    "preStudyMfeScreenerEnabled": false,
+    "quickApply": true,
+    "hasDocumentSigning": false,
+    "teamName": "Dialogue AI"
+   }
+  },
+  {
+   "id": "435181",
+   "type": "projectListing",
+   "attributes": {
+    "accessCode": "5nMq7PfDMQ",
+    "applyUrl": "/projects/5nMq7PfDMQ/apply",
+    "deviceRequirements": [
+     "Computer with webcam",
+     "MacOS",
+     "Windows",
+     "Audio",
+     "Screen"
+    ],
+    "estimatedTime": "10 minutes",
+    "interviewTypeId": 4,
+    "studyTypeId": 4,
+    "participantCompensationAmount": 10.0,
+    "publicDescription": "Make sure to answer all screener questions accurately and honestly to avoid issues with your submission.",
+    "publicTitle": "Research Study",
+    "runDateRangeString": "10 Jul 2026",
+    "locationShortString": null,
+    "latitude": null,
+    "longitude": null,
+    "compensationType": "choice of dozens of digital gift cards",
+    "advancedScreening": false,
+    "displayIncentive": true,
+    "interviewTypeName": "Online",
+    "studyTypeName": "Unmoderated Task",
+    "wePay": true,
+    "isPrivate": false,
+    "noIncentive": false,
+    "incentive": "$10.00 via choice of dozens of digital gift cards",
+    "preStudyMfeScreenerEnabled": false,
+    "quickApply": false,
+    "hasDocumentSigning": false,
+    "teamName": "PlaybookUX"
+   }
+  },
+  {
+   "id": "435176",
+   "type": "projectListing",
+   "attributes": {
+    "accessCode": "rccydOSJ3Q",
+    "applyUrl": "/projects/rccydOSJ3Q/apply",
+    "deviceRequirements": [
+     "Computer with webcam",
+     "Smartphone",
+     "Tablet"
+    ],
+    "estimatedTime": "44 minutes",
+    "interviewTypeId": 4,
+    "studyTypeId": 4,
+    "participantCompensationAmount": 22.0,
+    "publicDescription": "Join an innovative AI-powered interview study by Listen Labs. Our AI interviewer will ask you questions about your experiences and opinions, adapting based on your responses. Your insights will help shape future products and services. The process is designed to be engaging, efficient, and respectful of your time. Participate in cutting-edge research from the comfort of your own device!",
+    "publicTitle": "Share Your Experiences \u2014 30 to 40-Minute Video Interview",
+    "runDateRangeString": "16 Jul 2026",
+    "locationShortString": "multiple locations",
+    "latitude": 37.8043514,
+    "longitude": -122.2711639,
+    "compensationType": "choice of dozens of digital gift cards",
+    "advancedScreening": false,
+    "displayIncentive": true,
+    "interviewTypeName": "Online",
+    "studyTypeName": "Unmoderated Task",
+    "wePay": true,
+    "isPrivate": false,
+    "noIncentive": false,
+    "incentive": "$22.00 via choice of dozens of digital gift cards",
+    "preStudyMfeScreenerEnabled": false,
+    "quickApply": false,
+    "hasDocumentSigning": false,
+    "teamName": "Listen Labs"
+   }
+  },
+  {
+   "id": "fx-private",
+   "type": "projectListing",
+   "attributes": {
+    "accessCode": "yj9ug1YGww",
+    "applyUrl": "/projects/yj9ug1YGww/apply",
+    "deviceRequirements": [
+     "Computer with webcam"
+    ],
+    "estimatedTime": "45 minutes",
+    "interviewTypeId": 4,
+    "studyTypeId": 1,
+    "participantCompensationAmount": 45.0,
+    "publicDescription": "We're talking to Flight Centre customers about their recent travel experiences \u2014 planning, booking, and everything in between. It's a relaxed 45 minute conversation about what worked, what didn't, and how you go about organising trips. No right or wrong answers, just your honest experience.",
+    "publicTitle": "Share Your Flight Centre Travel Experience",
+    "runDateRangeString": "10 Jul 2026 - 29 Jul 2026",
+    "locationShortString": null,
+    "latitude": null,
+    "longitude": null,
+    "compensationType": "choice of dozens of digital gift cards",
+    "advancedScreening": false,
+    "displayIncentive": true,
+    "interviewTypeName": "Online",
+    "studyTypeName": "1-on-1 Interview",
+    "wePay": true,
+    "isPrivate": true,
+    "noIncentive": false,
+    "incentive": "$45.00 via choice of dozens of digital gift cards",
+    "preStudyMfeScreenerEnabled": false,
+    "quickApply": true,
+    "hasDocumentSigning": false,
+    "teamName": "Great Question"
+   }
+  },
+  {
+   "id": "fx-free",
+   "type": "projectListing",
+   "attributes": {
+    "accessCode": "5GOfLcEZlQ",
+    "applyUrl": "/projects/5GOfLcEZlQ/apply",
+    "deviceRequirements": [
+     "Computer with webcam",
+     "Google Chrome"
+    ],
+    "estimatedTime": "20 minutes",
+    "interviewTypeId": 4,
+    "studyTypeId": 4,
+    "participantCompensationAmount": null,
+    "publicDescription": "We're inviting you to come take a brief study on key voter issues and political perceptions!",
+    "publicTitle": "Study on Political Perceptions",
+    "runDateRangeString": "12 Jul 2026",
+    "locationShortString": null,
+    "latitude": null,
+    "longitude": null,
+    "compensationType": "choice of dozens of digital gift cards",
+    "advancedScreening": false,
+    "displayIncentive": true,
+    "interviewTypeName": "Online",
+    "studyTypeName": "Unmoderated Task",
+    "wePay": true,
+    "isPrivate": false,
+    "noIncentive": true,
+    "incentive": "$35.00 via choice of dozens of digital gift cards",
+    "preStudyMfeScreenerEnabled": false,
+    "quickApply": true,
+    "hasDocumentSigning": false,
+    "teamName": "Dialogue AI"
+   }
+  }
+ ],
+ "meta": {
+  "pagination": {
+   "currentPage": 1,
+   "hasMore": false
+  }
+ }
+}

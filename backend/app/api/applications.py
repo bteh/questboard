@@ -160,7 +160,7 @@ def list_applications(
     include_dead: bool = Query(False, description="Include postings whose URL is confirmed dead"),
     vertical: str | None = Query(
         None,
-        description="Vertical(s) to list, single or comma list (career,camera,study,lens,party). Defaults to career",
+        description="Vertical(s) to list, single or comma list; the vocabulary is packages/kinds/kinds.json. Defaults to career",
     ),
     upcoming_only: bool = Query(
         False,

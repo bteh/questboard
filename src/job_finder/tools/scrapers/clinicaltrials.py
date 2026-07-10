@@ -174,7 +174,7 @@ def _normalize_study(
         "location": _format_location(site),
         "url": f"https://clinicaltrials.gov/study/{nct_id}",
         "source": "clinicaltrials",
-        "vertical": "study",
+        "vertical": "body",
         # The protocol's own summary, whitespace-collapsed. No pay language is
         # added: the API has no compensation field.
         "description": _strip_html(ps.get("descriptionModule", {}).get("briefSummary") or ""),
@@ -197,9 +197,14 @@ def _normalize_study(
     display_name="ClinicalTrials.gov",
     url="https://clinicaltrials.gov",
     description="Research studies recruiting healthy volunteers via the ClinicalTrials.gov v2 API",
-    category="study",
+    category="body",
     enabled_by_default=False,
-    vertical="study",
+    # A clinical trial rents your BODY (screenings, confinement, doses);
+    # focus groups and interviews sell your opinion. The communities have
+    # self-sorted the same way (r/plassing vs r/focusgroups), so this
+    # source moved from the think lane to body (2026-07-09). New rows
+    # store vertical="body"; the alembic data revision refiles old rows.
+    kind="body",
 )
 def search_clinicaltrials(
     roles: list[str] | None = None,

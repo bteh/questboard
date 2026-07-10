@@ -1,7 +1,8 @@
 import { useState, type KeyboardEvent } from 'react';
 import { createRoute, Link } from '@tanstack/react-router';
 import { Route as appRoute } from './app';
-import { Stamp, StampDefs, verticals } from '@questboard/ui';
+import { StampDefs } from '@questboard/ui';
+import { LaneStamp, laneDisplay } from '@/components/shared/lane-display';
 import { useApplications, useCreateApplication, useLogEdit } from '@/hooks/use-applications';
 import { useSourceLabels, resolveSourceLabel } from '@/hooks/use-scrapers';
 import { useProfile } from '@/contexts/profile-context';
@@ -178,7 +179,7 @@ function LogCard({ app, labels }: { app: ApplicationResponse; labels: Record<str
   return (
     <article className="qb-lcard">
       <div className="qb-stampcell">
-        <Stamp vertical={vertical} size={28} />
+        <LaneStamp vertical={vertical} size={28} />
       </div>
       <div>
         <div className="qb-ltitle">{personal ? app.job_title : card!.title}</div>
@@ -259,7 +260,7 @@ function LogCard({ app, labels }: { app: ApplicationResponse; labels: Record<str
 }
 
 function verticalHue(app: ApplicationResponse): string {
-  return verticals[boardVertical(app)].hue;
+  return laneDisplay(boardVertical(app)).hue;
 }
 
 function DoneBlock({ done }: { done: ApplicationResponse[] }) {

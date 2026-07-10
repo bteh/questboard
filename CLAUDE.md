@@ -173,12 +173,15 @@ of errors (threshold within a rolling window, not lifetime), so transient hiccup
 one board don't black out a run -- run with >=2 working boards so an open circuit on
 one still leaves results.
 
-**Plugin scrapers** (16 sources via `src/job_finder/tools/scrapers/`): Remotive, Himalayas,
-We Work Remotely, Hacker News Who's Hiring, RemoteOK, CryptoJobsList, Getro (crypto + VC
-talent-network boards, opt-in), Consider (VC talent-network boards embedded in board HTML, e.g.
-a16z crypto's portfolio board at a16zcrypto.com/jobs, opt-in), Arbeitnow, The Muse, YC Work
-at a Startup, plus ATS scrapers for Greenhouse, Lever, Ashby, and Workday (company lists
-driven by user watchlist). Adding a new scraper = one decorated file, auto-discovered on import.
+**Plugin scrapers** (`src/job_finder/tools/scrapers/`, auto-discovered on import): career
+sources (Remotive, Himalayas, We Work Remotely, HN Who's Hiring, RemoteOK, CryptoJobsList,
+Getro, Consider, Arbeitnow, The Muse, YC Work at a Startup, plus ATS scrapers for Greenhouse,
+Lever, Ashby, and Workday driven by user watchlist) and quest-kind sources (focus groups,
+casting, paid research, bank bonuses, tasks, sitting, TCG drops; subreddit sources share
+`_reddit.py`). The per-kind lineup, research verdicts, and the declined-with-reasons list
+live in `docs/source-coverage.md`. Adding a scraper = one decorated file with a `kind` id
+validated at import; every run lands in `scrape_runs` and is judged by
+`GET /api/v1/scrapers/health`.
 
 ## Key Patterns to Reuse
 
