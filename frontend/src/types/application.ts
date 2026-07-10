@@ -190,6 +190,8 @@ export interface ApplicationFilters {
   recommendation?: string;
   company_type?: string;
   work_type?: string;
+  /** place text; remote/online/nationwide and no-place rows always pass */
+  location?: string;
   source?: string;
   search?: string;
   sort_by?: string;

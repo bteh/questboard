@@ -1,6 +1,6 @@
 /* The board's filter state, serialized two ways and pinned by
    board-state.test.ts:
-   - URL search params (?v, ?q, ?from, ?to, ?p) so a filtered board is a
+   - URL search params (?v, ?q, ?place, ?from, ?to, ?p) so a filtered board is a
      shareable address and back/forward walks filter changes;
    - localStorage at questboard:board.v1 so Tuesday's board is already set
      up on Wednesday. Params beat saved state: the board route redirects a
@@ -18,6 +18,8 @@ export interface BoardParams {
   v?: KindKey;
   /** Board search text. */
   q?: string;
+  /** Place text ("Los Angeles", "NV"); remote and no-place rows always pass. */
+  place?: string;
   /** Typed pay floor, as typed ("150k"). */
   from?: string;
   /** Typed pay ceiling, as typed. */
@@ -40,6 +42,7 @@ export function validateBoardSearch(search: Record<string, unknown>): BoardParam
   return {
     v: normalizeKindKey(v),
     q: cleanString(search.q),
+    place: cleanString(search.place),
     from: cleanString(search.from),
     to: cleanString(search.to),
     p: cleanString(search.p),
@@ -47,7 +50,7 @@ export function validateBoardSearch(search: Record<string, unknown>): BoardParam
 }
 
 export function hasBoardParams(params: BoardParams): boolean {
-  return Boolean(params.v || params.q || params.from || params.to || params.p);
+  return Boolean(params.v || params.q || params.place || params.from || params.to || params.p);
 }
 
 /** ?p= comma list -> the set of keys the board recognizes today. */

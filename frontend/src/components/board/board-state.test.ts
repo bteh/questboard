@@ -47,6 +47,11 @@ afterEach(() => {
 const PRESET_ORDER = ['noexp', 'remote', 'strong', 'score50', 'early', 'bigtech'];
 
 describe('validateBoardSearch', () => {
+  it('carries the place filter and drops an empty one', () => {
+    expect(validateBoardSearch({ place: 'Los Angeles' }).place).toBe('Los Angeles');
+    expect(validateBoardSearch({ place: '' }).place).toBeUndefined();
+  });
+
   it('keeps known verticals and drops junk', () => {
     expect(validateBoardSearch({ v: 'perform' }).v).toBe('perform');
     /* legacy vertical values from old URLs and saved state keep working */

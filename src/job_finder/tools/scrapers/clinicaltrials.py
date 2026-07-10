@@ -235,6 +235,10 @@ def search_clinicaltrials(
         params["query.term"] = query
     if lat is not None and lon is not None:
         params["filter.geo"] = f"distance({lat},{lon},{radius_miles}mi)"
+    else:
+        # the registry is global (a Guangzhou trial reached the live board);
+        # without a geo hint, keep the board's default audience reachable
+        params["query.locn"] = "United States"
 
     logger.info("Fetching healthy-volunteer studies from ClinicalTrials.gov...")
     results: list[dict] = []
