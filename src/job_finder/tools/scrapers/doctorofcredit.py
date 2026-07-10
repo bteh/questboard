@@ -94,11 +94,30 @@ def _glance(content_html: str) -> dict[str, str]:
 
 
 def _title_pay(title: str) -> dict:
-    """Salary fields from the stated title amounts; empty dict when none."""
-    amounts = [float(m.replace(",", "")) for m in _AMOUNT_RE.findall(title)]
+    """Salary fields from the stated title amounts; empty dict when none.
+
+    Only BONUS amounts count. DoC titles put offer MECHANICS in
+    parentheses ("($20 Per Month)", "($5,000 For 150 Days)",
+    "($5,000-$5,000,000 In Qualifying Assets Required)"), so parenthesized
+    segments are stripped before extraction; un-parenthesized cost framing
+    ("Deposit $5,000+ & Earn $250 Bonus") is excluded by context words.
+    Rendering a cost or a cadence as the reward would overstate or
+    understate the offer.
+    """
+    title = re.sub(r"\([^)]*\)", " ", title)
+    amounts: list[float] = []
+    lower = title.lower()
+    for m in _AMOUNT_RE.finditer(title):
+        before = lower[max(0, m.start() - 20):m.start()]
+        after = lower[m.end():m.end() + 12]
+        if any(word in before for word in ("deposit", "spend", "maintain", "keep")):
+            continue
+        if after.lstrip().startswith(("per month", "per mo", "/mo", "monthly")):
+            continue
+        amounts.append(float(m.group(1).replace(",", "")))
     if not amounts:
         return {}
-    if "up to" in title.lower():
+    if "up to" in lower:
         return {"salary_max": max(amounts), "salary_source": "reported"}
     return {
         "salary_min": min(amounts),
@@ -171,6 +190,10 @@ def _normalize_post(post: dict) -> dict | None:
     description="Live bank and brokerage bonuses with the source's own hard-pull and ChexSystems facts",
     category="house",
     kind="house",
+    # windowed fetch (newest-modified 100 of ~1k live posts): absence proves
+    # nothing, but DoC bumps live offers regularly, so 45 unconfirmed days
+    # means the offer very likely died
+    stale_after_days=45,
     enabled_by_default=False,
 )
 def search_doctorofcredit(

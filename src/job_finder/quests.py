@@ -102,10 +102,17 @@ def run_quest_search(
         "saved": 0,
         "deduped": 0,
         "skipped_stale": 0,
+        "expired": 0,
         "sources": {name: _new_counts() for name in names},
     }
     if not names:
         return summary
+
+    # the backup plan: a rotating snapshot before anything writes, so a bad
+    # sweep or a broken source can always be undone (job_finder.backup)
+    from job_finder.backup import snapshot_database
+
+    snapshot_database()
 
     geo = {"query": query, "lat": lat, "lon": lon, "radius_miles": radius_miles}
     scraper_kwargs: dict[str, dict[str, Any]] = {}
@@ -116,7 +123,10 @@ def run_quest_search(
 
     rows = run_scrapers(
         names=names,
-        max_results=50,
+        # 100, not 50: full_snapshot sources (bankrewards ~89 offers) must
+        # fetch their ENTIRE current set or the absence-expiry rule would
+        # tombstone live offers the cap truncated away
+        max_results=100,
         progress=progress,
         scraper_kwargs=scraper_kwargs or None,
     )
@@ -200,9 +210,25 @@ def run_quest_search(
         if counts["found"] == 0:
             logger.warning("Quest source %s returned no rows; dead or empty?", name)
 
+    # every source that just ran gets its expiry sweep: absence for
+    # full-snapshot sources, staleness for windowed ones, both guarded
+    # (job_finder.expiry). Rows the sweep tombstones leave the board but
+    # keep their record and their place in the log.
+    from job_finder.expiry import expire_for_source
+
+    for name in names:
+        result = expire_for_source(name)
+        if result.get("rule") == "none":
+            continue  # no contract declared: nothing to report
+        counts = sources.setdefault(name, _new_counts())
+        counts["expired"] = result.get("expired", 0)
+        if result.get("skipped"):
+            counts["expiry_skipped"] = result["skipped"]
+        summary["expired"] += result.get("expired", 0)
+
     if progress:
         progress(
             f"Quest refresh: {summary['saved']} saved, {summary['deduped']} already known, "
-            f"{summary['skipped_stale']} past events skipped"
+            f"{summary['skipped_stale']} past events skipped, {summary['expired']} expired"
         )
     return summary

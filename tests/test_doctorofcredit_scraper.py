@@ -63,6 +63,44 @@ class DoctorOfCreditTest(unittest.TestCase):
         self.assertEqual(mt["salary_max"], 400.0)
         self.assertEqual(mt["salary_source"], "reported")
 
+    def test_deposit_and_drip_amounts_never_count_as_the_bonus(self) -> None:
+        """Live-audit regression (2026-07-10): 'Deposit $5,000+ & Earn $250
+        Bonus' rendered a $250-5000 reward; the deposit is the COST."""
+        payload = _load_fixture()
+        trade = dict(payload[0])
+        trade["id"] = 999300
+        trade["title"] = {"rendered": "TradeStation: Deposit $5,000+ &#038; Earn $250 Bonus"}
+        trade["link"] = "https://www.doctorofcredit.com/tradestation-deposit-probe"
+        drip = dict(payload[0])
+        drip["id"] = 999301
+        drip["title"] = {"rendered": "Valley National Bank $240 Checking Bonus ($20 Per Month)"}
+        drip["link"] = "https://www.doctorofcredit.com/valley-drip-probe"
+        rows = self._search(payload + [trade, drip])
+
+        ts = next(r for r in rows if "TradeStation" in r["title"])
+        assert ts["salary_min"] == 250.0 and ts["salary_max"] == 250.0
+        vy = next(r for r in rows if "Valley National" in r["title"])
+        assert vy["salary_min"] == 240.0 and vy["salary_max"] == 240.0
+
+    def test_parenthesized_mechanics_never_count_as_the_bonus(self) -> None:
+        """DoC puts requirements in parens: deposit terms, asset minimums."""
+        payload = _load_fixture()
+        for i, (title, want) in enumerate((
+            ("316 Financial $250 Savings Bonus ($5,000 For 150 Days)", 250.0),
+            ("TradeStation $50-$5,000 Brokerage Bonus ($5,000-$5,000,000 In Qualifying Assets Required)", 5000.0),
+        )):
+            post = dict(payload[0])
+            post["id"] = 999400 + i
+            post["title"] = {"rendered": title}
+            post["link"] = f"https://www.doctorofcredit.com/paren-probe-{i}"
+            payload.append(post)
+        rows = self._search(payload)
+
+        fin = next(r for r in rows if "316 Financial" in r["title"])
+        assert fin["salary_min"] == 250.0 and fin["salary_max"] == 250.0
+        ts = next(r for r in rows if "Brokerage" in r["title"])
+        assert ts["salary_min"] == 50.0 and ts["salary_max"] == 5000.0
+
     def test_up_to_promises_a_ceiling_never_a_floor(self) -> None:
         rows = self._search(_load_fixture())
         citi = next(r for r in rows if "Citibank" in r["title"])

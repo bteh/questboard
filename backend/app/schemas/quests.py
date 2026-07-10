@@ -19,6 +19,9 @@ class QuestSourceCounts(BaseModel):
     saved: int = 0
     deduped: int = 0
     skipped_stale: int = 0
+    expired: int = 0
+    # set when the sweep did not run (mass-expiry guard, missing history)
+    expiry_skipped: str | None = None
 
 
 class QuestRefreshSummary(BaseModel):
@@ -27,4 +30,5 @@ class QuestRefreshSummary(BaseModel):
     saved: int = 0
     deduped: int = 0
     skipped_stale: int = 0
+    expired: int = 0
     sources: dict[str, QuestSourceCounts] = {}

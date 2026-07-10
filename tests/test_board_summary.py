@@ -156,6 +156,25 @@ def test_dead_personal_and_past_event_rows_never_count(api_client) -> None:
     assert payload["total"] == 4
 
 
+def test_expired_tombstones_stay_off_the_board(api_client) -> None:
+    client, jf_db = api_client
+    _seed(jf_db)
+
+    session = jf_db._SessionLocal()
+    try:
+        from job_finder.models.database import ApplicationRecord
+
+        row = session.query(ApplicationRecord).filter_by(vertical="study").first()
+        row.url_status = "expired"
+        session.commit()
+    finally:
+        session.close()
+
+    payload = client.get("/api/v1/board/summary").json()
+    assert payload["total"] == 3
+    assert _kind(payload, "think")["count"] == 0
+
+
 def test_fresh_rows_count_as_new_today(api_client) -> None:
     client, jf_db = api_client
     _seed(jf_db)

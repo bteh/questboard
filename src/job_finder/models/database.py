@@ -144,9 +144,15 @@ class ApplicationRecord(Base):
     user_feedback = Column(String(8), default="")  # "up" | "down" | ""
     feedback_notes = Column(Text, default="")
 
-    # URL liveness
-    url_status = Column(String(20), default="unknown")  # alive, dead, unknown
+    # URL liveness. "expired" is the absence tombstone: the source's own
+    # feed stopped listing this row (or it aged past the source's staleness
+    # window), so it leaves the board without losing the record. A re-listed
+    # URL revives to "unknown" on the next save.
+    url_status = Column(String(20), default="unknown")  # alive, dead, unknown, expired
     last_checked_at = Column(DateTime, nullable=True)
+    # when the row's own source last CONFIRMED it (fed by every re-scrape);
+    # expiry in job_finder.expiry reads this, never date_found
+    last_seen_at = Column(DateTime, nullable=True, index=True)
 
     # Posting date provenance — the job's TRUE original post date as reported by
     # the source board, kept distinct from date_found (when WE first saw it) so
@@ -357,6 +363,17 @@ def _migrate_db(engine) -> None:
             conn.execute(
                 text("ALTER TABLE applications ADD COLUMN url_status VARCHAR(20) DEFAULT 'unknown'")
             )
+        if "last_seen_at" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN last_seen_at DATETIME")
+            )
+            # existing rows were last confirmed when they were found; NULL
+            # would exempt them from expiry forever. Guard the source column:
+            # a minimal legacy table may predate date_found entirely.
+            if "date_found" in existing_cols:
+                conn.execute(
+                    text("UPDATE applications SET last_seen_at = date_found WHERE last_seen_at IS NULL")
+                )
         if "last_checked_at" not in existing_cols:
             conn.execute(
                 text("ALTER TABLE applications ADD COLUMN last_checked_at DATETIME")
@@ -601,6 +618,15 @@ def save_application(
             ).first()
             if existing:
                 changed = False
+                prior_updated_at = existing.updated_at
+                # The source just re-listed this URL: confirm it, and revive
+                # an absence tombstone (the offer came back; "unknown" lets
+                # check_urls re-verify). Confirmation deliberately does NOT
+                # bump updated_at: the log sorts by it, and a nightly
+                # re-scrape must never reshuffle the user's log.
+                existing.last_seen_at = _utcnow()
+                if existing.url_status == "expired":
+                    existing.url_status = "unknown"
                 if search_run_id and existing.search_run_id != search_run_id:
                     existing.search_run_id = search_run_id
                     changed = True
@@ -625,7 +651,15 @@ def save_application(
                     changed = True
                 if changed:
                     existing.updated_at = _utcnow()
-                    session.commit()
+                else:
+                    # pin updated_at explicitly: the column's onupdate would
+                    # otherwise fire because last_seen_at changed, and a
+                    # nightly confirm must never reshuffle the log
+                    from sqlalchemy.orm.attributes import flag_modified
+
+                    existing.updated_at = prior_updated_at
+                    flag_modified(existing, "updated_at")
+                session.commit()
                 session.refresh(existing)
                 session.expunge(existing)
                 return existing
@@ -743,6 +777,7 @@ def save_application(
             location=location,
             job_url=job_url,
             source=source,
+            last_seen_at=_utcnow(),
             description=description,
             is_remote=is_remote,
             salary_min=salary_min,

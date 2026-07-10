@@ -48,37 +48,50 @@ fixed floor, so thresholds do not rot):
 source, worst verdicts first, with the last error line inline plus a
 `needs_attention` count. Triage is one call.
 
+**4. Healthy-run-gated expiry** (`job_finder/expiry.py`). Every row
+carries `last_seen_at` (stamped on every re-scrape). Each source declares
+its own expiry contract in its registry entry: `full_snapshot=True`
+sources (one fetch is the whole current set, e.g. BankRewards) expire
+rows absent from TWO consecutive healthy runs; windowed sources declare
+`stale_after_days` instead, because absence from a newest-N fetch proves
+nothing. Backstops: a mass-expiry guard skips any sweep that would
+tombstone more than 30% of a source's live rows (a URL-format change must
+page a human, not wipe a lane); expired rows are tombstones, not deletes
+(they leave the board, keep the record, and keep their place in the log);
+a re-listed URL revives automatically; and confirmation never bumps
+updated_at, so a nightly re-scrape cannot reshuffle the user's log.
+
+**5. Rotating database snapshots** (`job_finder/backup.py`). Every quest
+refresh takes a snapshot first when the newest one is 20+ hours old
+(SQLite online backup API, keep 5, `<data>/backups/`). A bad sweep, a bad
+migration, or an over-eager source can always be undone.
+
+**6. Freshness as UX.** `/board/summary` carries `checked_at` from the
+run log and the board legend renders "sources checked Xh ago" plus the
+plain-words expiry promise. Accuracy is shown, not claimed.
+
 ## Queued next, in impact order
 
 These come from the research below; each is its own small PR.
 
-1. **Expiry gated on healthy runs.** Track absence per listing
-   (`last_seen_at`) and expire only after 2 consecutive HEALTHY-run
-   absences. One site redesign must never tombstone a whole source
-   overnight, and a broken run must never empty the board (the DB is the
-   last-known-good snapshot; keep serving it and flag staleness instead).
-2. **Tombstones, never dead outbound links.** Status expired/dead with
-   reason and timestamp; expired listings leave default results but keep a
-   "no longer available" record. HEAD-check HTML-source URLs as they age;
-   for ATS sources (Greenhouse/Lever/Ashby/Workday), absence from the JSON
-   endpoint is the cheap, reliable closed signal. The existing url_status +
-   check_urls machinery is the seed of this.
-3. **Freshness as UX.** "Checked Xh ago" from the run log on the board, and
-   always the ORIGINAL posted date (Greenhouse first_published, Lever
-   createdAt), never a repost-reset date. HiringCafe rode exactly this
-   honesty to trust-darling status.
-4. **Row contract validation.** Pydantic check per scraped row (url parses,
+1. **HEAD re-verification for aging rows.** The existing url_status +
+   check_urls machinery extended to quest lanes: HEAD-check HTML-source
+   URLs as they age; for ATS sources, absence from the JSON endpoint is
+   the cheap closed signal.
+2. **Original posted dates from ATS fields** (Greenhouse first_published,
+   Lever createdAt), never a repost-reset date.
+3. **Row contract validation.** Pydantic check per scraped row (url parses,
    pay only as stated, dates not in the future), with rows_invalid counted
    into the run log and alarmed like volume drops. Catches selector drift
    that volume checks miss.
-5. **Canary URL per source.** One known-good listing re-checked each run;
+4. **Canary URL per source.** One known-good listing re-checked each run;
    the cheapest early warning for redesigns.
-6. **Per-source config knobs.** rate_limit, expected_min_rows, enabled flag
+5. **Per-source config knobs.** rate_limit, expected_min_rows, enabled flag
    in the registry so a hostile source can be switched off without a
    deploy, plus a circuit breaker: after 2-3 consecutive failing runs,
    auto-disable and alert (the JobSpy boards already have one; this brings
    the plugin sources up to par).
-7. **Hosting the DB.** SQLite stays for launch: WAL mode,
+6. **Hosting the DB.** SQLite stays for launch: WAL mode,
    busy_timeout 5000, one writer doing batched transactions, Litestream
    streaming the WAL to S3 for continuous backup. That setup is a
    legitimate production shape for a read-heavy board with batch writes

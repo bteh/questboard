@@ -105,6 +105,8 @@ def _normalize_post(post: dict) -> dict | None:
     category="lens",
     vertical="lens",
     enabled_by_default=False,
+    # gigs are hired out within weeks; the fetch is a newest-100 window
+    stale_after_days=21,
 )
 def search_reddit_forhire(
     roles: list[str] | None = None,

@@ -205,6 +205,8 @@ def _normalize_study(
     # source moved from the think lane to body (2026-07-09). New rows
     # store vertical="body"; the alembic data revision refiles old rows.
     kind="body",
+    # recruiting studies churn slowly; the fetch is windowed, so use age
+    stale_after_days=45,
 )
 def search_clinicaltrials(
     roles: list[str] | None = None,

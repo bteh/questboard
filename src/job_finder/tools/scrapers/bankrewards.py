@@ -137,6 +137,8 @@ def _normalize_offer(offer: dict) -> dict | None:
     description="Structured bank and brokerage cash bonuses with state availability and requirement type",
     category="house",
     kind="house",
+    # one POST returns the entire active set, so absence proves removal
+    full_snapshot=True,
     enabled_by_default=False,
 )
 def search_bankrewards(

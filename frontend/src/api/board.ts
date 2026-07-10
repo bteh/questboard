@@ -13,6 +13,8 @@ export interface KindSummary {
 export interface BoardSummary {
   total: number;
   new_today: number;
+  /** last healthy quest-source run (ISO, naive UTC); null before the first */
+  checked_at: string | null;
   kinds: KindSummary[];
 }
 

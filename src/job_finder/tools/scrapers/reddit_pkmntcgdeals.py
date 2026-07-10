@@ -64,6 +64,8 @@ def _normalize_post(post: dict) -> dict | None:
     description="Mod-verified ACTIVE TCG drops and restocks via the arctic-shift mirror",
     category="flip",
     kind="flip",
+    # drops happen the same night; two days later the lead is dead
+    stale_after_days=2,
     enabled_by_default=False,
 )
 def search_reddit_pkmntcgdeals(

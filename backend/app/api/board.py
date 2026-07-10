@@ -20,7 +20,7 @@ from app.models.database import get_db
 from app.schemas.board import BoardSummaryResponse, KindSummary
 
 from job_finder.kinds import get_kinds, kind_for_vertical
-from job_finder.models.database import ApplicationRecord
+from job_finder.models.database import ApplicationRecord, ScrapeRunRecord
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +46,9 @@ def board_summary(
             ),
         )
         .filter(ApplicationRecord.vertical != "personal")
-        .filter(ApplicationRecord.url_status != "dead")
+        # dead = the link 404s; expired = the source stopped listing it
+        # (job_finder.expiry). Both are tombstones, both stay off the board.
+        .filter(ApplicationRecord.url_status.notin_(("dead", "expired")))
         # same upcoming semantics as the board list: a taping that already
         # happened is off the board, rows with no event date pass
         .filter(
@@ -85,8 +87,17 @@ def board_summary(
         )
         for kind in get_kinds()
     ]
+    # honest freshness for the UI: when a quest source last actually ran
+    # and found rows, from the scrape run log (never a guess)
+    checked_at = (
+        db.query(func.max(ScrapeRunRecord.started_at))
+        .filter(ScrapeRunRecord.finish_reason == "ok", ScrapeRunRecord.rows_found > 0)
+        .scalar()
+    )
+
     return BoardSummaryResponse(
         total=sum(counts.values()),
         new_today=sum(fresh.values()),
+        checked_at=checked_at,
         kinds=kinds,
     )
