@@ -1,8 +1,9 @@
-/* Landing redesign A: the board over the dawn field.
+/* The landing: the felt board over the dawn field.
    The world, hero, board-window frame, scenes, and demo choreography are
-   landing-owned. The quest cards inside the window are the real
-   @questboard/ui QuestCard fed real board rows, so card design and data
-   changes reflect here automatically (never a hardcoded fake). */
+   landing-owned. The posters inside the window are the real
+   @questboard/ui Poster on the same felt the board route uses, fed real
+   board rows, so design and data changes reflect here automatically
+   (never a hardcoded fake). */
 
 .qb-landing {
   --e: cubic-bezier(.22, 1, .36, 1);
@@ -101,12 +102,23 @@
 }
 .qb-win-title { font-family: var(--serif); font-variation-settings: 'opsz' 40; font-weight: 580; font-size: 16px; letter-spacing: -.005em; }
 .qb-win-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+/* the felt through the window: same linen, noise, and wood as the board
+   route (board-felt.css); --qb-felt feeds the posters' tear-tab notches */
 .qb-board-body {
+  --qb-felt: #C9C4B4;
   position: relative;
-  background: #F3EFE4;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(255, 255, 255, .14), rgba(255, 255, 255, 0) 46%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='120' height='120' filter='url(%23n)' opacity='0.05'/></svg>"),
+    linear-gradient(160deg, #C9C4B4 0%, #C2BCA9 100%);
+  box-shadow:
+    inset 0 2px 5px rgba(0, 0, 0, .14), inset 0 -2px 4px rgba(0, 0, 0, .08),
+    inset 0 0 0 1px rgba(90, 74, 52, .16);
+  border: 7px solid #5A4A34;
   border-radius: 0 0 13px 13px;
-  padding: 18px;
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+  padding: 18px 16px 22px;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+  align-items: start;
 }
 .qb-land-slot { position: relative; min-width: 0; }
 
@@ -199,14 +211,15 @@
 .qb-flapcell::after { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: rgba(28, 27, 23, .09); }
 .qb-odo-lab { font-size: 14.5px; color: var(--soft); }
 
-/* stamp strip card */
+/* stamp strip card: all ten kinds from the registry */
 .qb-stamp-card {
   background: var(--paper); border: 1px solid var(--hair); border-bottom-color: var(--edge);
   border-radius: 12px; box-shadow: var(--lift-2);
-  padding: 34px 48px; display: flex; gap: 52px; flex-wrap: wrap; justify-content: center;
+  padding: 32px 40px; max-width: 880px;
+  display: flex; gap: 26px 30px; flex-wrap: wrap; justify-content: center;
 }
-.qb-st { text-align: center; font-size: 13.5px; font-weight: 500; }
-.qb-st svg { width: 52px; height: 52px; display: block; margin: 0 auto 10px; transition: transform .15s var(--e); }
+.qb-st { text-align: center; font-size: 12.5px; font-weight: 500; width: 118px; line-height: 1.3; }
+.qb-st svg { width: 48px; height: 48px; display: block; margin: 0 auto 9px; transition: transform .15s var(--e); }
 .qb-st:hover svg { transform: rotate(-3deg) translateY(-1px); }
 
 /* foot */
@@ -303,16 +316,11 @@
   .qb-flapcell.qb-seat { animation: qb-seatk .14s var(--e); }
   @keyframes qb-seatk { 0% { transform: translateY(0); } 55% { transform: translateY(1.5px); } 100% { transform: translateY(0); } }
 
-  /* stamps thump in */
+  /* stamps thump in; each .qb-st carries its own --sd inline */
   html.qb-motion .qb-scene-stamps:not(.go) .qb-st svg,
   html.qb-motion .qb-scene-stamps:not(.go) .qb-st .qb-lab { opacity: 0; }
   .qb-scene-stamps.go .qb-st svg { animation: qb-stampin .24s var(--press) var(--sd, 0s) both; }
   .qb-scene-stamps.go .qb-st .qb-lab { animation: qb-fade .2s var(--e) calc(var(--sd, 0s) + .12s) both; }
-  .qb-scene-stamps.go .qb-st:nth-child(1) { --sd: .15s; }
-  .qb-scene-stamps.go .qb-st:nth-child(2) { --sd: .24s; }
-  .qb-scene-stamps.go .qb-st:nth-child(3) { --sd: .33s; }
-  .qb-scene-stamps.go .qb-st:nth-child(4) { --sd: .42s; }
-  .qb-scene-stamps.go .qb-st:nth-child(5) { --sd: .51s; }
   @keyframes qb-stampin { from { transform: scale(1.12) rotate(-5deg); opacity: 0; } to { transform: scale(1) rotate(0deg); opacity: 1; } }
 
   /* birds, the one infinite drift */

@@ -73,6 +73,16 @@ describe('pickLandingCards', () => {
     expect(pickLandingCards(items).map((a) => a.id)).toEqual([2, 3, 4]);
   });
 
+  it('folds career and lens into one skill pick so another kind gets the slot', () => {
+    const items = [
+      mk(1, 'career'),
+      mk(2, 'lens') /* also the skill kind */,
+      mk(3, 'camera'),
+      mk(4, 'study'),
+    ];
+    expect(pickLandingCards(items).map((a) => a.id)).toEqual([1, 3, 4]);
+  });
+
   it('falls back to newest leftovers when the board is one vertical', () => {
     const items = [mk(1, 'career'), mk(2, 'career'), mk(3, 'career'), mk(4, 'career')];
     expect(pickLandingCards(items).map((a) => a.id)).toEqual([1, 2, 3]);
@@ -107,11 +117,11 @@ describe('pickTrustCard', () => {
     const items = [
       mk(1, 'career', posted),
       mk(2, 'camera', posted),
-      mk(3, 'lens', posted),
-      mk(4, 'career', posted),
+      mk(3, 'study', posted),
+      mk(4, 'lens', posted),
       mk(5, 'study', posted),
     ];
-    const pinned = pickLandingCards(items); /* 1, 2, 3 */
+    const pinned = pickLandingCards(items); /* 1, 2, 3: skill, perform, think */
     expect(pickTrustCard(items, pinned)?.id).toBe(5);
   });
 
