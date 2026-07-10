@@ -13,18 +13,22 @@
  *   their needs line is assembled only from fields the source stated
  */
 
+import { kindForVertical } from '@questboard/kinds';
 import type { ApplicationResponse, EvaluationReport } from '@/types/application';
 import { computeRequirementFit, type RequirementFit } from '@/utils/job-fit';
 import { postedAgoLabel } from '@/utils/job-trust';
 
-export type BoardVertical = 'career' | 'camera' | 'study' | 'lens' | 'party';
+/** 'career' or any registry-known quest vertical (kind ids and legacy names). */
+export type BoardVertical = string;
 
-const QUEST_VERTICALS: ReadonlySet<string> = new Set(['camera', 'study', 'lens', 'party']);
-
-/** The row's vertical; anything unknown (or absent) is the career shape. */
+/** The row's vertical, from the kinds registry, never a hand list here:
+    'career' keeps the resume-fit card shape, every other registry-known
+    vertical gets the quest shape (quest pay grammar, no resume claims),
+    and anything unknown falls back to career. */
 export function boardVertical(app: Pick<ApplicationResponse, 'vertical'>): BoardVertical {
   const v = app.vertical || 'career';
-  return (QUEST_VERTICALS.has(v) ? v : 'career') as BoardVertical;
+  if (v === 'career') return 'career';
+  return kindForVertical(v) ? v : 'career';
 }
 
 export interface BoardCardModel {

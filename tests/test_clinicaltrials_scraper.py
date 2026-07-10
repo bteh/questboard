@@ -1,4 +1,7 @@
-"""Contract tests for the ClinicalTrials.gov quest scraper (vertical "study").
+"""Contract tests for the ClinicalTrials.gov quest scraper (body kind).
+
+Re-laned from the think/study lane on 2026-07-09: a clinical trial rents
+your body; focus groups sell your opinion (see docs/source-coverage.md).
 
 The fixture is a trimmed REAL response from the v2 studies endpoint (probed
 live 2026-07-08, HTTP 200): three recruiting healthy-volunteer studies kept,
@@ -76,7 +79,7 @@ class ClinicalTrialsParseTest(unittest.TestCase):
         self.assertEqual(r["company"], "Columbia University")
         self.assertEqual(r["url"], "https://clinicaltrials.gov/study/NCT05133102")
         self.assertEqual(r["source"], "clinicaltrials")
-        self.assertEqual(r["vertical"], "study")
+        self.assertEqual(r["vertical"], "body")
         self.assertTrue(r["is_rolling"])
         self.assertTrue(r["first_quest_ok"])
         self.assertEqual(r["date_posted"], "2021-11-24")
@@ -215,7 +218,7 @@ class ClinicalTrialsRegistryTest(unittest.TestCase):
         reg = get_registry()
         self.assertIn("clinicaltrials", reg)
         meta = reg["clinicaltrials"]
-        self.assertEqual(meta.vertical, "study")
+        self.assertEqual(meta.vertical, "body")
         self.assertFalse(meta.enabled_by_default)
         self.assertTrue(callable(meta.search_fn))
         # Quest scrapers never join the default career sweep.

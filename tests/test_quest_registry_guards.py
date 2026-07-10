@@ -56,6 +56,8 @@ def _meta(vertical: str, enabled_by_default: bool = False, search_fn=lambda **k:
 
 
 def test_quest_scrapers_are_never_enabled_by_default():
+    from job_finder.kinds import known_vertical_values
+
     metas = get_all_metadata()
     assert metas, "registry unexpectedly empty"
     career = [m for m in metas if m.vertical == "career"]
@@ -63,7 +65,8 @@ def test_quest_scrapers_are_never_enabled_by_default():
     assert career, "career scrapers missing from registry"
     assert quest, "quest scrapers expected in the registry"
     assert all(not m.enabled_by_default for m in quest)
-    assert all(m.vertical in {"career", "camera", "study", "lens", "party"} for m in metas)
+    # the lane vocabulary is the kinds registry, never a hand list here
+    assert all(m.vertical in known_vertical_values() for m in metas)
 
 
 def test_register_scraper_records_vertical(fake_camera_scraper):

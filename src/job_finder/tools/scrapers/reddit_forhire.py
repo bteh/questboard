@@ -29,87 +29,23 @@ from __future__ import annotations
 import logging
 import re
 
+from job_finder.tools.scrapers._reddit import (
+    ARCTIC_API_URL,
+    THREAD_PREFIX,
+    arctic_params,
+    author_handle,
+    clean_body,
+    extract_pay,
+)
 from job_finder.tools.scrapers._registry import register_scraper
 from job_finder.tools.scrapers._utils import _get_json, _parse_posted_date, _strip_html
 
 logger = logging.getLogger(__name__)
 
-_API_URL = "https://arctic-shift.photon-reddit.com/api/posts/search"
-# permalink is not a valid fields value on this API; url carries the thread link.
-_FIELDS = "author,created_utc,link_flair_text,selftext,title,url"
-_THREAD_PREFIX = "https://www.reddit.com/r/"
-
 # Substrings "photo" and "video" also cover photograph(y), videograph(er),
 # photoshoot, etc. Matched against the TITLE only: bodies are usually the
 # automod placeholder, and body mentions like "video call" are false positives.
 _KEYWORDS = ("photo", "video")
-
-_REMOVED_BODIES = frozenset({"[removed]", "[deleted]"})
-
-# One money mention: optional ~, $, amount (optional k), optional range tail,
-# optional +, optional per-unit word ("/hr", "per video", "a video").
-_PAY_RE = re.compile(
-    r"~?\$\s*(\d[\d,]*(?:\.\d+)?)(?:\s*([kK])\b)?"
-    r"(?:\s*(?:-|to)\s*\$?\s*(\d[\d,]*(?:\.\d+)?)(?:\s*([kK])\b)?)?"
-    r"(?:\s*\+)?"
-    r"(?:\s*(?:/|\bper\s+|\ban?\s+)\s*([A-Za-z]+))?"
-)
-
-_TIME_PERIODS: dict[str, str] = {
-    "hr": "hourly", "hour": "hourly", "hourly": "hourly",
-    "day": "daily", "daily": "daily",
-    "wk": "weekly", "week": "weekly", "weekly": "weekly",
-    "mo": "monthly", "month": "monthly", "monthly": "monthly",
-    "yr": "yearly", "year": "yearly", "yearly": "yearly", "annum": "yearly",
-}
-
-
-def _amount(num: str, has_k: str | None) -> float:
-    val = float(num.replace(",", ""))
-    return val * 1000 if has_k else val
-
-
-def _extract_pay(*texts: str) -> tuple[str | None, dict]:
-    """First stated pay figure across ``texts`` -> (pay_note, salary fields).
-
-    ``pay_note`` is the matched text verbatim. Salary keys are returned only
-    for unambiguous statements: a time-rated figure or a plain range. A bare
-    figure ("budget is $5000") or a per-piece rate stays note-only.
-    """
-    for text in texts:
-        if not text:
-            continue
-        for m in _PAY_RE.finditer(text):
-            lo_s, lo_k, hi_s, hi_k, unit = m.groups()
-            # No unit and a letter right after the match: a token like "$1M
-            # views" or "$30ish", not a pay figure.
-            if unit is None and text[m.end():m.end() + 1].isalpha():
-                continue
-            note = re.sub(r"\s+", " ", m.group(0)).strip()
-            period = _TIME_PERIODS.get((unit or "").lower().rstrip("s"))
-            piece_rate = unit is not None and period is None
-            lo = _amount(lo_s, lo_k)
-
-            fields: dict = {}
-            if hi_s:
-                hi = _amount(hi_s, hi_k)
-                if not piece_rate and lo <= hi:
-                    fields = {
-                        "salary_min": lo,
-                        "salary_max": hi,
-                        "salary_source": "reported",
-                    }
-                    if period:
-                        fields["salary_period"] = period
-            elif period:
-                fields = {
-                    "salary_min": lo,
-                    "salary_max": lo,
-                    "salary_period": period,
-                    "salary_source": "reported",
-                }
-            return note, fields
-    return None, {}
 
 
 def _is_hiring(post: dict) -> bool:
@@ -124,21 +60,18 @@ def _normalize_post(post: dict) -> dict | None:
     """Map one arctic-shift post object to a lens-vertical quest row, or None."""
     title = re.sub(r"\s+", " ", post.get("title") or "").strip()
     url = post.get("url") or ""
-    if not title or not url.startswith(_THREAD_PREFIX):
+    if not title or not url.startswith(THREAD_PREFIX):
         return None
 
     title_lower = title.lower()
     if not any(kw in title_lower for kw in _KEYWORDS):
         return None
 
-    author = (post.get("author") or "").strip()
-    company = f"u/{author}" if author and author != "[deleted]" else "r/forhire"
-
-    body_raw = (post.get("selftext") or "").strip()
-    body = "" if body_raw in _REMOVED_BODIES else body_raw
+    company = author_handle(post, "r/forhire")
+    body = clean_body(post)
     description = _strip_html(body) if body else ""
 
-    pay_note, salary_fields = _extract_pay(title, body)
+    pay_note, salary_fields = extract_pay(title, body)
     quest: dict = {}
     if pay_note:
         quest["pay_note"] = pay_note
@@ -186,15 +119,7 @@ def search_reddit_forhire(
     freshness.
     """
     logger.info("Fetching [Hiring] photo/video gigs from r/forhire...")
-    data = _get_json(
-        _API_URL,
-        params={
-            "subreddit": "forhire",
-            "limit": "100",
-            "sort": "desc",
-            "fields": _FIELDS,
-        },
-    )
+    data = _get_json(ARCTIC_API_URL, params=arctic_params("forhire"))
     posts = data.get("data") if isinstance(data, dict) else None
     if not isinstance(posts, list):
         return []

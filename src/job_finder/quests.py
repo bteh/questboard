@@ -13,13 +13,22 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Callable
 
+from job_finder.kinds import known_vertical_values
 from job_finder.tools.scrapers._registry import get_registry, run_scrapers
 
 logger = logging.getLogger(__name__)
 
-# Verticals a quest refresh may target. 'party' is a valid stored vertical
-# but has no scrapers yet; 'career' stays on the pipeline path.
-QUEST_VERTICALS = ("camera", "study", "lens")
+
+def quest_verticals() -> tuple[str, ...]:
+    """Every vertical a quest refresh may target: the registry's vocabulary
+    minus 'career' (the pipeline path). Derived, never listed by hand, so a
+    new kind in kinds.json is refreshable the moment its first scraper ships.
+    """
+    return tuple(sorted(known_vertical_values() - {"career"}))
+
+
+# Kept as a module attribute for existing callers; same derived value.
+QUEST_VERTICALS = quest_verticals()
 
 
 def _accepted_geo_kwargs(fn: Callable, candidates: dict[str, Any]) -> dict[str, Any]:
