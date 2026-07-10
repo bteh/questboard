@@ -1,20 +1,24 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from '@tanstack/react-router';
-import { Chip, QuestCard, SageButton, Stamp, StampDefs, verticals } from '@questboard/ui';
+import { Chip, KindStamp, Poster, SageButton } from '@questboard/ui';
+import { KINDS } from '@questboard/kinds';
 import { useApplications, useUpdateStatus } from '@/hooks/use-applications';
+import { useBoardSummary } from '@/hooks/use-board-summary';
 import { useSourceLabels, resolveSourceLabel } from '@/hooks/use-scrapers';
-import { CLIP_STATUS, shortDate, toBoardCard } from '@/utils/board-card';
-import { verticalParams } from '@/utils/board-verticals';
+import { CLIP_STATUS, shortDate } from '@/utils/board-card';
+import { kindParams } from '@/features/board/kind-params';
+import { toPoster } from '@/features/board/poster-model';
 import { hasEntered } from '@/lib/entry';
 import { handleEnter, pickLandingCards, plainWords } from './landing-logic';
 import type { ApplicationFilters, ApplicationResponse } from '@/types/application';
 import './landing.css';
 
-/* The front page, redesign A: the live board floats as a window over a coded
-   dawn field, and the product performs itself (a card clips, the explain
-   sheet answers) on a gentle loop. The cards inside the window are the real
-   @questboard/ui QuestCard fed real board rows, and the demo text is built
-   from those rows, so nothing here is a hardcoded fake that can drift. */
+/* The front page: the felt board floats as a window over a coded dawn
+   field, and the product performs itself (a poster clips, the explain
+   sheet answers) on a gentle loop. The posters inside the window are the
+   real @questboard/ui Poster fed real board rows through the same
+   poster-model the board route uses, and the demo text is built from
+   those rows, so nothing here is a hardcoded fake that can drift. */
 
 function BrandMark() {
   return (
@@ -72,22 +76,32 @@ function World() {
   );
 }
 
-/* One real board card; Clip writes through the real status mutation. */
-function LandingCard({ app, labels }: { app: ApplicationResponse; labels: Record<string, string> }) {
+/* One real poster through the board's own model; Clip writes through the
+   real status mutation. The fit line renders as plain text here: the
+   requirement sheet it opens lives in the app, not on the front page. */
+function LandingPoster({ app, labels }: { app: ApplicationResponse; labels: Record<string, string> }) {
   const updateStatus = useUpdateStatus();
-  const card = toBoardCard(app, resolveSourceLabel(app.source, labels));
+  const poster = toPoster(app, resolveSourceLabel(app.source, labels));
+  const { card } = poster;
+  const bring = poster.hasFit
+    ? `a resume. this one covers ${card.fit!.strong} of the ${card.fit!.total} things they ask for`
+    : poster.copy.bring;
   return (
-    <QuestCard
-      vertical={card.vertical}
+    <Poster
+      kind={poster.kind}
       title={card.title}
       href={card.href}
-      meta={card.meta}
-      needs={card.needs}
-      firstQuest={card.firstQuest}
+      giver={card.meta}
+      desc={poster.desc}
+      bring={bring}
+      bringFree={poster.copy.bringFree && !poster.hasFit}
+      catchLine={poster.copy.catchLine}
+      tags={poster.tags}
       pay={card.pay}
       payUnit={card.payUnit}
       applied={card.applied}
       clippedDate={card.clippedDate}
+      rotateDeg={poster.rotateDeg}
       onClip={() => updateStatus.mutate({ id: app.id, data: { status: CLIP_STATUS } })}
     />
   );
@@ -97,6 +111,19 @@ function LandingCard({ app, labels }: { app: ApplicationResponse; labels: Record
 function ChromeChip({ label, filters }: { label: string; filters: Partial<ApplicationFilters> }) {
   const { data } = useApplications({ ...filters, page: 1, page_size: 1 });
   return <Chip label={label} count={data?.total} dim={data !== undefined && data.total < 3} />;
+}
+
+/* The busiest kinds, counted by the same summary the board rail reads. */
+function ChromeKindChips() {
+  const { data } = useBoardSummary();
+  const top = [...(data?.kinds ?? [])].sort((a, b) => b.count - a.count).slice(0, 3);
+  return (
+    <>
+      {top.map((k) => (
+        <Chip key={k.id} label={k.label.toLowerCase()} count={k.count} dim={k.count < 3} />
+      ))}
+    </>
+  );
 }
 
 /* Split a number into fixed digit cells for the odometer. */
@@ -116,8 +143,6 @@ function OdoGroup({ value, label }: { value: number; label: string }) {
   );
 }
 
-const STRIP_VERTICALS = ['career', 'camera', 'study', 'lens', 'party'] as const;
-
 export function LandingPage() {
   const navigate = useNavigate();
   const labels = useSourceLabels();
@@ -128,17 +153,18 @@ export function LandingPage() {
     document.title = 'Questboard, one board for every side quest';
   }, []);
 
-  const boardTotal = useApplications({ ...verticalParams('all'), page: 1, page_size: 1 }).data?.total;
+  /* the same summary the board rail reads, so both surfaces say one number */
+  const boardTotal = useBoardSummary().data?.total;
   const pay500Total = useApplications({
-    ...verticalParams('all'),
+    ...kindParams('all'),
     salary_min: 500,
     page: 1,
     page_size: 1,
   }).data?.total;
 
-  /* one board page of the newest rows: enough spread for mixed verticals */
+  /* one board page of the newest rows: enough spread for mixed kinds */
   const newest = useApplications({
-    ...verticalParams('all'),
+    ...kindParams('all'),
     sort_by: 'date_found',
     sort_order: 'desc',
     page: 1,
@@ -388,17 +414,29 @@ export function LandingPage() {
       ghost.style.transform = `translate(${Math.round(x)}px,${Math.round(y)}px)`;
       void ghost.offsetWidth;
     };
+    /* the poster's real Clip control, in board-body coordinates; the demo
+       presses exactly where a user would */
+    const clipRect = (idx: number) => {
+      const slot = slots[idx];
+      if (!body || !slot) return null;
+      const clip = slot.querySelector<HTMLElement>('.qb-poster-clip');
+      if (clip) {
+        const p = offsetIn(clip, body);
+        return { x: p.x, y: p.y, w: clip.offsetWidth, h: clip.offsetHeight };
+      }
+      const p = offsetIn(slot, body);
+      return { x: p.x + slot.offsetWidth - 62, y: p.y + 20, w: 44, h: 22 };
+    };
     const placeMark = (idx: number) => {
-      if (!body || !mark || !ring || !slots[idx]) return;
-      const p = offsetIn(slots[idx], body);
-      const w = slots[idx].offsetWidth;
-      const h = slots[idx].offsetHeight;
-      mark.style.left = `${p.x + w - 86}px`;
-      mark.style.top = `${p.y + h - 30}px`;
-      ring.style.left = `${p.x + w - 88}px`;
-      ring.style.top = `${p.y + h - 32}px`;
-      ring.style.width = '92px';
-      ring.style.height = '26px';
+      if (!mark || !ring) return;
+      const c = clipRect(idx);
+      if (!c) return;
+      mark.style.left = `${c.x + c.w - 98}px`;
+      mark.style.top = `${c.y - 1}px`;
+      ring.style.left = `${c.x - 5}px`;
+      ring.style.top = `${c.y - 4}px`;
+      ring.style.width = `${c.w + 10}px`;
+      ring.style.height = `${c.h + 8}px`;
     };
     const placeSheet = (idx: number) => {
       if (!body || !sheet || !slots[idx]) return;
@@ -449,14 +487,14 @@ export function LandingPage() {
       const ex = list[exIdx % list.length];
       let t = 0;
 
-      /* phase 1: the ghost clips the first card, the postmark presses */
+      /* phase 1: the ghost clips the first poster, the postmark presses */
       after((t += 150), () => {
         if (!body) return;
         ghostJump(body.offsetWidth - 30, -16);
         ghost?.classList.add('gshow');
         placeMark(0);
-        const p = offsetIn(slots[0], body);
-        ghostTo(p.x + slots[0].offsetWidth - 60, p.y + slots[0].offsetHeight - 20, 950);
+        const c = clipRect(0);
+        if (c) ghostTo(c.x + c.w * 0.55, c.y + c.h * 0.6, 950);
       });
       after((t += 1250), () => ghost?.classList.add('gpress'));
       after((t += 140), () => {
@@ -574,7 +612,6 @@ export function LandingPage() {
 
   return (
     <div className="qb-page qb-landing" ref={rootRef}>
-      <StampDefs />
       <World />
 
       <div className="qb-land-page">
@@ -596,19 +633,17 @@ export function LandingPage() {
               <div className="qb-win-chrome">
                 <span className="qb-win-title">The board</span>
                 <div className="qb-win-chips">
-                  <ChromeChip label="career" filters={verticalParams('career')} />
-                  <ChromeChip label="on camera" filters={verticalParams('camera')} />
-                  <ChromeChip label="paid studies" filters={verticalParams('study')} />
+                  <ChromeKindChips />
                   <ChromeChip
                     label="$500 or more"
-                    filters={{ ...verticalParams('all'), salary_min: 500 }}
+                    filters={{ ...kindParams('all'), salary_min: 500 }}
                   />
                 </div>
               </div>
               <div className="qb-board-body" data-board-body>
                 {pinned.map((app) => (
                   <div key={app.id} className="qb-land-slot">
-                    <LandingCard app={app} labels={labels} />
+                    <LandingPoster app={app} labels={labels} />
                   </div>
                 ))}
                 <span className="qb-demo-ring" data-ring aria-hidden="true" />
@@ -678,17 +713,17 @@ export function LandingPage() {
         <div className="qb-scene qb-scene-stamps" data-reveal>
           <p className="qb-scap">One board, every kind of quest.</p>
           <div className="qb-stamp-card qb-on-field qb-scene-obj">
-            {STRIP_VERTICALS.map((v) => (
-              <div key={v} className="qb-st" style={{ color: verticals[v].hue }}>
-                <Stamp vertical={v} size={52} inheritColor />
-                <span className="qb-lab">{verticals[v].label}</span>
+            {KINDS.map((k, i) => (
+              <div key={k.id} className="qb-st" style={{ ['--sd' as string]: `${0.15 + i * 0.07}s` }}>
+                <KindStamp kind={k.id} size={48} />
+                <span className="qb-lab">{k.label}</span>
               </div>
             ))}
           </div>
         </div>
 
         <div className="qb-land-foot">
-          <p className="qb-fnote">The board restocks daily. Every listing links straight to the source.</p>
+          <p className="qb-fnote">New quests land every day. Every listing links straight to the source.</p>
           <SageButton big onClick={enter}>
             {ctaLabel}
           </SageButton>

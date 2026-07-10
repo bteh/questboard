@@ -1,3 +1,4 @@
+import { kindForVertical } from '@questboard/kinds';
 import { boardVertical, toBoardCard } from '@/utils/board-card';
 import { postedAgoLabel } from '@/utils/job-trust';
 import { markEntered } from '@/lib/entry';
@@ -16,18 +17,19 @@ function hasStatedPay(app: ApplicationResponse): boolean {
   return app.salary_min != null || app.salary_max != null;
 }
 
-/* Up to three cards for the horizon, per the first-run beats: mixed
-   verticals, stated pay, newest first. Cards with stated pay outrank the
-   rest; one card per vertical while verticals remain unseen, then newest
-   leftovers. Items arrive newest-first from the query. */
+/* Up to three posters for the hero, per the first-run beats: mixed KINDS,
+   stated pay, newest first. Posters with stated pay outrank the rest; one
+   per kind while kinds remain unseen (career and lens both fold into
+   skill, so they never crowd out another kind), then newest leftovers.
+   Items arrive newest-first from the query. */
 export function pickLandingCards(items: ApplicationResponse[]): ApplicationResponse[] {
   const ranked = [...items.filter(hasStatedPay), ...items.filter((app) => !hasStatedPay(app))];
   const picks: ApplicationResponse[] = [];
   const seen = new Set<string>();
   for (const app of ranked) {
-    const v = boardVertical(app);
-    if (!seen.has(v)) {
-      seen.add(v);
+    const kind = kindForVertical(app.vertical || 'career')?.id ?? 'skill';
+    if (!seen.has(kind)) {
+      seen.add(kind);
       picks.push(app);
       if (picks.length === 3) return picks;
     }
