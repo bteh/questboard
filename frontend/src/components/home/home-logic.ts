@@ -62,16 +62,6 @@ export function pickBounty(
   return newest ? { app: newest, fallback: true } : null;
 }
 
-/* The five newest rows for "New on the board", skipping the bounty so the
-   front page never prints the same quest twice. */
-export function pickNewRows(
-  items: ApplicationResponse[],
-  bounty: ApplicationResponse | null,
-  count = 5,
-): ApplicationResponse[] {
-  return items.filter((app) => app.id !== bounty?.id).slice(0, count);
-}
-
 export interface LogTile {
   label: string;
   count: number;

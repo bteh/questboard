@@ -33,11 +33,19 @@ from job_finder.tools.scrapers._utils import _get_json, _parse_posted_date, _str
 
 logger = logging.getLogger(__name__)
 
-# platform-manipulation and gift-card tasks fail the house rules
+# platform-manipulation and gift-card tasks fail the house rules; recruiting
+# ads dressed as tasks ("Looking for Licensed Medicare Agents") are jobs,
+# not one-offs, and belong to career machinery or nowhere
 _EXCLUDE_RE = re.compile(
-    r"gift ?cards?|\bkarma\b|\bupvotes?\b|\bdownvotes?\b|vote for|\breviews? for\b",
+    r"gift ?cards?|\bkarma\b|\bupvotes?\b|\bdownvotes?\b|vote for|\breviews? for\b"
+    r"|\brecruit\w*|\blicensed\b.{0,30}\bagents?\b|\bagents? (?:wanted|needed)\b",
     re.IGNORECASE,
 )
+
+# a real one-off task tops out in the hundreds; a bigger figure in a [Task]
+# post is a salary or a commission pitch, and rendering it as the reward
+# would be the board's loudest lie ("$30,000-120,000 odd job")
+_MAX_TASK_PAY = 1_000
 
 
 def _is_task(post: dict) -> bool:
@@ -60,6 +68,8 @@ def _normalize_post(post: dict) -> dict | None:
 
     description = _strip_html(body) if body else ""
     pay_note, salary_fields = extract_pay(title, body)
+    if salary_fields and (salary_fields.get("salary_max") or 0) > _MAX_TASK_PAY:
+        salary_fields = {}  # keep the verbatim note, never the structured claim
     quest: dict = {}
     if pay_note:
         quest["pay_note"] = pay_note

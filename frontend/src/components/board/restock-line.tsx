@@ -25,8 +25,8 @@ export function RestockLine() {
     return (
       <p className="qb-restockline" role="status">
         {progress
-          ? `Restocking, ${progress.done} of ${progress.total} sources in.`
-          : 'Restocking, reaching the sources.'}
+          ? `Checking the sources, ${progress.done} of ${progress.total} in.`
+          : 'Checking the sources.'}
       </p>
     );
   }
@@ -40,7 +40,7 @@ export function RestockLine() {
       <p className="qb-restockline">
         Nothing new this week.{' '}
         <Link to="/restock" className="qb-textlink" style={{ fontSize: 13.5 }}>
-          Restock the board
+          Check for new quests
         </Link>
         .
       </p>
@@ -48,9 +48,9 @@ export function RestockLine() {
   }
   return (
     <p className="qb-restockline">
-      Restocked {line.label}.{' '}
+      Fresh quests landed {line.label}.{' '}
       <Link to="/restock" className="qb-textlink" style={{ fontSize: 13.5 }}>
-        Restock
+        Check for new
       </Link>
     </p>
   );
