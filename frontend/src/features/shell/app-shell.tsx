@@ -25,6 +25,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/log/numbers': 'Your numbers',
   '/board': 'The board',
   '/settings': 'Settings',
+  '/health': 'Source health',
 };
 
 function SearchBox() {
@@ -67,6 +68,7 @@ export function AppShell() {
   /* fuzzy so the ledger and the numbers keep the log tab lit */
   const onLog = Boolean(matchRoute({ to: '/log', fuzzy: true }));
   const onSettings = Boolean(matchRoute({ to: '/settings' }));
+  const onHealth = Boolean(matchRoute({ to: '/health' }));
 
   return (
     <TooltipProvider>
@@ -78,6 +80,7 @@ export function AppShell() {
           onBoard={onBoard}
           onLog={onLog}
           onSettings={onSettings}
+          onHealth={onHealth}
         />
 
         <main className="qb-main">

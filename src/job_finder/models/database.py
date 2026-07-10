@@ -259,7 +259,11 @@ def record_scrape_runs(runs: list[dict]) -> None:
         session.close()
 
 
-def get_recent_scrape_runs(days: int = 14) -> list[ScrapeRunRecord]:
+def get_recent_scrape_runs(
+    days: int = 14,
+    source: str | None = None,
+    limit: int | None = None,
+) -> list[ScrapeRunRecord]:
     """Run-log rows from the last N days, newest first. Empty on any failure."""
     try:
         session = get_session()
@@ -269,12 +273,16 @@ def get_recent_scrape_runs(days: int = 14) -> list[ScrapeRunRecord]:
         from datetime import timedelta
 
         cutoff = _utcnow() - timedelta(days=days)
-        return (
+        query = (
             session.query(ScrapeRunRecord)
             .filter(ScrapeRunRecord.started_at >= cutoff)
             .order_by(ScrapeRunRecord.started_at.desc())
-            .all()
         )
+        if source:
+            query = query.filter(ScrapeRunRecord.source == source)
+        if limit is not None:
+            query = query.limit(limit)
+        return query.all()
     except Exception:
         logger.warning("scrape run log: read failed", exc_info=True)
         return []

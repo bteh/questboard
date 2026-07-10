@@ -46,7 +46,10 @@ fixed floor, so thresholds do not rot):
 
 **3. The triage endpoint.** `GET /api/v1/scrapers/health` returns every
 source, worst verdicts first, with the last error line inline plus a
-`needs_attention` count. Triage is one call.
+`needs_attention` count. Triage is one call. The `/health` page in the app
+renders it (tiles, verdicts, and the raw run log via
+`GET /api/v1/scrapers/runs`); the door in is the board legend's
+"sources checked" line.
 
 **4. Healthy-run-gated expiry** (`job_finder/expiry.py`). Every row
 carries `last_seen_at` (stamped on every re-scrape). Each source declares

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
+  Activity01Icon,
   ArrowDown01Icon,
   Cancel01Icon,
   Home01Icon,
@@ -110,10 +111,12 @@ export interface DrawerProps {
   onBoard: boolean;
   onLog: boolean;
   onSettings: boolean;
+  onHealth: boolean;
 }
 
-export function Drawer({ open, onClose, onHome, onBoard, onLog, onSettings }: DrawerProps) {
+export function Drawer({ open, onClose, onHome, onBoard, onLog, onSettings, onHealth }: DrawerProps) {
   const { data: summary } = useBoardSummary();
+  const { hostedMode } = useWorkspace();
 
   useEffect(() => {
     if (!open) return;
@@ -165,6 +168,21 @@ export function Drawer({ open, onClose, onHome, onBoard, onLog, onSettings }: Dr
             <span className="qb-nico"><HugeiconsIcon icon={Settings02Icon} size={18} strokeWidth={STROKE} /></span>
             Settings
           </Link>
+          {/* Ops zone: local mode means you run the board, so the health
+              page gets a door here. Hosted visitors never see it. */}
+          {!hostedMode && (
+            <>
+              <div className="qb-nav-hr" aria-hidden="true" />
+              <Link
+                to="/health"
+                className={onHealth ? 'qb-nav-item qb-active' : 'qb-nav-item'}
+                onClick={onClose}
+              >
+                <span className="qb-nico"><HugeiconsIcon icon={Activity01Icon} size={18} strokeWidth={STROKE} /></span>
+                Source health
+              </Link>
+            </>
+          )}
         </nav>
 
         <DawnFoot />
