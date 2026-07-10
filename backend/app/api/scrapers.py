@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Query
 
-from app.schemas.scrapers import ScraperSource, SourceHealthEntry, SourceHealthResponse
+from app.schemas.scrapers import (
+    ScraperSource,
+    ScrapeRunEntry,
+    ScrapeRunsResponse,
+    SourceHealthEntry,
+    SourceHealthResponse,
+)
 
 router = APIRouter(prefix="/scrapers", tags=["scrapers"])
 
@@ -69,3 +75,32 @@ async def sources_health(
     ]
     attention = sum(1 for e in entries if e.verdict in ("failing", "zero_rows", "dropped"))
     return SourceHealthResponse(sources=entries, needs_attention=attention)
+
+
+@router.get("/runs", response_model=ScrapeRunsResponse)
+async def scrape_runs(
+    source: str | None = Query(None, max_length=64, description="Limit to one source"),
+    days: int = Query(14, ge=1, le=90, description="Run-log window in days"),
+    limit: int = Query(200, ge=1, le=500, description="Newest rows to return"),
+) -> ScrapeRunsResponse:
+    """Raw run-log rows, newest first: the drill-down behind the health verdicts."""
+    from job_finder.models.database import get_recent_scrape_runs
+    from job_finder.tools.scrapers import get_all_metadata
+
+    display = {m.name: m.display_name for m in get_all_metadata()}
+    rows = get_recent_scrape_runs(days=days, source=source, limit=limit)
+    return ScrapeRunsResponse(
+        runs=[
+            ScrapeRunEntry(
+                source=r.source,
+                display_name=display.get(r.source, r.source),
+                vertical=r.vertical or "career",
+                started_at=r.started_at,
+                duration_s=r.duration_s or 0.0,
+                finish_reason=r.finish_reason,
+                rows_found=r.rows_found or 0,
+                error_sample=r.error_sample or "",
+            )
+            for r in rows
+        ]
+    )

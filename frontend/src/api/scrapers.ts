@@ -14,3 +14,46 @@ export interface ScraperSource {
 export function getScraperSources(): Promise<ScraperSource[]> {
   return apiGet<ScraperSource[]>('/scrapers/sources');
 }
+
+export interface SourceHealthEntry {
+  source: string;
+  display_name: string;
+  vertical: string;
+  /** ok | zero_rows | dropped | failing | quiet (worst first from the API) */
+  verdict: string;
+  last_run_at: string | null;
+  last_finish_reason: string;
+  last_rows: number;
+  median_rows: number;
+  runs_seen: number;
+  error_sample: string;
+}
+
+export interface SourceHealthResponse {
+  sources: SourceHealthEntry[];
+  needs_attention: number;
+}
+
+export interface ScrapeRunEntry {
+  source: string;
+  display_name: string;
+  vertical: string;
+  started_at: string | null;
+  duration_s: number;
+  /** ok | zero_rows | exception | timeout */
+  finish_reason: string;
+  rows_found: number;
+  error_sample: string;
+}
+
+export interface ScrapeRunsResponse {
+  runs: ScrapeRunEntry[];
+}
+
+export function getSourceHealth(days: number): Promise<SourceHealthResponse> {
+  return apiGet<SourceHealthResponse>('/scrapers/health', { days });
+}
+
+export function getScrapeRuns(days: number, limit = 200): Promise<ScrapeRunsResponse> {
+  return apiGet<ScrapeRunsResponse>('/scrapers/runs', { days, limit });
+}

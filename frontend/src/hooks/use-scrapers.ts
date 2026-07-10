@@ -1,6 +1,11 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getScraperSources, type ScraperSource } from '@/api/scrapers';
+import {
+  getScraperSources,
+  getScrapeRuns,
+  getSourceHealth,
+  type ScraperSource,
+} from '@/api/scrapers';
 
 /** Format a raw source key into a readable label (offline fallback). */
 export function formatSourceKey(key: string): string {
@@ -31,4 +36,22 @@ export function useScraperSources() {
 export function useSourceLabels(): Record<string, string> {
   const { data } = useScraperSources();
   return useMemo(() => buildSourceLabels(data), [data]);
+}
+
+/* The /health ops page watches these while a restock runs, so both queries
+   refetch on a slow heartbeat instead of going stale. */
+export function useSourceHealth(days: number) {
+  return useQuery({
+    queryKey: ['scrapers', 'health', days],
+    queryFn: () => getSourceHealth(days),
+    refetchInterval: 60_000,
+  });
+}
+
+export function useScrapeRuns(days: number) {
+  return useQuery({
+    queryKey: ['scrapers', 'runs', days],
+    queryFn: () => getScrapeRuns(days),
+    refetchInterval: 60_000,
+  });
 }

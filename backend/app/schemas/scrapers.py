@@ -33,3 +33,19 @@ class SourceHealthResponse(BaseModel):
     sources: list[SourceHealthEntry]
     # sources whose latest run needs a human: failing, zero_rows, dropped
     needs_attention: int
+
+
+class ScrapeRunEntry(BaseModel):
+    source: str
+    display_name: str
+    vertical: str
+    started_at: datetime | None = None
+    duration_s: float
+    # ok | zero_rows | exception | timeout
+    finish_reason: str
+    rows_found: int
+    error_sample: str = ""
+
+
+class ScrapeRunsResponse(BaseModel):
+    runs: list[ScrapeRunEntry]

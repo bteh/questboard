@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { createRoute, redirect, useNavigate } from '@tanstack/react-router';
+import { createRoute, Link, redirect, useNavigate } from '@tanstack/react-router';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { CoinsDollarIcon, Location01Icon, Search01Icon } from '@hugeicons/core-free-icons';
 import { Route as appRoute } from './app';
@@ -613,7 +613,14 @@ function BoardPage() {
         <p className="qb-board-legend">
           Pull <b>take it</b> to go straight to the source. <b>The colour of the pin tells you the kind of quest.</b>{' '}
           Every date on this board is the true post date; postings with no verifiable date say nothing.
-          {checkedAgo && <> Quests the sources stop listing come down on their own. <b>{checkedAgo}.</b></>}
+          {checkedAgo && (
+            <>
+              {' '}Quests the sources stop listing come down on their own.{' '}
+              <Link to="/health" className="qb-legend-link" title="Source health">
+                <b>{checkedAgo}.</b>
+              </Link>
+            </>
+          )}
         </p>
       </div>
 
