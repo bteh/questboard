@@ -14,6 +14,7 @@
 
 import type { ApplicationFilters, ApplicationResponse } from '@/types/application';
 import { parseAmount, shortDate } from '@/utils/board-card';
+import { ALL_VERTICALS } from '@/utils/board-verticals';
 
 /** Board rows join the log only through one of these statuses. */
 export const LOG_BOARD_STATUSES =
@@ -35,7 +36,8 @@ export function personalLogFilters(profile?: string): ApplicationFilters {
 
 export function boardLogFilters(profile?: string): ApplicationFilters {
   return {
-    vertical: 'career,camera,study,lens,party',
+    // every registry lane: a clipped bank bonus belongs in the log too
+    vertical: ALL_VERTICALS,
     status: LOG_BOARD_STATUSES,
     sort_by: 'updated_at',
     sort_order: 'desc',

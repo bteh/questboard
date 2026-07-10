@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { createRoute, Link } from '@tanstack/react-router';
 import { Route as appRoute } from './app';
-import { PostmarkStamp, SplitFlap, Stamp, StampDefs, TextLink, verticals } from '@questboard/ui';
+import { SplitFlap, StampDefs, TextLink } from '@questboard/ui';
+import { LanePostmark, LaneStamp, laneDisplay } from '@/components/shared/lane-display';
 import { useApplications, useUpdateStatus } from '@/hooks/use-applications';
 import { useSourceLabels, resolveSourceLabel } from '@/hooks/use-scrapers';
 import { CLIP_STATUS, shortDate, toBoardCard } from '@/utils/board-card';
@@ -89,13 +90,13 @@ function HomeHorizon() {
 function BountyCard({ app, labels }: { app: ApplicationResponse; labels: Record<string, string> }) {
   const updateStatus = useUpdateStatus();
   const card = toBoardCard(app, resolveSourceLabel(app.source, labels));
-  const v = verticals[card.vertical];
+  const v = laneDisplay(card.vertical);
   /* clipped after mount gets the press; already-clipped renders settled */
   const [stampedAtMount] = useState(() => Boolean(card.applied || card.clippedDate));
   return (
     <article className="qb-feat">
       <div className={`qb-band qb-${v.bandClass}`}>
-        <Stamp vertical={card.vertical} size={18} inheritColor />
+        <LaneStamp vertical={card.vertical} size={18} inheritColor />
         <span>{v.label}</span>
       </div>
       <div className="qb-feat-body">
@@ -131,7 +132,7 @@ function BountyCard({ app, labels }: { app: ApplicationResponse; labels: Record<
         </div>
         <div className="qb-feat-pay">
           {card.clippedDate && !card.applied && (
-            <PostmarkStamp vertical={card.vertical} press={!stampedAtMount} />
+            <LanePostmark vertical={card.vertical} press={!stampedAtMount} />
           )}
           <div className="qb-p">{card.pay}</div>
           {card.payUnit && <div className="qb-u">{card.payUnit}</div>}
@@ -149,7 +150,7 @@ function HomeRow({ app, labels }: { app: ApplicationResponse; labels: Record<str
   return (
     <div className="qb-hrow">
       <div className="qb-stampcell">
-        <Stamp vertical={card.vertical} size={34} />
+        <LaneStamp vertical={card.vertical} size={34} />
       </div>
       <div className="qb-hmain">
         <div className="qb-htitle">
@@ -167,7 +168,7 @@ function HomeRow({ app, labels }: { app: ApplicationResponse; labels: Record<str
           {card.firstQuest && (
             <>
               {' '}
-              <span className="qb-fq" style={{ color: verticals[card.vertical].hue }}>
+              <span className="qb-fq" style={{ color: laneDisplay(card.vertical).hue }}>
                 first quest
               </span>
             </>
@@ -188,7 +189,7 @@ function HomeRow({ app, labels }: { app: ApplicationResponse; labels: Record<str
       </div>
       {card.applied || card.clippedDate ? (
         <span className="qb-clipcell">
-          <PostmarkStamp vertical={card.vertical} press={!stampedAtMount} />
+          <LanePostmark vertical={card.vertical} press={!stampedAtMount} />
         </span>
       ) : (
         <button
