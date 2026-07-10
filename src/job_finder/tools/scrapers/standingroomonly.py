@@ -242,6 +242,8 @@ def _normalize_page(page: dict, today: date) -> dict | None:
     description="US TV audience seats and court-show casting calls from Standing Room Only",
     category="camera",
     vertical="camera",
+    # audience calls post days ahead
+    refresh_hours=24,
     enabled_by_default=False,
 )
 def search_standingroomonly(

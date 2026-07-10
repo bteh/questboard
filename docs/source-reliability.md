@@ -14,6 +14,21 @@ the wrong text in the right field. To the old code, all of those looked
 exactly like a quiet day. Users then see an empty or wrong board and blame
 the product, never the pipeline.
 
+## Built now (PR: the scheduler)
+
+**0. The board restocks itself.** Each quest source declares
+`refresh_hours` in its registry entry (like the expiry contract). A
+background loop in the backend (`app/services/scheduler_service.py`,
+started by the lifespan, local mode only until the hosting build) ticks
+every 15 minutes, asks `job_finder.schedule.due_sources()` which sources
+are past their cadence (measured from the last ATTEMPT in the run log, so
+a failing source retries at its rhythm instead of hammering), and runs
+exactly those through `run_quest_search(only_sources=...)`, which carries
+the whole trust machinery: snapshot before writes, run logging, dedup,
+expiry. One sweep at a time; overlapping ticks are skipped.
+`GET /api/v1/scrapers/schedule` shows every source's cadence and due
+state. Kill switch: `SCHEDULER_ENABLED=false`.
+
 ## Built now (PR: source run log + health)
 
 **1. The run log, `scrape_runs`.** One row per source per fetch, written by

@@ -95,6 +95,8 @@ def _normalize_event(event: dict) -> dict | None:
     description="Free studio-audience seats for TV tapings and fan events",
     category="camera",
     vertical="camera",
+    # tapings announce days ahead
+    refresh_hours=24,
     enabled_by_default=False,
 )
 def search_oneiota(

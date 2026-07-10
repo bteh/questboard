@@ -89,6 +89,8 @@ def _normalize_post(post: dict) -> dict | None:
     kind="body",
     # matches the 60-day fetch window: older posts fall out of the fetch
     stale_after_days=60,
+    # listings arrive a few per week
+    refresh_hours=24,
     enabled_by_default=False,
 )
 def search_studyscavenger(

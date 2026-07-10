@@ -39,6 +39,13 @@ class ScraperMeta:
     # reddit tells us WHERE to crawl, it is never itself the content
     # (curation verdict, docs/source-coverage.md).
     research_only: bool = False
+    # Refresh cadence, declared by each source about ITSELF (like the
+    # expiry contract): how many hours between automatic sweeps. The
+    # board scheduler (job_finder.schedule) only ever runs quest sources
+    # that declare this; None means manual-only. Pick the source's real
+    # publishing rhythm, not "as fast as possible": politeness is part
+    # of the trust posture.
+    refresh_hours: int | None = None
 
 
 _REGISTRY: dict[str, ScraperMeta] = {}
@@ -56,6 +63,7 @@ def register_scraper(
     full_snapshot: bool = False,
     stale_after_days: int | None = None,
     research_only: bool = False,
+    refresh_hours: int | None = None,
 ) -> Callable:
     """Decorator that registers a scraper function with its metadata.
 
@@ -86,6 +94,7 @@ def register_scraper(
             full_snapshot=full_snapshot,
             stale_after_days=stale_after_days,
             research_only=research_only,
+            refresh_hours=refresh_hours,
         )
         return fn
     return decorator

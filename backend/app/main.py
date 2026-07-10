@@ -38,7 +38,15 @@ async def lifespan(app: FastAPI):
             next(db_gen)
         except StopIteration:
             pass
+    from app.services.scheduler_service import build_scheduler
+
+    scheduler = build_scheduler()
+    app.state.scheduler = scheduler
+    if scheduler is not None:
+        scheduler.start()
     yield
+    if scheduler is not None:
+        await scheduler.stop()
 
 
 app = FastAPI(

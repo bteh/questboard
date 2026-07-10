@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 
 from app.schemas.scrapers import (
+    BoardScheduleResponse,
     ScraperSource,
     ScrapeRunEntry,
     ScrapeRunsResponse,
     SourceHealthEntry,
     SourceHealthResponse,
+    SourceScheduleEntry,
 )
 
 router = APIRouter(prefix="/scrapers", tags=["scrapers"])
@@ -103,4 +105,32 @@ async def scrape_runs(
             )
             for r in rows
         ]
+    )
+
+
+@router.get("/schedule", response_model=BoardScheduleResponse)
+async def board_schedule(request: Request) -> BoardScheduleResponse:
+    """Every schedulable source with its cadence and due state, soonest first.
+
+    scheduler_running says whether this process owns a live sweep loop;
+    the per-source rows are true either way (they read the run log).
+    """
+    from job_finder.schedule import board_schedule as compute_schedule
+
+    entries = compute_schedule()
+    scheduler = getattr(request.app.state, "scheduler", None)
+    return BoardScheduleResponse(
+        scheduler_running=scheduler is not None,
+        sources=[
+            SourceScheduleEntry(
+                source=s.name,
+                display_name=s.display_name,
+                vertical=s.vertical,
+                refresh_hours=s.refresh_hours,
+                last_attempt_at=s.last_attempt_at,
+                due_at=s.due_at,
+                due_now=s.due(),
+            )
+            for s in entries
+        ],
     )

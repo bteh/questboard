@@ -49,3 +49,19 @@ class ScrapeRunEntry(BaseModel):
 
 class ScrapeRunsResponse(BaseModel):
     runs: list[ScrapeRunEntry]
+
+
+class SourceScheduleEntry(BaseModel):
+    source: str
+    display_name: str
+    vertical: str
+    refresh_hours: int
+    last_attempt_at: datetime | None = None
+    # None means the source has never run and is due immediately
+    due_at: datetime | None = None
+    due_now: bool
+
+
+class BoardScheduleResponse(BaseModel):
+    scheduler_running: bool
+    sources: list[SourceScheduleEntry]

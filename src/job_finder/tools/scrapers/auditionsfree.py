@@ -278,6 +278,8 @@ def _normalize_post(post: object) -> dict | None:
     url="https://www.auditionsfree.com",
     description="Open casting calls for film, TV, theater, and reality shows",
     category="quest",
+    # calls post daily
+    refresh_hours=24,
     enabled_by_default=False,
     vertical="camera",
 )

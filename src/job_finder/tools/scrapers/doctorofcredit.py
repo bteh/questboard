@@ -194,6 +194,8 @@ def _normalize_post(post: dict) -> dict | None:
     # nothing, but DoC bumps live offers regularly, so 45 unconfirmed days
     # means the offer very likely died
     stale_after_days=45,
+    # DoC posts new offers through the day
+    refresh_hours=12,
     enabled_by_default=False,
 )
 def search_doctorofcredit(

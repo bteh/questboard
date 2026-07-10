@@ -19,6 +19,12 @@ class Settings(BaseSettings):
     config_dir: str = "config"
     data_dir: str = "data"
     hosted_mode: bool = False
+    # The board restocks itself: a background loop sweeps quest sources on
+    # their registry-declared cadence. Local/desktop only for now; hosted
+    # sweeps land with the hosting build (shared-pool design).
+    scheduler_enabled: bool = True
+    scheduler_tick_seconds: int = 900
+    scheduler_initial_delay_seconds: int = 90
     dev_hosted_auth: bool = False
     dev_hosted_auth_secret: str = ""
     dev_hosted_auth_issuer: str = "https://questboard.dev.local/auth/v1"

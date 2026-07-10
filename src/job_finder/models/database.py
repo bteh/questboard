@@ -259,6 +259,32 @@ def record_scrape_runs(runs: list[dict]) -> None:
         session.close()
 
 
+def latest_scrape_attempts() -> dict[str, datetime]:
+    """Newest run started_at per source, any outcome. Empty on any failure.
+
+    The scheduler measures cadence from the last attempt, so a failing
+    source retries at its declared rhythm instead of every tick.
+    """
+    try:
+        session = get_session()
+    except Exception:
+        return {}
+    try:
+        from sqlalchemy import func
+
+        rows = (
+            session.query(ScrapeRunRecord.source, func.max(ScrapeRunRecord.started_at))
+            .group_by(ScrapeRunRecord.source)
+            .all()
+        )
+        return {source: started for source, started in rows if started is not None}
+    except Exception:
+        logger.warning("scrape run log: attempts read failed", exc_info=True)
+        return {}
+    finally:
+        session.close()
+
+
 def get_recent_scrape_runs(
     days: int = 14,
     source: str | None = None,

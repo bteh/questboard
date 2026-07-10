@@ -23,3 +23,14 @@ def _isolated_data_dir(tmp_path, monkeypatch):
     monkeypatch.setenv("JOB_FINDER_DATA_DIR", str(tmp_path))
     yield
     # tmp_path is auto-cleaned by pytest; nothing further to do.
+
+
+@pytest.fixture(autouse=True)
+def _no_background_scheduler(monkeypatch):
+    """No test may ever fire a real board sweep.
+
+    The backend lifespan starts the board scheduler by default; a
+    TestClient context would otherwise arm a loop that sweeps live
+    sources. Scheduler tests opt back in explicitly.
+    """
+    monkeypatch.setenv("SCHEDULER_ENABLED", "false")
