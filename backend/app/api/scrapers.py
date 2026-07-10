@@ -1,10 +1,10 @@
-"""Scraper sources endpoint: serves registry metadata to the frontend."""
+"""Scraper sources endpoints: registry metadata and per-source health."""
 
 from __future__ import annotations
 
 from fastapi import APIRouter, Query
 
-from app.schemas.scrapers import ScraperSource
+from app.schemas.scrapers import ScraperSource, SourceHealthEntry, SourceHealthResponse
 
 router = APIRouter(prefix="/scrapers", tags=["scrapers"])
 
@@ -36,3 +36,36 @@ async def list_sources(
         )
         for m in metas
     ]
+
+
+@router.get("/health", response_model=SourceHealthResponse)
+async def sources_health(
+    days: int = Query(14, ge=1, le=90, description="Run-log window in days"),
+) -> SourceHealthResponse:
+    """Per-source health from the scrape run log, worst verdicts first.
+
+    Triage is this one call: a source that broke (failing), silently broke
+    (zero_rows while history says it finds rows), or halved (dropped) is at
+    the top with its last error line. See docs/source-reliability.md.
+    """
+    from job_finder.source_health import source_health
+    from job_finder.tools.scrapers import get_all_metadata
+
+    display = {m.name: m.display_name for m in get_all_metadata()}
+    entries = [
+        SourceHealthEntry(
+            source=h.source,
+            display_name=display.get(h.source, h.source),
+            vertical=h.vertical,
+            verdict=h.verdict,
+            last_run_at=h.last_run_at,
+            last_finish_reason=h.last_finish_reason,
+            last_rows=h.last_rows,
+            median_rows=h.median_rows,
+            runs_seen=h.runs_seen,
+            error_sample=h.error_sample,
+        )
+        for h in source_health(days=days)
+    ]
+    attention = sum(1 for e in entries if e.verdict in ("failing", "zero_rows", "dropped"))
+    return SourceHealthResponse(sources=entries, needs_attention=attention)

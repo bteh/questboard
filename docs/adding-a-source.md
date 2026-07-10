@@ -53,3 +53,6 @@ sources can then register with the new kind id immediately.
 - `src/job_finder/tools/scrapers/`: one file per source, `_registry.py` is the contract.
 - `backend/app/api/board.py`: the summary endpoint the board rail reads.
 - Taxonomy rationale: `docs/sidequest-research.md`. Requirements per kind: `docs/board-ux-research.md`.
+- Every run of your source is recorded in `scrape_runs` and judged by
+  `job_finder/source_health.py`; check `GET /api/v1/scrapers/health` after
+  shipping. The trust contract lives in `docs/source-reliability.md`.
