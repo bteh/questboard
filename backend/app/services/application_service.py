@@ -36,6 +36,7 @@ def get_applications(
     salary_min: float | None = None,
     profile: str | None = None,
     workspace_id: str | None = None,
+    shared_quest_workspace: str | None = None,
     search_run_id: str | None = None,
     first_seen_run_id: str | None = None,
     exclude_dead: bool = False,
@@ -116,7 +117,13 @@ def get_applications(
                 and_(lo.isnot(None), hi.is_(None), lo >= salary_min),
             )
         )
-    if workspace_id:
+    if shared_quest_workspace:
+        # hosted board read: your rows plus the shared quest pool
+        # (see app.services.row_scope for the visibility contract)
+        from app.services.row_scope import visible_rows_filter
+
+        query = query.filter(visible_rows_filter(shared_quest_workspace))
+    elif workspace_id:
         query = query.filter(ApplicationRecord.workspace_id == workspace_id)
     elif profile:
         query = query.filter(ApplicationRecord.profile == profile)
@@ -213,7 +220,19 @@ def get_applications(
 def get_application(db: Session, app_id: int, workspace_id: str | None = None) -> ApplicationRecord | None:
     query = db.query(ApplicationRecord).filter(ApplicationRecord.id == app_id)
     if workspace_id:
-        query = query.filter(ApplicationRecord.workspace_id == workspace_id)
+        # yours, or a read of a shared quest row (the hosted board is one
+        # felt for everyone; mutations clone first, reads need not)
+        from sqlalchemy import and_, or_
+
+        query = query.filter(
+            or_(
+                ApplicationRecord.workspace_id == workspace_id,
+                and_(
+                    ApplicationRecord.workspace_id.is_(None),
+                    ApplicationRecord.vertical != "career",
+                ),
+            )
+        )
     return query.first()
 
 
@@ -247,13 +266,53 @@ def create_application(db: Session, data, workspace_id: str | None = None) -> Ap
     return record
 
 
+def _clone_shared_quest_row(
+    db: Session, shared: ApplicationRecord, workspace_id: str
+) -> ApplicationRecord:
+    """Copy a shared quest row into a workspace (hosted clone-on-touch).
+
+    The shared row stays pristine for everyone else; the copy is the
+    user's, and board reads hide the original behind it (job_url dedupe).
+    """
+    values = {
+        column.name: getattr(shared, column.name)
+        for column in ApplicationRecord.__table__.columns
+        if column.name != "id"
+    }
+    values["workspace_id"] = workspace_id
+    copy = ApplicationRecord(**values)
+    db.add(copy)
+    db.flush()
+    return copy
+
+
 def update_application(
-    db: Session, app_id: int, workspace_id: str | None = None, **kwargs
+    db: Session,
+    app_id: int,
+    workspace_id: str | None = None,
+    allow_quest_clone: bool = False,
+    **kwargs,
 ) -> ApplicationRecord | None:
     query = db.query(ApplicationRecord).filter(ApplicationRecord.id == app_id)
     if workspace_id:
         query = query.filter(ApplicationRecord.workspace_id == workspace_id)
     record = query.first()
+    if not record and workspace_id and allow_quest_clone:
+        # hosted: the id may name a SHARED quest row; touch = clone first.
+        # A stale client can send the shared id after a copy already
+        # exists, so resolve to the existing copy by URL before cloning.
+        from app.services.row_scope import shared_quest_row_filter
+
+        shared = db.query(ApplicationRecord).filter(shared_quest_row_filter(app_id)).first()
+        if shared is not None:
+            record = (
+                db.query(ApplicationRecord)
+                .filter(
+                    ApplicationRecord.workspace_id == workspace_id,
+                    ApplicationRecord.job_url == shared.job_url,
+                )
+                .first()
+            ) or _clone_shared_quest_row(db, shared, workspace_id)
     if not record:
         return None
     for key, value in kwargs.items():

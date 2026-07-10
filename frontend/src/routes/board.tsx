@@ -413,6 +413,7 @@ function BoardPage() {
       sort_by: sortNewest ? 'date_found' : 'overall_score',
       sort_order: 'desc',
       page_size: PAGE_SIZE,
+      scope: 'board',
     }),
     [kindKey, activeKeys, search, place, payFloor, sortNewest],
   );
@@ -489,6 +490,7 @@ function BoardPage() {
       salary_min: payFloor ?? undefined,
       page: 1,
       page_size: 1,
+      scope: 'board',
     };
   }
 

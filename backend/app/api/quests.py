@@ -42,6 +42,14 @@ def refresh_quests(
             "career refresh stays on /search/run",
         )
 
+    if get_settings().hosted_mode:
+        # The hosted board is one shared pool the scheduler sweeps on each
+        # source's declared cadence; per-visitor sweeps would duplicate it.
+        raise HTTPException(
+            403,
+            "The board restocks itself here; fresh quests land on their own.",
+        )
+
     enforce_rate_limit(
         "quests-refresh",
         request_identity(request, workspace.workspace.id if workspace else None),
@@ -56,7 +64,7 @@ def refresh_quests(
         lat=req.lat,
         lon=req.lon,
         radius_miles=req.radius_miles,
-        # hosted rows scope to the visitor; local rows join the one pool
+        # local rows join the one pool
         workspace_id=workspace_scope_id(workspace),
     )
     return QuestRefreshSummary(**summary)

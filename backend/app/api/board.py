@@ -60,7 +60,10 @@ def board_summary(
     )
     scope = workspace_scope_id(workspace)
     if scope:
-        query = query.filter(ApplicationRecord.workspace_id == scope)
+        # hosted: the shared quest pool plus this workspace's own rows
+        from app.services.row_scope import visible_rows_filter
+
+        query = query.filter(visible_rows_filter(scope))
     elif profile:
         query = query.filter(ApplicationRecord.profile == profile)
     rows = query.group_by(ApplicationRecord.vertical).all()

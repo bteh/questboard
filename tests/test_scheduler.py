@@ -211,7 +211,7 @@ class TestBoardScheduler:
         sched = self._scheduler()
         assert asyncio.run(sched.tick()) == 0
 
-    def test_build_scheduler_honors_kill_switch_and_hosted_mode(self, monkeypatch) -> None:
+    def test_build_scheduler_honors_kill_switch(self, monkeypatch) -> None:
         # get_settings constructs a fresh Settings per call, so env is enough
         from app.services import scheduler_service
 
@@ -219,10 +219,12 @@ class TestBoardScheduler:
         assert scheduler_service.build_scheduler() is None
 
         monkeypatch.setenv("SCHEDULER_ENABLED", "true")
-        monkeypatch.setenv("HOSTED_MODE", "true")
-        assert scheduler_service.build_scheduler() is None
-
         monkeypatch.setenv("HOSTED_MODE", "false")
+        assert scheduler_service.build_scheduler() is not None
+
+        # hosted runs the loop too: sweeps write the shared pool the
+        # hosted board reads (one felt for every visitor)
+        monkeypatch.setenv("HOSTED_MODE", "true")
         assert scheduler_service.build_scheduler() is not None
 
 

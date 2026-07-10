@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     scheduler_enabled: bool = True
     scheduler_tick_seconds: int = 900
     scheduler_initial_delay_seconds: int = 90
+    # Hosted ops access: comma-separated emails allowed to read the
+    # scraper health/runs/schedule endpoints. Local mode is always open
+    # (it is your machine).
+    admin_emails: str = ""
     dev_hosted_auth: bool = False
     dev_hosted_auth_secret: str = ""
     dev_hosted_auth_issuer: str = "https://questboard.dev.local/auth/v1"

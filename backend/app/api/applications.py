@@ -198,9 +198,19 @@ def list_applications(
     sort_dir: str = "desc",
     page: int = Query(1, ge=1),
     page_size: int = Query(25, ge=1, le=100),
+    scope: str = Query(
+        "mine",
+        pattern="^(mine|board)$",
+        description=(
+            "mine = your rows only (the log). board = the felt: in hosted "
+            "mode adds the shared quest pool alongside your rows; identical "
+            "to mine in local mode, where one pool serves both"
+        ),
+    ),
     workspace = Depends(get_active_workspace_context),
     db: Session = Depends(get_db),
 ):
+    ws_scope = workspace_scope_id(workspace)
     try:
         items, total = application_service.get_applications(
             db,
@@ -214,8 +224,9 @@ def list_applications(
             work_type=work_type,
             location=location,
             salary_min=salary_min,
-            profile=None if workspace_scope_id(workspace) else profile,
-            workspace_id=workspace_scope_id(workspace),
+            profile=None if ws_scope else profile,
+            workspace_id=ws_scope,
+            shared_quest_workspace=ws_scope if scope == "board" else None,
             search_run_id=search_run_id,
             first_seen_run_id=first_seen_run_id,
             exclude_dead=not include_dead,
@@ -340,6 +351,7 @@ def update_application(
         db,
         app_id,
         workspace_id=workspace_scope_id(workspace),
+        allow_quest_clone=True,
         **update.model_dump(exclude_unset=True),
     )
     if not record:
@@ -361,6 +373,7 @@ def update_status(
         db,
         app_id,
         workspace_id=workspace_scope_id(workspace),
+        allow_quest_clone=True,
         **kwargs,
     )
     if not record:
@@ -383,6 +396,7 @@ def update_feedback(
         db,
         app_id,
         workspace_id=workspace_scope_id(workspace),
+        allow_quest_clone=True,
         **kwargs,
     )
     if not record:

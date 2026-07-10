@@ -61,3 +61,10 @@ src/job_finder/
 - **The landing mirrors the product.** The landing hero renders real components with real board
   data (the standing sync rule); when the board's look changes, the landing follows in the same
   PR series.
+- **Row pools (hosted).** Quest rows live in ONE shared pool (workspace_id NULL) that the
+  scheduler sweeps; every visitor's board reads it. Career rows stay per-workspace. Touching a
+  shared quest row clones it into your workspace first (clone-on-touch), so your log is yours
+  and the shared row stays pristine; reads hide the original behind your copy (job_url dedupe).
+  URL uniqueness is per pool, never global. The visibility contract is
+  `backend/app/services/row_scope.py`; reads declare `scope=board` (the felt) or `scope=mine`
+  (the log). Local/desktop own one NULL pool, where both scopes are identical.
