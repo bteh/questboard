@@ -56,6 +56,29 @@ class RedditSlavelabourTest(unittest.TestCase):
         self.assertTrue(paid, "at least one fixture task states pay in its title")
         self.assertIn("$", paid[0]["quest"]["pay_note"])
 
+    def test_salary_scale_pay_is_never_a_task_reward(self) -> None:
+        """Live-audit regression (2026-07-10): a recruiting ad's
+        '$30,000-120,000' rendered as an odd-job reward on the home page."""
+        payload = _load_fixture()
+        base = dict(payload["data"][0])
+        base["title"] = "[Task] Sell policies part time, earn $30,000-$120,000"
+        base["url"] = "https://www.reddit.com/r/slavelabour/comments/zzsalary/"
+        base["selftext"] = ""
+        rows = self._search({"data": [base]})
+        assert len(rows) == 1
+        row = rows[0]
+        self.assertNotIn("salary_min", row)
+        self.assertNotIn("salary_max", row)
+        self.assertIn("$30,000", row["quest"]["pay_note"])
+
+    def test_recruiting_ads_are_not_tasks(self) -> None:
+        payload = _load_fixture()
+        base = dict(payload["data"][0])
+        base["title"] = "[Task] Looking for Licensed Medicare Agents"
+        base["url"] = "https://www.reddit.com/r/slavelabour/comments/zzagents/"
+        rows = self._search({"data": [base]})
+        self.assertEqual(rows, [])
+
     def test_bad_payload_returns_empty(self) -> None:
         for bad in (None, {}, {"data": None}, "x", 42):
             self.assertEqual(self._search(bad), [])

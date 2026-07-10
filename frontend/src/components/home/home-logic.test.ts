@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { logStripTiles, pickBounty, pickNewRows } from './home-logic';
+import { logStripTiles, pickBounty } from './home-logic';
 import type { ApplicationResponse } from '@/types/application';
 
 function mk(id: number, extra: Partial<ApplicationResponse> = {}): ApplicationResponse {
@@ -68,22 +68,6 @@ describe('pickBounty', () => {
   it('returns null when nothing on the board states pay', () => {
     expect(pickBounty([noPay], [noPay])).toBeNull();
     expect(pickBounty([], [])).toBeNull();
-  });
-});
-
-describe('pickNewRows', () => {
-  it('takes the first five and skips the bounty row', () => {
-    const items = [1, 2, 3, 4, 5, 6, 7].map((id) => mk(id));
-    expect(pickNewRows(items, mk(3)).map((a) => a.id)).toEqual([1, 2, 4, 5, 6]);
-  });
-
-  it('takes the first five when no bounty exists', () => {
-    const items = [1, 2, 3, 4, 5, 6].map((id) => mk(id));
-    expect(pickNewRows(items, null).map((a) => a.id)).toEqual([1, 2, 3, 4, 5]);
-  });
-
-  it('shows what exists when fewer than five rows exist', () => {
-    expect(pickNewRows([mk(1), mk(2)], null).map((a) => a.id)).toEqual([1, 2]);
   });
 });
 

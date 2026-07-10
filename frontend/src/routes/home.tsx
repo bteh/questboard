@@ -1,14 +1,14 @@
-import { useState } from 'react';
 import { createRoute, Link } from '@tanstack/react-router';
 import { Route as appRoute } from './app';
-import { SplitFlap, StampDefs, TextLink } from '@questboard/ui';
-import { LanePostmark, LaneStamp, laneDisplay } from '@/components/shared/lane-display';
+import { Poster, SageButton, SplitFlap } from '@questboard/ui';
 import { useApplications, useUpdateStatus } from '@/hooks/use-applications';
+import { useBoardSummary } from '@/hooks/use-board-summary';
 import { useSourceLabels, resolveSourceLabel } from '@/hooks/use-scrapers';
-import { CLIP_STATUS, shortDate, toBoardCard } from '@/utils/board-card';
+import { CLIP_STATUS } from '@/utils/board-card';
 import { ALL_VERTICALS, verticalParams } from '@/utils/board-verticals';
-import { CredoLine } from '@/components/home/credo-line';
-import { logStripTiles, pickBounty, pickNewRows } from '@/components/home/home-logic';
+import { checkedAgoLabel } from '@/features/board/freshness';
+import { toPoster } from '@/features/board/poster-model';
+import { logStripTiles, pickBounty } from '@/components/home/home-logic';
 import type { ApplicationResponse } from '@/types/application';
 import '@/components/home/home.css';
 
@@ -18,14 +18,12 @@ export const Route = createRoute({
   component: HomePage,
 });
 
-/* The masthead home, ported from packages/ui/reference/quest-board-mock.html
-   (#page-home): the returning reader's front page. Every number on it is a
-   live query total or a field the source stated; the flaps and the credo
-   line are the page's two motions, the postmark press on Clip the third. */
+/* The returning reader's front page, in the felt language the landing and
+   the board speak: live counts up top, ONE real poster pinned to a strip
+   of felt as today's bounty, and the door to the board. Every number is a
+   live query total or a field the source stated. */
 
-const QUEST_VERTICALS = 'camera,study,lens';
-
-/* The mock's home horizon, verbatim: the masthead's closing edge. */
+/* The home horizon: the masthead's closing edge. */
 function HomeHorizon() {
   return (
     <svg
@@ -86,122 +84,34 @@ function HomeHorizon() {
   );
 }
 
-/* Today's bounty: the mock's featured card, filled by a real row. */
-function BountyCard({ app, labels }: { app: ApplicationResponse; labels: Record<string, string> }) {
+/* Today's bounty: one REAL poster through the board's own model, same as
+   the landing hero. The fit sheet lives in the app, so a career fit line
+   renders as plain text here. */
+function BountyPoster({ app, labels }: { app: ApplicationResponse; labels: Record<string, string> }) {
   const updateStatus = useUpdateStatus();
-  const card = toBoardCard(app, resolveSourceLabel(app.source, labels));
-  const v = laneDisplay(card.vertical);
-  /* clipped after mount gets the press; already-clipped renders settled */
-  const [stampedAtMount] = useState(() => Boolean(card.applied || card.clippedDate));
+  const poster = toPoster(app, resolveSourceLabel(app.source, labels));
+  const { card } = poster;
+  const bring = poster.hasFit
+    ? `a resume. this one covers ${card.fit!.strong} of the ${card.fit!.total} things they ask for`
+    : poster.copy.bring;
   return (
-    <article className="qb-feat">
-      <div className={`qb-band qb-${v.bandClass}`}>
-        <LaneStamp vertical={card.vertical} size={18} inheritColor />
-        <span>{v.label}</span>
-      </div>
-      <div className="qb-feat-body">
-        <div className="qb-feat-left">
-          <h3>
-            {card.href ? (
-              <a href={card.href} target="_blank" rel="noreferrer">
-                {card.title}
-              </a>
-            ) : (
-              card.title
-            )}
-          </h3>
-          <div className="qb-feat-meta">{card.meta}</div>
-          {card.needs && <div className="qb-feat-needs">{card.needs}</div>}
-          <div className="qb-feat-actions">
-            {card.href && <TextLink href={card.href}>Apply at source</TextLink>}
-            {card.applied ? (
-              <span className="qb-applied-stamp">{card.applied}</span>
-            ) : card.clippedDate ? (
-              <span className="qb-feat-meta">Clipped, {card.clippedDate}</span>
-            ) : (
-              <button
-                type="button"
-                className="qb-clip"
-                aria-label="Clip this quest"
-                onClick={() => updateStatus.mutate({ id: app.id, data: { status: CLIP_STATUS } })}
-              >
-                Clip
-              </button>
-            )}
-          </div>
-        </div>
-        <div className="qb-feat-pay">
-          {card.clippedDate && !card.applied && (
-            <LanePostmark vertical={card.vertical} press={!stampedAtMount} />
-          )}
-          <div className="qb-p">{card.pay}</div>
-          {card.payUnit && <div className="qb-u">{card.payUnit}</div>}
-        </div>
-      </div>
-    </article>
-  );
-}
-
-/* One row of "New on the board", the mock's ledger-row grammar. */
-function HomeRow({ app, labels }: { app: ApplicationResponse; labels: Record<string, string> }) {
-  const updateStatus = useUpdateStatus();
-  const card = toBoardCard(app, resolveSourceLabel(app.source, labels));
-  const [stampedAtMount] = useState(() => Boolean(card.applied || card.clippedDate));
-  return (
-    <div className="qb-hrow">
-      <div className="qb-stampcell">
-        <LaneStamp vertical={card.vertical} size={34} />
-      </div>
-      <div className="qb-hmain">
-        <div className="qb-htitle">
-          {card.href ? (
-            <a href={card.href} target="_blank" rel="noreferrer">
-              {card.title}
-            </a>
-          ) : (
-            card.title
-          )}
-        </div>
-        <div className="qb-hmeta">
-          {card.meta}
-          {card.clippedDate ? `, clipped ${card.clippedDate}` : ''}
-          {card.firstQuest && (
-            <>
-              {' '}
-              <span className="qb-fq" style={{ color: laneDisplay(card.vertical).hue }}>
-                first quest
-              </span>
-            </>
-          )}
-        </div>
-      </div>
-      <div className="qb-hneeds">
-        {card.applied ? <span className="qb-applied-stamp">{card.applied}</span> : card.needs}
-      </div>
-      <div className="qb-paycell">
-        {card.pay ? (
-          <span className="qb-hpay">
-            {card.pay} {card.payUnit && <span className="qb-u">{card.payUnit}</span>}
-          </span>
-        ) : (
-          <span className="qb-hpay qb-none">pay not stated</span>
-        )}
-      </div>
-      {card.applied || card.clippedDate ? (
-        <span className="qb-clipcell">
-          <LanePostmark vertical={card.vertical} press={!stampedAtMount} />
-        </span>
-      ) : (
-        <button
-          type="button"
-          className="qb-clip"
-          aria-label="Clip this quest"
-          onClick={() => updateStatus.mutate({ id: app.id, data: { status: CLIP_STATUS } })}
-        >
-          Clip
-        </button>
-      )}
-    </div>
+    <Poster
+      kind={poster.kind}
+      title={card.title}
+      href={card.href}
+      giver={card.meta}
+      desc={poster.desc}
+      bring={bring}
+      bringFree={poster.copy.bringFree && !poster.hasFit}
+      catchLine={poster.copy.catchLine}
+      tags={poster.tags}
+      pay={card.pay}
+      payUnit={card.payUnit}
+      applied={card.applied}
+      clippedDate={card.clippedDate}
+      rotateDeg={poster.rotateDeg}
+      onClip={() => updateStatus.mutate({ id: app.id, data: { status: CLIP_STATUS } })}
+    />
   );
 }
 
@@ -211,22 +121,24 @@ function useTotal(filters: Parameters<typeof useApplications>[0]): number | unde
 
 function HomePage() {
   const labels = useSourceLabels();
+  const summary = useBoardSummary().data;
 
-  /* the lede's totals: the same queries the board's All chip and pay-floor
-     input count, page_size 1, never hardcoded */
-  const boardTotal = useTotal(verticalParams('all'));
+  /* the lede: the same summary the board head and rail read, one number
+     everywhere; the pay floor stays a live probe */
+  const boardTotal = summary?.total;
   const pay500Total = useTotal({ ...verticalParams('all'), salary_min: 500 });
+  const checkedAgo = checkedAgoLabel(summary?.checked_at);
 
-  /* the flaps: rows provably posted in the last 24 hours, and quest rows
-     whose taping or session date falls inside the next 7 days */
-  const posted24 = useTotal({ ...verticalParams('all'), posted_within_days: 1 });
+  /* the flaps: the board rail's own new-today count, and rows whose taping
+     or session date falls inside the next 7 days, any lane */
   const eventsWeek = useTotal({
-    vertical: QUEST_VERTICALS,
+    vertical: ALL_VERTICALS,
     upcoming_only: true,
     event_within_days: 7,
   });
 
-  /* newest rows: the row list, the bounty fallback, and the updated date */
+  /* the bounty pool: rows with a provable post date in the last 3 days;
+     honest fallback to the newest stated-pay row (pickBounty) */
   const newest = useApplications({
     ...verticalParams('all'),
     sort_by: 'date_found',
@@ -234,8 +146,6 @@ function HomePage() {
     page: 1,
     page_size: 24,
   });
-  /* the bounty pool: rows with a provable post date in the last 3 days.
-     One page of the 100 newest finds; the pick is deterministic over it. */
   const recent = useApplications({
     ...verticalParams('all'),
     posted_within_days: 3,
@@ -250,18 +160,11 @@ function HomePage() {
   const interviewing = useTotal({ vertical: ALL_VERTICALS, status: 'interviewing' });
   const offers = useTotal({ vertical: ALL_VERTICALS, status: 'offer' });
 
-  const newestItems = newest.data?.items ?? [];
-  const bounty = pickBounty(recent.data?.items ?? [], newestItems);
-  const rows = pickNewRows(newestItems, bounty?.app ?? null);
+  const bounty = pickBounty(recent.data?.items ?? [], newest.data?.items ?? []);
   const tiles = logStripTiles({ applied, interviewing, offers });
-
-  const updated = shortDate(newestItems[0]?.date_found);
-  const today = shortDate(new Date().toISOString());
-  const updatedLabel = updated === today ? 'today' : updated;
 
   return (
     <>
-      <StampDefs />
       <div className="qb-mast">
         <div className="qb-hwrap qb-mast-inner">
           <h1 className="qb-lede">
@@ -273,11 +176,10 @@ function HomePage() {
               </>
             )}
           </h1>
-          {updatedLabel && (
-            <p className="qb-msub">
-              Updated {updatedLabel}. Every listing links straight to the source.
-            </p>
-          )}
+          <p className="qb-msub">
+            {checkedAgo ? `${checkedAgo[0].toUpperCase()}${checkedAgo.slice(1)}. ` : ''}
+            Every listing links straight to the source.
+          </p>
           <p className="qb-msub">
             Never done any of this? Most quests here need nothing you don't already have.{' '}
             <Link to="/board" className="qb-textlink">
@@ -285,11 +187,11 @@ function HomePage() {
             </Link>
           </p>
           <div className="qb-flaprow">
-            {posted24 !== undefined && (
+            {summary !== undefined && (
               <SplitFlap
-                value={String(posted24)}
-                caption="posted in the last 24 hours"
-                srLabel={`${posted24} quests posted in the last 24 hours.`}
+                value={String(summary.new_today)}
+                caption="new today"
+                srLabel={`${summary.new_today} quests new today.`}
               />
             )}
             {eventsWeek !== undefined && (
@@ -312,25 +214,16 @@ function HomePage() {
             <h2 className="qb-ch-title">
               {bounty.fallback ? 'Newest with stated pay' : "Today's bounty"}
             </h2>
-            <BountyCard app={bounty.app} labels={labels} />
+            <div className="qb-home-felt">
+              <BountyPoster app={bounty.app} labels={labels} />
+            </div>
           </section>
         )}
 
-        <section className="qb-chapter qb-washed">
-          <CredoLine text="Every date on this board is the true post date." />
-          <h2 className="qb-ch-title">
-            New on the board{' '}
-            <span className="qb-aside">
-              <Link to="/board" className="qb-textlink">
-                See the full board
-              </Link>
-            </span>
-          </h2>
-          <div className="qb-hrows">
-            {rows.map((app) => (
-              <HomeRow key={app.id} app={app} labels={labels} />
-            ))}
-          </div>
+        <section className="qb-chapter qb-home-door">
+          <Link to="/board">
+            <SageButton big>Open the board</SageButton>
+          </Link>
           {newest.isError && (
             <p style={{ fontSize: 14.5, color: 'var(--soft)', margin: '16px 0 0' }}>
               The board could not reach the backend. Start it with make dev and reload.

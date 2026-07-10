@@ -74,6 +74,7 @@ export function AppShell() {
         <Drawer
           open={menuOpen}
           onClose={closeMenu}
+          onHome={onHome}
           onBoard={onBoard}
           onLog={onLog}
           onSettings={onSettings}

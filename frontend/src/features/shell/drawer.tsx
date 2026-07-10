@@ -4,6 +4,7 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import {
   ArrowDown01Icon,
   Cancel01Icon,
+  Home01Icon,
   Logout03Icon,
   Notebook01Icon,
   Notification03Icon,
@@ -105,12 +106,13 @@ function DawnFoot() {
 export interface DrawerProps {
   open: boolean;
   onClose: () => void;
+  onHome: boolean;
   onBoard: boolean;
   onLog: boolean;
   onSettings: boolean;
 }
 
-export function Drawer({ open, onClose, onBoard, onLog, onSettings }: DrawerProps) {
+export function Drawer({ open, onClose, onHome, onBoard, onLog, onSettings }: DrawerProps) {
   const { data: summary } = useBoardSummary();
 
   useEffect(() => {
@@ -137,6 +139,10 @@ export function Drawer({ open, onClose, onBoard, onLog, onSettings }: DrawerProp
         <ProfileCard onNavigate={onClose} />
 
         <nav className="qb-drawer-nav">
+          <Link to="/home" className={onHome ? 'qb-nav-item qb-active' : 'qb-nav-item'} onClick={onClose}>
+            <span className="qb-nico"><HugeiconsIcon icon={Home01Icon} size={18} strokeWidth={STROKE} /></span>
+            Home
+          </Link>
           <Link to="/board" className={onBoard ? 'qb-nav-item qb-active' : 'qb-nav-item'} onClick={onClose}>
             <span className="qb-nico"><HugeiconsIcon icon={PinIcon} size={18} strokeWidth={STROKE} /></span>
             The board
