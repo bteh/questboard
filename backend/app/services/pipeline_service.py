@@ -343,6 +343,18 @@ def start_run(
 
     run_id = uuid.uuid4().hex[:12]
     queue: asyncio.Queue | None = asyncio.Queue() if not get_settings().hosted_mode else None
+
+    # The run's workspace_id is IDENTITY: run persistence, events, resume,
+    # prefs. Saved ROWS scope per workspace only in hosted mode; local and
+    # desktop runs write into the one shared pool (workspace_id NULL) the
+    # board reads, no matter which session started them.
+    data_workspace_id = workspace_id if get_settings().hosted_mode else None
+    if config_override and isinstance(config_override.get("workspace"), dict):
+        config_override = {
+            **config_override,
+            "workspace": {**config_override["workspace"], "workspace_id": data_workspace_id},
+        }
+
     run = PipelineRun(
         run_id=run_id,
         profile=profile,
@@ -427,6 +439,8 @@ def start_run(
         config_override or {},
         llm_override,
         companies or [],
+        True,
+        data_workspace_id,
     )
     return run
 
@@ -444,6 +458,7 @@ def _execute_pipeline(
     llm_override: Any | None = None,
     target_companies: list[str] | None = None,
     emit_error_event: bool = True,
+    data_workspace_id: str | None = None,
 ) -> None:
     """Run the pipeline in a worker thread."""
     run.status = "running"
@@ -605,7 +620,7 @@ def _execute_pipeline(
                     jobs,
                     progress_cb,
                     search_run_id=run.run_id,
-                    workspace_id=workspace_id,
+                    workspace_id=data_workspace_id,
                 )
         else:
             # search_score: AI scoring only (no enhancement)
@@ -636,7 +651,7 @@ def _execute_pipeline(
             )
 
         # Auto-merge any cross-source duplicates in the DB
-        merged = _auto_deduplicate(pipeline.profile_name, workspace_id=workspace_id)
+        merged = _auto_deduplicate(pipeline.profile_name, workspace_id=data_workspace_id)
         if merged > 0:
             _send_event(run, "progress", f"Merged {merged} cross-source duplicates")
 
@@ -649,7 +664,7 @@ def _execute_pipeline(
                 from app.services.application_service import check_urls as _check_urls
                 # Cover this run's jobs (capped); parallelized inside check_urls.
                 _limit = min(max(len(jobs), 50), 200)
-                _with_db(lambda db: _check_urls(db, limit=_limit, workspace_id=workspace_id))
+                _with_db(lambda db: _check_urls(db, limit=_limit, workspace_id=data_workspace_id))
             except Exception as exc:
                 logger.debug("Auto URL check failed (non-fatal): %s", exc)
 
@@ -969,6 +984,8 @@ def process_next_hosted_run(worker_id: str | None = None) -> bool:
             llm_override=llm,
             target_companies=[str(item) for item in payload.get("companies") or []],
             emit_error_event=False,
+            # hosted-only path: rows belong to the visitor's workspace
+            data_workspace_id=record.workspace_id,
         )
 
         db.refresh(record)

@@ -319,9 +319,13 @@ def test_refresh_endpoint_runs_and_returns_summary(api_client, monkeypatch):
     assert calls["args"] == (["camera", "study"], "tv taping", 40.7, -74.0, 30)
 
 
-def test_refresh_threads_the_callers_workspace_id(api_client, monkeypatch):
-    """Regression: quest rows saved without the caller's workspace are
-    invisible to every cookied session (the board would show zero quests)."""
+def test_local_refresh_writes_into_the_shared_pool(api_client, monkeypatch):
+    """Local mode owns ONE pool: a cookied session's refresh must save rows
+    with workspace_id None, where the (unscoped) local board reads them.
+    Threading the session workspace here split the pool in two: rows became
+    invisible to the CLI, to other sessions, and to this session once its
+    cookie rotated. Hosted refreshes still scope per visitor workspace
+    (see workspace_scope_id)."""
     client, _jf_db = api_client
     import job_finder.quests as quests
 
@@ -341,7 +345,7 @@ def test_refresh_threads_the_callers_workspace_id(api_client, monkeypatch):
     monkeypatch.setattr(quests, "run_quest_search", fake_run)
     resp = client.post("/api/v1/quests/refresh", json={"verticals": ["camera"]})
     assert resp.status_code == 200, resp.text
-    assert seen["workspace_id"], "refresh must run inside the caller's workspace"
+    assert seen["workspace_id"] is None, "local refresh must write the shared pool"
 
 
 def test_run_quest_search_stamps_workspace_on_saved_rows(db, fake_party_scrapers):

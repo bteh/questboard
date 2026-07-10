@@ -95,7 +95,12 @@ def get_active_workspace_context(
     request: Request,
     db: Session = Depends(get_db),
 ):
-    """Return the hosted workspace when required, otherwise best-effort context."""
+    """Return the hosted workspace when required, otherwise best-effort context.
+
+    The context is IDENTITY (preferences, resume, run bookkeeping), not data
+    scope. When filtering or stamping application/quest rows, pass it through
+    workspace_scope_id(); never use workspace.workspace.id directly for rows.
+    """
     from app.services import workspace_service
 
     if get_settings().hosted_mode:
@@ -113,6 +118,21 @@ def get_active_workspace_context_csrf(
     if get_settings().hosted_mode:
         return workspace_service.require_workspace_context(db, request, validate_csrf=True)
     return workspace_service.get_workspace_context_optional(db, request)
+
+
+def workspace_scope_id(workspace) -> str | None:
+    """The workspace id that scopes application/quest ROWS, or None.
+
+    Hosted mode isolates rows per visitor workspace. Local and desktop mode
+    own ONE pool (workspace_id NULL): the pipeline and CLI write there, so
+    scoping local reads to the anonymous session workspace hides everything
+    and the board goes blank as soon as the lb_session cookie lands. The
+    session workspace stays useful locally for identity only (preferences,
+    resume, run history).
+    """
+    if workspace is not None and get_settings().hosted_mode:
+        return workspace.workspace.id
+    return None
 
 
 def reject_legacy_route_in_hosted_mode(detail: str = "Route not available in hosted mode") -> None:
