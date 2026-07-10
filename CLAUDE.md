@@ -45,12 +45,20 @@ backend/
 
 frontend/
   src/
-    routes/                # TanStack Router pages (index, search, applications, analytics, settings)
-    components/            # React components (job cards, score badges, pipeline status, etc.)
+    routes/                # TanStack Router pages -- kept THIN (data wiring + composition)
+    features/              # feature modules (shell/, board/) -- new UI work starts here
+    components/            # legacy pre-convention components; migrate on touch
     api/                   # Typed API client functions
-    hooks/                 # Custom React hooks (useScraperSources, etc.)
+    hooks/                 # Custom React hooks (useBoardSummary, useApplications, etc.)
     utils/                 # Constants, helpers
+
+packages/
+  kinds/                   # quest-kind taxonomy registry (kinds.json, single source of truth
+                           # for TS AND Python -- see docs/adding-a-source.md)
+  ui/                      # @questboard/ui trade-paper design system (Poster, KindStamp, ...)
 ```
+
+Conventions for all of this live in docs/architecture.md.
 
 ## Commands
 

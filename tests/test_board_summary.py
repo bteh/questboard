@@ -117,12 +117,14 @@ def test_zero_supply_kinds_still_appear_for_supply_honesty(api_client) -> None:
     assert orders == sorted(orders)
 
 
-def test_dead_and_personal_rows_never_count(api_client) -> None:
+def test_dead_personal_and_past_event_rows_never_count(api_client) -> None:
     client, jf_db = api_client
     _seed(jf_db)
 
     session = jf_db._SessionLocal()
     try:
+        from datetime import datetime, timedelta, timezone
+
         from job_finder.models.database import ApplicationRecord
 
         dead = ApplicationRecord(
@@ -138,7 +140,14 @@ def test_dead_and_personal_rows_never_count(api_client) -> None:
             job_url="https://example.com/personal/note",
             vertical="personal",
         )
-        session.add_all([dead, personal])
+        past_taping = ApplicationRecord(
+            job_title="Yesterday's audience seat",
+            company="Studio",
+            job_url="https://example.com/quests/past",
+            vertical="camera",
+            event_start=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=2),
+        )
+        session.add_all([dead, personal, past_taping])
         session.commit()
     finally:
         session.close()

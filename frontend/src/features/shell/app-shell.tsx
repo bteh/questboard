@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, Outlet, useMatchRoute, useMatches, useNavigate } from '@tanstack/react-router';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Menu01Icon, Search01Icon, Settings02Icon } from '@hugeicons/core-free-icons';
+import {
+  Home01Icon,
+  Menu01Icon,
+  Notebook01Icon,
+  PinIcon,
+  Search01Icon,
+  Settings02Icon,
+} from '@hugeicons/core-free-icons';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster } from '@/components/ui/sonner';
 import { ErrorBoundary } from '@/components/shared/error-boundary';
@@ -89,28 +96,34 @@ export function AppShell() {
             </Link>
             <SearchBox />
           </div>
-          <nav className="qb-mobilebar" aria-label="Main">
-            <Link to="/home" className={cx('qb-mtab', onHome && 'qb-active')}>
+          <ErrorBoundary resetKey={matches[matches.length - 1]?.fullPath}>
+            <Outlet />
+          </ErrorBoundary>
+          {/* phone-web: a strip of ticket stubs along the bottom, drawn from
+              scratch (perforations between stubs, the active one half torn
+              free), never a reskinned platform tab bar */}
+          <nav className="qb-stubbar" aria-label="Main">
+            <Link to="/home" className={cx('qb-stub', onHome && 'qb-stub-on')}>
+              <HugeiconsIcon icon={Home01Icon} size={18} strokeWidth={1.7} />
               Home
             </Link>
-            <Link to="/board" className={cx('qb-mtab', onBoard && 'qb-active')}>
+            <Link to="/board" className={cx('qb-stub', onBoard && 'qb-stub-on')}>
+              <HugeiconsIcon icon={PinIcon} size={18} strokeWidth={1.7} />
               The board
             </Link>
-            <Link to="/log" className={cx('qb-mtab', onLog && 'qb-active')}>
+            <Link to="/log" className={cx('qb-stub', onLog && 'qb-stub-on')}>
+              <HugeiconsIcon icon={Notebook01Icon} size={18} strokeWidth={1.7} />
               Your log
             </Link>
             <Link
               to="/settings"
               search={{ tab: undefined }}
-              className={cx('qb-mtab', 'qb-mgear', onSettings && 'qb-active')}
-              aria-label="Settings"
+              className={cx('qb-stub', onSettings && 'qb-stub-on')}
             >
-              <HugeiconsIcon icon={Settings02Icon} size={17} strokeWidth={1.7} />
+              <HugeiconsIcon icon={Settings02Icon} size={18} strokeWidth={1.7} />
+              Settings
             </Link>
           </nav>
-          <ErrorBoundary resetKey={matches[matches.length - 1]?.fullPath}>
-            <Outlet />
-          </ErrorBoundary>
         </main>
       </div>
       <Toaster />
