@@ -163,6 +163,8 @@ class ClinicalTrialsRequestTest(unittest.TestCase):
         self.assertEqual(p["filter.geo"], "distance(40.7128,-74.006,50mi)")
         self.assertEqual(p["query.term"], "sleep")
         self.assertEqual(p["pageSize"], "10")
+        # an explicit geo hint replaces the US default, never stacks with it
+        self.assertNotIn("query.locn", p)
 
     def test_no_geo_filter_without_both_coordinates(self) -> None:
         captured: list[dict] = []
@@ -175,6 +177,9 @@ class ClinicalTrialsRequestTest(unittest.TestCase):
             self.mod.search_clinicaltrials(lat=40.7128)
         self.assertNotIn("filter.geo", captured[0])
         self.assertNotIn("query.term", captured[0])
+        # the registry is global; without a geo hint the fetch stays US
+        # (a Guangzhou trial reached the live board before this default)
+        self.assertEqual(captured[0]["query.locn"], "United States")
 
     def test_paginates_via_next_page_token(self) -> None:
         page1 = _fixture()

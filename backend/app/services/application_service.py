@@ -32,6 +32,7 @@ def get_applications(
     company_type: str | None = None,
     is_remote: bool | None = None,
     work_type: str | None = None,
+    location: str | None = None,
     salary_min: float | None = None,
     profile: str | None = None,
     workspace_id: str | None = None,
@@ -76,6 +77,26 @@ def get_applications(
         query = query.filter(ApplicationRecord.is_remote == is_remote)
     if work_type:
         query = query.filter(ApplicationRecord.work_type == work_type)
+    if location:
+        # A place filter narrows to quests you can actually reach; it must
+        # never hide work-from-anywhere. Rows pass when their location
+        # matches the typed text, when they say remote/online/nationwide in
+        # any wording, or when the source stated no place at all (unknown
+        # is not "elsewhere"). Text-level matching: "Georgia" does not
+        # match "GA" yet; structured places are the follow-up.
+        pattern = f"%{location.strip()}%"
+        query = query.filter(
+            or_(
+                ApplicationRecord.location.ilike(pattern),
+                ApplicationRecord.location.is_(None),
+                ApplicationRecord.location == "",
+                ApplicationRecord.location.ilike("%remote%"),
+                ApplicationRecord.location.ilike("%online%"),
+                ApplicationRecord.location.ilike("%nationwide%"),
+                ApplicationRecord.location.ilike("%anywhere%"),
+                ApplicationRecord.is_remote.is_(True),
+            )
+        )
     if salary_min is not None:
         # Annual pay floor. Mirrors job_finder.pipeline._job_salary_passes:
         # prefer annualized values, use the range midpoint when both ends are
@@ -168,6 +189,8 @@ def get_applications(
                 ApplicationRecord.job_title.ilike(pattern),
                 ApplicationRecord.company.ilike(pattern),
                 ApplicationRecord.description.ilike(pattern),
+                # a typed city must find the sit whose location says it
+                ApplicationRecord.location.ilike(pattern),
             )
         )
 

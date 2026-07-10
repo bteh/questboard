@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createRoute, redirect, useNavigate } from '@tanstack/react-router';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { CoinsDollarIcon, Location01Icon, Search01Icon } from '@hugeicons/core-free-icons';
 import { Route as appRoute } from './app';
 import {
   Chip,
@@ -327,6 +329,7 @@ function BoardPage() {
   /* text inputs buffer locally, debounce into the URL with replace so
      typing never spams history */
   const [searchRaw, setSearchRaw] = useState(params.q ?? '');
+  const [placeRaw, setPlaceRaw] = useState(params.place ?? '');
   const [payFromRaw, setPayFromRaw] = useState(params.from ?? '');
   const [payToRaw, setPayToRaw] = useState(params.to ?? '');
   /* newest first by default: the API's score sort floats unscored rows to
@@ -339,40 +342,54 @@ function BoardPage() {
   const [explainApp, setExplainApp] = useState<ApplicationResponse | null>(null);
 
   const search = useDebounced(searchRaw.trim());
+  const place = useDebounced(placeRaw.trim());
   const payFrom = useDebounced(payFromRaw.trim());
   const payTo = useDebounced(payToRaw.trim());
   const payFloor = parseAmount(payFrom);
   const payCeiling = parseAmount(payTo);
 
   /* what this page last wrote into the URL; anything else is history nav */
-  const pushedRef = useRef<{ q?: string; from?: string; to?: string }>({
+  const pushedRef = useRef<{ q?: string; place?: string; from?: string; to?: string }>({
     q: params.q,
+    place: params.place,
     from: params.from,
     to: params.to,
   });
 
   /* debounced edits -> URL (replace) */
   useEffect(() => {
-    const next = { q: search || undefined, from: payFrom || undefined, to: payTo || undefined };
+    const next = {
+      q: search || undefined,
+      place: place || undefined,
+      from: payFrom || undefined,
+      to: payTo || undefined,
+    };
     const cur = pushedRef.current;
-    if (cur.q === next.q && cur.from === next.from && cur.to === next.to) return;
+    if (cur.q === next.q && cur.place === next.place && cur.from === next.from && cur.to === next.to) return;
     pushedRef.current = next;
     void navigate({
       to: '/board',
       search: (prev: BoardParams) => ({ ...prev, ...next }),
       replace: true,
     });
-  }, [search, payFrom, payTo, navigate]);
+  }, [search, place, payFrom, payTo, navigate]);
 
   /* back/forward -> inputs: adopt a URL this page did not write */
   useEffect(() => {
     const cur = pushedRef.current;
-    if (params.q === cur.q && params.from === cur.from && params.to === cur.to) return;
-    pushedRef.current = { q: params.q, from: params.from, to: params.to };
+    if (
+      params.q === cur.q &&
+      params.place === cur.place &&
+      params.from === cur.from &&
+      params.to === cur.to
+    )
+      return;
+    pushedRef.current = { q: params.q, place: params.place, from: params.from, to: params.to };
     setSearchRaw(params.q ?? '');
+    setPlaceRaw(params.place ?? '');
     setPayFromRaw(params.from ?? '');
     setPayToRaw(params.to ?? '');
-  }, [params.q, params.from, params.to]);
+  }, [params.q, params.place, params.from, params.to]);
 
   /* the whole state persists locally so the next bare /board reopens it */
   useEffect(() => {
@@ -391,12 +408,13 @@ function BoardPage() {
       ...kindParams(kindKey),
       ...presetParams(activeKeys),
       search: search || undefined,
+      location: place || undefined,
       salary_min: payFloor ?? undefined,
       sort_by: sortNewest ? 'date_found' : 'overall_score',
       sort_order: 'desc',
       page_size: PAGE_SIZE,
     }),
-    [kindKey, activeKeys, search, payFloor, sortNewest],
+    [kindKey, activeKeys, search, place, payFloor, sortNewest],
   );
 
   const filtersKey = JSON.stringify(baseFilters);
@@ -467,6 +485,7 @@ function BoardPage() {
       ...kindParams(kindKey),
       ...presetParams(probe),
       search: search || undefined,
+      location: place || undefined,
       salary_min: payFloor ?? undefined,
       page: 1,
       page_size: 1,
@@ -489,7 +508,7 @@ function BoardPage() {
 
         <KindRail selected={kindKey} onSelect={selectKind} />
 
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div className="qb-preset-row">
           {visiblePresets.map((preset) => (
             <PresetChip
               key={preset.key}
@@ -501,34 +520,48 @@ function BoardPage() {
           ))}
         </div>
 
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginTop: 12 }}>
-          <input
-            className="qb-board-filter qb-board-search"
-            placeholder="Search the board"
-            aria-label="Search the board"
-            value={searchRaw}
-            onChange={(e) => setSearchRaw(e.target.value)}
-          />
-          <input
-            className="qb-board-filter qb-board-pay"
-            inputMode="numeric"
-            placeholder="pay from $150k"
-            aria-label="Pay floor, a year"
-            value={payFromRaw}
-            onChange={(e) => setPayFromRaw(e.target.value)}
-          />
-          <input
-            className="qb-board-filter qb-board-pay"
-            inputMode="numeric"
-            placeholder="to $210k"
-            aria-label="Pay ceiling, a year"
-            value={payToRaw}
-            onChange={(e) => setPayToRaw(e.target.value)}
-          />
-          <span style={{ fontSize: 12.5, color: 'var(--mute)' }}>
-            Only counts pay the posting states; jobs with no stated pay stay on the board.
-          </span>
+        <div className="qb-tray" role="search">
+          <label className="qb-tray-field qb-tray-grow">
+            <HugeiconsIcon icon={Search01Icon} size={16} strokeWidth={1.7} />
+            <input
+              placeholder="Search the board"
+              aria-label="Search the board"
+              value={searchRaw}
+              onChange={(e) => setSearchRaw(e.target.value)}
+            />
+          </label>
+          <label className="qb-tray-field qb-tray-place">
+            <HugeiconsIcon icon={Location01Icon} size={16} strokeWidth={1.7} />
+            <input
+              placeholder="your city or state"
+              aria-label="Filter by place; remote quests always pass"
+              value={placeRaw}
+              onChange={(e) => setPlaceRaw(e.target.value)}
+            />
+          </label>
+          <label className="qb-tray-field qb-tray-pay">
+            <HugeiconsIcon icon={CoinsDollarIcon} size={16} strokeWidth={1.7} />
+            <input
+              inputMode="numeric"
+              placeholder="pay from 150k"
+              aria-label="Pay floor, a year"
+              value={payFromRaw}
+              onChange={(e) => setPayFromRaw(e.target.value)}
+            />
+            <span className="qb-tray-to">to</span>
+            <input
+              inputMode="numeric"
+              placeholder="210k"
+              aria-label="Pay ceiling, a year"
+              value={payToRaw}
+              onChange={(e) => setPayToRaw(e.target.value)}
+            />
+          </label>
         </div>
+        <p className="qb-tray-note">
+          Pay counts only what the posting states; no stated pay keeps a quest on the board.
+          A place keeps remote and no-place quests too.
+        </p>
 
         <FirstRunNotice onStartHere={startHere} />
 

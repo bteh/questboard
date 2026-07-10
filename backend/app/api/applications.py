@@ -149,6 +149,11 @@ def list_applications(
     company_type: str | None = None,
     is_remote: bool | None = None,
     work_type: str | None = None,
+    location: str | None = Query(
+        None,
+        max_length=120,
+        description="Place text; keeps rows matching it plus remote/online/nationwide and rows with no stated place",
+    ),
     salary_min: float | None = Query(
         None,
         ge=0,
@@ -207,6 +212,7 @@ def list_applications(
             company_type=company_type,
             is_remote=is_remote,
             work_type=work_type,
+            location=location,
             salary_min=salary_min,
             profile=None if workspace_scope_id(workspace) else profile,
             workspace_id=workspace_scope_id(workspace),
