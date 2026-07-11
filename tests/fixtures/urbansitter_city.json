@@ -1,0 +1,63 @@
+{
+  "props": {
+    "pageProps": {
+      "city": "chicago",
+      "state": "il",
+      "jobTotalCount": 34,
+      "jobs": [
+        {
+          "id": 1469448,
+          "created": "2026-07-09 02:54:42",
+          "status": "new",
+          "title": null,
+          "type": "one_time",
+          "booking": {
+            "parent": {
+              "id": 4559381,
+              "firstName": null
+            },
+            "address": {
+              "city": "Deerfield",
+              "state": "IL",
+              "zip": "60015"
+            },
+            "start": "2026-07-11 13:00:00",
+            "end": "2026-07-11 21:00:00",
+            "duration": 8,
+            "numberOfChildren": 3,
+            "kidsAges": "6 years, 5 years, 3 years",
+            "rate": null,
+            "paymentType": "cash",
+            "description": "Hello!  We are looking for a kind and responsible caregiver to look after our three daughters.  They love to engage in imaginative play with each other, ride bikes and scooters and play at the park just down the street from our house. "
+          }
+        },
+        {
+          "id": 1469286,
+          "created": "2026-07-08 15:38:01",
+          "status": "new",
+          "title": null,
+          "type": "recurring",
+          "booking": {
+            "parent": {
+              "id": 4557877,
+              "firstName": null
+            },
+            "address": {
+              "city": "Buffalo Grove",
+              "state": "IL",
+              "zip": "60089"
+            },
+            "start": "2026-07-13 00:00:00",
+            "end": null,
+            "duration": 0,
+            "numberOfChildren": 1,
+            "kidsAges": "7 months",
+            "rate": 25,
+            "paymentType": "cash",
+            "description": "We’re looking for a warm, reliable nanny to care for our 7 month-old baby girl. Responsibilities include supervising playtime, preparing meals/snacks, light housekeeping related to childcare (tidying toys, washing bottles/dishes), and engaging in age-appropriate activities like reading, crafts, and outdoor play."
+          }
+        }
+      ]
+    }
+  }
+}

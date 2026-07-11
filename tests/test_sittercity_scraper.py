@@ -65,5 +65,47 @@ class SittercityTest(unittest.TestCase):
         self.assertEqual(self._search([]), [])
 
 
+class SittercityFetchTest(unittest.TestCase):
+    """The 429 postmortem (2026-07-10): our own Accept: application/json
+    header made every city URL 301 onto the generic /babysitting-jobs path
+    (which then 406s), and that per-path burst tripped their rate limit.
+    The fetch must ask for HTML and must treat the generic-redirect landing
+    as a failed city, never as a page worth parsing."""
+
+    def setUp(self) -> None:
+        from job_finder.tools.scrapers import sittercity as mod
+        self.mod = mod
+
+    def _resp(self, url: str, body: str = "<html></html>"):
+        class _R:
+            def __init__(self, url: str, text: str) -> None:
+                self.url = url
+                self.text = text
+            def raise_for_status(self) -> None:
+                return None
+        return _R(url, body)
+
+    def test_fetch_asks_for_html(self) -> None:
+        captured: dict = {}
+
+        def fake_get(url, headers=None, timeout=None):
+            captured["accept"] = (headers or {}).get("Accept", "")
+            return self._resp(url)
+
+        with unittest.mock.patch.object(self.mod.requests, "get", side_effect=fake_get):
+            self.mod._fetch_city("ny/new-york")
+        self.assertEqual(captured["accept"], "text/html")
+
+    def test_generic_redirect_landing_is_a_failed_city(self) -> None:
+        def fake_get(url, headers=None, timeout=None):
+            # the content-negotiation collapse: city URL 301s onto the
+            # generic index
+            return self._resp("https://www.sittercity.com/babysitting-jobs")
+
+        with unittest.mock.patch.object(self.mod.requests, "get", side_effect=fake_get):
+            cards = self.mod._fetch_city("ny/new-york")
+        self.assertEqual(cards, [])
+
+
 if __name__ == "__main__":
     unittest.main()
