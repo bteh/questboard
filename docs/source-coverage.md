@@ -51,19 +51,19 @@ Principle, from the debate synthesis: scarcity is less damaging than
 false actionability. Debate record:
 `~/.claude-octopus/debates/.../001-board-curation/synthesis.md`.
 
-## Live sources per kind (2026-07-10, post-curation)
+## Live sources per kind (2026-07-11, post-supply-push)
 
 | kind | sources | pay shape |
 |---|---|---|
 | skill | 18 career scrapers + JobSpy boards | stated ranges |
 | think | FocusGroups.org, **User Interviews** | per-session, stated |
 | perform | AuditionsFree, Casting Networks, 1iota, Project Casting, Standing Room Only | stated when posted |
-| odd | none, by curation verdict (was r/slavelabour) | n/a |
+| odd | none (honest state; see the 2026-07-11 verdicts) | n/a |
 | flip | none, paused by curation verdict (was r/PKMNTCGDeals) | n/a |
 | deliver | none, by verdict (see below) | n/a |
-| lookafter | **Sittercity** | poster-set hourly ranges |
+| lookafter | **Sittercity** (429 postmortem fixed), **Care.com**, **UrbanSitter** | poster-set hourly ranges only |
 | house | **Doctor of Credit**, **BankRewards.io** | exact stated bonuses |
-| body | **ClinicalTrials.gov** (refiled from think), **Study Scavenger** | stated, up-to maps to a ceiling |
+| body | **ClinicalTrials.gov**, **Study Scavenger**, **Trialmed (PPD clinics)**, **Fortrea**, **ICON** | stated, up-to maps to a ceiling |
 | party | none, by design (make your own) | n/a |
 
 Bold = added in the kind-sources push. Every source is one decorated
@@ -123,17 +123,66 @@ scrapers stay in the tree as research tooling (`research_only=True`).
   bare email address; the community reports non-payment.
 - **Prolific**: never scraped, never probed, standing rule.
 
+## The 2026-07-11 supply push (three live-probe research passes)
+
+**Sittercity 429 postmortem: it was us.** The shared headers' `Accept:
+application/json` made every city URL 301 onto the generic
+`/babysitting-jobs` path (which 406s), and that per-path burst tripped
+their rate limiter. Never a bot wall. Fix: ask for HTML, treat a
+generic-redirect landing as a failed city.
+
+**Built:** Care.com (jobs sitemap the site publishes deliberately,
+JSON-LD JobPosting, poster-set hourly, crawl-delay respected),
+UrbanSitter (`__NEXT_DATA__` city pages, poster-set rates or no pay,
+3s crawl delay), Trialmed = the PPD clinic network (open WP REST,
+US-clinic + enrolling-now gates, data-driven country map), Fortrea
+(server-rendered study table, exact stated stipends), ICON
+(studies-cards, up-to ceilings, no source dates by the DoC precedent).
+
+**Declined with evidence:**
+- **FindFocusGroups (was queued: FLIPPED).** Listings 41 days stale,
+  city pages empty, and a live SQL-injection test listing sat
+  unmoderated for 15 days. The Project Casting failure shape.
+- **Airtasker.** Public browse and an open JSON API exist, but
+  robots.txt disallows /tasks and /api. The Craigslist shape: trivial
+  tech, the site says no. Revisit only with a legal read or partnership.
+- **Think-lane facilities as a class** (Schlesinger=Sago, L&E,
+  Fieldwork, WatchLAB, Plaza dead): the industry moved to
+  panel-signup + screeners; public session calendars no longer exist.
+- **User-testing platforms as a class** (PlaytestCloud, BetaTesting,
+  Userlytics, TestingTime): email-invite panels, no public gig lists.
+- **Velocity Clinical** (lead form, no rows), **ResearchMatch**
+  (register-and-be-contacted), **CenterWatch** (CT.gov-derived,
+  standing decline), **Nextdoor** (login-walled, verified),
+  TaskRabbit-adjacent apps (Dolly→TaskRabbit, Gigwalk/Field
+  Agent/Observa in-app only), gig-shift boards (Wonolo, Instawork,
+  Jobble: marketing pages or ad arbitrage, no listings).
+
+**Product decisions, not scraping problems:**
+- **House sits** (TrustedHousesitters, MindMyHouse, Nomador): pay is a
+  free stay AND applying needs a paid sitter membership. Only honest as
+  a labeled "unpaid stay, membership required" poster. MindMyHouse has
+  a public RSS if that call ever lands.
+- **UW-Madison local student jobs**: a real, rare find (named
+  household posters, lump-sum tasks, same-day dates, public board) but
+  single-metro. Deferred as the pilot of a "campus community boards"
+  pattern; most campuses are login-walled (JobX class verified).
+
+**Watch items:** donedirtcheap.app (the r/DoneDirtCheap mods' own
+off-reddit platform; waitlist-only today, purpose-built odd-lane supply
+if it launches). The odd lane's honest state is empty: US-wide one-off
+task supply with real counterparties lives inside login walls today.
+
 ## Probed and queued (good, just not built yet)
 
-In rough impact order: FindFocusGroups.com (think; sitemap + clean HTML,
-pay always stated), Fortrea phase-1 units (body; a literal compensation
-column, $7k-$15k posters), Care.com SEO job pages (lookafter; biggest
-volume, moderate HTML build), r/sportsbook sbpotdbot daily promos
-(house; needs state-legality gating), TrustedHousesitters + MindMyHouse
-(lookafter; unpaid free-stay exchange, render the actual deal),
-r/buildapcsales + Slickdeals search RSS (flip; strict title grammar,
-watch for shopping-feed drift), r/DoneDirtCheap (odd; overlaps
-slavelabour).
+Most of the 2026-07-09 queue resolved in the 2026-07-11 supply push:
+FindFocusGroups flipped to declined, Fortrea and Care.com are built,
+the house-sit pair became a product decision, and the reddit entries
+died with the reddit-is-research verdict. Still genuinely queued:
+Slickdeals search RSS (flip; strict title grammar, watch for
+shopping-feed drift; only relevant once the flip lane re-enters),
+UW-Madison local student jobs (odd; the campus-boards pilot, see the
+supply-push verdicts), donedirtcheap.app (odd; watch for launch).
 
 ## Ingest guardrails (apply to every future source)
 

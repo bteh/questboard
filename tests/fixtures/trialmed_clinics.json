@@ -1,0 +1,106 @@
+[
+ {
+  "id": 445,
+  "slug": "the-villages",
+  "link": "https://trialmed.com/clinics/the-villages/",
+  "title": {
+   "rendered": "The Villages"
+  },
+  "meta": {
+   "trialmed_business_address_city": "The Villages",
+   "trialmed_business_address_state": "FL",
+   "trialmed_business_address_country": "US"
+  }
+ },
+ {
+  "id": 424,
+  "slug": "midlands",
+  "link": "https://trialmed.com/clinics/midlands/",
+  "title": {
+   "rendered": "Midlands"
+  },
+  "meta": {
+   "trialmed_business_address_city": "Birmingham",
+   "trialmed_business_address_state": "",
+   "trialmed_business_address_country": "GB"
+  }
+ },
+ {
+  "id": 421,
+  "slug": "manchester",
+  "link": "https://trialmed.com/clinics/manchester/",
+  "title": {
+   "rendered": "Manchester"
+  },
+  "meta": {
+   "trialmed_business_address_city": "Manchester ",
+   "trialmed_business_address_state": "",
+   "trialmed_business_address_country": "GB"
+  }
+ },
+ {
+  "id": 411,
+  "slug": "warsaw",
+  "link": "https://trialmed.com/clinics/warsaw/",
+  "title": {
+   "rendered": "Warsaw"
+  },
+  "meta": {
+   "trialmed_business_address_city": "Warsaw",
+   "trialmed_business_address_state": "",
+   "trialmed_business_address_country": "PL"
+  }
+ },
+ {
+  "id": 367,
+  "slug": "austin",
+  "link": "https://trialmed.com/clinics/austin/",
+  "title": {
+   "rendered": "Austin"
+  },
+  "meta": {
+   "trialmed_business_address_city": "Austin",
+   "trialmed_business_address_state": "TX",
+   "trialmed_business_address_country": "US"
+  }
+ },
+ {
+  "id": 362,
+  "slug": "atlanta",
+  "link": "https://trialmed.com/clinics/atlanta/",
+  "title": {
+   "rendered": "Atlanta"
+  },
+  "meta": {
+   "trialmed_business_address_city": "Atlanta",
+   "trialmed_business_address_state": "GA",
+   "trialmed_business_address_country": "US"
+  }
+ },
+ {
+  "id": 312,
+  "slug": "phoenix",
+  "link": "https://trialmed.com/clinics/phoenix/",
+  "title": {
+   "rendered": "Phoenix"
+  },
+  "meta": {
+   "trialmed_business_address_city": "Phoenix",
+   "trialmed_business_address_state": "AZ",
+   "trialmed_business_address_country": "US"
+  }
+ },
+ {
+  "id": 296,
+  "slug": "birmingham",
+  "link": "https://trialmed.com/clinics/birmingham/",
+  "title": {
+   "rendered": "Birmingham"
+  },
+  "meta": {
+   "trialmed_business_address_city": "Birmingham",
+   "trialmed_business_address_state": "AL",
+   "trialmed_business_address_country": "US"
+  }
+ }
+]

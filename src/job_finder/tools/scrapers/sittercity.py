@@ -109,10 +109,23 @@ def _normalize_card(card, city_label: str) -> dict | None:
 def _fetch_city(path: str) -> list:
     url = _CITY_URL.format(path=path.strip("/"))
     try:
-        resp = requests.get(url, headers=_HEADERS, timeout=_TIMEOUT)
+        # Ask for HTML explicitly: the shared headers' Accept:
+        # application/json made every city URL 301 onto the generic
+        # /babysitting-jobs path (which 406s), and that per-path burst is
+        # what tripped their rate limit (the 2026-07-10 "429" postmortem;
+        # it was never a bot wall).
+        resp = requests.get(
+            url, headers={**_HEADERS, "Accept": "text/html"}, timeout=_TIMEOUT
+        )
         resp.raise_for_status()
     except Exception as exc:
         logger.warning("Sittercity %s fetch failed: %s", path, exc)
+        return []
+    if resp.url.rstrip("/").endswith("/babysitting-jobs"):
+        # the content-negotiation collapse: landed on the generic index,
+        # not the city page; a page of someone else's jobs is worse than
+        # no page
+        logger.warning("Sittercity %s redirected to the generic index", path)
         return []
     soup = BeautifulSoup(resp.text, "html.parser")
     return soup.select("article.job-card")

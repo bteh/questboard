@@ -1,0 +1,67 @@
+[
+ {
+  "id": 3326,
+  "date": "2026-07-10T14:25:11",
+  "modified": "2026-07-10T14:28:33",
+  "slug": "3152225-aus",
+  "link": "https://trialmed.com/studies/3152225-aus/",
+  "title": {
+   "rendered": "3152225 AUS Healthy"
+  },
+  "content": {
+   "rendered": "<section class=\"trialmed-block wp-block-trialmed-study-summary\">\n\t<div class=\"section__inner wp-study-summary-container\">\n\t\t<dl class=\"wp-study-summary-def-list\">\n\n\t\t\t<div class=\"study-summary-def-list-item\">\n\t\t\t\t<dt class=\"study-summary-def-list-term\">\n\t\t\t\t\tCheck-in date\t\t\t\t</dt>\n\t\t\t\t<dd class=\"study-summary-def-list-definition\">\n\t\t\t\t\tFlexible start date\t\t\t\t</dd>\n\t\t\t</div>\n\n\t\t\t<div class=\"study-summary-def-list-item\">\n\t\t\t\t<dt class=\"study-summary-def-list-term\">\n\t\t\t\t\tTherapy area(s)\t\t\t\t</dt>\n\t\t\t\t<dd class=\"study-summary-def-list-definition\">\n\t\t\t\t\tHealthy volunteers\t\t\t\t</dd>\n\t\t\t</div>\n\n\t\t\t<div class=\"study-summary-def-list-item\">\n\t\t\t\t<dt class=\"study-summary-def-list-term\">\n\t\t\t\t\tLocation\t\t\t\t</dt>\n\t\t\t\t<dd class=\"study-summary-def-list-definition\">\n\t\t\t\t\tAustin\t\t\t\t</dd>\n\t\t\t</div>\n\n\t\t\t\t\t\t<div class=\"study-summary-def-list-item\">\n\t\t\t\t<dt class=\"study-summary-def-list-term\">\n\t\t\t\t\tCompensation\t\t\t\t</dt>\n\t\t\t\t<dd class=\"study-summary-def-list-definition\">\n\t\t\t\t\tUp to &#036;15800\t\t\t\t</dd>\n\t\t\t</div>\n\t\t\t\n\t\t\t<div class=\"study-summary-def-list-item\">\n\t\t\t\t<dt class=\"study-summary-def-list-term\">\n\t\t\t\t\tStatus\t\t\t\t</dt>\n\t\t\t\t<dd class=\"study-summary-def-list-definition\">\n\t\t\t\t\t<a class=\"contact-form-anchor-link\" href=\"#contact-form\"><div class=\"wp-atom-pill status-pill status-now\">\n\t\t\t\t<span class=\"pill-content icon-after\">Enrolling now</span>\n\t\t\t</div></a>\t\t\t\t</dd>\n\t\t\t</div>\n\n\t\t</dl>\n\t</div>\n</section>"
+  }
+ },
+ {
+  "id": 3199,
+  "date": "2026-06-09T14:12:11",
+  "modified": "2026-06-09T14:12:12",
+  "slug": "alz",
+  "link": "https://trialmed.com/studies/alz/",
+  "title": {
+   "rendered": "Alzheimer&#8217;s Research"
+  },
+  "content": {
+   "rendered": "<section class=\"trialmed-block wp-block-trialmed-study-summary\">\n\t<div class=\"section__inner wp-study-summary-container\">\n\t\t<dl class=\"wp-study-summary-def-list\">\n\n\t\t\t<div class=\"study-summary-def-list-item\">\n\t\t\t\t<dt class=\"study-summary-def-list-term\">\n\t\t\t\t\tStart date\t\t\t\t</dt>\n\t\t\t\t<dd class=\"study-summary-def-list-definition\">\n\t\t\t\t\tFlexible start date\t\t\t\t</dd>\n\t\t\t</div>\n\n\t\t\t<div class=\"study-summary-def-list-item\">\n\t\t\t\t<dt class=\"study-summary-def-list-term\">\n\t\t\t\t\tTherapy area(s)\t\t\t\t</dt>\n\t\t\t\t<dd class=\"study-summary-def-list-definition\">\n\t\t\t\t\tMind &amp;\u00a0memory health\t\t\t\t</dd>\n\t\t\t</div>\n\n\t\t\t<div class=\"study-summary-def-list-item\">\n\t\t\t\t<dt class=\"study-summary-def-list-term\">\n\t\t\t\t\tLocation\t\t\t\t</dt>\n\t\t\t\t<dd class=\"study-summary-def-list-definition\">\n\t\t\t\t\tThe Villages\t\t\t\t</dd>\n\t\t\t</div>\n\n\t\t\t\t\t\t<div class=\"study-summary-def-list-item\">\n\t\t\t\t<dt class=\"study-summary-def-list-term\">\n\t\t\t\t\tCompensation\t\t\t\t</dt>\n\t\t\t\t<dd class=\"study-summary-def-list-definition\">\n\t\t\t\t\tCompensation varies by study\t\t\t\t</dd>\n\t\t\t</div>\n\t\t\t\n\t\t\t<div class=\"study-summary-def-list-item\">\n\t\t\t\t<dt class=\"study-summary-def-list-term\">\n\t\t\t\t\tStatus\t\t\t\t</dt>\n\t\t\t\t<dd class=\"study-summary-def-list-definition\">\n\t\t\t\t\t<a class=\"contact-form-anchor-link\" href=\"#contact-form\"><div class=\"wp-atom-pill status-pill status-soon\">\n\t\t\t\t<span class=\"pill-content icon-after\">Coming soon</span>\n\t\t\t</div></a>\t\t\t\t</dd>\n\t\t\t</div>\n\n\t\t</dl>\n\t</div>\n</section>"
+  }
+ },
+ {
+  "id": 2952,
+  "date": "2026-04-02T02:11:58",
+  "modified": "2026-04-27T09:43:09",
+  "slug": "dpn-phnx",
+  "link": "https://trialmed.com/studies/dpn-phnx/",
+  "title": {
+   "rendered": "Generic DPN"
+  },
+  "content": {
+   "rendered": "<section class=\"trialmed-block wp-block-trialmed-study-summary\">\n\t<div class=\"section__inner wp-study-summary-container\">\n\t\t<dl class=\"wp-study-summary-def-list\">\n\n\t\t\t<div class=\"study-summary-def-list-item\">\n\t\t\t\t<dt class=\"study-summary-def-list-term\">\n\t\t\t\t\tStart date\t\t\t\t</dt>\n\t\t\t\t<dd class=\"study-summary-def-list-definition\">\n\t\t\t\t\tFlexible start date\t\t\t\t</dd>\n\t\t\t</div>\n\n\t\t\t<div class=\"study-summary-def-list-item\">\n\t\t\t\t<dt class=\"study-summary-def-list-term\">\n\t\t\t\t\tTherapy area(s)\t\t\t\t</dt>\n\t\t\t\t<dd class=\"study-summary-def-list-definition\">\n\t\t\t\t\tDiabetes &amp; metabolic health\t\t\t\t</dd>\n\t\t\t</div>\n\n\t\t\t<div class=\"study-summary-def-list-item\">\n\t\t\t\t<dt class=\"study-summary-def-list-term\">\n\t\t\t\t\tLocation\t\t\t\t</dt>\n\t\t\t\t<dd class=\"study-summary-def-list-definition\">\n\t\t\t\t\tPhoenix\t\t\t\t</dd>\n\t\t\t</div>\n\n\t\t\t\t\t\t<div class=\"study-summary-def-list-item\">\n\t\t\t\t<dt class=\"study-summary-def-list-term\">\n\t\t\t\t\tCompensation\t\t\t\t</dt>\n\t\t\t\t<dd class=\"study-summary-def-list-definition\">\n\t\t\t\t\tCompensation varies by study\t\t\t\t</dd>\n\t\t\t</div>\n\t\t\t\n\t\t\t<div class=\"study-summary-def-list-item\">\n\t\t\t\t<dt class=\"study-summary-def-list-term\">\n\t\t\t\t\tStatus\t\t\t\t</dt>\n\t\t\t\t<dd class=\"study-summary-def-list-definition\">\n\t\t\t\t\t<a class=\"contact-form-anchor-link\" href=\"#contact-form\"><div class=\"wp-atom-pill status-pill status-now\">\n\t\t\t\t<span class=\"pill-content icon-after\">Enrolling now</span>\n\t\t\t</div></a>\t\t\t\t</dd>\n\t\t\t</div>\n\n\t\t</dl>\n\t</div>\n</section>"
+  }
+ },
+ {
+  "id": 2492,
+  "date": "2025-11-23T14:40:27",
+  "modified": "2025-12-08T11:18:51",
+  "slug": "afib-study",
+  "link": "https://trialmed.com/studies/afib-study/",
+  "title": {
+   "rendered": "Afib Study"
+  },
+  "content": {
+   "rendered": "<section class=\"trialmed-block wp-block-trialmed-study-summary\">\n\t<div class=\"section__inner wp-study-summary-container\">\n\t\t<dl class=\"wp-study-summary-def-list\">\n\n\t\t\t<div class=\"study-summary-def-list-item\">\n\t\t\t\t<dt class=\"study-summary-def-list-term\">\n\t\t\t\t\tStart date\t\t\t\t</dt>\n\t\t\t\t<dd class=\"study-summary-def-list-definition\">\n\t\t\t\t\tMultiple start dates\t\t\t\t</dd>\n\t\t\t</div>\n\n\t\t\t<div class=\"study-summary-def-list-item\">\n\t\t\t\t<dt class=\"study-summary-def-list-term\">\n\t\t\t\t\tTherapy area(s)\t\t\t\t</dt>\n\t\t\t\t<dd class=\"study-summary-def-list-definition\">\n\t\t\t\t\tHeart health\t\t\t\t</dd>\n\t\t\t</div>\n\n\t\t\t<div class=\"study-summary-def-list-item\">\n\t\t\t\t<dt class=\"study-summary-def-list-term\">\n\t\t\t\t\tLocation\t\t\t\t</dt>\n\t\t\t\t<dd class=\"study-summary-def-list-definition\">\n\t\t\t\t\t2 clinics\t\t\t\t</dd>\n\t\t\t</div>\n\n\t\t\t\t\t\t<div class=\"study-summary-def-list-item\">\n\t\t\t\t<dt class=\"study-summary-def-list-term\">\n\t\t\t\t\tCompensation\t\t\t\t</dt>\n\t\t\t\t<dd class=\"study-summary-def-list-definition\">\n\t\t\t\t\tCompensation varies by study\t\t\t\t</dd>\n\t\t\t</div>\n\t\t\t\n\t\t\t<div class=\"study-summary-def-list-item\">\n\t\t\t\t<dt class=\"study-summary-def-list-term\">\n\t\t\t\t\tStatus\t\t\t\t</dt>\n\t\t\t\t<dd class=\"study-summary-def-list-definition\">\n\t\t\t\t\t<a class=\"contact-form-anchor-link\" href=\"#contact-form\"><div class=\"wp-atom-pill status-pill status-now\">\n\t\t\t\t<span class=\"pill-content icon-after\">Enrolling now</span>\n\t\t\t</div></a>\t\t\t\t</dd>\n\t\t\t</div>\n\n\t\t</dl>\n\t</div>\n</section>"
+  }
+ },
+ {
+  "id": 1476,
+  "date": "2025-07-02T09:00:55",
+  "modified": "2025-11-06T16:56:18",
+  "slug": "mdd",
+  "link": "https://trialmed.com/studies/mdd/",
+  "title": {
+   "rendered": "Major Depressive Disorder Study"
+  },
+  "content": {
+   "rendered": "<section class=\"trialmed-block wp-block-trialmed-study-summary\">\n\t<div class=\"section__inner wp-study-summary-container\">\n\t\t<dl class=\"wp-study-summary-def-list\">\n\n\t\t\t<div class=\"study-summary-def-list-item\">\n\t\t\t\t<dt class=\"study-summary-def-list-term\">\n\t\t\t\t\tStart date\t\t\t\t</dt>\n\t\t\t\t<dd class=\"study-summary-def-list-definition\">\n\t\t\t\t\tStarts Oct 28th\t\t\t\t</dd>\n\t\t\t</div>\n\n\t\t\t<div class=\"study-summary-def-list-item\">\n\t\t\t\t<dt class=\"study-summary-def-list-term\">\n\t\t\t\t\tTherapy area(s)\t\t\t\t</dt>\n\t\t\t\t<dd class=\"study-summary-def-list-definition\">\n\t\t\t\t\tMental health\t\t\t\t</dd>\n\t\t\t</div>\n\n\t\t\t<div class=\"study-summary-def-list-item\">\n\t\t\t\t<dt class=\"study-summary-def-list-term\">\n\t\t\t\t\tLocation\t\t\t\t</dt>\n\t\t\t\t<dd class=\"study-summary-def-list-definition\">\n\t\t\t\t\tAtlanta\t\t\t\t</dd>\n\t\t\t</div>\n\n\t\t\t\t\t\t<div class=\"study-summary-def-list-item\">\n\t\t\t\t<dt class=\"study-summary-def-list-term\">\n\t\t\t\t\tCompensation\t\t\t\t</dt>\n\t\t\t\t<dd class=\"study-summary-def-list-definition\">\n\t\t\t\t\tCompensation varies\t\t\t\t</dd>\n\t\t\t</div>\n\t\t\t\n\t\t\t<div class=\"study-summary-def-list-item\">\n\t\t\t\t<dt class=\"study-summary-def-list-term\">\n\t\t\t\t\tStatus\t\t\t\t</dt>\n\t\t\t\t<dd class=\"study-summary-def-list-definition\">\n\t\t\t\t\t<a class=\"contact-form-anchor-link\" href=\"#contact-form\"><div class=\"wp-atom-pill status-pill status-now\">\n\t\t\t\t<span class=\"pill-content icon-after\">Register interest now</span>\n\t\t\t</div></a>\t\t\t\t</dd>\n\t\t\t</div>\n\n\t\t</dl>\n\t</div>\n</section>"
+  }
+ }
+]
