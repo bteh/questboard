@@ -114,3 +114,127 @@ def test_no_location_param_returns_everything(api_client) -> None:
 
     resp = client.get("/api/v1/applications", params={"vertical": VERTS})
     assert resp.json()["total"] == 5
+
+
+def _seed_states(jf_db) -> None:
+    rows = (
+        ("Florida-only bonus", "https://x.example/fl", "FL only", "house"),
+        ("Northeast bonus", "https://x.example/ne", "ME, VT & NH", "house"),
+        ("DC-corridor bonus", "https://x.example/dc", "AL, CT, D.C., MD, VA Only", "house"),
+        ("Georgia sit", "https://x.example/gasit", "Atlanta, Georgia", "lookafter"),
+        ("Mexico study", "https://x.example/mx", "Guadalajara", "body"),
+        # the review's confirmed false-positive traps:
+        ("Niagara sit", "https://x.example/niag", "Niagara Falls, NY", "lookafter"),   # not GA
+        ("West Virginia bonus", "https://x.example/wv", "Charleston, West Virginia", "house"),  # not VA
+        ("Austin prose sit", "https://x.example/atx", "office in Austin, TX", "lookafter"),  # not IN
+        ("Slash-list bonus", "https://x.example/slash", "OR/WA only", "house"),  # Oregon+Washington
+    )
+    for title, url, location, vertical in rows:
+        jf_db.save_application(
+            job_title=title, company="Fixture", job_url=url,
+            location=location, vertical=vertical,
+        )
+
+
+def test_a_typed_state_name_matches_abbreviation_lists(api_client) -> None:
+    client, jf_db = api_client
+    _seed_states(jf_db)
+
+    resp = client.get(
+        "/api/v1/applications", params={"vertical": VERTS, "location": "Florida"}
+    )
+    titles = {r["job_title"] for r in resp.json()["items"]}
+    assert "Florida-only bonus" in titles
+    assert "Northeast bonus" not in titles
+
+
+def test_a_typed_abbreviation_matches_the_full_state_name(api_client) -> None:
+    client, jf_db = api_client
+    _seed_states(jf_db)
+
+    resp = client.get(
+        "/api/v1/applications", params={"vertical": VERTS, "location": "GA"}
+    )
+    titles = {r["job_title"] for r in resp.json()["items"]}
+    assert "Georgia sit" in titles
+    # the whole point: "GA" never matches cities that merely contain the
+    # letters (Guadalajara, Niagara, Chattanooga) — a query-time SQL
+    # tokenizer would have leaked all of these
+    assert "Mexico study" not in titles
+    assert "Niagara sit" not in titles
+
+
+def test_virginia_does_not_leak_west_virginia(api_client) -> None:
+    client, jf_db = api_client
+    _seed_states(jf_db)
+
+    resp = client.get(
+        "/api/v1/applications", params={"vertical": VERTS, "location": "Virginia"}
+    )
+    titles = {r["job_title"] for r in resp.json()["items"]}
+    # the DC-corridor bonus lists VA; the West Virginia bonus does not
+    assert "DC-corridor bonus" in titles
+    assert "West Virginia bonus" not in titles
+
+
+def test_prose_word_is_never_a_state(api_client) -> None:
+    client, jf_db = api_client
+    _seed_states(jf_db)
+
+    # "Indiana" (abbr IN) must not return "office in Austin, TX"
+    resp = client.get(
+        "/api/v1/applications", params={"vertical": VERTS, "location": "Indiana"}
+    )
+    titles = {r["job_title"] for r in resp.json()["items"]}
+    assert "Austin prose sit" not in titles
+
+
+def test_slash_separated_availability_matches(api_client) -> None:
+    client, jf_db = api_client
+    _seed_states(jf_db)
+
+    resp = client.get(
+        "/api/v1/applications", params={"vertical": VERTS, "location": "Oregon"}
+    )
+    titles = {r["job_title"] for r in resp.json()["items"]}
+    assert "Slash-list bonus" in titles  # "OR/WA only"
+
+
+def test_a_state_query_still_keeps_remote_and_placeless(api_client) -> None:
+    client, jf_db = api_client
+    # the seed from the top-of-file _seed(): a Remote study and a placeless drop
+    _seed(jf_db)
+    _seed_states(jf_db)
+
+    resp = client.get(
+        "/api/v1/applications", params={"vertical": VERTS, "location": "Georgia"}
+    )
+    titles = {r["job_title"] for r in resp.json()["items"]}
+    # a place never hides work-from-anywhere or nationwide supply
+    assert "Online study" in titles
+    assert "Nationwide bonus" in titles
+    assert "Placeless drop" in titles
+
+
+def test_state_tokens_match_inside_availability_lists(api_client) -> None:
+    client, jf_db = api_client
+    _seed_states(jf_db)
+
+    for query in ("Vermont", "VT"):
+        resp = client.get(
+            "/api/v1/applications", params={"vertical": VERTS, "location": query}
+        )
+        titles = {r["job_title"] for r in resp.json()["items"]}
+        assert "Northeast bonus" in titles, query
+        assert "Florida-only bonus" not in titles, query
+
+
+def test_dotted_dc_matches_both_ways(api_client) -> None:
+    client, jf_db = api_client
+    _seed_states(jf_db)
+
+    resp = client.get(
+        "/api/v1/applications", params={"vertical": VERTS, "location": "DC"}
+    )
+    titles = {r["job_title"] for r in resp.json()["items"]}
+    assert "DC-corridor bonus" in titles
