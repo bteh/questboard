@@ -192,6 +192,9 @@ export interface ApplicationFilters {
   work_type?: string;
   /** place text; remote/online/nationwide and no-place rows always pass */
   location?: string;
+  /** "near me only": with a location set, keep only rows that match it,
+      dropping remote/nationwide/placeless. No-op without a location. */
+  location_strict?: boolean;
   source?: string;
   search?: string;
   sort_by?: string;

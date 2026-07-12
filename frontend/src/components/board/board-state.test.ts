@@ -52,6 +52,16 @@ describe('validateBoardSearch', () => {
     expect(validateBoardSearch({ place: '' }).place).toBeUndefined();
   });
 
+  it('normalizes near me only however the router round-trips it', () => {
+    // ?near=1 can come back as a string, the number 1, or a boolean
+    expect(validateBoardSearch({ place: 'Chicago', near: '1' }).near).toBe('1');
+    expect(validateBoardSearch({ place: 'Chicago', near: 1 }).near).toBe('1');
+    expect(validateBoardSearch({ place: 'Chicago', near: true }).near).toBe('1');
+    expect(validateBoardSearch({ near: 0 }).near).toBeUndefined();
+    expect(validateBoardSearch({ near: '0' }).near).toBeUndefined();
+    expect(validateBoardSearch({}).near).toBeUndefined();
+  });
+
   it('keeps known verticals and drops junk', () => {
     expect(validateBoardSearch({ v: 'perform' }).v).toBe('perform');
     /* legacy vertical values from old URLs and saved state keep working */

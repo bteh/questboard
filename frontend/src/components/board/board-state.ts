@@ -20,6 +20,8 @@ export interface BoardParams {
   q?: string;
   /** Place text ("Los Angeles", "NV"); remote and no-place rows always pass. */
   place?: string;
+  /** "1" = near me only: with a place set, drop remote/placeless rows. */
+  near?: string;
   /** Typed pay floor, as typed ("150k"). */
   from?: string;
   /** Typed pay ceiling, as typed. */
@@ -43,6 +45,10 @@ export function validateBoardSearch(search: Record<string, unknown>): BoardParam
     v: normalizeKindKey(v),
     q: cleanString(search.q),
     place: cleanString(search.place),
+    // the router may hand back near as the number 1, the string "1", or a
+    // boolean, depending on how it round-tripped the URL; treat them alike
+    near:
+      search.near === '1' || search.near === 1 || search.near === true ? '1' : undefined,
     from: cleanString(search.from),
     to: cleanString(search.to),
     p: cleanString(search.p),
@@ -50,7 +56,9 @@ export function validateBoardSearch(search: Record<string, unknown>): BoardParam
 }
 
 export function hasBoardParams(params: BoardParams): boolean {
-  return Boolean(params.v || params.q || params.place || params.from || params.to || params.p);
+  return Boolean(
+    params.v || params.q || params.place || params.near || params.from || params.to || params.p,
+  );
 }
 
 /** ?p= comma list -> the set of keys the board recognizes today. */
@@ -81,7 +89,7 @@ export function readSavedBoardState(): SavedBoardState | null {
 export function saveBoardState(state: SavedBoardState): void {
   try {
     const compact: Record<string, string> = {};
-    for (const key of ['v', 'q', 'from', 'to', 'p', 'sort'] as const) {
+    for (const key of ['v', 'q', 'place', 'near', 'from', 'to', 'p', 'sort'] as const) {
       const value = state[key];
       if (value) compact[key] = value;
     }

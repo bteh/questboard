@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createRoute, Link, redirect, useNavigate } from '@tanstack/react-router';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { CoinsDollarIcon, Location01Icon, Search01Icon } from '@hugeicons/core-free-icons';
+import { CoinsDollarIcon, Search01Icon } from '@hugeicons/core-free-icons';
 import { Route as appRoute } from './app';
 import {
   Chip,
@@ -36,6 +36,7 @@ import {
 import { checkedAgoLabel } from '@/features/board/freshness';
 import { isCareerKind, kindParams, type KindKey } from '@/features/board/kind-params';
 import { KindRail } from '@/features/board/kind-rail';
+import { PlacePicker } from '@/features/board/place-picker';
 import { toPoster } from '@/features/board/poster-model';
 import { useBoardSummary } from '@/hooks/use-board-summary';
 import type { ApplicationFilters, ApplicationResponse, RequirementMatch } from '@/types/application';
@@ -62,7 +63,10 @@ export const Route = createRoute({
     if (saved && hasBoardParams(saved)) {
       throw redirect({
         to: '/board',
-        search: { v: saved.v, q: saved.q, from: saved.from, to: saved.to, p: saved.p },
+        search: {
+          v: saved.v, q: saved.q, place: saved.place, near: saved.near,
+          from: saved.from, to: saved.to, p: saved.p,
+        },
         replace: true,
       });
     }
@@ -330,6 +334,7 @@ function BoardPage() {
      typing never spams history */
   const [searchRaw, setSearchRaw] = useState(params.q ?? '');
   const [placeRaw, setPlaceRaw] = useState(params.place ?? '');
+  const [nearOnly, setNearOnly] = useState(params.near === '1');
   const [payFromRaw, setPayFromRaw] = useState(params.from ?? '');
   const [payToRaw, setPayToRaw] = useState(params.to ?? '');
   /* newest first by default: the API's score sort floats unscored rows to
@@ -348,10 +353,14 @@ function BoardPage() {
   const payFloor = parseAmount(payFrom);
   const payCeiling = parseAmount(payTo);
 
+  /* near me only is meaningless without a place, so it rides the place text */
+  const nearParam = nearOnly && place ? '1' : undefined;
+
   /* what this page last wrote into the URL; anything else is history nav */
-  const pushedRef = useRef<{ q?: string; place?: string; from?: string; to?: string }>({
+  const pushedRef = useRef<{ q?: string; place?: string; near?: string; from?: string; to?: string }>({
     q: params.q,
     place: params.place,
+    near: params.near,
     from: params.from,
     to: params.to,
   });
@@ -361,18 +370,26 @@ function BoardPage() {
     const next = {
       q: search || undefined,
       place: place || undefined,
+      near: nearParam,
       from: payFrom || undefined,
       to: payTo || undefined,
     };
     const cur = pushedRef.current;
-    if (cur.q === next.q && cur.place === next.place && cur.from === next.from && cur.to === next.to) return;
+    if (
+      cur.q === next.q &&
+      cur.place === next.place &&
+      cur.near === next.near &&
+      cur.from === next.from &&
+      cur.to === next.to
+    )
+      return;
     pushedRef.current = next;
     void navigate({
       to: '/board',
       search: (prev: BoardParams) => ({ ...prev, ...next }),
       replace: true,
     });
-  }, [search, place, payFrom, payTo, navigate]);
+  }, [search, place, nearParam, payFrom, payTo, navigate]);
 
   /* back/forward -> inputs: adopt a URL this page did not write */
   useEffect(() => {
@@ -380,28 +397,34 @@ function BoardPage() {
     if (
       params.q === cur.q &&
       params.place === cur.place &&
+      params.near === cur.near &&
       params.from === cur.from &&
       params.to === cur.to
     )
       return;
-    pushedRef.current = { q: params.q, place: params.place, from: params.from, to: params.to };
+    pushedRef.current = {
+      q: params.q, place: params.place, near: params.near, from: params.from, to: params.to,
+    };
     setSearchRaw(params.q ?? '');
     setPlaceRaw(params.place ?? '');
+    setNearOnly(params.near === '1');
     setPayFromRaw(params.from ?? '');
     setPayToRaw(params.to ?? '');
-  }, [params.q, params.place, params.from, params.to]);
+  }, [params.q, params.place, params.near, params.from, params.to]);
 
   /* the whole state persists locally so the next bare /board reopens it */
   useEffect(() => {
     saveBoardState({
       v: params.v,
       q: params.q,
+      place: params.place,
+      near: params.near,
       from: params.from,
       to: params.to,
       p: params.p,
       sort: sortNewest ? undefined : 'score',
     });
-  }, [params.v, params.q, params.from, params.to, params.p, sortNewest]);
+  }, [params.v, params.q, params.place, params.near, params.from, params.to, params.p, sortNewest]);
 
   const baseFilters = useMemo<ApplicationFilters>(
     () => ({
@@ -409,13 +432,14 @@ function BoardPage() {
       ...presetParams(activeKeys),
       search: search || undefined,
       location: place || undefined,
+      location_strict: nearParam ? true : undefined,
       salary_min: payFloor ?? undefined,
       sort_by: sortNewest ? 'date_found' : 'overall_score',
       sort_order: 'desc',
       page_size: PAGE_SIZE,
       scope: 'board',
     }),
-    [kindKey, activeKeys, search, place, payFloor, sortNewest],
+    [kindKey, activeKeys, search, place, nearParam, payFloor, sortNewest],
   );
 
   const filtersKey = JSON.stringify(baseFilters);
@@ -488,6 +512,7 @@ function BoardPage() {
       ...presetParams(probe),
       search: search || undefined,
       location: place || undefined,
+      location_strict: nearParam ? true : undefined,
       salary_min: payFloor ?? undefined,
       page: 1,
       page_size: 1,
@@ -533,15 +558,12 @@ function BoardPage() {
               onChange={(e) => setSearchRaw(e.target.value)}
             />
           </label>
-          <label className="qb-tray-field qb-tray-place">
-            <HugeiconsIcon icon={Location01Icon} size={16} strokeWidth={1.7} />
-            <input
-              placeholder="your city or state"
-              aria-label="Filter by place; remote quests always pass"
-              value={placeRaw}
-              onChange={(e) => setPlaceRaw(e.target.value)}
-            />
-          </label>
+          <PlacePicker
+            value={placeRaw}
+            onChange={setPlaceRaw}
+            ariaLabel="Filter by place; remote quests pass unless near me only is on"
+            className="qb-tray-field qb-tray-place"
+          />
           <label className="qb-tray-field qb-tray-pay">
             <HugeiconsIcon icon={CoinsDollarIcon} size={16} strokeWidth={1.7} />
             <input
@@ -562,8 +584,23 @@ function BoardPage() {
           </label>
         </div>
         <p className="qb-tray-note">
-          Pay counts only what the posting states; no stated pay keeps a quest on the board.
-          A place keeps remote and no-place quests too.
+          {placeRaw.trim() ? (
+            <>
+              <label className="qb-nearme">
+                <input
+                  type="checkbox"
+                  checked={nearOnly}
+                  onChange={(e) => setNearOnly(e.target.checked)}
+                />
+                near me only
+              </label>
+              {nearOnly
+                ? ' Showing only quests in that place. Remote and no-place quests are hidden.'
+                : ' A place keeps remote and no-place quests too. Tick near me only to hide them.'}
+            </>
+          ) : (
+            'Pay counts only what the posting states; no stated pay keeps a quest on the board. A place keeps remote and no-place quests too.'
+          )}
         </p>
 
         <FirstRunNotice onStartHere={startHere} />

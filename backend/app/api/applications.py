@@ -154,6 +154,10 @@ def list_applications(
         max_length=120,
         description="Place text; keeps rows matching it plus remote/online/nationwide and rows with no stated place",
     ),
+    location_strict: bool = Query(
+        False,
+        description='"Near me only": with a location set, keeps only rows that match the place, dropping remote/nationwide/placeless. No-op without a location',
+    ),
     salary_min: float | None = Query(
         None,
         ge=0,
@@ -223,6 +227,7 @@ def list_applications(
             is_remote=is_remote,
             work_type=work_type,
             location=location,
+            location_strict=location_strict,
             salary_min=salary_min,
             profile=None if ws_scope else profile,
             workspace_id=ws_scope,

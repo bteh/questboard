@@ -1,13 +1,18 @@
 import { kindForVertical } from '@questboard/kinds';
 import { boardVertical, toBoardCard } from '@/utils/board-card';
 import { postedAgoLabel } from '@/utils/job-trust';
-import { markEntered } from '@/lib/entry';
+import { hasOnboarded, markEntered } from '@/lib/entry';
 import type { ApplicationResponse } from '@/types/application';
 
-type EnterNavigate = (opts: { to: '/board' }) => void | Promise<void>;
+type EnterNavigate = (opts: { to: '/board' | '/start' }) => void | Promise<void>;
 
-/* Any CTA click counts as entering: set the flag, land on the board. */
+/* A first-timer gets the one-question place picker; a returner lands
+   straight on the board. Either way the CTA counts as entering. */
 export function handleEnter(navigate: EnterNavigate): void {
+  if (!hasOnboarded()) {
+    void navigate({ to: '/start' });
+    return;
+  }
   markEntered();
   void navigate({ to: '/board' });
 }
