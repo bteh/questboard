@@ -62,6 +62,10 @@ class SourceScheduleEntry(BaseModel):
     # None means the source has never run and is due immediately
     due_at: datetime | None = None
     due_now: bool
+    # consecutive failed runs, and whether the breaker is backing this
+    # source off after too many in a row
+    failure_streak: int = 0
+    breaker_open: bool = False
 
 
 class BoardScheduleResponse(BaseModel):

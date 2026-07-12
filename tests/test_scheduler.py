@@ -119,6 +119,97 @@ class TestDueLogic:
         assert names == ["never_ran", "soon", "later"]
 
 
+class TestCircuitBreaker:
+    def _patch_registry(self, monkeypatch, metas) -> None:
+        import job_finder.schedule as schedule
+
+        monkeypatch.setattr(schedule, "schedulable_metas", lambda: metas)
+
+    def _meta(self, name: str, hours: int = 12):
+        from job_finder.tools.scrapers._registry import ScraperMeta
+
+        return ScraperMeta(
+            name=name, display_name=name, url="", description="", category="",
+            enabled_by_default=False, search_fn=lambda: [], vertical="house",
+            refresh_hours=hours,
+        )
+
+    def test_streak_counts_leading_failures_and_breaks_on_a_healthy_run(self, monkeypatch) -> None:
+        import job_finder.schedule as schedule
+
+        class _Run:
+            def __init__(self, source, reason):
+                self.source, self.finish_reason = source, reason
+
+        # newest first: blocked has 3 leading failures then an ok; steady is clean
+        runs = [
+            _Run("blocked", "exception"), _Run("blocked", "timeout"),
+            _Run("blocked", "exception"), _Run("blocked", "ok"),
+            _Run("steady", "ok"), _Run("steady", "exception"),
+        ]
+        monkeypatch.setattr(
+            "job_finder.models.database.get_recent_scrape_runs", lambda days=14: runs
+        )
+        streaks = schedule.failure_streaks()
+        assert streaks == {"blocked": 3}  # steady's newest run is ok -> streak 0
+
+    def test_a_source_under_threshold_keeps_normal_cadence(self, monkeypatch) -> None:
+        import job_finder.schedule as schedule
+
+        self._patch_registry(monkeypatch, [self._meta("wobbly", 12)])
+        monkeypatch.setattr(
+            "job_finder.models.database.latest_scrape_attempts",
+            lambda: {"wobbly": NOW - timedelta(hours=13)},
+        )
+        monkeypatch.setattr(schedule, "failure_streaks", lambda: {"wobbly": 2})  # < threshold 3
+        s = schedule.board_schedule(NOW)[0]
+        assert s.breaker_open is False
+        assert s.due(NOW) is True  # 13h old on a 12h cadence, still due
+
+    def test_the_breaker_backs_a_failing_source_off(self, monkeypatch) -> None:
+        import job_finder.schedule as schedule
+
+        self._patch_registry(monkeypatch, [self._meta("blocked", 12)])
+        last = NOW - timedelta(hours=13)  # normally due (past the 12h cadence)
+        monkeypatch.setattr(
+            "job_finder.models.database.latest_scrape_attempts",
+            lambda: {"blocked": last},
+        )
+        monkeypatch.setattr(schedule, "failure_streaks", lambda: {"blocked": 3})
+        s = schedule.board_schedule(NOW)[0]
+        assert s.breaker_open is True
+        assert s.failure_streak == 3
+        # at the threshold the wait doubles the 12h cadence -> 24h
+        assert s.due_at == last + timedelta(hours=24)
+        # 13h since the last attempt but the breaker demands 24h: not due
+        assert s.due(NOW) is False
+
+    def test_backoff_doubles_the_cadence_and_caps(self) -> None:
+        import job_finder.schedule as schedule
+
+        # a 12h source: 2x, 4x, 8x, then capped at 72h
+        assert schedule._breaker_backoff_hours(12, 3) == 24
+        assert schedule._breaker_backoff_hours(12, 4) == 48
+        assert schedule._breaker_backoff_hours(12, 5) == 72   # 96 capped to 72
+        assert schedule._breaker_backoff_hours(12, 9) == 72
+        # a 24h source doubles too
+        assert schedule._breaker_backoff_hours(24, 3) == 48
+
+    def test_a_deeply_failing_source_is_not_due(self, monkeypatch) -> None:
+        import job_finder.schedule as schedule
+
+        self._patch_registry(monkeypatch, [self._meta("hardblocked", 24)])
+        last = NOW - timedelta(hours=40)  # long past its 24h cadence
+        monkeypatch.setattr(
+            "job_finder.models.database.latest_scrape_attempts",
+            lambda: {"hardblocked": last},
+        )
+        monkeypatch.setattr(schedule, "failure_streaks", lambda: {"hardblocked": 4})  # 48h wait
+        due = schedule.due_sources(NOW)
+        # 40h since last attempt but the breaker demands 48h: not swept
+        assert due == []
+
+
 class TestOnlySources:
     def test_refresh_narrows_to_named_sources(self, monkeypatch) -> None:
         from job_finder import quests

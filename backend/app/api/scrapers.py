@@ -138,6 +138,8 @@ async def board_schedule(request: Request) -> BoardScheduleResponse:
                 last_attempt_at=s.last_attempt_at,
                 due_at=s.due_at,
                 due_now=s.due(),
+                failure_streak=s.failure_streak,
+                breaker_open=s.breaker_open,
             )
             for s in entries
         ],
