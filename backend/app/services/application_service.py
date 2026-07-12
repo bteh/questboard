@@ -81,14 +81,25 @@ def get_applications(
     if location:
         # A place filter narrows to quests you can actually reach; it must
         # never hide work-from-anywhere. Rows pass when their location
-        # matches the typed text, when they say remote/online/nationwide in
-        # any wording, or when the source stated no place at all (unknown
-        # is not "elsewhere"). Text-level matching: "Georgia" does not
-        # match "GA" yet; structured places are the follow-up.
-        pattern = f"%{location.strip()}%"
+        # matches, when they say remote/online/nationwide in any wording,
+        # or when the source stated no place at all (unknown is not
+        # "elsewhere"). A typed US state (either spelling) matches the
+        # pre-parsed state_codes token field, so "Georgia" and "GA" both
+        # find a "VA, GA & NC only" bonus and neither matches
+        # "Guadalajara" or "West Virginia" (job_finder.us_states explains
+        # why this beats tokenizing prose in SQL). A typed city or free
+        # text keeps a plain location substring match.
+        from job_finder.us_states import state_aliases
+
+        aliases = state_aliases(location)
+        if aliases:
+            _full_name, abbr = aliases
+            place_match = ApplicationRecord.state_codes.like(f"%,{abbr},%")
+        else:
+            place_match = ApplicationRecord.location.ilike(f"%{location.strip()}%")
         query = query.filter(
             or_(
-                ApplicationRecord.location.ilike(pattern),
+                place_match,
                 ApplicationRecord.location.is_(None),
                 ApplicationRecord.location == "",
                 ApplicationRecord.location.ilike("%remote%"),

@@ -58,6 +58,11 @@ class ApplicationRecord(Base):
     job_title = Column(String(500), nullable=False)
     company = Column(String(300), nullable=False)
     location = Column(String(300), default="")
+    # The US states this location names, comma-wrapped (",AL,CT,VA," or
+    # ""), parsed at save time (job_finder.us_states). The place filter
+    # matches a typed state against this instead of guessing from prose;
+    # see us_states for why parse-at-ingest beats query-time tokenizing.
+    state_codes = Column(String(200), default="", index=True)
     # Uniqueness is per POOL, not global (see __table_args__): the hosted
     # shared board keeps one row per URL in the NULL-workspace pool, and a
     # workspace's clone-on-touch copy of a shared quest row may carry the
@@ -432,6 +437,33 @@ def _migrate_db(engine) -> None:
             conn.execute(
                 text("ALTER TABLE applications ADD COLUMN last_checked_at DATETIME")
             )
+        if "state_codes" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN state_codes VARCHAR(200) DEFAULT ''")
+            )
+        # Backfill parsed states every startup for rows that still lack them
+        # (predate the column, or a DB that got the column without the
+        # backfill during an intermediate deploy). Idempotent: only rows with
+        # a location and no codes are read, and only a non-empty parse writes,
+        # so after the first pass this matches nothing and costs one SELECT.
+        # Guarded on location: a minimal legacy table may lack it.
+        if "location" in existing_cols:
+            from job_finder.us_states import state_codes_field
+
+            rows = conn.execute(
+                text(
+                    "SELECT id, location FROM applications "
+                    "WHERE location IS NOT NULL AND location != '' "
+                    "AND (state_codes IS NULL OR state_codes = '')"
+                )
+            ).fetchall()
+            for _id, _loc in rows:
+                codes = state_codes_field(_loc)
+                if codes:
+                    conn.execute(
+                        text("UPDATE applications SET state_codes = :c WHERE id = :i"),
+                        {"c": codes, "i": _id},
+                    )
         if "date_posted" not in existing_cols:
             conn.execute(
                 text("ALTER TABLE applications ADD COLUMN date_posted VARCHAR(40) DEFAULT ''")
@@ -713,6 +745,22 @@ def save_application(
                     existing.date_posted = date_posted
                     existing.date_confidence = date_confidence or ""
                     changed = True
+                # A re-scrape can move a listing (or backfill a location the
+                # first pass lacked); keep the parsed state codes in step.
+                if location and location != (existing.location or ""):
+                    from job_finder.us_states import state_codes_field
+
+                    existing.location = location
+                    existing.state_codes = state_codes_field(location)
+                    changed = True
+                elif not existing.state_codes and existing.location:
+                    # backfill: rows saved before this column existed
+                    from job_finder.us_states import state_codes_field
+
+                    codes = state_codes_field(existing.location)
+                    if codes:
+                        existing.state_codes = codes
+                        changed = True
                 if changed:
                     existing.updated_at = _utcnow()
                 else:
@@ -835,10 +883,13 @@ def save_application(
         elif key_gaps is None:
             key_gaps = "[]"
 
+        from job_finder.us_states import state_codes_field
+
         record = ApplicationRecord(
             job_title=job_title,
             company=company,
             location=location,
+            state_codes=state_codes_field(location),
             job_url=job_url,
             source=source,
             last_seen_at=_utcnow(),
