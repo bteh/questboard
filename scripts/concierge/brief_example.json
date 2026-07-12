@@ -1,0 +1,10 @@
+{
+  "name": "extra-500-remote",
+  "person": "first tester",
+  "brief": "An extra $500 this month without a second job. Remote or anywhere in the US. Open to paid studies, user tests, and bank bonuses. No acting, no driving.",
+  "kinds": ["think", "body", "house"],
+  "search": "",
+  "place": "",
+  "pay_floor": 100,
+  "max_items": 6
+}
