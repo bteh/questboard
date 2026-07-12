@@ -89,8 +89,9 @@ class ProfilePreferences(BaseModel):
     current_tc: int = 100_000
     min_base: int = 80_000
     target_total_comp: int = 150_000
+    # prepares application kits for STRONG_APPLY jobs; nothing is ever
+    # transmitted (docs/anti-slop.md)
     auto_apply_enabled: bool = False
-    auto_apply_dry_run: bool = True
 
     # Scoring weights
     scoring_technical: float = 0.25

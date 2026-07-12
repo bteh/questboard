@@ -68,8 +68,8 @@ export interface ProfilePreferences {
   current_tc: number;
   min_base: number;
   target_total_comp: number;
+  /** prepares application kits for strong matches; nothing is ever transmitted */
   auto_apply_enabled: boolean;
-  auto_apply_dry_run: boolean;
 
   // Scoring weights
   scoring_technical: number;

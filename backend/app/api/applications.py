@@ -19,7 +19,7 @@ from app.schemas.application import (
     FeedbackUpdate,
     StatusUpdate,
 )
-from app.schemas.apply import PrepareResponse, SubmitRequest, SubmitResponse
+from app.schemas.apply import KitRequest, KitResponse, PrepareResponse
 from app.services import application_service
 from app.services import apply_service
 from app.dependencies import (
@@ -707,28 +707,28 @@ def prepare_application(
     return PrepareResponse(**result)
 
 
-@router.post("/{app_id}/apply", response_model=SubmitResponse)
-def submit_application(
+@router.post("/{app_id}/apply", response_model=KitResponse)
+def application_kit(
     app_id: int,
-    body: SubmitRequest,
+    body: KitRequest,
     profile: str = "default",
     workspace = Depends(get_active_workspace_context_csrf),
     db: Session = Depends(get_db),
 ):
-    """Submit an application via detected ATS (Greenhouse/Lever).
+    """The application kit: everything prefilled for the detected ATS.
 
-    Defaults to dry_run=True for safety. Set dry_run=False for live submission.
+    Questboard never transmits an application (docs/anti-slop.md); the
+    human sends it at apply_url, then marks the row applied.
     """
     profile = sanitize_profile(profile)
     _reject_non_career_row(db, app_id, workspace)
-    result = apply_service.submit_application(
+    result = apply_service.build_application_kit(
         db,
         app_id,
         cover_letter=body.cover_letter,
-        dry_run=body.dry_run,
         profile=profile,
         workspace_id=workspace_scope_id(workspace),
     )
     if result is None:
         raise HTTPException(status_code=404, detail="Application not found")
-    return SubmitResponse(**result)
+    return KitResponse(**result)
