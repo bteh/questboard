@@ -228,14 +228,10 @@ applicant_info:
   phone: ""
   linkedin_url: ""
 
+# Application kits: everything prefilled, YOU send it. Questboard never
+# transmits an application.
 auto_apply:
   enabled: false
-  dry_run: true
-  methods:
-    greenhouse: true
-    lever: true
-    linkedin_easy_apply: false
-  max_applications_per_run: 5
 """
 
 

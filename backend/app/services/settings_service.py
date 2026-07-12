@@ -615,7 +615,6 @@ def get_profile_preferences(name: str) -> dict:
             "min_base": comp.get("min_base", 80_000),
             "target_total_comp": comp.get("target_total_comp", 150_000),
             "auto_apply_enabled": auto.get("enabled", False),
-            "auto_apply_dry_run": auto.get("dry_run", True),
             # Scoring weights
             "scoring_technical": scoring.get("technical_skills", 0.25),
             "scoring_leadership": scoring.get("leadership_signal", 0.15),
@@ -658,8 +657,6 @@ def _extract_prefs_from_config(cfg: dict) -> dict:
     # Include auto_apply fields if present
     if "enabled" in auto:
         result["auto_apply_enabled"] = auto["enabled"]
-    if "dry_run" in auto:
-        result["auto_apply_dry_run"] = auto["dry_run"]
     # Scoring weights
     result["scoring_technical"] = scoring.get("technical_skills", 0.25)
     result["scoring_leadership"] = scoring.get("leadership_signal", 0.15)
@@ -756,14 +753,11 @@ def update_profile_preferences(name: str, prefs: dict) -> dict:
     if prefs.get("target_total_comp") is not None:
         cfg["compensation"]["target_total_comp"] = prefs["target_total_comp"]
 
-    # Update auto_apply settings if provided
-    if "auto_apply_enabled" in prefs or "auto_apply_dry_run" in prefs:
+    # Update application-kit settings if provided (nothing ever transmits)
+    if "auto_apply_enabled" in prefs:
         if "auto_apply" not in cfg:
             cfg["auto_apply"] = {}
-        if "auto_apply_enabled" in prefs:
-            cfg["auto_apply"]["enabled"] = prefs["auto_apply_enabled"]
-        if "auto_apply_dry_run" in prefs:
-            cfg["auto_apply"]["dry_run"] = prefs["auto_apply_dry_run"]
+        cfg["auto_apply"]["enabled"] = prefs["auto_apply_enabled"]
 
     # Update scoring weights
     scoring_keys = {

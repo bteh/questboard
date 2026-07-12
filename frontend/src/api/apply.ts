@@ -18,22 +18,27 @@ export interface PrepareResponse {
   job_url: string;
 }
 
-export interface SubmitRequest {
+export interface KitRequest {
+  /** user-edited cover letter, saved before the kit builds */
   cover_letter?: string;
-  dry_run?: boolean;
 }
 
-export interface SubmitResponse {
+/** The application kit: everything prefilled, YOU send it.
+    Questboard never transmits an application. */
+export interface KitResponse {
   success: boolean;
   method: string | null;
   message: string;
-  dry_run: boolean;
+  /** where the human acts */
+  apply_url: string;
+  /** the ATS form, prefilled (empty for unmapped ATS types) */
+  fields: Record<string, string>;
 }
 
 export function prepareApplication(id: number): Promise<PrepareResponse> {
   return apiPost<PrepareResponse>(`/applications/${id}/prepare`);
 }
 
-export function submitApplication(id: number, data: SubmitRequest = {}): Promise<SubmitResponse> {
-  return apiPost<SubmitResponse>(`/applications/${id}/apply`, data);
+export function getApplicationKit(id: number, data: KitRequest = {}): Promise<KitResponse> {
+  return apiPost<KitResponse>(`/applications/${id}/apply`, data);
 }

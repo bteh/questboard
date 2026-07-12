@@ -27,7 +27,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { ScoreCircle } from '@/components/scores/score-circle';
 import { CompanyAvatar } from '@/components/shared/company-avatar';
 import { RecommendationBadge } from '@/components/badges/recommendation-badge';
-import { usePrepareApplication, useSubmitApplication } from '@/hooks/use-apply';
+import { usePrepareApplication } from '@/hooks/use-apply';
 import { useUpdateStatus } from '@/hooks/use-applications';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -127,10 +127,8 @@ function PreparingStep({ progressIndex }: { progressIndex: number }) {
 
 /* ─── Step 3: Submitted ─── */
 function SubmittedStep({
-  method,
   onClose,
 }: {
-  method: string | null;
   onClose: () => void;
 }) {
   return (
@@ -139,14 +137,8 @@ function SubmittedStep({
         <CheckCircle2 className="h-8 w-8 text-success" />
       </div>
       <div className="text-center space-y-1.5">
-        <h3 className="text-lg font-semibold text-text-primary">
-          {method ? 'Application submitted' : 'Marked as applied'}
-        </h3>
-        {method ? (
-          <p className="text-sm text-text-secondary">Applied via {method}</p>
-        ) : (
-          <p className="text-sm text-text-secondary">Nice work. We added it to your tracker.</p>
-        )}
+        <h3 className="text-lg font-semibold text-text-primary">Marked as applied</h3>
+        <p className="text-sm text-text-secondary">Nice work. We added it to your tracker.</p>
         <p className="text-xs text-text-muted">Good luck. You'll find it under Applied.</p>
       </div>
       <Button onClick={onClose} className="mt-2 bg-brand text-white hover:bg-brand-hover">
@@ -268,11 +260,9 @@ export function ApplyDrawer({ app, open, onClose }: ApplyDrawerProps) {
   const [prepareData, setPrepareData] = useState<PrepareResponse | null>(null);
   const [coverLetter, setCoverLetter] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
-  const [submitMethod, setSubmitMethod] = useState<string | null>(null);
   const hasStartedRef = useRef(false);
 
   const prepareMutation = usePrepareApplication();
-  const submitMutation = useSubmitApplication();
   const updateStatus = useUpdateStatus();
 
   /* ─── Reset state when drawer closes ─── */
@@ -285,7 +275,6 @@ export function ApplyDrawer({ app, open, onClose }: ApplyDrawerProps) {
         setPrepareData(null);
         setCoverLetter('');
         setErrorMessage('');
-        setSubmitMethod(null);
         hasStartedRef.current = false;
       }, 300);
       return () => clearTimeout(timer);
@@ -342,31 +331,12 @@ export function ApplyDrawer({ app, open, onClose }: ApplyDrawerProps) {
       { id: app.id, data: { status: 'applied' } },
       {
         onSuccess: () => {
-          setSubmitMethod(null);
           setStep('submitted');
         },
         onError: () => toast.error('Could not update status'),
       },
     );
   }, [app.id, updateStatus]);
-
-  /* ─── Opt-in only: let us submit through the ATS API for you ─── */
-  const handleSubmit = useCallback(() => {
-    submitMutation.mutate(
-      { id: app.id, data: { cover_letter: coverLetter || undefined, dry_run: false } },
-      {
-        onSuccess: (res) => {
-          setSubmitMethod(res.method);
-          setStep('submitted');
-          toast.success(res.message || 'Application submitted');
-        },
-        onError: (err) => {
-          setErrorMessage(err instanceof Error ? err.message : 'Submission failed');
-          setStep('error');
-        },
-      },
-    );
-  }, [app.id, coverLetter, submitMutation]);
 
   /* ─── Copy materials handler ─── */
   const handleCopyMaterials = useCallback(() => {
@@ -449,7 +419,7 @@ export function ApplyDrawer({ app, open, onClose }: ApplyDrawerProps) {
             )}
 
             {step === 'submitted' && (
-              <SubmittedStep method={submitMethod} onClose={onClose} />
+              <SubmittedStep onClose={onClose} />
             )}
 
             {step === 'error' && (
@@ -464,8 +434,8 @@ export function ApplyDrawer({ app, open, onClose }: ApplyDrawerProps) {
         </ScrollArea>
 
         {/* ─── Footer actions (review step only) ─── */}
-        {/* Honest model: you apply on the company's real site with your kit in
-            hand. We never submit on your behalf unless you explicitly opt in. */}
+        {/* You apply on the company's real site with your kit in hand.
+            Questboard never transmits an application (docs/anti-slop.md). */}
         {step === 'review' && (
           <>
             <Separator />
@@ -493,19 +463,6 @@ export function ApplyDrawer({ app, open, onClose }: ApplyDrawerProps) {
                   )}
                 </Button>
               </div>
-              {atsDetected && (
-                <div className="text-right">
-                  <button
-                    type="button"
-                    onClick={handleSubmit}
-                    disabled={submitMutation.isPending}
-                    className="inline-flex items-center gap-1 text-[11px] text-text-muted hover:text-text-secondary underline underline-offset-2 disabled:opacity-50"
-                  >
-                    {submitMutation.isPending && <Loader2 className="h-3 w-3 animate-spin" />}
-                    Or let us submit it through {atsType} for you
-                  </button>
-                </div>
-              )}
             </div>
           </>
         )}

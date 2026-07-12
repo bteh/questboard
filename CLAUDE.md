@@ -2,14 +2,15 @@
 
 AI-powered job search agent. Searches 14+ job boards, scores jobs against your resume
 using 7-dimension weighted scoring, generates tailored application materials via LLM,
-and optionally auto-applies through Greenhouse/Lever endpoints when those ATS links
-are detected. Works for any profession -- not just tech.
+and prepares application kits (ATS detected, every field prefilled) for Greenhouse and
+Lever links. Questboard never transmits an application: the human sends it
+(docs/anti-slop.md). Works for any profession -- not just tech.
 
 ## Architecture
 
 ```
 src/job_finder/
-  pipeline.py              # 7-stage orchestrator: search -> parse -> score -> optimize -> cover letter -> research -> auto-apply
+  pipeline.py              # 7-stage orchestrator: search -> parse -> score -> optimize -> cover letter -> research -> application kits
   llm_client.py            # Unified OpenAI-compatible client (10 provider presets, health check, JSON parsing)
   scorer.py                # TF-IDF + keyword scoring, 7 dimensions, no LLM needed
   company_classifier.py    # 8-tier company classification (FAANG+ through Unknown) + location filtering
@@ -30,7 +31,7 @@ src/job_finder/
   tools/
     job_search_tool.py     # JobSpy wrapper -- scrapes Indeed, LinkedIn, Glassdoor, ZipRecruiter, Google
     resume_parser_tool.py  # PyPDF2 extraction with profile-aware resume detection
-    auto_apply_tool.py     # Greenhouse + Lever API submission, ATS URL detection, dry-run support
+    auto_apply_tool.py     # application kits: ATS URL detection + prefilled field maps; never transmits
     scrapers/              # Plugin registry -- each scraper is one decorated file
       _registry.py         # @register_scraper decorator, ScraperMeta, run_scrapers()
       _utils.py            # Shared helpers (_get_json, _match_roles, _parse_salary, etc.)
@@ -145,15 +146,16 @@ After search, jobs pass through 5 filters in order:
 
 Each filter also purges existing DB records that no longer match.
 
-## Auto-Apply Safety Rules
+## Application Kits (prefill-only)
 
-- Always disabled by default (`enabled: false`)
-- `dry_run: true` by default -- logs what would happen without submitting
-- Only applies to STRONG_APPLY recommendations
-- Only Greenhouse and Lever APIs (LinkedIn flagged as manual-only)
+Questboard never transmits an application; the human sends it. The full
+argument is docs/anti-slop.md; the code shape is `auto_apply_tool.py`,
+which contains no submission path at all (no requests import).
+
+- Kits prepare only for STRONG_APPLY recommendations, opt-in (`auto_apply.enabled: false` by default)
+- ATS detection + prefilled field maps for Greenhouse and Lever; LinkedIn kits carry materials only
 - Requires `applicant_info` in config (first_name, email minimum)
-- Capped by `max_applications_per_run` (default: 5)
-- DB status updated to "applied" only on successful live submission
+- DB status becomes "applied" only when the USER marks it after sending; no code path may set it
 
 ## Database
 
@@ -199,7 +201,7 @@ is judged by `GET /api/v1/scrapers/health`.
 - Require an LLM for basic functionality -- search and keyword scoring must always work offline
 - Use `print()` in library code -- use `logger` and progress callbacks
 - Store secrets in YAML profiles -- use `.env` for API keys
-- Skip `dry_run` safety -- auto-apply must default to dry-run
+- Add any code path that transmits an application -- kits prefill, the human sends (docs/anti-slop.md)
 - Mutate the scoring weight contract -- always return all 7 dimension scores + recommendation
 - Add cloud dependencies -- the system is local-first (SQLite, local PDFs)
 - Mix frontend/backend concerns -- keep React in `frontend/`, FastAPI in `backend/`, pipeline in `src/`

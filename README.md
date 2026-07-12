@@ -22,7 +22,7 @@ That's it. Open [localhost:5173](http://localhost:5173), upload your resume, set
 - **Searches 14+ sources in parallel**: Indeed, Glassdoor, LinkedIn, Greenhouse / Lever / Ashby ATS boards (preloaded with 150+ active startup slugs), YC Work at a Startup, RemoteOK, Hacker News Who's Hiring, and more
 - **Scores every job** across 7 weighted dimensions: skills match, leadership, career progression, comp, platform building, company trajectory, culture fit
 - **Drafts cover letters and resume tweaks** for top matches via your LLM
-- **Auto-applies** through Greenhouse + Lever APIs (opt-in, dry-run by default, capped per run)
+- **Application kits**: ATS detected, every field prefilled; YOU send it. Questboard never transmits an application ([why](docs/anti-slop.md))
 - **Tracks your pipeline** end-to-end: analytics dashboard, status flow, CSV export
 
 Profession-agnostic: works for engineers, nurses, marketers, designers. Prompts and scoring keywords adapt via your YAML profile.
@@ -78,7 +78,7 @@ Architecture and conventions: [CLAUDE.md](CLAUDE.md). Contributing guide: [CONTR
 
 - **Local code paths are deterministic**: search, offline scoring, ATS detection, persistence
 - **LLM outputs are drafts**: cover letters, resume tweaks, and company research are not web-grounded; verify factual claims yourself
-- **Auto-apply is opt-in**: `dry_run: true` by default, only Greenhouse/Lever, only STRONG_APPLY jobs, capped per run
+- **Kits are opt-in** and prepare only for STRONG_APPLY jobs; no code path can submit on your behalf, and "applied" is only ever set by you
 - **Dedup is URL-keyed**: exact duplicates are removed; fuzzy cross-board duplicates with different URLs can survive
 
 ## Contributing

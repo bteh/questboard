@@ -144,11 +144,7 @@ applicant_info:
   linkedin_url: ""
 
 # Auto-apply configuration (opt-in)
+# Application kits: everything prefilled, YOU send it. Questboard never
+# transmits an application (docs/anti-slop.md).
 auto_apply:
-  enabled: false  # Set to true to enable
-  dry_run: true   # Set to false to actually submit
-  methods:
-    greenhouse: true
-    lever: true
-    linkedin_easy_apply: false  # Not automatable without browser automation
-  max_applications_per_run: 5
+  enabled: false  # Set to true to prepare kits for STRONG_APPLY jobs

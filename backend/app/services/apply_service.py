@@ -152,24 +152,24 @@ def prepare_application(
     }
 
 
-def submit_application(
+def build_application_kit(
     db: Session,
     app_id: int,
     cover_letter: str | None = None,
-    dry_run: bool = True,
     profile: str = "default",
     workspace_id: str | None = None,
 ) -> dict | None:
-    """Submit an application to the detected ATS.
+    """The application kit: everything prefilled, the human sends it.
 
     If *cover_letter* is provided (user-edited version), it is saved to
-    the DB before submission.  When *dry_run* is ``True``, the ATS call
-    is simulated and no real submission occurs.
+    the DB first so the kit carries it. Questboard never transmits an
+    application (docs/anti-slop.md); status changes to "applied" only
+    when the user marks it after sending.
 
-    Returns a dict matching ``SubmitResponse``, or *None* when the
+    Returns a dict matching ``KitResponse``, or *None* when the
     application record cannot be found.
     """
-    from job_finder.tools.auto_apply_tool import auto_apply, detect_ats_type
+    from job_finder.tools.auto_apply_tool import prepare_application_kit, detect_ats_type
     from job_finder.tools.resume_parser_tool import find_resume
 
     record = _get_scoped_application(db, app_id, workspace_id)
@@ -202,40 +202,23 @@ def submit_application(
     if not resume_path and not workspace_id:
         resume_path = find_resume(profile=profile) or ""
 
-    # Build the job dict expected by auto_apply
     job = {
         "title": record.job_title,
         "company": record.company,
         "url": job_url,
     }
 
-    result = auto_apply(
+    result = prepare_application_kit(
         job=job,
         config=config,
         resume_path=resume_path,
         cover_letter_text=cl_text,
-        dry_run=dry_run,
     )
 
-    method = result.get("method")
-    success = result.get("success", False)
-
-    # On live successful submission, update status
-    if success and not dry_run:
-        record.status = "applied"
-        record.date_applied = _utcnow()
-        record.application_method = method or ""
-        record.updated_at = _utcnow()
-        db.commit()
-        db.refresh(record)
-        logger.info(
-            "Application %d submitted via %s (%s @ %s)",
-            app_id, method, record.job_title, record.company,
-        )
-
     return {
-        "success": success,
-        "method": method,
+        "success": result.get("success", False),
+        "method": result.get("method"),
         "message": result.get("message", ""),
-        "dry_run": dry_run,
+        "apply_url": result.get("apply_url", job_url),
+        "fields": result.get("fields", {}),
     }

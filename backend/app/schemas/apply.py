@@ -14,13 +14,19 @@ class PrepareResponse(BaseModel):
     job_url: str
 
 
-class SubmitRequest(BaseModel):
-    cover_letter: str | None = None  # User-edited version
-    dry_run: bool = True
+class KitRequest(BaseModel):
+    cover_letter: str | None = None  # User-edited version, saved before the kit builds
 
 
-class SubmitResponse(BaseModel):
+class KitResponse(BaseModel):
+    """The application kit: everything prefilled, the human sends it.
+
+    Questboard never transmits an application (docs/anti-slop.md).
+    """
     success: bool
-    method: str | None = None  # "greenhouse", "lever", None
+    method: str | None = None  # "greenhouse", "lever", "linkedin", None
     message: str
-    dry_run: bool
+    # where the human acts
+    apply_url: str = ""
+    # the ATS form, prefilled (empty for unmapped ATS types)
+    fields: dict = {}

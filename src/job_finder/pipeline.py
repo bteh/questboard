@@ -2496,76 +2496,56 @@ class JobFinderPipeline:
 
     # -- Stage 7: Auto-apply (opt-in) -------------------------------------
 
-    def auto_apply_jobs(
+    def prepare_application_kits(
         self,
         jobs: list[dict],
         resume_path: str = "",
         progress: Callable[[str], None] | None = None,
     ) -> list[dict]:
-        """Auto-apply to qualifying jobs via detected ATS.
+        """Prepare application kits for STRONG_APPLY jobs with known ATS routes.
 
-        Only applies to STRONG_APPLY jobs with Greenhouse or Lever URLs.
-        Respects ``auto_apply`` config (enabled, dry_run, max_applications_per_run).
+        Questboard never transmits an application (docs/anti-slop.md);
+        this stage prefills everything so the human sends it in seconds.
+        Respects ``auto_apply.enabled`` as the prepare-kits switch.
         """
-        from job_finder.tools.auto_apply_tool import auto_apply
+        from job_finder.tools.auto_apply_tool import prepare_application_kit
 
         apply_config = self.config.get("auto_apply", {})
         if not apply_config.get("enabled", False):
             if progress:
-                progress("Auto-apply is disabled in config")
+                progress("Application kits are disabled in config")
             return jobs
-
-        dry_run = apply_config.get("dry_run", True)
-        max_apps = apply_config.get("max_applications_per_run", 5)
-        applied_count = 0
 
         candidates = [
             j for j in jobs
             if j.get("recommendation") == "STRONG_APPLY"
         ]
-
         if progress:
-            mode = "DRY RUN" if dry_run else "LIVE"
-            progress(f"Auto-apply ({mode}): {len(candidates)} STRONG_APPLY candidates")
+            progress(f"Application kits: {len(candidates)} STRONG_APPLY candidates")
 
+        kits = 0
         for job in candidates:
-            if applied_count >= max_apps:
-                break
-
-            cover_letter = job.get("cover_letter", "")
-            result = auto_apply(
+            result = prepare_application_kit(
                 job=job,
                 config=self.config,
                 resume_path=resume_path,
-                cover_letter_text=cover_letter,
-                dry_run=dry_run,
+                cover_letter_text=job.get("cover_letter", ""),
             )
-
-            method = result.get("method")
-            if not method or method == "linkedin":
+            if not result.get("success"):
                 continue
-
+            job["application_kit"] = {
+                "method": result["method"],
+                "apply_url": result.get("apply_url", ""),
+                "fields": result.get("fields", {}),
+            }
+            kits += 1
             if progress:
-                action = "Would apply" if dry_run else "Applied"
-                status = "OK" if result.get("success") else "FAILED"
                 progress(
-                    f"  {action} to {job.get('company', '')} via {method} [{status}]"
+                    f"  Kit ready for {job.get('company', '')} via {result['method']}"
                 )
 
-            if result.get("success") and not dry_run:
-                job["application_method"] = method
-                applied_count += 1
-                # Update DB record if we have an ID
-                db_id = job.get("db_id")
-                if db_id:
-                    update_application_status(
-                        db_id,
-                        status="applied",
-                        notes=f"Auto-applied via {method}",
-                    )
-
         if progress:
-            progress(f"Auto-apply complete: {applied_count} applications submitted")
+            progress(f"Application kits complete: {kits} ready; you send them")
 
         return jobs
 
@@ -2770,15 +2750,15 @@ class JobFinderPipeline:
                 job["db_id"] = rec.id
                 saved += 1
 
-        # 6. Auto-apply (opt-in)
+        # 6. Application kits (opt-in; nothing is ever transmitted)
         apply_config = self.config.get("auto_apply", {})
         if apply_config.get("enabled", False):
             if progress:
-                progress("Running auto-apply for top jobs...")
+                progress("Preparing application kits for top jobs...")
             resume_path = self.config.get("profile", {}).get("resume_path", "")
             if not resume_path:
                 resume_path = find_resume(profile=self.profile_name) or ""
-            self.auto_apply_jobs(jobs, resume_path=resume_path, progress=progress)
+            self.prepare_application_kits(jobs, resume_path=resume_path, progress=progress)
 
         if progress:
             progress(f"Done! Saved {saved} jobs ({enhanced_count} enhanced with AI)")

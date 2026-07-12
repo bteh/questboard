@@ -375,9 +375,7 @@ def test_prepare_and_apply_refuse_quest_rows(api_client):
     assert resp.status_code == 400, resp.text
     assert "career" in resp.json()["detail"].lower()
 
-    resp = client.post(
-        f"/api/v1/applications/{quest.id}/apply", json={"dry_run": True}
-    )
+    resp = client.post(f"/api/v1/applications/{quest.id}/apply", json={})
     assert resp.status_code == 400, resp.text
     assert "career" in resp.json()["detail"].lower()
 
