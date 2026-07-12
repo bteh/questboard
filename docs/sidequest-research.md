@@ -50,8 +50,14 @@ lowest first.
 Party quests (make-your-own, e.g. a homemade Amazing Race) stays a distinct Questboard-original mode:
 it's user-posted, not a found gig, so it sits alongside as its own thing rather than inside a realm.
 
-Careers do NOT get their own tab. A career job is a "Bring a skill" quest one commitment tier up.
-That's the structural trick that stops the board from reading as "job site with weird extra tabs."
+Careers got their own lane (revised 2026-07-12). The original bet folded career jobs into
+"Bring a skill" so the board would not read as a job site with weird extra tabs. In practice the
+opposite happened: career supply is high-volume, so the default "all" board became a wall of
+ordinary job postings that buried the real quests and made the whole thing read like a generic
+job board (with a confusing resume-fit "pitch" on every card). So career now lives in its own
+`work` kind, a Jobs lane set apart at the end of the rail. The default "All quests" board is
+side-quests only; the resume-fit line only appears in the Jobs lane, never on a quest. Freelance
+and commissions (the `lens` vertical) stay a real side-quest under "Bring a skill".
 
 ---
 

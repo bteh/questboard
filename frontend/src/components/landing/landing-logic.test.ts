@@ -73,9 +73,9 @@ describe('pickLandingCards', () => {
     expect(pickLandingCards(items).map((a) => a.id)).toEqual([2, 3, 4]);
   });
 
-  it('folds career and lens into one skill pick so another kind gets the slot', () => {
+  it('folds two rows of one kind into a single pick so another kind gets the slot', () => {
     const items = [
-      mk(1, 'career'),
+      mk(1, 'lens') /* skill kind */,
       mk(2, 'lens') /* also the skill kind */,
       mk(3, 'camera'),
       mk(4, 'study'),

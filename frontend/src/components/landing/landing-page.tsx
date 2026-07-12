@@ -6,7 +6,7 @@ import { useApplications, useUpdateStatus } from '@/hooks/use-applications';
 import { useBoardSummary } from '@/hooks/use-board-summary';
 import { useSourceLabels, resolveSourceLabel } from '@/hooks/use-scrapers';
 import { CLIP_STATUS, shortDate } from '@/utils/board-card';
-import { kindParams } from '@/features/board/kind-params';
+import { kindParams, questTotal } from '@/features/board/kind-params';
 import { toPoster } from '@/features/board/poster-model';
 import { hasEntered } from '@/lib/entry';
 import { handleEnter, pickLandingCards, plainWords } from './landing-logic';
@@ -153,8 +153,11 @@ export function LandingPage() {
     document.title = 'Questboard, one board for every side quest';
   }, []);
 
-  /* the same summary the board rail reads, so both surfaces say one number */
-  const boardTotal = useBoardSummary().data?.total;
+  /* the same summary the board rail reads, so both surfaces say one number.
+     side-quests only, matching the default board: the front page sells
+     quests, so job postings never pad the count */
+  const summary = useBoardSummary().data;
+  const boardTotal = summary ? questTotal(summary.kinds) : undefined;
   const pay500Total = useApplications({
     ...kindParams('all'),
     salary_min: 500,

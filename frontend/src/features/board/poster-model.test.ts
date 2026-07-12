@@ -36,7 +36,8 @@ describe('the poster model', () => {
   it('maps stored verticals onto kinds', () => {
     expect(toPoster(app({ vertical: 'study' }), 'Fieldwork').kind).toBe('think');
     expect(toPoster(app({ vertical: 'camera' }), 'x').kind).toBe('perform');
-    expect(toPoster(app({ vertical: 'career' }), 'x').kind).toBe('skill');
+    // career is its own Jobs lane now; lens (freelance/gigs) stays skill
+    expect(toPoster(app({ vertical: 'career' }), 'x').kind).toBe('work');
     expect(toPoster(app({ vertical: 'lens' }), 'x').kind).toBe('skill');
   });
 
@@ -75,7 +76,8 @@ describe('the poster model', () => {
 
 describe('kind params', () => {
   it('expands a kind to every stored value it answers to', () => {
-    expect(kindParams('skill').vertical!.split(',').sort()).toEqual(['career', 'lens', 'skill']);
+    expect(kindParams('skill').vertical!.split(',').sort()).toEqual(['lens', 'skill']);
+    expect(kindParams('work').vertical!.split(',').sort()).toEqual(['career', 'work']);
     expect(kindParams('think').vertical).toContain('study');
   });
 

@@ -56,7 +56,7 @@ describe('validateBoardSearch', () => {
     expect(validateBoardSearch({ v: 'perform' }).v).toBe('perform');
     /* legacy vertical values from old URLs and saved state keep working */
     expect(validateBoardSearch({ v: 'camera' }).v).toBe('perform');
-    expect(validateBoardSearch({ v: 'career' }).v).toBe('skill');
+    expect(validateBoardSearch({ v: 'career' }).v).toBe('work');
     expect(validateBoardSearch({ v: 'lens' }).v).toBe('skill');
     expect(validateBoardSearch({ v: 'party-bus' }).v).toBeUndefined();
     expect(validateBoardSearch({ v: 42 }).v).toBeUndefined();

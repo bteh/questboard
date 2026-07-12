@@ -26,7 +26,7 @@ registry maps legacy values to kinds at read time, so no migration and no scrape
 New sources register with kind ids directly; `register_scraper` validates the id against the
 registry so a typo fails at import, not in production.
 
-Kind mapping for existing data: career→skill, lens→skill, camera→perform, study→think, party→party.
+Kind mapping for existing data: career→work (its own Jobs lane, revised 2026-07-12), lens→skill, camera→perform, study→think, party→party.
 Kinds without sources yet (odd, deliver, body, lookafter, flip, house) exist in the registry but the
 board only shows kinds with live supply plus Party; supply honesty, not empty shelves.
 

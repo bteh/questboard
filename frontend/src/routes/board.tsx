@@ -34,7 +34,7 @@ import {
   withinPayCeiling,
 } from '@/utils/board-card';
 import { checkedAgoLabel } from '@/features/board/freshness';
-import { kindParams, type KindKey } from '@/features/board/kind-params';
+import { isCareerKind, kindParams, type KindKey } from '@/features/board/kind-params';
 import { KindRail } from '@/features/board/kind-rail';
 import { toPoster } from '@/features/board/poster-model';
 import { useBoardSummary } from '@/hooks/use-board-summary';
@@ -424,17 +424,18 @@ function BoardPage() {
   const firstPage = useApplications({ ...baseFilters, page: 1 });
   const total = firstPage.data?.total;
 
-  /* careerOnly presets lean on fields only career rows carry; career lives
-     under the skill kind, so they hide everywhere else */
-  const questScoped = kindKey !== 'all' && kindKey !== 'skill';
-  const visiblePresets = PRESETS.filter((p) => !p.careerOnly || !questScoped);
+  /* careerOnly presets lean on fields only career rows carry (score,
+     company type), and career rows only live in the Jobs lane now, so the
+     presets show there and nowhere else */
+  const careerLane = isCareerKind(kindKey);
+  const visiblePresets = PRESETS.filter((p) => !p.careerOnly || careerLane);
 
   function selectKind(key: KindKey) {
     void navigate({
       to: '/board',
       search: (prev: BoardParams) => {
         let keys = presetKeysFrom(prev.p, PRESET_KEYS);
-        if (key !== 'all' && key !== 'skill') {
+        if (!isCareerKind(key)) {
           /* a hidden careerOnly preset must not keep silently filtering the feed */
           keys = new Set([...keys].filter((k) => !PRESETS.find((p) => p.key === k)?.careerOnly));
         }
