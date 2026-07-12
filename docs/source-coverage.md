@@ -64,6 +64,8 @@ false actionability. Debate record:
 | lookafter | **Sittercity** (429 postmortem fixed), **Care.com**, **UrbanSitter** | poster-set hourly ranges only |
 | house | **Doctor of Credit**, **BankRewards.io** | exact stated bonuses |
 | body | **ClinicalTrials.gov**, **Study Scavenger**, **Trialmed (PPD clinics)**, **Fortrea**, **ICON** | stated, up-to maps to a ceiling |
+| speak | **CallingAllPapers**, **PaperCall** (B2B pilot, docs/b2b-pilot.md) | never; stated travel assistance rides in the perk note |
+| pitch | **SBIR.gov**, **California Grants Portal**, **Accelerator majors (YC/Techstars/500)** (B2B pilot) | amounts only as stated; up-to = ceiling |
 | party | none, by design (make your own) | n/a |
 
 Bold = added in the kind-sources push. Every source is one decorated
@@ -172,6 +174,47 @@ US-clinic + enrolling-now gates, data-driven country map), Fortrea
 off-reddit platform; waitlist-only today, purpose-built odd-lane supply
 if it launches). The odd lane's honest state is empty: US-wide one-off
 task supply with real counterparties lives inside login walls today.
+
+## The 2026-07-12 B2B pilot pass (two live-probe researchers)
+
+**Built (speak):** CallingAllPapers (one GET = the whole open-CFP set,
+~295 rows incl. the Sessionize supply that has no public surface of its
+own; api robots disallow is search-engine de-indexing, the project's own
+homepage offers the API publicly) + PaperCall (~224 direct, permissive
+robots, and the only structured stated-perk signal in the lane: "CFP
+offers travel assistance"). Queued ride-alongs: confs.tech
+conference-data and developers.events all-cfps.json (both MIT
+open-JSON, heavy CAP overlap; add when dedupe-by-submission-URL is
+worth the volume).
+
+**Built (pitch):** SBIR.gov open topics via server-rendered HTML (the
+official JSON API is down for maintenance and is the documented upgrade
+path), California Grants Portal (official CKAN dataset on data.ca.gov,
+updated daily, Business-eligible rows only; the pilot of a state-portal
+pattern, most states run login-walled eCivis/Fluxx instead), and the
+accelerator majors as one curated scraper (YC data-page JSON, Techstars
+__NEXT_DATA__ programs with ISO deadlines, 500 Global via
+strict-grammar-or-skip prose).
+
+**Deferred:** Grants.gov search2 API (works, no auth, 448
+small-business-eligible rows, but NIH-shaped institutional skew would
+make the lane read "not for me" to a studio; needs a relevance-filter
+design first). SAM.gov opportunities API (needs a free API key: a
+config decision).
+
+**Declined with evidence:** Sessionize direct (no public open-CFP
+directory; /discover 404; supply arrives via CAP; sessionize.com stays
+a valid link target), WikiCFP (academic paper/journal CFPs, a
+Project-Casting-shaped curation trap, declined on fit), podcast
+guesting as a class (MatchMaker.fm Cloudflare-walled, PodcastGuests is
+a directory OF guests with guest-wanted listings behind email signup;
+the marketplaces monetize the match), F6S (bot wall), OpenGrants (AI
+search SPA, no listing rows), Hello Alice (2 listings, deadlines only
+in FAQ prose; watch), iFundWomen (403 + membership), **paid design
+awards as a class** (Awwwards $65/entry: pay-to-enter with a
+non-trivial fee is this lane's scam shape even from a legit operator),
+pitch-competition aggregators (blog listicles, article rows), VC4A (no
+deadlines on the list surface + curation tells).
 
 ## Probed and queued (good, just not built yet)
 

@@ -23,6 +23,7 @@ That's it. Open [localhost:5173](http://localhost:5173), upload your resume, set
 - **Scores every job** across 7 weighted dimensions: skills match, leadership, career progression, comp, platform building, company trajectory, culture fit
 - **Drafts cover letters and resume tweaks** for top matches via your LLM
 - **Application kits**: ATS detected, every field prefilled; YOU send it. Questboard never transmits an application ([why](docs/anti-slop.md))
+- **No one pays to be pinned**: listed parties never pay to list, rank, or reach you; only seekers ever pay, for depth ([the payment constitution](docs/payment-constitution.md))
 - **Tracks your pipeline** end-to-end: analytics dashboard, status flow, CSV export
 
 Profession-agnostic: works for engineers, nurses, marketers, designers. Prompts and scoring keywords adapt via your YAML profile.
