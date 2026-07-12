@@ -7,7 +7,10 @@
       "sub": "jobs, freelance, commissions",
       "hue": "#3F6B54",
       "order": 1,
-      "legacy_verticals": ["career", "lens"]
+      "legacy_verticals": [
+        "career",
+        "lens"
+      ]
     },
     {
       "id": "think",
@@ -15,7 +18,9 @@
       "sub": "focus groups, user tests",
       "hue": "#8A6A1F",
       "order": 2,
-      "legacy_verticals": ["study"]
+      "legacy_verticals": [
+        "study"
+      ]
     },
     {
       "id": "perform",
@@ -23,7 +28,9 @@
       "sub": "casting, voice, music",
       "hue": "#A6522E",
       "order": 3,
-      "legacy_verticals": ["camera"]
+      "legacy_verticals": [
+        "camera"
+      ]
     },
     {
       "id": "odd",
@@ -74,12 +81,30 @@
       "legacy_verticals": []
     },
     {
+      "id": "speak",
+      "label": "Take the stage",
+      "sub": "talks, panels, CFPs",
+      "hue": "#2E6472",
+      "order": 10,
+      "legacy_verticals": []
+    },
+    {
+      "id": "pitch",
+      "label": "Pitch it",
+      "sub": "grants, accelerators, competitions",
+      "hue": "#585089",
+      "order": 11,
+      "legacy_verticals": []
+    },
+    {
       "id": "party",
       "label": "Party quests",
       "sub": "gather friends, make one",
       "hue": "#A65A6E",
-      "order": 10,
-      "legacy_verticals": ["party"]
+      "order": 12,
+      "legacy_verticals": [
+        "party"
+      ]
     }
   ]
 }

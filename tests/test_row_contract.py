@@ -116,14 +116,22 @@ class TestValidateRows:
 
 
 class TestRegistryContracts:
+    # Sources whose rows point OUTWARD at many legitimate hosts by
+    # design, so a host gate is impossible; each validates https itself
+    # and documents the reasoning in its module docstring. A new
+    # hosts=None source fails this test until deliberately added here.
+    OUTWARD_SOURCES = {
+        "bankrewards",        # rows land on each bank's own offer page
+        "callingallpapers",   # submission links span sessionize + one-off conference hosts
+        "cagrants",           # GrantURLs span many *.ca.gov subdomains + vendor hosts
+    }
+
     def test_every_schedulable_source_declares_where_its_rows_point(self) -> None:
-        # bankrewards is the deliberate exception: rows point at each
-        # bank's own offer page, so a host gate is impossible by design
         from job_finder.schedule import schedulable_metas
 
         for meta in schedulable_metas():
-            if meta.name == "bankrewards":
-                assert meta.allowed_url_hosts is None
+            if meta.name in self.OUTWARD_SOURCES:
+                assert meta.allowed_url_hosts is None, meta.name
                 continue
             assert meta.allowed_url_hosts, f"{meta.name} declares no allowed_url_hosts"
 

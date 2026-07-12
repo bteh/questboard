@@ -1,0 +1,140 @@
+{
+ "cfps": [
+  {
+   "name": "Devfest Milano 2026",
+   "uri": "https://sessionize.com/devfest-milano-2026",
+   "dateCfpStart": "2026-04-30T22:00:00+00:00",
+   "dateCfpEnd": "2026-07-30T21:59:00+00:00",
+   "location": "Milan, Italy",
+   "latitude": 45.4643,
+   "longitude": 9.18951,
+   "description": "",
+   "dateEventStart": "2026-10-09T22:00:00+00:00",
+   "dateEventEnd": "2026-10-09T22:00:00+00:00",
+   "iconUri": "",
+   "eventUri": "https://devfestmilano.it",
+   "timezone": "Europe/Rome",
+   "tags": [
+    ""
+   ],
+   "sources": [
+    "Sessionize"
+   ],
+   "lastChange": "2026-06-09T03:05:57+00:00",
+   "_rel": {
+    "cfp_uri": "v1/cfp/00ea8cf6a85f79dd56fc433d086c2661adef1ce2"
+   }
+  },
+  {
+   "name": "HoneyCON26",
+   "uri": "https://papercall.io/cfps/6611/submissions/new",
+   "dateCfpStart": "2026-03-17T05:04:20+00:00",
+   "dateCfpEnd": "2026-09-01T00:00:00+00:00",
+   "location": "Guadalajara, Spain",
+   "latitude": 40.74,
+   "longitude": -2.50593,
+   "description": "",
+   "dateEventStart": "2026-09-23T22:00:00+00:00",
+   "dateEventEnd": "2026-09-24T22:00:00+00:00",
+   "iconUri": "https://papercallio-production.s3.amazonaws.com/uploads/event/logo/7310/mid_300_Logopequeno.jpg",
+   "eventUri": "https://honeysec.info",
+   "timezone": "Europe/Madrid",
+   "tags": [
+    "",
+    "Ciberseguridad",
+    "Hacking",
+    "Congreso",
+    "Guadalajara",
+    "España"
+   ],
+   "sources": [
+    "papercallio"
+   ],
+   "lastChange": "2026-03-17T05:04:23+00:00",
+   "_rel": {
+    "cfp_uri": "v1/cfp/02139a305befce1f6b3f3dad4122b9bbdc1aa9df"
+   }
+  },
+  {
+   "name": "Terraform Community Brazil",
+   "uri": "https://sessionize.com/terraform-community-brazil",
+   "dateCfpStart": "2026-06-30T04:00:00+00:00",
+   "dateCfpEnd": "2026-07-16T02:59:00+00:00",
+   "location": "",
+   "latitude": 0,
+   "longitude": 0,
+   "description": "",
+   "dateEventStart": "2026-07-31T03:00:00+00:00",
+   "dateEventEnd": "2026-07-31T03:00:00+00:00",
+   "iconUri": "",
+   "eventUri": "https://cloudinfocus.com.br",
+   "timezone": "America/Sao_Paulo",
+   "tags": [
+    ""
+   ],
+   "sources": [
+    "Sessionize"
+   ],
+   "lastChange": "2026-07-12T03:03:20+00:00",
+   "_rel": {
+    "cfp_uri": "v1/cfp/29bc8b633046202ad3413b9afb1ee498bd403550"
+   }
+  },
+  {
+   "name": "hayaData 2026",
+   "uri": "https://sessionize.com/hayadata-2026",
+   "dateCfpStart": "2026-06-09T06:18:00+00:00",
+   "dateCfpEnd": "2026-07-12T20:59:00+00:00",
+   "location": "Tel Aviv, Israel",
+   "latitude": 32.0809,
+   "longitude": 34.7806,
+   "description": "",
+   "dateEventStart": "2026-10-19T21:00:00+00:00",
+   "dateEventEnd": "2026-10-19T21:00:00+00:00",
+   "iconUri": "",
+   "eventUri": "https://www.haya-data.com",
+   "timezone": "Asia/Jerusalem",
+   "tags": [
+    "data"
+   ],
+   "sources": [
+    "confs.tech",
+    "Sessionize"
+   ],
+   "lastChange": "2026-07-12T03:05:26+00:00",
+   "_rel": {
+    "cfp_uri": "v1/cfp/4ac0971127020df0498ed4a0f6c562e0f9202202"
+   }
+  },
+  {
+   "name": "ASF Community Over Code / ChurConf",
+   "uri": "https://tinyurl.com/asfchurconfcfp",
+   "dateCfpStart": "2026-07-12T04:08:55+00:00",
+   "dateCfpEnd": "2026-07-31T13:59:59+00:00",
+   "location": "Sidney",
+   "latitude": -33.8698,
+   "longitude": 151.208,
+   "description": "",
+   "dateEventStart": "2026-11-17T21:00:00+00:00",
+   "dateEventEnd": "2026-11-19T06:00:00+00:00",
+   "iconUri": "",
+   "eventUri": "https://au.churconf.com",
+   "timezone": "Australia/Sydney",
+   "tags": [
+    "groovy",
+    "java",
+    "opensource"
+   ],
+   "sources": [
+    "confs.tech"
+   ],
+   "lastChange": "2026-07-12T04:08:55+00:00",
+   "_rel": {
+    "cfp_uri": "v1/cfp/866281a47429d5893d453dff700d896361c6c801"
+   }
+  }
+ ],
+ "meta": {
+  "count": 5
+ }
+}

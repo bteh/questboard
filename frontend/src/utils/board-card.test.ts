@@ -257,6 +257,21 @@ describe('quest rows', () => {
     expect(card.report).toBeNull();
   });
 
+  it('never repeats a counterparty the title already names', () => {
+    /* speak rows: title "Speak at X", company X — a 2026-07-12 live
+       poster read "Speak at X, X" before this rule */
+    const card = toBoardCard(
+      makeApp({
+        job_title: 'Speak at Conf42 MLOps 2026',
+        company: 'Conf42 MLOps 2026',
+        vertical: 'speak',
+        source: 'papercall',
+      }),
+      'PaperCall',
+    );
+    expect(card.title).toBe('Speak at Conf42 MLOps 2026');
+  });
+
   it('renders session pay the mock way: "$125" with a "max" unit for up-to chips', () => {
     const card = toBoardCard(
       makeApp({

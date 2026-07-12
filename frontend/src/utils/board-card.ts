@@ -269,12 +269,16 @@ export function questPay(app: ApplicationResponse): { pay: string; payUnit: stri
 
 const normalizeName = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-/** Quest title; the company is dropped when it just restates the source. */
+/** Quest title; the company is dropped when it just restates the source
+    or when the title already names it (speak rows: "Speak at X" + X). */
 function questTitle(app: ApplicationResponse, sourceLabel?: string): string {
   const company = (app.company || '').trim();
   if (!company) return app.job_title;
   const norm = normalizeName(company);
   if (norm === normalizeName(app.source) || norm === normalizeName(sourceLabel || '')) {
+    return app.job_title;
+  }
+  if (norm && normalizeName(app.job_title).includes(norm)) {
     return app.job_title;
   }
   return `${app.job_title}, ${company}`;

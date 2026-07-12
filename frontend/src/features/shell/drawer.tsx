@@ -90,6 +90,7 @@ function DawnFoot() {
       <div className="qb-drawer-note">
         <span className="qb-note-pin" aria-hidden="true" />
         Every quest links to its source. Pay is only what the poster wrote.
+        No one pays to be pinned here.
         <b>If it's pinned here, it's real.</b>
       </div>
       <div className="qb-dawn" aria-hidden="true">
