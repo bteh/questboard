@@ -14,6 +14,20 @@ the wrong text in the right field. To the old code, all of those looked
 exactly like a quiet day. Users then see an empty or wrong board and blame
 the product, never the pipeline.
 
+## Built now (PR: the circuit breaker)
+
+**0c. A failing source backs off instead of retrying on its rhythm.**
+After `BREAKER_THRESHOLD` (3) consecutive failed runs (exception/timeout),
+`job_finder.schedule` pushes a source's next-due time to its cadence
+times a factor that doubles per further failure (2x at the threshold,
+then 4x, 8x, capped at 72h). So a site that starts hard-blocking or
+429-storming is retried ever less often rather than every cadence
+forever, which risks escalating a soft block to an IP ban and floods the
+run log with the same failure; it never gets abandoned, and one healthy
+run resets the streak and closes the breaker. `GET /api/v1/scrapers/schedule`
+exposes `failure_streak` and `breaker_open` per source. This matters
+most on a datacenter IP (hosting), where blocks come faster.
+
 ## Built now (PR: link re-verification)
 
 **0b. Dead links tombstone between expiry windows.** Each scheduler tick
