@@ -43,6 +43,21 @@ season pass under the constitution); (b) no signal → the kinds stay as
 free board content or retire; the decision must be MADE on the date,
 not deferred (the pilot may not become indefinite avoidance).
 
+## Known caveats (from the 2026-07-12 accuracy audit)
+
+- **California Grants Portal "active" status can lag the real cycle.**
+  The CKAN dataset marked a Song-Brown training grant `active` while the
+  program page said it "will not be accepting applications for the
+  2026-27 cycle". The page returns 200, so neither the dead-link
+  re-verify (HTTP-level) nor the row contract catches it; detecting it
+  would need a per-row program-page fetch, which the scraper does not do.
+  For the pilot this is accepted and the row is tombstoned by hand when
+  found. If it proves frequent, cagrants gets stricter handling or drops
+  at the quarterly review.
+- **Speak lane:** predatory pay-to-present conference mills and sentinel
+  placeholder deadlines (e.g. 2050-01-01) are now filtered at the source
+  (`_speak.py`), after the audit found one of each on the board.
+
 ## Deferred with reasons
 
 - Grants.gov search2 API: works (448 small-business-eligible rows) but

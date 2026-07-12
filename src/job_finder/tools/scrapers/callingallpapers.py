@@ -80,6 +80,12 @@ def _acceptable_uri(uri: str) -> bool:
     # can. CAP keeps sessionize and one-off hosts.
     if host == "papercall.io" or host.endswith(".papercall.io"):
         return False
+    # predatory pay-to-present conference mills are never a real stage
+    # (audit 2026-07-12: a Paris "summit" on averconferences reached here)
+    from job_finder.tools.scrapers._speak import is_predatory_host
+
+    if is_predatory_host(uri):
+        return False
     return not any(
         host == d or host.endswith("." + d) for d in _SHORTENER_DOMAINS
     )
@@ -105,6 +111,11 @@ def _normalize_cfp(cfp: dict, now: datetime) -> dict | None:
     deadline = _parse_iso(cfp.get("dateCfpEnd"))
     if deadline is not None and deadline < now:
         return None
+    if deadline is not None:
+        from job_finder.tools.scrapers._speak import is_sentinel_deadline
+
+        if is_sentinel_deadline(deadline):
+            return None  # a placeholder far-future date is not a real deadline
 
     location = str(cfp.get("location") or "").strip()
     is_remote = not location
