@@ -33,9 +33,11 @@ class BoardScheduler:
         self,
         tick_seconds: int,
         initial_delay_seconds: int,
+        reverify_batch: int = 0,
     ) -> None:
         self._tick_seconds = max(60, tick_seconds)
         self._initial_delay = max(0, initial_delay_seconds)
+        self._reverify_batch = max(0, reverify_batch)
         self._task: asyncio.Task | None = None
         self._sweeping = asyncio.Lock()
         self.sweeps_run = 0
@@ -66,12 +68,46 @@ class BoardScheduler:
                 logger.exception("board scheduler: tick failed")
             await asyncio.sleep(self._tick_seconds)
 
+    def _reverify_links(self) -> None:
+        """One rolling batch of dead-link re-verification (sync, threaded).
+
+        The expiry contracts catch delisting; this catches the posting
+        that 404s BETWEEN expiry windows. Only definitive 404/410 marks
+        a row dead (the classifier's rule), so bot walls and hiccups
+        never hide live quests.
+        """
+        from app.models.database import get_db
+        from app.services import application_service
+
+        db_gen = get_db()
+        try:
+            db = next(db_gen)
+            summary = application_service.check_urls(
+                db, limit=self._reverify_batch, live_only=True
+            )
+            if summary.get("dead"):
+                logger.info(
+                    "board scheduler: re-verified %d links, %d confirmed dead",
+                    summary.get("checked", 0), summary.get("dead", 0),
+                )
+        finally:
+            try:
+                next(db_gen)
+            except StopIteration:
+                pass
+
     async def tick(self) -> int:
         """Sweep every due source. Returns how many sources were swept."""
         if self._sweeping.locked():
             logger.info("board scheduler: sweep still running, tick skipped")
             return 0
         async with self._sweeping:
+            if self._reverify_batch:
+                try:
+                    await asyncio.to_thread(self._reverify_links)
+                except Exception:
+                    logger.exception("board scheduler: link re-verification failed")
+
             from job_finder.schedule import due_sources
 
             due = await asyncio.to_thread(due_sources)
@@ -110,4 +146,5 @@ def build_scheduler() -> BoardScheduler | None:
     return BoardScheduler(
         tick_seconds=settings.scheduler_tick_seconds,
         initial_delay_seconds=settings.scheduler_initial_delay_seconds,
+        reverify_batch=settings.scheduler_reverify_batch,
     )

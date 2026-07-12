@@ -331,11 +331,19 @@ def check_urls(
     ids: list[int] | None = None,
     limit: int = 100,
     workspace_id: str | None = None,
+    live_only: bool = False,
 ) -> dict:
-    """HEAD-check job URLs and update url_status. Returns summary counts."""
+    """HEAD-check job URLs and update url_status. Returns summary counts.
+
+    ``live_only`` skips rows already off the board (dead/expired), so the
+    scheduler's rolling re-verification never wastes its batch re-proving
+    what is already tombstoned.
+    """
     import requests as req
 
     query = db.query(ApplicationRecord).filter(ApplicationRecord.job_url.isnot(None))
+    if live_only:
+        query = query.filter(ApplicationRecord.url_status.notin_(("dead", "expired")))
     if workspace_id:
         query = query.filter(ApplicationRecord.workspace_id == workspace_id)
     if ids:

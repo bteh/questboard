@@ -211,6 +211,42 @@ class TestBoardScheduler:
         sched = self._scheduler()
         assert asyncio.run(sched.tick()) == 0
 
+    def test_tick_reverifies_a_batch_of_links(self, monkeypatch) -> None:
+        import job_finder.schedule as schedule
+
+        monkeypatch.setattr(schedule, "due_sources", lambda now=None: [])
+
+        captured: dict = {}
+
+        def fake_check_urls(db, ids=None, limit=100, workspace_id=None, live_only=False):
+            captured["limit"] = limit
+            captured["live_only"] = live_only
+            return {"checked": limit, "alive": limit, "dead": 0, "unknown": 0}
+
+        from app.services import application_service
+
+        monkeypatch.setattr(application_service, "check_urls", fake_check_urls)
+
+        from app.services.scheduler_service import BoardScheduler
+
+        sched = BoardScheduler(tick_seconds=900, initial_delay_seconds=0, reverify_batch=40)
+        asyncio.run(sched.tick())
+        assert captured == {"limit": 40, "live_only": True}
+
+    def test_zero_batch_never_reverifies(self, monkeypatch) -> None:
+        import job_finder.schedule as schedule
+
+        monkeypatch.setattr(schedule, "due_sources", lambda now=None: [])
+
+        from app.services import application_service
+
+        def boom(*a, **kw):  # pragma: no cover - the assertion is that this never runs
+            raise AssertionError("re-verified with a zero batch")
+
+        monkeypatch.setattr(application_service, "check_urls", boom)
+        sched = self._scheduler()  # reverify_batch defaults to 0
+        assert asyncio.run(sched.tick()) == 0
+
     def test_build_scheduler_honors_kill_switch(self, monkeypatch) -> None:
         # get_settings constructs a fresh Settings per call, so env is enough
         from app.services import scheduler_service
@@ -293,3 +329,55 @@ def test_schedule_endpoint_reports_due_state(api_client) -> None:
 def test_lifespan_does_not_start_scheduler_when_disabled(api_client) -> None:
     client, _jf_db, app_main = api_client
     assert app_main.app.state.scheduler is None
+
+
+def test_reverify_skips_rows_already_off_the_board(api_client, monkeypatch) -> None:
+    """live_only re-verification never wastes its batch on tombstones."""
+    client, jf_db, app_main = api_client
+    jf_db.save_application(
+        job_title="Live row", company="X", job_url="https://x.example/live",
+        vertical="house",
+    )
+    jf_db.save_application(
+        job_title="Dead row", company="X", job_url="https://x.example/dead",
+        vertical="house",
+    )
+    session = jf_db.get_session()
+    try:
+        dead = (
+            session.query(jf_db.ApplicationRecord)
+            .filter(jf_db.ApplicationRecord.job_url == "https://x.example/dead")
+            .one()
+        )
+        dead.url_status = "dead"
+        session.commit()
+    finally:
+        session.close()
+
+    checked_urls: list[str] = []
+
+    class _Resp:
+        status_code = 200
+
+    def fake_head(url, timeout=None, allow_redirects=None):
+        checked_urls.append(url)
+        return _Resp()
+
+    monkeypatch.setattr("requests.head", fake_head)
+
+    import importlib
+
+    application_service = importlib.import_module("app.services.application_service")
+    backend_db = importlib.import_module("app.models.database")
+    db_gen = backend_db.get_db()
+    db = next(db_gen)
+    try:
+        summary = application_service.check_urls(db, limit=10, live_only=True)
+    finally:
+        try:
+            next(db_gen)
+        except StopIteration:
+            pass
+    assert "https://x.example/live" in checked_urls
+    assert "https://x.example/dead" not in checked_urls
+    assert summary["checked"] == 1

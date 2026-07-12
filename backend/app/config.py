@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     scheduler_enabled: bool = True
     scheduler_tick_seconds: int = 900
     scheduler_initial_delay_seconds: int = 90
+    # Rolling dead-link re-verification: each tick HEAD-checks this many
+    # of the oldest-checked live rows (0 disables). Only definitive
+    # 404/410 marks a row dead; at 40 per 15-minute tick a ~2,000-row
+    # board re-proves every link roughly daily.
+    scheduler_reverify_batch: int = 40
     # Hosted ops access: comma-separated emails allowed to read the
     # scraper health/runs/schedule endpoints. Local mode is always open
     # (it is your machine).

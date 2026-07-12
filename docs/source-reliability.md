@@ -14,6 +14,17 @@ the wrong text in the right field. To the old code, all of those looked
 exactly like a quiet day. Users then see an empty or wrong board and blame
 the product, never the pipeline.
 
+## Built now (PR: link re-verification)
+
+**0b. Dead links tombstone between expiry windows.** Each scheduler tick
+HEAD-checks a rolling batch of the oldest-checked live rows
+(`scheduler_reverify_batch`, default 40; 0 disables). Only a definitive
+404/410 marks a row dead: bot walls, 403/405/429, 5xx, and timeouts map
+to "unknown" so a live posting is never hidden by a hiccup. At 40 per
+15-minute tick a ~2,000-row board re-proves every link roughly daily.
+Expiry contracts catch delisting; this catches the posting that died
+mid-window.
+
 ## Built now (PR: the scheduler)
 
 **0. The board restocks itself.** Each quest source declares
