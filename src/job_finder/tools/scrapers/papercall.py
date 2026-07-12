@@ -98,6 +98,13 @@ def _normalize_card(card, now: datetime) -> dict | None:
         # outlive the event (a 2020 conference wore that label on the
         # live board, 2026-07-12); unverifiable liveness never publishes.
         return None
+    from job_finder.tools.scrapers._speak import is_sentinel_deadline
+
+    if is_sentinel_deadline(deadline):
+        # a placeholder 2050-01-01 close is a rolling call, not a real
+        # deadline (audit 2026-07-12: "Web3 London" wore it); a fake date
+        # fails the real-date contract as surely as no date
+        return None
 
     loc_node = card.select_one("var.atc_location")
     location = loc_node.get_text(strip=True) if loc_node else ""
