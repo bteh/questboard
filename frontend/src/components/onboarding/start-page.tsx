@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import { SageButton } from '@questboard/ui';
 import { PlacePicker } from '@/features/board/place-picker';
+import { World } from '@/components/landing/world';
 import { markEntered, markOnboarded } from '@/lib/entry';
 import './start.css';
 
@@ -33,6 +34,7 @@ export function StartPage() {
 
   return (
     <div className="qb-start">
+      <World />
       <div className="qb-start-card">
         <div className="qb-start-brand">
           <span className="qb-start-tile">

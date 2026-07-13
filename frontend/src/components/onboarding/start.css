@@ -2,17 +2,19 @@
    trade-paper hand as the landing and the board. */
 
 .qb-start {
+  position: relative;
   min-height: 100dvh;
   display: flex; align-items: center; justify-content: center;
   padding: 24px; background: var(--ground);
 }
 .qb-start-card {
+  position: relative; z-index: 1;
   width: 100%; max-width: 440px;
   background: var(--paper);
   border: 1px solid var(--hair); border-bottom: 3px solid var(--edge);
   border-radius: 14px;
   padding: 34px 32px 26px;
-  box-shadow: 0 18px 44px rgba(28, 27, 23, .10);
+  box-shadow: 0 24px 54px rgba(28, 27, 23, .16);
   text-align: center;
 }
 .qb-start-brand { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 22px; }
