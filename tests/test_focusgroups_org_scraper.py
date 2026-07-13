@@ -83,7 +83,8 @@ class FixtureParseTest(unittest.TestCase):
     def test_row_contract(self) -> None:
         for r in self.rows:
             self.assertEqual(r["source"], "focusgroups_org")
-            self.assertEqual(r["vertical"], "study")
+            # focus groups/surveys -> "study"; clinical trials -> "body"
+            self.assertIn(r["vertical"], ("study", "body"))
             self.assertEqual(r["company"], "FocusGroups.org")
             self.assertTrue(r["url"].startswith("https://focusgroups.org/category/"))
             self.assertTrue(r["first_quest_ok"])
@@ -165,6 +166,42 @@ class FixtureParseTest(unittest.TestCase):
             "https://focusgroups.org/category/unmoderated-studies/"
             "research-study-on-business-tools-38/4a1d72ff-c691-42b4-a0ef-a4df3414999b/",
         )
+
+
+class VerticalRoutingTest(unittest.TestCase):
+    """FocusGroups.org lists focus groups AND clinical trials. Trials route to
+    'body' (Join a study); focus groups/surveys stay in 'study' (the friendly
+    Tell-them-what-you-think lane)."""
+
+    def setUp(self) -> None:
+        from job_finder.tools.scrapers import focusgroups_org as mod
+        self.mod = mod
+
+    def _vert(self, title: str) -> str:
+        row = self.mod._normalize_card(
+            {"title": title, "url": "https://focusgroups.org/category/x/abc-uuid/"}
+        )
+        return row["vertical"]
+
+    def test_clinical_trials_go_to_body(self) -> None:
+        for t in (
+            "Clinical Trial on COPD",
+            "COPD Clinical Trial",
+            "Clinical Research on COPD - up to $2400",
+            "Participate in clinical trials near you",
+            "Heart Failure Clinical Trial",
+            "COVID Vaccine Clinical Trial",
+        ):
+            self.assertEqual(self._vert(t), "body", t)
+
+    def test_focus_groups_and_surveys_stay_in_study(self) -> None:
+        for t in (
+            "Focus Group on Gynecological Cancer - $150",
+            "Research Study on Diabetes - $125",
+            "Online Focus Group on Snacks",
+            "Paid Survey on Streaming Habits",
+        ):
+            self.assertEqual(self._vert(t), "study", t)
 
 
 class SearchTest(unittest.TestCase):
