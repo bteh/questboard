@@ -19,6 +19,7 @@ from app.dependencies import get_active_workspace_context, workspace_scope_id
 from app.models.database import get_db
 from app.schemas.board import BoardSummaryResponse, KindSummary
 
+from app.services.application_service import time_sensitive_stale
 from job_finder.kinds import get_kinds, kind_for_vertical
 from job_finder.models.database import ApplicationRecord, ScrapeRunRecord
 
@@ -57,6 +58,9 @@ def board_summary(
                 ApplicationRecord.event_start >= now,
             )
         )
+        # casting/audition calls carry their date only in the text; drop the
+        # ones whose publish date is past the shelf life so counts match the list
+        .filter(~time_sensitive_stale(ApplicationRecord))
     )
     scope = workspace_scope_id(workspace)
     if scope:

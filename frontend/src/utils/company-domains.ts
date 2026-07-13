@@ -222,51 +222,97 @@ const KNOWN_DOMAINS: Record<string, string> = {
   bytedance: 'bytedance.com',
 };
 
+/** Hosts that are job boards / ATS, not the employer's own site. A job_url on
+ * one of these tells us nothing about the company's real domain, so we ignore
+ * it and fall back to name-based guessing. */
+const AGGREGATOR_HOSTS = [
+  'greenhouse.io', 'lever.co', 'ashbyhq.com', 'workday.com', 'myworkdayjobs.com',
+  'builtin.com', 'indeed.com', 'linkedin.com', 'remotive.com', 'himalayas.app',
+  'weworkremotely.com', 'ycombinator.com', 'workatastartup.com', 'remoteok.com',
+  'remoteok.io', 'cryptojobslist.com', 'wellfound.com', 'angel.co', 'getro.com',
+  'consider.com', 'themuse.com', 'arbeitnow.com', 'jobs.gem.com', 'smartrecruiters.com',
+  'bamboohr.com', 'workable.com', 'jobvite.com', 'icims.com', 'taleo.net',
+  'google.com', 'bing.com', 'ziprecruiter.com', 'glassdoor.com', 'dice.com',
+];
+
+/** Pull a real employer domain out of a job posting URL, or null if the URL
+ * only points at an aggregator/ATS. */
+export function domainFromUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const host = new URL(url).hostname.toLowerCase()
+      .replace(/^(www|jobs|job|boards|board|apply|careers|career|hire|hiring)\./, '');
+    if (!host.includes('.')) return null;
+    // registrable-ish domain = last two labels (good enough for logo lookup)
+    const parts = host.split('.');
+    const registrable = parts.slice(-2).join('.');
+    if (AGGREGATOR_HOSTS.some((h) => host === h || host.endsWith('.' + h) || registrable === h)) {
+      return null;
+    }
+    return host;
+  } catch {
+    return null;
+  }
+}
+
+/** True when a company name is already written as a domain, e.g. "IPinfo.io",
+ * "monday.com", "booking.com". */
+function nameLooksLikeDomain(lower: string): string | null {
+  const compact = lower.replace(/\s+/g, '');
+  if (/^[a-z0-9][a-z0-9-]*\.[a-z]{2,}$/.test(compact)) return compact;
+  return null;
+}
+
 /**
- * Guess a company's domain from its name.
- * Tries exact match, lowercase match, then heuristic domain generation.
+ * Guess a company's domain from its name (and the posting URL when it points at
+ * the employer's own site). Exact map, then domain-shaped names, then the URL,
+ * then a slug heuristic. A wrong guess just 404s and falls back to a letter, so
+ * over-guessing is safe.
  */
-export function getCompanyDomain(companyName: string): string | null {
-  if (!companyName) return null;
-  const lower = companyName.toLowerCase().trim();
+export function getCompanyDomain(companyName: string, url?: string | null): string | null {
+  const lower = (companyName || '').toLowerCase().trim();
 
   // 1. Exact lookup
-  if (KNOWN_DOMAINS[lower]) return KNOWN_DOMAINS[lower];
+  if (lower && KNOWN_DOMAINS[lower]) return KNOWN_DOMAINS[lower];
 
-  // 2. Try without common suffixes: "Inc.", "Corp", "LLC", "Ltd", "Co."
+  // 2. The name is already a domain ("IPinfo.io")
+  const asDomain = lower ? nameLooksLikeDomain(lower) : null;
+  if (asDomain) return asDomain;
+
+  // 3. Strip common suffixes, retry the map
   const cleaned = lower
-    .replace(/,?\s*(inc\.?|corp\.?|llc|ltd\.?|co\.?|group|holdings|technologies|technology|labs|studio|studios)$/i, '')
+    .replace(/,?\s*(inc\.?|corp\.?|corporation|llc|ltd\.?|co\.?|group|holdings|technologies|technology|labs|studio|studios|global)$/i, '')
     .trim();
-  if (KNOWN_DOMAINS[cleaned]) return KNOWN_DOMAINS[cleaned];
+  if (cleaned && KNOWN_DOMAINS[cleaned]) return KNOWN_DOMAINS[cleaned];
 
-  // 3. Heuristic: slugify name to domain
-  const slug = cleaned
-    .replace(/[^a-z0-9\s]/g, '')
-    .replace(/\s+/g, '')
-    .trim();
-  if (slug.length >= 2 && slug.length <= 30) {
-    return `${slug}.com`;
-  }
+  // 4. A real employer domain from the posting URL (skips ATS/aggregator hosts)
+  const fromUrl = domainFromUrl(url);
+  if (fromUrl) return fromUrl;
+
+  // 5. Heuristic: slugify the name to a .com
+  const slug = cleaned.replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, '').trim();
+  if (slug.length >= 2 && slug.length <= 30) return `${slug}.com`;
 
   return null;
 }
 
 /**
- * Get a logo URL for a company. Returns null if no domain can be determined.
- * Uses img.logo.dev for high-quality logos with Google Favicon as built-in fallback.
+ * Primary logo URL. unavatar aggregates real company logos (Clearbit, favicon,
+ * Twitter, ...) and, with fallback=false, returns a clean error on a miss so the
+ * avatar falls through to a colored letter instead of a generic globe.
  */
-export function getCompanyLogoUrl(companyName: string, size = 128): string | null {
-  const domain = getCompanyDomain(companyName);
+export function getCompanyLogoUrl(companyName: string, size = 128, url?: string | null): string | null {
+  const domain = getCompanyDomain(companyName, url);
   if (!domain) return null;
-  // logo.dev provides high-quality company logos; fallback to Google Favicon in CompanyAvatar onError
-  return `https://img.logo.dev/${domain}?token=pk_a8V7kXYGRZqIlWfB06kPJA&size=${size}&format=png`;
+  return `https://unavatar.io/${domain}?fallback=false&size=${size}`;
 }
 
 /**
- * Fallback logo URL using Google Favicon API.
+ * No second network source on purpose. unavatar already aggregates favicon +
+ * logo providers, so if it misses (403) the company almost certainly has no
+ * real logo, and a colored initial is cleaner than a parked-domain favicon or a
+ * generic globe. Returning null sends the avatar straight to the letter.
  */
-export function getCompanyLogoFallbackUrl(companyName: string, size = 128): string | null {
-  const domain = getCompanyDomain(companyName);
-  if (!domain) return null;
-  return `https://www.google.com/s2/favicons?domain=${domain}&sz=${size}`;
+export function getCompanyLogoFallbackUrl(_companyName: string, _size = 128, _url?: string | null): string | null {
+  return null;
 }

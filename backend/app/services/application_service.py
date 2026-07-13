@@ -21,6 +21,36 @@ def _utcnow():
     return datetime.now(timezone.utc)
 
 
+# Casting / audition quests are short-lived, and their real audition date lives
+# only in the posting text (e.g. "auditions JUNE 15"), so event_start is NULL
+# and the upcoming-only filter can't expire them. Once the source's publish date
+# is older than this shelf life, the call has almost certainly passed. Only ISO
+# date_posted strings sort below the cutoff, so free-text ("Reposted 9 days ago")
+# and absent dates are conservatively KEPT on the board.
+TIME_SENSITIVE_VERTICALS = ("camera",)
+TIME_SENSITIVE_SHELF_DAYS = 30
+
+
+def time_sensitive_stale(model, now: datetime | None = None):
+    """A SQLAlchemy condition that is TRUE for a stale time-sensitive quest.
+
+    Negate with ``~`` to keep everything else. ``model`` is the caller's
+    ApplicationRecord class (board_summary imports a different one), so the
+    filter binds to that module's mapped columns.
+    """
+    ref = now or datetime.now(timezone.utc)
+    cutoff = (ref - timedelta(days=TIME_SENSITIVE_SHELF_DAYS)).strftime("%Y-%m-%dT%H:%M:%S")
+    return and_(
+        model.vertical.in_(TIME_SENSITIVE_VERTICALS),
+        model.event_start.is_(None),
+        # Only a real ISO date_posted expires. The >= "2000-01-01" floor drops
+        # empty strings and free text ("Reposted 9 days ago"), which sort below
+        # a real year and would otherwise look "older than the cutoff".
+        model.date_posted >= "2000-01-01",
+        model.date_posted < cutoff,
+    )
+
+
 def get_applications(
     db: Session,
     *,
@@ -164,6 +194,9 @@ def get_applications(
                 ApplicationRecord.event_start >= now,
             )
         )
+        # Casting calls carry their date only in the text, so also drop the
+        # ones whose publish date is past the shelf life.
+        query = query.filter(~time_sensitive_stale(ApplicationRecord))
     if first_quest_ok is not None:
         # "No experience needed", provably. Only rows whose source stated a
         # beginner-friendly signal carry the flag; career rows and unmarked

@@ -204,6 +204,7 @@ function BoardPosters({
             title={card.title}
             href={card.href}
             giver={card.meta}
+            giverLogoUrl={poster.logoUrl}
             desc={poster.desc}
             bring={bring}
             bringFree={poster.copy.bringFree && !poster.hasFit}
