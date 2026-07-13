@@ -3,6 +3,7 @@ import { Route as rootRoute } from './routes/__root';
 import { Route as appRoute } from './routes/app';
 import { Route as indexRoute } from './routes/index';
 import { Route as welcomeRoute } from './routes/welcome';
+import { Route as startRoute } from './routes/start';
 import { Route as searchRedirect } from './routes/search';
 import { Route as restockRoute } from './routes/restock';
 import { Route as logRoute } from './routes/log';
@@ -37,6 +38,7 @@ const routeTree = rootRoute.addChildren([
   ]),
   indexRoute,
   welcomeRoute,
+  startRoute,
   designRoute,
 ]);
 

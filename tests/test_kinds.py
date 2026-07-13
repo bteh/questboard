@@ -48,7 +48,9 @@ def test_ids_and_orders_are_unique_and_sorted():
 
 
 def test_legacy_verticals_map_where_the_old_data_expects():
-    assert kind_for_vertical("career").id == "skill"
+    # career split into its own `work` lane so the default quest board
+    # never shows job postings; lens (freelance/gigs) stays under skill
+    assert kind_for_vertical("career").id == "work"
     assert kind_for_vertical("lens").id == "skill"
     assert kind_for_vertical("study").id == "think"
     assert kind_for_vertical("camera").id == "perform"
@@ -68,7 +70,8 @@ def test_no_legacy_vertical_claimed_twice():
 
 
 def test_vertical_value_expansion_for_queries():
-    assert sorted(vertical_values_for("skill")) == ["career", "lens", "skill"]
+    assert sorted(vertical_values_for("skill")) == ["lens", "skill"]
+    assert sorted(vertical_values_for("work")) == ["career", "work"]
     assert vertical_values_for("nope") == []
 
 

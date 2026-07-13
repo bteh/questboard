@@ -6,6 +6,11 @@
 
 export const ENTERED_KEY = 'questboard:entered';
 
+/* The onboarded flag: set once someone has picked a place (or explicitly
+   skipped) on the first-run screen, so the one-question setup never asks
+   twice. A returner's CTA goes straight to the board. */
+export const ONBOARDED_KEY = 'questboard:onboarded';
+
 export function hasEntered(): boolean {
   try {
     return window.localStorage.getItem(ENTERED_KEY) === '1';
@@ -19,6 +24,22 @@ export function markEntered(): void {
     window.localStorage.setItem(ENTERED_KEY, '1');
   } catch {
     /* storage refused: nothing breaks, the landing shows next visit */
+  }
+}
+
+export function hasOnboarded(): boolean {
+  try {
+    return window.localStorage.getItem(ONBOARDED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export function markOnboarded(): void {
+  try {
+    window.localStorage.setItem(ONBOARDED_KEY, '1');
+  } catch {
+    /* storage refused: the place picker shows again next visit, harmless */
   }
 }
 

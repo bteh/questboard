@@ -116,6 +116,32 @@ def test_no_location_param_returns_everything(api_client) -> None:
     assert resp.json()["total"] == 5
 
 
+def test_near_me_only_drops_remote_and_placeless(api_client) -> None:
+    client, jf_db = api_client
+    _seed(jf_db)
+
+    # location_strict is the "near me only" toggle: it keeps only rows that
+    # actually match the place, dropping the remote/nationwide/placeless
+    # escape hatches so the filter visibly bites
+    resp = client.get(
+        "/api/v1/applications",
+        params={"vertical": VERTS, "location": "Culver City", "location_strict": "true"},
+    )
+    titles = {item["job_title"] for item in resp.json()["items"]}
+    assert titles == {"LA babysitting"}
+
+
+def test_near_me_only_without_a_place_is_a_noop(api_client) -> None:
+    client, jf_db = api_client
+    _seed(jf_db)
+
+    # strict with no place has nothing to narrow to: it must not empty the board
+    resp = client.get(
+        "/api/v1/applications", params={"vertical": VERTS, "location_strict": "true"}
+    )
+    assert resp.json()["total"] == 5
+
+
 def _seed_states(jf_db) -> None:
     rows = (
         ("Florida-only bonus", "https://x.example/fl", "FL only", "house"),
@@ -214,6 +240,23 @@ def test_a_state_query_still_keeps_remote_and_placeless(api_client) -> None:
     assert "Online study" in titles
     assert "Nationwide bonus" in titles
     assert "Placeless drop" in titles
+
+
+def test_near_me_only_with_a_state_keeps_only_that_state(api_client) -> None:
+    client, jf_db = api_client
+    _seed(jf_db)
+    _seed_states(jf_db)
+
+    resp = client.get(
+        "/api/v1/applications",
+        params={"vertical": VERTS, "location": "Georgia", "location_strict": "true"},
+    )
+    titles = {r["job_title"] for r in resp.json()["items"]}
+    assert "Georgia sit" in titles
+    # near-me only drops work-from-anywhere and nationwide supply
+    assert "Online study" not in titles
+    assert "Nationwide bonus" not in titles
+    assert "Placeless drop" not in titles
 
 
 def test_state_tokens_match_inside_availability_lists(api_client) -> None:

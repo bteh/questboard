@@ -64,13 +64,13 @@ def _seed(jf_db) -> None:
         job_title="Senior Engineer",
         company="Acme",
         job_url="https://example.com/jobs/senior",
-    )  # vertical defaults to career -> skill
+    )  # vertical defaults to career -> work (its own Jobs lane)
     jf_db.save_application(
         job_title="Second shooter",
         company="r/forhire",
         job_url="https://example.com/quests/shooter",
         vertical="lens",
-    )  # lens -> skill too
+    )  # lens -> skill (freelance/gigs stay a side-quest)
     jf_db.save_application(
         job_title="Snack focus group",
         company="Fieldwork",
@@ -98,7 +98,8 @@ def test_counts_map_legacy_verticals_onto_kinds(api_client) -> None:
     payload = resp.json()
 
     assert payload["total"] == 4
-    assert _kind(payload, "skill")["count"] == 2  # career + lens fold together
+    assert _kind(payload, "work")["count"] == 1  # career sits in its own Jobs lane
+    assert _kind(payload, "skill")["count"] == 1  # lens (freelance/gigs) only
     assert _kind(payload, "think")["count"] == 1
     assert _kind(payload, "perform")["count"] == 1
 
@@ -182,4 +183,5 @@ def test_fresh_rows_count_as_new_today(api_client) -> None:
     payload = client.get("/api/v1/board/summary").json()
     # everything just seeded counts as new within 24h
     assert payload["new_today"] == payload["total"] == 4
-    assert _kind(payload, "skill")["new_today"] == 2
+    assert _kind(payload, "work")["new_today"] == 1  # the career row
+    assert _kind(payload, "skill")["new_today"] == 1  # the lens row

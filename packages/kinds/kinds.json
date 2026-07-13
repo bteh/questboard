@@ -4,11 +4,10 @@
     {
       "id": "skill",
       "label": "Bring a skill",
-      "sub": "jobs, freelance, commissions",
+      "sub": "freelance, commissions, gigs",
       "hue": "#3F6B54",
       "order": 1,
       "legacy_verticals": [
-        "career",
         "lens"
       ]
     },
@@ -104,6 +103,16 @@
       "order": 12,
       "legacy_verticals": [
         "party"
+      ]
+    },
+    {
+      "id": "work",
+      "label": "Find work",
+      "sub": "jobs, full-time, contract",
+      "hue": "#3D4756",
+      "order": 13,
+      "legacy_verticals": [
+        "career"
       ]
     }
   ]

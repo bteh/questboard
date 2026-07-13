@@ -33,6 +33,7 @@ def get_applications(
     is_remote: bool | None = None,
     work_type: str | None = None,
     location: str | None = None,
+    location_strict: bool = False,
     salary_min: float | None = None,
     profile: str | None = None,
     workspace_id: str | None = None,
@@ -97,18 +98,23 @@ def get_applications(
             place_match = ApplicationRecord.state_codes.like(f"%,{abbr},%")
         else:
             place_match = ApplicationRecord.location.ilike(f"%{location.strip()}%")
-        query = query.filter(
-            or_(
-                place_match,
-                ApplicationRecord.location.is_(None),
-                ApplicationRecord.location == "",
-                ApplicationRecord.location.ilike("%remote%"),
-                ApplicationRecord.location.ilike("%online%"),
-                ApplicationRecord.location.ilike("%nationwide%"),
-                ApplicationRecord.location.ilike("%anywhere%"),
-                ApplicationRecord.is_remote.is_(True),
+        if location_strict:
+            # "near me only": keep only rows that actually match the place, so
+            # the filter visibly bites. Remote and placeless supply drop.
+            query = query.filter(place_match)
+        else:
+            query = query.filter(
+                or_(
+                    place_match,
+                    ApplicationRecord.location.is_(None),
+                    ApplicationRecord.location == "",
+                    ApplicationRecord.location.ilike("%remote%"),
+                    ApplicationRecord.location.ilike("%online%"),
+                    ApplicationRecord.location.ilike("%nationwide%"),
+                    ApplicationRecord.location.ilike("%anywhere%"),
+                    ApplicationRecord.is_remote.is_(True),
+                )
             )
-        )
     if salary_min is not None:
         # Annual pay floor. Mirrors job_finder.pipeline._job_salary_passes:
         # prefer annualized values, use the range midpoint when both ends are

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { handleEnter, pickLandingCards, pickTrustCard, plainWords } from './landing-logic';
-import { ENTERED_KEY } from '@/lib/entry';
+import { ENTERED_KEY, ONBOARDED_KEY } from '@/lib/entry';
 import type { ApplicationResponse } from '@/types/application';
 
 type MutableGlobal = Record<string, unknown>;
@@ -8,6 +8,19 @@ type MutableGlobal = Record<string, unknown>;
 afterEach(() => {
   delete (globalThis as MutableGlobal).window;
 });
+
+function withStore(seed: Record<string, string> = {}) {
+  const store = new Map<string, string>(Object.entries(seed));
+  (globalThis as MutableGlobal).window = {
+    localStorage: {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        store.set(key, value);
+      },
+    },
+  };
+  return store;
+}
 
 function mk(
   id: number,
@@ -18,16 +31,18 @@ function mk(
 }
 
 describe('handleEnter', () => {
-  it('sets the entered flag and lands on the board', () => {
-    const store = new Map<string, string>();
-    (globalThis as MutableGlobal).window = {
-      localStorage: {
-        getItem: (key: string) => store.get(key) ?? null,
-        setItem: (key: string, value: string) => {
-          store.set(key, value);
-        },
-      },
-    };
+  it('sends a first-timer to the place picker without entering yet', () => {
+    const store = withStore();
+    const navigate = vi.fn();
+    handleEnter(navigate);
+    // onboarding is not done, so the CTA opens the one-question setup and
+    // does NOT mark entered (that happens when they finish)
+    expect(store.get(ENTERED_KEY)).toBeUndefined();
+    expect(navigate).toHaveBeenCalledWith({ to: '/start' });
+  });
+
+  it('sends a returner straight to the board and marks entered', () => {
+    const store = withStore({ [ONBOARDED_KEY]: '1' });
     const navigate = vi.fn();
     handleEnter(navigate);
     expect(store.get(ENTERED_KEY)).toBe('1');
@@ -73,9 +88,9 @@ describe('pickLandingCards', () => {
     expect(pickLandingCards(items).map((a) => a.id)).toEqual([2, 3, 4]);
   });
 
-  it('folds career and lens into one skill pick so another kind gets the slot', () => {
+  it('folds two rows of one kind into a single pick so another kind gets the slot', () => {
     const items = [
-      mk(1, 'career'),
+      mk(1, 'lens') /* skill kind */,
       mk(2, 'lens') /* also the skill kind */,
       mk(3, 'camera'),
       mk(4, 'study'),

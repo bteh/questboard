@@ -26,7 +26,10 @@ describe('the kinds registry', () => {
         seen.set(legacy, kind.id);
       }
     }
-    expect(kindForVertical('career')?.id).toBe('skill');
+    // career now lives in its own `work` lane, split out of skill so the
+    // default quest board never shows job postings; lens (freelance/gigs)
+    // stays a real side-quest under skill
+    expect(kindForVertical('career')?.id).toBe('work');
     expect(kindForVertical('lens')?.id).toBe('skill');
     expect(kindForVertical('study')?.id).toBe('think');
     expect(kindForVertical('camera')?.id).toBe('perform');
@@ -40,7 +43,8 @@ describe('the kinds registry', () => {
   });
 
   it('answers the stored-value expansion the API needs', () => {
-    expect(verticalValuesFor('skill').sort()).toEqual(['career', 'lens', 'skill']);
+    expect(verticalValuesFor('skill').sort()).toEqual(['lens', 'skill']);
+    expect(verticalValuesFor('work').sort()).toEqual(['career', 'work']);
     expect(verticalValuesFor('nope')).toEqual([]);
     expect(kindById('body')?.label).toBe('Join a study');
   });

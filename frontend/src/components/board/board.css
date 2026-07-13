@@ -124,6 +124,13 @@
 .qb-tray-note { margin: 8px 0 0; font-size: 12.5px; color: var(--mute); }
 @media (prefers-reduced-motion: reduce) { .qb-tray-field svg { transition: none; } }
 
+/* "near me only": appears once a place is set, drops remote from the list */
+.qb-nearme {
+  display: inline-flex; align-items: center; gap: 6px; margin-left: 4px;
+  font-size: 12.5px; color: var(--soft); cursor: pointer; user-select: none;
+}
+.qb-nearme input { accent-color: var(--sage); margin: 0; }
+
 /* phone pass: no horizontal scroll, 44px targets, the filter row usable */
 @media (max-width: 700px) {
   .qb-board-wrap { padding: 0 18px 64px; }
