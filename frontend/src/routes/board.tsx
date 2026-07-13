@@ -37,6 +37,7 @@ import { checkedAgoLabel } from '@/features/board/freshness';
 import { isCareerKind, kindParams, type KindKey } from '@/features/board/kind-params';
 import { KindRail } from '@/features/board/kind-rail';
 import { PlacePicker } from '@/features/board/place-picker';
+import { JobsCallout } from '@/features/board/jobs-callout';
 import { toPoster } from '@/features/board/poster-model';
 import { useBoardSummary } from '@/hooks/use-board-summary';
 import type { ApplicationFilters, ApplicationResponse, RequirementMatch } from '@/types/application';
@@ -603,7 +604,7 @@ function BoardPage() {
           )}
         </p>
 
-        <FirstRunNotice onStartHere={startHere} />
+        {careerLane ? <JobsCallout /> : <FirstRunNotice onStartHere={startHere} />}
 
         {firstPage.isError && (
           <p style={{ marginTop: 40, fontSize: 14.5, color: 'var(--soft)' }}>
