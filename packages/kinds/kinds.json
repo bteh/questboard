@@ -1,24 +1,40 @@
 {
-  "$comment": "The single source of truth for Questboard's quest kinds. Both the TypeScript wrapper (packages/kinds/src/index.ts) and the Python loader (src/job_finder/kinds.py) read this file; sync tests on both sides fail if either drifts. Adding a kind: add an entry here (id, label, sub, hue, order) plus a stamp in @questboard/ui. legacy_verticals maps historical DB vertical values onto kinds at read time so old rows never need a migration. Taxonomy rationale lives in docs/sidequest-research.md.",
+  "$comment": "The single source of truth for Questboard's quest kinds. Both the TypeScript wrapper (packages/kinds/src/index.ts) and the Python loader (src/job_finder/kinds.py) read this file; sync tests on both sides fail if either drifts. Adding a kind: add an entry here (id, label, sub, hue, order) plus a stamp in @questboard/ui. legacy_verticals maps historical DB vertical values onto kinds at read time so old rows never need a migration. Taxonomy rationale lives in docs/sidequest-research.md and docs/quest-taxonomy-rework.md.",
   "kinds": [
+    {
+      "id": "think",
+      "label": "Tell them what you think",
+      "sub": "focus groups, user tests, mock juries",
+      "hue": "#8A6A1F",
+      "order": 1,
+      "legacy_verticals": [
+        "study"
+      ]
+    },
+    {
+      "id": "lookafter",
+      "label": "Look after",
+      "sub": "dogs, cats, houses, kids",
+      "hue": "#6B6A34",
+      "order": 2,
+      "legacy_verticals": []
+    },
+    {
+      "id": "house",
+      "label": "Bank & card bonuses",
+      "sub": "bank & card sign-up bonuses",
+      "hue": "#2F7A5E",
+      "order": 3,
+      "legacy_verticals": []
+    },
     {
       "id": "skill",
       "label": "Bring a skill",
       "sub": "freelance, commissions, gigs",
       "hue": "#3F6B54",
-      "order": 1,
+      "order": 4,
       "legacy_verticals": [
         "lens"
-      ]
-    },
-    {
-      "id": "think",
-      "label": "Tell them what you think",
-      "sub": "focus groups, user tests",
-      "hue": "#8A6A1F",
-      "order": 2,
-      "legacy_verticals": [
-        "study"
       ]
     },
     {
@@ -26,25 +42,25 @@
       "label": "Perform & entertain",
       "sub": "casting, voice, music",
       "hue": "#A6522E",
-      "order": 3,
+      "order": 5,
       "legacy_verticals": [
         "camera"
       ]
+    },
+    {
+      "id": "body",
+      "label": "Join a study",
+      "sub": "sleep labs, plasma, trials",
+      "hue": "#7D3B4C",
+      "order": 6,
+      "legacy_verticals": []
     },
     {
       "id": "odd",
       "label": "Odd jobs",
       "sub": "help a neighbor, one-days",
       "hue": "#7A5C3E",
-      "order": 4,
-      "legacy_verticals": []
-    },
-    {
-      "id": "flip",
-      "label": "Flip & rent",
-      "sub": "cards, thrift, your car",
-      "hue": "#6B5081",
-      "order": 5,
+      "order": 7,
       "legacy_verticals": []
     },
     {
@@ -52,30 +68,14 @@
       "label": "Deliver & drive",
       "sub": "packages and rides",
       "hue": "#44607A",
-      "order": 6,
-      "legacy_verticals": []
-    },
-    {
-      "id": "lookafter",
-      "label": "Look after",
-      "sub": "pets, kids, houses",
-      "hue": "#6B6A34",
-      "order": 7,
-      "legacy_verticals": []
-    },
-    {
-      "id": "house",
-      "label": "Beat the house",
-      "sub": "bonuses, matched bets",
-      "hue": "#33302A",
       "order": 8,
       "legacy_verticals": []
     },
     {
-      "id": "body",
-      "label": "Join a study",
-      "sub": "sleep labs, plasma, trials",
-      "hue": "#7D3B4C",
+      "id": "flip",
+      "label": "Flip & rent",
+      "sub": "cards, thrift, your car",
+      "hue": "#6B5081",
       "order": 9,
       "legacy_verticals": []
     },

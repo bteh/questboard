@@ -3,9 +3,10 @@ import { useBoardSummary } from '@/hooks/use-board-summary';
 import { isCareerKind, questTotal, type KindKey } from '@/features/board/kind-params';
 
 /* The kind rail: a labeled, even grid of two-line tags (name over real
-   examples), counts right-aligned, biggest supply first by registry order.
-   Supply honesty: kinds with nothing live stay off the rail rather than
-   posing as stocked shelves; Party always shows because it is user-made.
+   examples), counts right-aligned, in registry order.
+   Supply honesty: a kind with nothing live stays off the rail rather than
+   posing as a stocked shelf. That includes Party, which has no source and led
+   to an empty board when tapped; it returns only if a real source ever fills it.
    Career sits apart in its own Jobs lane so the quest grid stays quests. */
 
 function Tag({
@@ -33,7 +34,7 @@ export function KindRail({
 }) {
   const { data } = useBoardSummary();
   if (!data) return null;
-  const shown = data.kinds.filter((k) => k.count > 0 || k.id === 'party');
+  const shown = data.kinds.filter((k) => k.count > 0);
   const quests = shown.filter((k) => !isCareerKind(k.id));
   const jobs = data.kinds.filter((k) => isCareerKind(k.id) && k.count > 0);
   const questCount = questTotal(data.kinds);
@@ -59,9 +60,7 @@ export function KindRail({
               <b>{kind.label}</b>
               <span className="qb-ktag-sub">{kind.sub}</span>
             </span>
-            <span className="qb-ktag-count">
-              {kind.count > 0 ? kind.count.toLocaleString() : 'make your own'}
-            </span>
+            <span className="qb-ktag-count">{kind.count.toLocaleString()}</span>
           </Tag>
         ))}
       </div>

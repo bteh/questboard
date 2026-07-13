@@ -107,15 +107,34 @@ def _fetch_job_urls() -> list[str]:
     return urls
 
 
+# Round-robin order across kept verticals. Pets lead so a high-volume
+# childcare backlog can't crowd pet-care out of the per-run fetch cap
+# (the whole point of the pets-first lane).
+_VERTICAL_ORDER = ("petcare", "childcare", "specialneeds")
+
+
 def _newest_first(urls: list[str]) -> list[str]:
-    """Kept-vertical job URLs, deduped by id, newest (highest id) first."""
-    keyed: dict[int, str] = {}
+    """Kept-vertical job URLs, deduped by id, newest first, round-robined across
+    verticals so childcare volume can't starve pet-care within the fetch cap.
+    Each vertical stays newest-first internally; pets take the first slot."""
+    by_vertical: dict[str, dict[int, str]] = {}
     for url in urls:
         m = _JOB_URL_RE.match(url.strip())
         if not m or m.group(1) not in _KEPT_VERTICALS:
             continue
-        keyed.setdefault(int(m.group(2)), url.strip())
-    return [keyed[job_id] for job_id in sorted(keyed, reverse=True)]
+        by_vertical.setdefault(m.group(1), {}).setdefault(int(m.group(2)), url.strip())
+
+    lanes = [
+        [keyed[job_id] for job_id in sorted(keyed, reverse=True)]
+        for vertical in _VERTICAL_ORDER
+        if (keyed := by_vertical.get(vertical))
+    ]
+    out: list[str] = []
+    for i in range(max((len(lane) for lane in lanes), default=0)):
+        for lane in lanes:
+            if i < len(lane):
+                out.append(lane[i])
+    return out
 
 
 def _find_job_posting(html: str) -> dict | None:
