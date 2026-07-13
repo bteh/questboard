@@ -6,6 +6,7 @@
 import { kindForVertical } from '@questboard/kinds';
 import { toBoardCard, type BoardCardModel } from '@/utils/board-card';
 import { kindCopy, type KindCopy } from '@/features/board/kind-copy';
+import { getCompanyLogoUrl } from '@/utils/company-domains';
 import type { ApplicationResponse } from '@/types/application';
 
 export interface PosterModel {
@@ -18,6 +19,8 @@ export interface PosterModel {
   hasFit: boolean;
   tags: string[];
   rotateDeg: number;
+  /** the company/source logo, resolved from the poster's own company + url */
+  logoUrl?: string;
 }
 
 /** First sentence of the posting's own description, capped for scanning.
@@ -64,5 +67,6 @@ export function toPoster(app: ApplicationResponse, sourceLabel: string): PosterM
     hasFit,
     tags: tags.slice(0, 2),
     rotateDeg: rotationFor(app.id),
+    logoUrl: getCompanyLogoUrl(app.company || '', 64, app.job_url) ?? undefined,
   };
 }

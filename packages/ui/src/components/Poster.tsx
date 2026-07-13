@@ -1,7 +1,26 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { kindById } from '@questboard/kinds';
 import { cx } from '../cx';
 import { KindStamp } from './KindStamp';
+
+/* A small company/source logo for the giver line. Hides itself if the image
+   fails to load, so a poster with no resolvable logo just reads as before. */
+function GiverLogo({ src, alt }: { src?: string; alt: string }) {
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) return null;
+  return (
+    <img
+      className="qb-p-logo"
+      src={src}
+      alt=""
+      aria-label={alt}
+      width={18}
+      height={18}
+      loading="lazy"
+      onError={() => setFailed(true)}
+    />
+  );
+}
 
 /* A quest poster: cream paper pinned to the felt. The pin stays upright in
    the slot while the paper tilts; the reward rides a tear-off tab; the
@@ -14,6 +33,8 @@ export interface PosterProps {
   href?: string;
   /** who posted it, e.g. "Focusgroups Org" */
   giver: string;
+  /** optional company/source logo shown before the giver name */
+  giverLogoUrl?: string;
   /** where, e.g. "Chicago" or "remote" */
   place?: string;
   /** honest freshness, e.g. "first seen Jul 2" or "posted yesterday" */
@@ -45,6 +66,7 @@ export function Poster({
   title,
   href = '#',
   giver,
+  giverLogoUrl,
   place,
   posted,
   desc,
@@ -85,6 +107,7 @@ export function Poster({
           <a href={href} target="_blank" rel="noreferrer">{title}</a>
         </h3>
         <div className="qb-p-giver">
+          <GiverLogo src={giverLogoUrl} alt={giver} />
           {giver}
           {place ? ` · ${place}` : ''}
           {showExplain && onExplain && (

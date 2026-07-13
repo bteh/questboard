@@ -25,8 +25,8 @@ import type { LLMConfig, LLMStatus } from '@/types/settings';
 // ── Provider metadata for cards ──────────────────────────────────────
 // Maps backend preset names to user-friendly descriptions and key URLs.
 const PROVIDER_INFO: Record<string, { description: string; keyUrl?: string; keyLabel?: string; badge: string; badgeColor: string; recommended?: boolean }> = {
-  gemini:         { description: 'Gemini for Questboard. Free tier available, but users still need a free Gemini API key.', keyUrl: 'https://aistudio.google.com/apikey', keyLabel: 'Get free Gemini key', badge: 'Free', badgeColor: 'text-success bg-success/10', recommended: true },
-  groq:           { description: 'Very fast — 1,000 uses/day', keyUrl: 'https://console.groq.com/keys', keyLabel: 'Get free key', badge: 'Free', badgeColor: 'text-success bg-success/10' },
+  groq:           { description: 'Free and fast, and it does not train on what you send. Best for ranking your resume. 1,000 uses a day.', keyUrl: 'https://console.groq.com/keys', keyLabel: 'Create a free Groq key', badge: 'Free', badgeColor: 'text-success bg-success/10', recommended: true },
+  gemini:         { description: 'Best with your own free key. Google can use free-tier data to improve its products, so use it for drafting, not resumes.', keyUrl: 'https://aistudio.google.com/apikey', keyLabel: 'Get a free Gemini key', badge: 'Free', badgeColor: 'text-success bg-success/10' },
   cerebras:       { description: 'Ultra-fast — generous free tier', keyUrl: 'https://cloud.cerebras.ai', keyLabel: 'Get free key', badge: 'Free', badgeColor: 'text-success bg-success/10' },
   openrouter:     { description: '29 free AI models through one key — 200 uses/day', keyUrl: 'https://openrouter.ai/keys', keyLabel: 'Get free key', badge: 'Free', badgeColor: 'text-success bg-success/10' },
   mistral:        { description: 'European AI provider — generous free tier', keyUrl: 'https://console.mistral.ai/api-keys', keyLabel: 'Get free key', badge: 'Free', badgeColor: 'text-success bg-success/10' },
@@ -181,7 +181,7 @@ export function AiProviderTab() {
   const [showAllProviders, setShowAllProviders] = useState(false);
   const [geminiKey, setGeminiKey] = useState('');
   // AI tab — controls the simplified primary connect card.
-  const [quickProvider, setQuickProvider] = useState<'gemini' | 'openai-api' | 'anthropic-api' | 'ollama'>('gemini');
+  const [quickProvider, setQuickProvider] = useState<'groq' | 'gemini' | 'openai-api' | 'anthropic-api' | 'ollama'>('groq');
   const [quickKey, setQuickKey] = useState('');
   const [showAdvancedAi, setShowAdvancedAi] = useState(false);
 
@@ -288,6 +288,42 @@ export function AiProviderTab() {
   const advancedPresets = userPresets.filter((p) => !isPopularProvider(p.name, hostedMode));
   const devPresets = presets?.filter((p) => p.internal) || [];
 
+  // Hosted: AI is platform-managed by the operator's server key. End users
+  // can't (and shouldn't) set a provider key here — saving one 403s. So show
+  // a managed status and nothing to configure. The paste-a-key UI below is
+  // only ever for the self-host / desktop operator.
+  if (hostedMode) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Sparkles className="h-4 w-4" />
+            AI for ranking and drafting
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {llm?.available ? (
+            <div className="rounded-xl border border-success/20 bg-success/5 p-4">
+              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-success">
+                <CheckCircle2 className="h-4 w-4" />
+                AI is on
+              </span>
+              <p className="mt-1 text-sm text-text-secondary">
+                Managed by Questboard. Your resume is ranked automatically, nothing to set up.
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-border-default bg-bg-subtle/40 p-4">
+              <p className="text-sm text-text-secondary">
+                AI ranking is managed by Questboard. Nothing to set up here.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <>
     {/* Primary card — uses the unified diagnostic modal for connect/switch/fix. */}
@@ -300,7 +336,7 @@ export function AiProviderTab() {
           </CardTitle>
           {!llm?.available && (
             <p className="text-sm text-text-tertiary">
-              ChatGPT/Claude subscriptions don't work here — get a free key below.
+              ChatGPT and Claude subscriptions don't work here. Get a free key below.
             </p>
           )}
         </div>
@@ -336,18 +372,20 @@ export function AiProviderTab() {
               aria-label="AI provider"
               className="flex gap-1 rounded-lg border border-border-default bg-bg-subtle p-0.5"
             >
-              {(['gemini', 'openai-api', 'anthropic-api', 'ollama'] as const)
+              {(['groq', 'gemini', 'openai-api', 'anthropic-api', 'ollama'] as const)
                 .filter((name) => !hostedMode || name !== 'ollama')
                 .map((name) => {
                   const active = quickProvider === name;
                   const label =
-                    name === 'gemini'
-                      ? 'Gemini'
-                      : name === 'openai-api'
-                        ? 'ChatGPT'
-                        : name === 'anthropic-api'
-                          ? 'Claude'
-                          : 'Local';
+                    name === 'groq'
+                      ? 'Groq'
+                      : name === 'gemini'
+                        ? 'Gemini'
+                        : name === 'openai-api'
+                          ? 'ChatGPT'
+                          : name === 'anthropic-api'
+                            ? 'Claude'
+                            : 'Local';
                   return (
                     <button
                       key={name}
@@ -372,27 +410,42 @@ export function AiProviderTab() {
             {/* Get-key link */}
             <a
               href={
-                quickProvider === 'gemini'
-                  ? 'https://aistudio.google.com/apikey'
-                  : quickProvider === 'openai-api'
-                    ? 'https://platform.openai.com/api-keys'
-                    : quickProvider === 'anthropic-api'
-                      ? 'https://console.anthropic.com/settings/keys'
-                      : 'https://ollama.com/download'
+                quickProvider === 'groq'
+                  ? 'https://console.groq.com/keys'
+                  : quickProvider === 'gemini'
+                    ? 'https://aistudio.google.com/apikey'
+                    : quickProvider === 'openai-api'
+                      ? 'https://platform.openai.com/api-keys'
+                      : quickProvider === 'anthropic-api'
+                        ? 'https://console.anthropic.com/settings/keys'
+                        : 'https://ollama.com/download'
               }
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 text-xs font-medium text-brand hover:underline"
             >
-              {quickProvider === 'gemini'
-                ? 'Create a free Gemini API key'
-                : quickProvider === 'openai-api'
-                  ? 'Get an OpenAI API key'
-                  : quickProvider === 'anthropic-api'
-                    ? 'Get an Anthropic API key'
-                    : 'Install Ollama'}
+              {quickProvider === 'groq'
+                ? 'Create a free Groq key'
+                : quickProvider === 'gemini'
+                  ? 'Create a free Gemini API key'
+                  : quickProvider === 'openai-api'
+                    ? 'Get an OpenAI API key'
+                    : quickProvider === 'anthropic-api'
+                      ? 'Get an Anthropic API key'
+                      : 'Install Ollama'}
               <ExternalLink className="h-3 w-3" />
             </a>
+
+            {quickProvider === 'groq' && (
+              <p className="text-[11px] leading-relaxed text-text-muted">
+                Recommended. Free, fast, and Groq does not train on what you send, so your resume stays yours. No credit card.
+              </p>
+            )}
+            {quickProvider === 'gemini' && (
+              <p className="text-[11px] leading-relaxed text-text-muted">
+                Fine with your own key. Google can use free-tier data to improve its products, so we keep resumes on Groq.
+              </p>
+            )}
 
             {/* Paste field or Ollama detection */}
             {quickProvider === 'ollama' ? (
@@ -412,11 +465,13 @@ export function AiProviderTab() {
               <Input
                 type="password"
                 placeholder={
-                  quickProvider === 'gemini'
-                    ? 'Paste Gemini key'
-                    : quickProvider === 'openai-api'
-                      ? 'Paste OpenAI key'
-                      : 'Paste Anthropic key'
+                  quickProvider === 'groq'
+                    ? 'Paste Groq key'
+                    : quickProvider === 'gemini'
+                      ? 'Paste Gemini key'
+                      : quickProvider === 'openai-api'
+                        ? 'Paste OpenAI key'
+                        : 'Paste Anthropic key'
                 }
                 value={quickKey}
                 onChange={(event) => setQuickKey(event.target.value)}

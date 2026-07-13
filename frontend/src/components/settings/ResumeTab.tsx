@@ -83,6 +83,19 @@ export function ResumeTab({ onboarding, navigate }: ResumeTabProps) {
           )}
         </div>
 
+        {onboarding?.resume.exists && (
+          <div className="rounded-xl border border-success/20 bg-success/5 p-3 text-sm text-text-secondary">
+            Resume saved. Next, run a search and every job comes back ranked to how well you fit it.{' '}
+            <button
+              type="button"
+              onClick={() => navigate({ to: '/restock' })}
+              className="font-medium text-brand underline underline-offset-2"
+            >
+              Find &amp; rank jobs →
+            </button>
+          </div>
+        )}
+
         {lastUpload && (
           <ResumeAnalysisBanner
             upload={lastUpload}

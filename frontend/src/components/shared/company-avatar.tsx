@@ -5,12 +5,14 @@ import { getCompanyLogoUrl, getCompanyLogoFallbackUrl } from '@/utils/company-do
 interface CompanyAvatarProps {
   company: string;
   size?: number;
+  /** The posting URL, used to resolve the employer's real domain for direct postings. */
+  url?: string | null;
 }
 
-export function CompanyAvatar({ company, size = 40 }: CompanyAvatarProps) {
+export function CompanyAvatar({ company, size = 40, url }: CompanyAvatarProps) {
   const [imgStage, setImgStage] = useState<'primary' | 'fallback' | 'letter'>('primary');
-  const logoUrl = getCompanyLogoUrl(company, size >= 64 ? 128 : 64);
-  const fallbackUrl = getCompanyLogoFallbackUrl(company, size >= 64 ? 128 : 64);
+  const logoUrl = getCompanyLogoUrl(company, size >= 64 ? 128 : 64, url);
+  const fallbackUrl = getCompanyLogoFallbackUrl(company, size >= 64 ? 128 : 64, url);
   const bg = avatarColor(company);
   const initial = company ? company[0].toUpperCase() : '?';
 
