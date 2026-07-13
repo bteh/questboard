@@ -209,7 +209,7 @@ export function JobCard({ app, sourceLabels, latestRunId }: JobCardProps) {
         onClick={() => setExpanded(!expanded)}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(!expanded); } }}
       >
-        <CompanyAvatar company={app.company} size={48} />
+        <CompanyAvatar company={app.company} size={48} url={app.job_url} />
 
         <div className="flex-1 min-w-0">
           {/* Title row — title and salary share top-line emphasis */}

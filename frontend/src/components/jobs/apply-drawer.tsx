@@ -504,7 +504,7 @@ function ReviewStep({
     <div className="space-y-6">
       {/* ─── Job info summary ─── */}
       <div className="flex items-start gap-3 rounded-xl border border-border-default bg-bg-card p-4">
-        <CompanyAvatar company={app.company} size={40} />
+        <CompanyAvatar company={app.company} size={40} url={app.job_url} />
         <div className="flex-1 min-w-0">
           <h4 className="text-sm font-semibold text-text-primary leading-snug">{prepareData.job_title}</h4>
           <p className="text-xs text-text-secondary mt-0.5">{prepareData.company}</p>

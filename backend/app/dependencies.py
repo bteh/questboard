@@ -23,7 +23,7 @@ _ENV_PATH = os.path.join(_PROJECT_ROOT, ".env")
 # Load .env once at import time
 load_dotenv(_ENV_PATH, override=False)
 
-from job_finder.llm_client import LLMClient, PRESETS
+from job_finder.llm_client import LLMClient, FailoverLLMClient, build_llm, PRESETS
 from job_finder.pipeline import JobFinderPipeline, _load_search_config
 from app.config import get_settings
 from app.models.database import get_db
@@ -46,13 +46,15 @@ def sanitize_profile(name: str) -> str:
     return name
 
 
-def get_llm() -> LLMClient:
-    """Create an LLMClient from current environment.
+def get_llm() -> LLMClient | FailoverLLMClient:
+    """Create the LLM client from the current environment.
 
     Reads explicitly from os.environ (which update_llm_config keeps in sync)
     and passes values directly so we don't depend on load_dotenv's file search.
+    build_llm adds free failover lanes (Groq, Cerebras) automatically when a
+    matching <PROVIDER>_API_KEY is set, otherwise returns a plain LLMClient.
     """
-    return LLMClient(
+    return build_llm(
         provider=os.getenv("LLM_PROVIDER") or None,
         base_url=os.getenv("LLM_BASE_URL") or None,
         api_key=os.getenv("LLM_API_KEY") or None,

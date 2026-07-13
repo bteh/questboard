@@ -198,8 +198,12 @@ def _get_keychain_key() -> str:
 PRESETS: dict[str, dict[str, str]] = {
     # ── Free cloud providers (recommended for public users) ──
     "groq": {
+        # llama-3.3-70b-versatile was deprecated on Groq (2026-06-17). gpt-oss-120b
+        # is a current model and supports strict structured (JSON) output, which is
+        # what the scorer wants. Model IDs on free tiers churn — verify against
+        # https://console.groq.com/docs/models before trusting long-term.
         "base_url": "https://api.groq.com/openai/v1",
-        "model": "llama-3.3-70b-versatile",
+        "model": "openai/gpt-oss-120b",
         "api_key": "",
         "label": "Groq",
         "needs_api_key": "true",
@@ -705,3 +709,181 @@ class LLMClient:
             "model": self.model,
             "configured": str(self.is_configured),
         }
+
+
+class FailoverLLMClient:
+    """An ordered chain of :class:`LLMClient` lanes with a circuit breaker.
+
+    Free API tiers wall out (Groq is org-wide ~1,000 calls/day, and a single
+    resume+JD prompt can trip the per-minute token cap) and churn models. So
+    instead of leaning the whole app on one lane, we chain them: the primary
+    is tried first, and a lane that keeps failing is skipped for a cooldown so
+    calls slide to the next lane. When every lane is exhausted the call returns
+    ``None`` and the caller's existing keyword-scoring floor takes over.
+
+    This presents the exact surface the pipeline and services read off an
+    ``LLMClient`` (``is_configured``, ``is_available``, ``chat``, ``chat_json``,
+    ``chat_json_anthropic_cached``, ``get_provider_info``,
+    ``_is_anthropic_provider``, and the ``provider`` / ``model`` / ``base_url``
+    / ``api_key`` / ``label`` / ``last_error`` attributes), delegating to the
+    first healthy lane. :func:`build_llm` returns a single lane unwrapped, so
+    this class only ever engages when 2+ lanes are configured, keeping the
+    common one-provider path byte-identical to before.
+    """
+
+    _FAILURE_THRESHOLD = 3   # consecutive failures before a lane is benched
+    _COOLDOWN = 60.0         # seconds a benched lane sits out before a retry
+
+    def __init__(self, clients: list["LLMClient"]) -> None:
+        self._clients = [c for c in clients if c is not None]
+        self._fails = [0] * len(self._clients)
+        self._cooldown_until = [0.0] * len(self._clients)
+        self._lock = threading.Lock()
+
+    # -- health / attribute proxying --------------------------------------
+
+    @property
+    def is_configured(self) -> bool:
+        return any(c.is_configured for c in self._clients)
+
+    def _live_indices(self) -> list[int]:
+        """Configured lanes not currently benched, in priority order."""
+        now = time.time()
+        with self._lock:
+            return [
+                i for i, c in enumerate(self._clients)
+                if c.is_configured and self._cooldown_until[i] <= now
+            ]
+
+    def _active(self) -> "LLMClient":
+        """Lane whose config we report: first live one, else the first lane."""
+        live = self._live_indices()
+        return self._clients[live[0] if live else 0]
+
+    @property
+    def provider(self) -> str:
+        return self._active().provider
+
+    @property
+    def model(self) -> str:
+        return self._active().model
+
+    @property
+    def base_url(self) -> str:
+        return self._active().base_url
+
+    @property
+    def api_key(self) -> str:
+        return self._active().api_key
+
+    @property
+    def label(self) -> str:
+        active = self._active()
+        return PRESETS.get(active.provider, {}).get("label", active.provider or "")
+
+    @property
+    def last_error(self) -> Exception | None:
+        return self._active().last_error
+
+    def _is_anthropic_provider(self) -> bool:
+        return self._active()._is_anthropic_provider()
+
+    def is_available(self, force: bool = False) -> bool:
+        """True if any live lane can complete a request."""
+        for i in self._live_indices():
+            if self._clients[i].is_available(force=force):
+                return True
+        return False
+
+    def get_provider_info(self) -> dict[str, str]:
+        return self._active().get_provider_info()
+
+    # -- circuit-breaker bookkeeping --------------------------------------
+
+    def _on_success(self, idx: int) -> None:
+        with self._lock:
+            self._fails[idx] = 0
+            self._cooldown_until[idx] = 0.0
+
+    def _on_failure(self, idx: int) -> None:
+        with self._lock:
+            self._fails[idx] += 1
+            if self._fails[idx] >= self._FAILURE_THRESHOLD:
+                self._cooldown_until[idx] = time.time() + self._COOLDOWN
+                logger.warning(
+                    "LLM lane '%s' benched after %d straight failures; skipping for %ds",
+                    self._clients[idx].provider or "?",
+                    self._fails[idx],
+                    int(self._COOLDOWN),
+                )
+
+    def _call(self, method: str, *args: Any, **kwargs: Any):
+        """Try each live lane in priority order; first non-None wins.
+
+        A lane returning None is counted as a failure and the next lane is
+        tried. When all lanes are benched, returns None immediately (no
+        hammering) so the caller degrades to keyword scoring.
+        """
+        for idx in self._live_indices():
+            result = getattr(self._clients[idx], method)(*args, **kwargs)
+            if result is not None:
+                self._on_success(idx)
+                return result
+            self._on_failure(idx)
+        return None
+
+    def chat(self, *args: Any, **kwargs: Any) -> str | None:
+        return self._call("chat", *args, **kwargs)
+
+    def chat_json(self, *args: Any, **kwargs: Any) -> dict | None:
+        return self._call("chat_json", *args, **kwargs)
+
+    def chat_json_anthropic_cached(self, *args: Any, **kwargs: Any) -> dict | None:
+        return self._call("chat_json_anthropic_cached", *args, **kwargs)
+
+
+# Free fallback lanes auto-enrolled from a per-provider key in the env.
+# Drop a key, get a lane. With no keys the chain is empty and scoring falls
+# back to keyword matching, which always works offline.
+_FALLBACK_LANES: tuple[tuple[str, str], ...] = (
+    ("groq", "GROQ_API_KEY"),
+    ("cerebras", "CEREBRAS_API_KEY"),
+)
+
+
+def build_llm(
+    provider: str | None = None,
+    base_url: str | None = None,
+    api_key: str | None = None,
+    model: str | None = None,
+) -> "LLMClient | FailoverLLMClient":
+    """Build the LLM client, with automatic free-provider failover.
+
+    The primary lane comes from the passed args / the ``LLM_*`` env, exactly
+    like a bare :class:`LLMClient`. Additional free lanes (Groq, Cerebras) are
+    appended when a matching ``<PROVIDER>_API_KEY`` is set, so one lane hitting
+    its wall slides to the next. Lanes are de-duplicated by provider. A single
+    configured lane is returned unwrapped (identical to before); zero lanes
+    returns the (unconfigured) primary so callers keyword-score.
+    """
+    primary = LLMClient(provider=provider, base_url=base_url, api_key=api_key, model=model)
+    lanes: list[LLMClient] = [primary]
+    seen: set[str] = {primary.provider} if primary.is_configured else set()
+
+    for lane, key_env in _FALLBACK_LANES:
+        if lane in seen:
+            continue
+        lane_key = os.getenv(key_env) or ""
+        if not lane_key:
+            continue
+        candidate = LLMClient(provider=lane, api_key=lane_key)
+        if candidate.is_configured:
+            lanes.append(candidate)
+            seen.add(lane)
+
+    configured = [c for c in lanes if c.is_configured]
+    if not configured:
+        return primary
+    if len(configured) == 1:
+        return configured[0]
+    return FailoverLLMClient(configured)

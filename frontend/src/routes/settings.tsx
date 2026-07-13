@@ -3,7 +3,6 @@ import { createRoute, Link, useNavigate } from '@tanstack/react-router';
 import { Route as appRoute } from './app';
 
 import { AiProviderTab } from '@/components/settings/AiProviderTab';
-import { TheAiDownloadSection } from '@/components/settings/TheAiDownload';
 import { AutoApplyTab } from '@/components/settings/AutoApplyTab';
 import { ResumeTab } from '@/components/settings/ResumeTab';
 import { SearchPrefsTab } from '@/components/settings/SearchPrefsTab';
@@ -107,12 +106,7 @@ function SettingsPage() {
           <SearchPrefsTab onboarding={onboarding} navigate={navigate} />
         )}
 
-        {activeTab === 'ai' && (
-          <>
-            <TheAiDownloadSection />
-            <AiProviderTab />
-          </>
-        )}
+        {activeTab === 'ai' && <AiProviderTab />}
 
         {activeTab === 'auto-apply' && <AutoApplyTab />}
       </div>

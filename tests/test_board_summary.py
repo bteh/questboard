@@ -157,6 +157,62 @@ def test_dead_personal_and_past_event_rows_never_count(api_client) -> None:
     assert payload["total"] == 4
 
 
+def test_stale_casting_by_publish_date_never_counts(api_client) -> None:
+    """Casting calls carry their audition date only in the text, so event_start
+    is NULL and the upcoming filter can't expire them. Once the source publish
+    date is past the shelf life the call has passed and drops off the board.
+    ISO dates expire; free text, absent dates, and real future events stay."""
+    client, jf_db = api_client
+    _seed(jf_db)  # includes one camera row with no date -> perform starts at 1
+
+    session = jf_db._SessionLocal()
+    try:
+        from datetime import datetime, timedelta, timezone
+
+        from job_finder.models.database import ApplicationRecord
+
+        now = datetime.now(timezone.utc)
+        iso = lambda d: d.strftime("%Y-%m-%dT%H:%M:%S")  # noqa: E731
+
+        stale = ApplicationRecord(
+            job_title="Auditions JUNE 15 (already past)",
+            company="AuditionsFree",
+            job_url="https://example.com/quests/stale-cast",
+            vertical="camera",
+            date_posted=iso(now - timedelta(days=40)),  # ISO, past the shelf life
+        )
+        fresh = ApplicationRecord(
+            job_title="Rush call this week",
+            company="AuditionsFree",
+            job_url="https://example.com/quests/fresh-cast",
+            vertical="camera",
+            date_posted=iso(now - timedelta(days=5)),
+        )
+        freetext = ApplicationRecord(
+            job_title="Reposted casting call",
+            company="AuditionsFree",
+            job_url="https://example.com/quests/freetext-cast",
+            vertical="camera",
+            date_posted="Reposted 40 Days Ago",  # not ISO -> conservatively kept
+        )
+        future_event = ApplicationRecord(
+            job_title="Old post, future taping",
+            company="1iota",
+            job_url="https://example.com/quests/future-cast",
+            vertical="camera",
+            date_posted=iso(now - timedelta(days=40)),
+            event_start=(now + timedelta(days=10)).replace(tzinfo=None),  # real date wins
+        )
+        session.add_all([stale, fresh, freetext, future_event])
+        session.commit()
+    finally:
+        session.close()
+
+    payload = client.get("/api/v1/board/summary").json()
+    # seed camera (1) + fresh + freetext + future_event = 4; only `stale` drops
+    assert _kind(payload, "perform")["count"] == 4
+
+
 def test_expired_tombstones_stay_off_the_board(api_client) -> None:
     client, jf_db = api_client
     _seed(jf_db)
