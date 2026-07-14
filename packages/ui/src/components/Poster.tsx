@@ -47,6 +47,8 @@ export interface PosterProps {
   bringFree?: boolean;
   /** the honest trap, when the kind or the data carries one */
   catchLine?: string;
+  /** referral disclosure; render only when the link actually carries a live tag */
+  disclosure?: string;
   /** flavor tags: time and effort only, two at most */
   tags?: string[];
   pay?: string;
@@ -73,6 +75,7 @@ export function Poster({
   bring,
   bringFree,
   catchLine,
+  disclosure,
   tags = [],
   pay,
   payUnit,
@@ -150,6 +153,7 @@ export function Poster({
             take it →
           </a>
         </div>
+        {disclosure && <p className="qb-p-disclosure">{disclosure}</p>}
       </article>
     </div>
   );

@@ -26,6 +26,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/board': 'The board',
   '/settings': 'Settings',
   '/health': 'Source health',
+  '/how-we-make-money': 'How we make money',
 };
 
 function SearchBox() {
@@ -69,6 +70,7 @@ export function AppShell() {
   const onLog = Boolean(matchRoute({ to: '/log', fuzzy: true }));
   const onSettings = Boolean(matchRoute({ to: '/settings' }));
   const onHealth = Boolean(matchRoute({ to: '/health' }));
+  const onMoney = Boolean(matchRoute({ to: '/how-we-make-money' }));
 
   return (
     <TooltipProvider>
@@ -81,6 +83,7 @@ export function AppShell() {
           onLog={onLog}
           onSettings={onSettings}
           onHealth={onHealth}
+          onMoney={onMoney}
         />
 
         <main className="qb-main">

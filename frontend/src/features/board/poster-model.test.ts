@@ -58,6 +58,21 @@ describe('the poster model', () => {
     expect(poster.hasFit).toBe(false);
   });
 
+  it("a row's stated bring and catch beat the kind template", () => {
+    const stated = toPoster(
+      app({
+        vertical: 'flip',
+        first_quest_ok: true,
+        quest: { bring: 'photos of your clothes', catch: 'Poshmark takes 20% at $15 or more' },
+      }),
+      'Questboard',
+    );
+    expect(stated.copy.bring).toBe('photos of your clothes');
+    expect(stated.copy.catchLine).toBe('Poshmark takes 20% at $15 or more');
+    // the beginner treatment survives alongside the stated copy
+    expect(stated.copy.bringFree).toBe(true);
+  });
+
   it('gives the beginner treatment only on the stated signal', () => {
     const plain = toPoster(app({ vertical: 'camera' }), 'x');
     expect(plain.copy.bringFree).toBeUndefined();
