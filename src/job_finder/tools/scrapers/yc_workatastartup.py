@@ -368,6 +368,11 @@ def _fetch_job_detail(job_url: str) -> dict:
     url="https://workatastartup.com",
     description="YC Work at a Startup job listings",
     category="startup",
+    # Off by default: the current data-page shape returns jobs whose apply
+    # link isn't under the url/job_url keys this scraper reads, so every row
+    # lands with an empty URL and is dropped as a dead link (verified on the
+    # live board). Re-enable once the real URL field is confirmed live.
+    enabled_by_default=False,
 )
 def search_yc_jobs(
     roles: list[str] | None = None,
