@@ -269,6 +269,19 @@ export function questPay(app: ApplicationResponse): { pay: string; payUnit: stri
 
 const normalizeName = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
+/** Career meta that leads with the company (so the company logo pairs with it),
+    then the source, then place, then freshness. The role is the title, so the
+    company never appears twice. "remote" lives here once, never also as a tag. */
+export function careerMeta(app: ApplicationResponse, sourceLabel?: string): string {
+  const company = (app.company || '').trim();
+  const source = sourceLabel || app.source || '';
+  const posted = postedAgoLabel(app.date_posted, app.date_confidence);
+  const place = app.is_remote ? 'remote' : app.location || '';
+  const namesSource = company && normalizeName(company) === normalizeName(source);
+  const lead = company && !namesSource ? [company, source ? `via ${source}` : ''] : [source];
+  return [...lead, place, posted ? posted.toLowerCase() : ''].filter(Boolean).join(', ');
+}
+
 /** Quest title; the company is dropped when it just restates the source
     or when the title already names it (speak rows: "Speak at X" + X). */
 function questTitle(app: ApplicationResponse, sourceLabel?: string): string {
@@ -329,9 +342,10 @@ export function toBoardCard(app: ApplicationResponse, sourceLabel?: string): Boa
   const card: BoardCardModel = {
     id: app.id,
     vertical,
-    title: `${app.job_title}, ${app.company}`,
+    // Role is the headline; the company leads the meta line (with its logo).
+    title: app.job_title,
     href: app.job_url || undefined,
-    meta: boardMeta(app, sourceLabel),
+    meta: careerMeta(app, sourceLabel),
     needs: needsLine(fit),
     fit,
     report,

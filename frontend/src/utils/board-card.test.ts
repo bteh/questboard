@@ -83,6 +83,20 @@ function reportJson(strong: number, partial: number, missing: number): string {
   });
 }
 
+describe('career card grammar', () => {
+  it('role is the title; the company leads the meta line, source secondary, remote once', () => {
+    const card = toBoardCard(
+      makeApp({ job_title: 'Senior Data Engineer', company: 'Acme', is_remote: true }),
+      'BuiltIn',
+    );
+    expect(card.title).toBe('Senior Data Engineer');
+    expect(card.meta).toContain('Acme, via BuiltIn');
+    expect(card.meta).toContain('remote');
+    // remote is stated once (on the meta), never repeated
+    expect(card.meta.match(/remote/g) ?? []).toHaveLength(1);
+  });
+});
+
 describe('needs line', () => {
   it('reports coverage when a real evaluation report exists', () => {
     const card = toBoardCard(makeApp({ evaluation_report_json: reportJson(7, 0, 2) }));

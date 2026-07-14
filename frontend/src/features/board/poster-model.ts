@@ -55,9 +55,14 @@ export function toPoster(app: ApplicationResponse, sourceLabel: string): PosterM
     copy = { bring: 'nothing you don’t already have', bringFree: true, catchLine: copy.catchLine };
   }
 
-  const tags: string[] = [];
-  if (app.is_remote) tags.push('remote');
-  if (app.work_type && app.work_type !== 'unknown') tags.push(app.work_type);
+  // Location already reads on the meta line, so "remote" never doubles as a
+  // tag. Career rows carry no flavor tags; a quest keeps its work type only
+  // when it adds something the meta doesn't (hybrid/onsite, never "remote").
+  const isCareer = (app.vertical || 'career') === 'career';
+  const wt = (app.work_type || '').trim();
+  const tags: string[] = isCareer || !wt || wt === 'unknown' || wt.toLowerCase() === 'remote'
+    ? []
+    : [wt];
 
   return {
     kind,

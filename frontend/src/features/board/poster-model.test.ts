@@ -41,6 +41,17 @@ describe('the poster model', () => {
     expect(toPoster(app({ vertical: 'lens' }), 'x').kind).toBe('skill');
   });
 
+  it('career rows carry no flavor tags, and remote never doubles', () => {
+    // remote/location reads on the meta line; it must not also be a tag
+    expect(toPoster(app({ vertical: 'career', is_remote: true, work_type: 'remote' }), 'BuiltIn').tags)
+      .toEqual([]);
+  });
+
+  it('a quest keeps a work type only when it adds something the meta lacks', () => {
+    expect(toPoster(app({ vertical: 'camera', is_remote: true, work_type: 'remote' }), 'x').tags).toEqual([]);
+    expect(toPoster(app({ vertical: 'lens', work_type: 'hybrid' }), 'x').tags).toEqual(['hybrid']);
+  });
+
   it('never asks a focus group for a resume', () => {
     const poster = toPoster(app({ vertical: 'study' }), 'Fieldwork');
     expect(poster.copy.bring).toContain('no resume');

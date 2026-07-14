@@ -190,14 +190,9 @@ def _parse_html_jobs(
         work_type = _icon_sibling_text(card, "fa-house-building")
         location = _icon_sibling_text(card, "fa-location-dot")
         salary_text = _icon_sibling_text(card, "fa-sack-dollar")
-        level = _icon_sibling_text(card, "fa-trophy")
         sal_min, sal_max = _parse_salary(salary_text)
 
         is_remote = "remote" in work_type.lower() or "remote" in location.lower()
-
-        # The listing card carries no description body, so build a scannable one
-        # from the stated facts rather than shipping an empty description.
-        description = " · ".join(p for p in (work_type, location, salary_text, level) if p)
 
         # Date posted — first span with time-related text
         date_posted = ""
@@ -213,7 +208,9 @@ def _parse_html_jobs(
             "location": location or ("Remote" if is_remote else "Not specified"),
             "url": job_url,
             "source": "builtin",
-            "description": description,
+            # Listing cards carry no description body; the card reads complete
+            # from the role, company, pay and meta without a synthesized line.
+            "description": "",
             "salary_min": sal_min,
             "salary_max": sal_max,
             "date_posted": date_posted,
