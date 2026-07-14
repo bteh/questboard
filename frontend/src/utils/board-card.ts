@@ -110,6 +110,8 @@ function fmtBound(n: number): string {
 export function formatStatedPay(min: number | null, max: number | null): string {
   const k = (n: number) => n >= 1000;
   if (min != null && max != null) {
+    // Equal bounds are a single figure, never a "$60–60" range.
+    if (min === max) return k(min) ? `$${fmtBound(min)}k` : `$${min}`;
     if (k(min) && k(max)) return `$${fmtBound(min)}–${fmtBound(max)}k`;
     return `$${min}–${max}`;
   }
@@ -269,10 +271,37 @@ export function questPay(app: ApplicationResponse): { pay: string; payUnit: stri
 
 const normalizeName = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
+/** JSON-key-ish tokens a mis-mapped scraper can leave in `company` ("name"
+    from an object it meant to read `.name` off of, "null" from a stringified
+    empty). They are not company names; the card must never print them. */
+const COMPANY_PLACEHOLDERS = new Set([
+  'name', 'null', 'undefined', 'none', 'n/a', 'na', 'company', 'title', 'unknown',
+]);
+
+/** The stated company, or '' when it's blank or an obvious placeholder token.
+    Every path that renders or looks up a company goes through this. */
+export function cleanCompany(raw: string | null | undefined): string {
+  const c = (raw || '').trim();
+  return COMPANY_PLACEHOLDERS.has(c.toLowerCase()) ? '' : c;
+}
+
+/** Career meta that leads with the company (so the company logo pairs with it),
+    then the source, then place, then freshness. The role is the title, so the
+    company never appears twice. "remote" lives here once, never also as a tag. */
+export function careerMeta(app: ApplicationResponse, sourceLabel?: string): string {
+  const company = cleanCompany(app.company);
+  const source = sourceLabel || app.source || '';
+  const posted = postedAgoLabel(app.date_posted, app.date_confidence);
+  const place = app.is_remote ? 'remote' : app.location || '';
+  const namesSource = company && normalizeName(company) === normalizeName(source);
+  const lead = company && !namesSource ? [company, source ? `via ${source}` : ''] : [source];
+  return [...lead, place, posted ? posted.toLowerCase() : ''].filter(Boolean).join(', ');
+}
+
 /** Quest title; the company is dropped when it just restates the source
     or when the title already names it (speak rows: "Speak at X" + X). */
 function questTitle(app: ApplicationResponse, sourceLabel?: string): string {
-  const company = (app.company || '').trim();
+  const company = cleanCompany(app.company);
   if (!company) return app.job_title;
   const norm = normalizeName(company);
   if (norm === normalizeName(app.source) || norm === normalizeName(sourceLabel || '')) {
@@ -329,9 +358,10 @@ export function toBoardCard(app: ApplicationResponse, sourceLabel?: string): Boa
   const card: BoardCardModel = {
     id: app.id,
     vertical,
-    title: `${app.job_title}, ${app.company}`,
+    // Role is the headline; the company leads the meta line (with its logo).
+    title: app.job_title,
     href: app.job_url || undefined,
-    meta: boardMeta(app, sourceLabel),
+    meta: careerMeta(app, sourceLabel),
     needs: needsLine(fit),
     fit,
     report,

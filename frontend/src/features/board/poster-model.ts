@@ -4,7 +4,7 @@
    The route composes the bring line's inline fit action itself. */
 
 import { kindForVertical } from '@questboard/kinds';
-import { toBoardCard, type BoardCardModel } from '@/utils/board-card';
+import { cleanCompany, toBoardCard, type BoardCardModel } from '@/utils/board-card';
 import { kindCopy, type KindCopy } from '@/features/board/kind-copy';
 import { getCompanyLogoUrl } from '@/utils/company-domains';
 import type { ApplicationResponse } from '@/types/application';
@@ -55,9 +55,14 @@ export function toPoster(app: ApplicationResponse, sourceLabel: string): PosterM
     copy = { bring: 'nothing you don’t already have', bringFree: true, catchLine: copy.catchLine };
   }
 
-  const tags: string[] = [];
-  if (app.is_remote) tags.push('remote');
-  if (app.work_type && app.work_type !== 'unknown') tags.push(app.work_type);
+  // Location already reads on the meta line, so "remote" never doubles as a
+  // tag. Career rows carry no flavor tags; a quest keeps its work type only
+  // when it adds something the meta doesn't (hybrid/onsite, never "remote").
+  const isCareer = (app.vertical || 'career') === 'career';
+  const wt = (app.work_type || '').trim();
+  const tags: string[] = isCareer || !wt || wt === 'unknown' || wt.toLowerCase() === 'remote'
+    ? []
+    : [wt];
 
   return {
     kind,
@@ -67,6 +72,6 @@ export function toPoster(app: ApplicationResponse, sourceLabel: string): PosterM
     hasFit,
     tags: tags.slice(0, 2),
     rotateDeg: rotationFor(app.id),
-    logoUrl: getCompanyLogoUrl(app.company || '', 64, app.job_url) ?? undefined,
+    logoUrl: getCompanyLogoUrl(cleanCompany(app.company), 64, app.job_url) ?? undefined,
   };
 }
