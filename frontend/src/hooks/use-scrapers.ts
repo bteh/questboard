@@ -28,7 +28,9 @@ export function resolveSourceLabel(key: string, labels?: Record<string, string>)
 export function useScraperSources() {
   return useQuery({
     queryKey: ['scrapers', 'sources'],
-    queryFn: getScraperSources,
+    // wrapped: react-query passes its context object as the first argument,
+    // which must not land in getScraperSources' optional vertical param
+    queryFn: () => getScraperSources(),
     staleTime: 60 * 60 * 1000, // 1 hour
   });
 }
