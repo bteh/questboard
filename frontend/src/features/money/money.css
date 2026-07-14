@@ -1,0 +1,43 @@
+/* How we make money (/how-we-make-money): the payment constitution as a
+   quiet page. Hairline rules between claims; the words carry it. */
+
+.qb-money-head { padding: 40px 0 10px; }
+.qb-money-head h1 {
+  font-family: var(--serif);
+  font-variation-settings: 'opsz' 80;
+  font-weight: 560;
+  font-size: 26px;
+  letter-spacing: -.01em;
+  margin: 6px 0 0;
+}
+.qb-money-sub { font-size: 13px; color: var(--mute); margin-top: 4px; }
+
+.qb-money-block { padding: 20px 0 22px; border-bottom: 1px solid var(--hair); }
+.qb-money-idx {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .1em;
+  color: var(--mute);
+}
+.qb-money-block h2 {
+  font-family: var(--serif);
+  font-variation-settings: 'opsz' 40;
+  font-weight: 560;
+  font-size: 18.5px;
+  letter-spacing: -.008em;
+  margin: 4px 0 8px;
+}
+.qb-money-block p { font-size: 14.5px; line-height: 1.6; color: var(--soft); margin: 0; }
+
+.qb-money-why { margin-top: 22px; font-size: 13.5px; line-height: 1.6; color: var(--mute); }
+.qb-money-foot {
+  margin-top: 26px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: .04em;
+  color: var(--mute);
+}
+
+@media (max-width: 700px) {
+  .qb-money-head { padding-top: 24px; }
+}

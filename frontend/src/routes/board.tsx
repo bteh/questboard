@@ -39,6 +39,7 @@ import { KindRail } from '@/features/board/kind-rail';
 import { PlacePicker } from '@/features/board/place-picker';
 import { JobsCallout } from '@/features/board/jobs-callout';
 import { toPoster } from '@/features/board/poster-model';
+import { decoratePosterLink } from '@/monetization/affiliate';
 import { useBoardSummary } from '@/hooks/use-board-summary';
 import type { ApplicationFilters, ApplicationResponse, RequirementMatch } from '@/types/application';
 import '@/components/board/board.css';
@@ -176,6 +177,9 @@ function BoardPosters({
       {items.map((app) => {
         const poster = toPoster(app, resolveSourceLabel(app.source, labels));
         const { card } = poster;
+        /* render edge only: decoration runs after ordering, so the bounty
+           can never touch what shows or the order */
+        const link = decoratePosterLink(card.href, Boolean(poster.copy.catchLine));
         /* career rows bring their real resume fit; the kind template yields */
         const bring: ReactNode = poster.hasFit ? (
           <>
@@ -202,13 +206,14 @@ function BoardPosters({
             key={app.id}
             kind={poster.kind}
             title={card.title}
-            href={card.href}
+            href={link.href}
             giver={card.meta}
             giverLogoUrl={poster.logoUrl}
             desc={poster.desc}
             bring={bring}
             bringFree={poster.copy.bringFree && !poster.hasFit}
             catchLine={poster.copy.catchLine}
+            disclosure={link.disclosure}
             tags={poster.tags}
             pay={card.pay}
             payUnit={card.payUnit}
@@ -605,7 +610,20 @@ function BoardPage() {
           )}
         </p>
 
-        {careerLane ? <JobsCallout /> : <FirstRunNotice onStartHere={startHere} />}
+        {careerLane ? (
+          <>
+            <JobsCallout />
+            <p className="qb-jobs-bridge">
+              Landed something? A new paycheck is the best moment for a{' '}
+              <button type="button" className="qb-textlink" onClick={() => selectKind('house')}>
+                bank bonus
+              </button>
+              .
+            </p>
+          </>
+        ) : (
+          <FirstRunNotice onStartHere={startHere} />
+        )}
 
         {firstPage.isError && (
           <p style={{ marginTop: 40, fontSize: 14.5, color: 'var(--soft)' }}>

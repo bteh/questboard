@@ -11,8 +11,9 @@ export interface ScraperSource {
   vertical?: string;
 }
 
-export function getScraperSources(): Promise<ScraperSource[]> {
-  return apiGet<ScraperSource[]>('/scrapers/sources');
+export function getScraperSources(vertical?: string): Promise<ScraperSource[]> {
+  const suffix = vertical ? `?vertical=${encodeURIComponent(vertical)}` : '';
+  return apiGet<ScraperSource[]>(`/scrapers/sources${suffix}`);
 }
 
 export interface SourceHealthEntry {

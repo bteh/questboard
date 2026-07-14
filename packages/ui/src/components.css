@@ -263,3 +263,9 @@
   box-shadow: 0 1px 0 color-mix(in srgb, var(--qb-hue, var(--sage)) 60%, #000), 0 4px 10px -4px color-mix(in srgb, var(--qb-hue, var(--sage)) 55%, #000);
 }
 .qb-p-reward-unstated { font-size: 13px; font-weight: 400; color: var(--mute); }
+/* referral disclosure: continues the tear stub so it sits with the take-it link */
+.qb-p-disclosure {
+  margin: 0 -17px; padding: 0 17px 12px;
+  background: color-mix(in srgb, var(--paper) 88%, var(--ground));
+  font-family: var(--mono); font-size: 10px; line-height: 1.5; color: var(--mute);
+}

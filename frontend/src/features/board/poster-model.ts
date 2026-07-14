@@ -33,6 +33,11 @@ export function scannableDesc(description: string | null | undefined): string | 
   return cut;
 }
 
+function statedStr(quest: ApplicationResponse['quest'], key: string): string {
+  const v = quest?.[key];
+  return typeof v === 'string' ? v.trim() : '';
+}
+
 /** Stable per-posting tilt so the wall reads tacked-up, not animated. */
 export function rotationFor(id: number): number {
   const steps = [-1.4, -1.1, -0.7, 0.6, 0.9, 1.2, 1.4];
@@ -54,6 +59,13 @@ export function toPoster(app: ApplicationResponse, sourceLabel: string): PosterM
   if (!hasFit && card.firstQuest) {
     copy = { bring: 'nothing you don’t already have', bringFree: true, catchLine: copy.catchLine };
   }
+  /* a row's own stated bring/catch beats any template: curated sources
+     (flip on-ramps) state the real fee as the catch, so the card never
+     shows a kind-generic line when the source said the specific thing */
+  const statedBring = statedStr(app.quest, 'bring');
+  const statedCatch = statedStr(app.quest, 'catch');
+  if (statedBring) copy = { ...copy, bring: statedBring };
+  if (statedCatch) copy = { ...copy, catchLine: statedCatch };
 
   // Location already reads on the meta line, so "remote" never doubles as a
   // tag. Career rows carry no flavor tags; a quest keeps its work type only

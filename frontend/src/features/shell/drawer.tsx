@@ -5,6 +5,7 @@ import {
   Activity01Icon,
   ArrowDown01Icon,
   Cancel01Icon,
+  Coins01Icon,
   Home01Icon,
   Logout03Icon,
   Notebook01Icon,
@@ -113,9 +114,10 @@ export interface DrawerProps {
   onLog: boolean;
   onSettings: boolean;
   onHealth: boolean;
+  onMoney: boolean;
 }
 
-export function Drawer({ open, onClose, onHome, onBoard, onLog, onSettings, onHealth }: DrawerProps) {
+export function Drawer({ open, onClose, onHome, onBoard, onLog, onSettings, onHealth, onMoney }: DrawerProps) {
   const { data: summary } = useBoardSummary();
   const { hostedMode } = useWorkspace();
 
@@ -168,6 +170,14 @@ export function Drawer({ open, onClose, onHome, onBoard, onLog, onSettings, onHe
           >
             <span className="qb-nico"><HugeiconsIcon icon={Settings02Icon} size={18} strokeWidth={STROKE} /></span>
             Settings
+          </Link>
+          <Link
+            to="/how-we-make-money"
+            className={onMoney ? 'qb-nav-item qb-active' : 'qb-nav-item'}
+            onClick={onClose}
+          >
+            <span className="qb-nico"><HugeiconsIcon icon={Coins01Icon} size={18} strokeWidth={STROKE} /></span>
+            How we make money
           </Link>
           {/* Ops zone: local mode means you run the board, so the health
               page gets a door here. Hosted visitors never see it. */}
