@@ -30,7 +30,10 @@ const COPY: Record<string, KindCopy> = {
     bring: 'a 4-door car, license, insurance, 21+, a background check',
     catchLine: 'personal auto policies often exclude delivery, so check yours first',
   },
-  lookafter: { bring: 'references' },
+  lookafter: {
+    bring: 'a meet-and-greet first; reviews if you have them',
+    catchLine: 'real owners meet you and the pet in person first; anyone who skips the meet, pays off-platform, or overpays by check is a scam',
+  },
   flip: {
     bring: 'cash upfront and patience',
     catchLine: 'grading and resale fees eat the spread; comps first',

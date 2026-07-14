@@ -34,6 +34,11 @@ _FIELDS = "id,date,title,link,content"
 _WINDOW_DAYS = 60
 
 _TAG_RE = re.compile(r"<[^>]+>")
+# Divi / WordPress page-builder shortcodes ([et_pb_section ...], [/et_pb_text],
+# [vc_row], ...). They aren't HTML tags, so tag-stripping leaves them behind as
+# "[et_pb_section fb_built=..." soup. Lowercase shortcode name only, so real
+# bracketed text like "[Phase 2]" survives.
+_SHORTCODE_RE = re.compile(r"\[/?[a-z][a-z0-9_]*(?:\s[^\]]*)?\]")
 _CITY_RE = re.compile(r"\(([^()]{2,40},\s*[A-Z]{2})\)")
 _COMP_RE = re.compile(
     r"compensat\w*[^.$]{0,80}?(up\s+to\s+)?\$\s*(\d[\d,]*(?:\.\d+)?)",
@@ -61,7 +66,11 @@ def _normalize_post(post: dict) -> dict | None:
     if not title or not link:
         return None
 
-    text = html.unescape(_TAG_RE.sub(" ", (post.get("content") or {}).get("rendered") or ""))
+    # unescape first (so any encoded brackets become literal), then drop
+    # page-builder shortcodes, then HTML tags, then collapse whitespace.
+    raw = html.unescape((post.get("content") or {}).get("rendered") or "")
+    raw = _SHORTCODE_RE.sub(" ", raw)
+    text = _TAG_RE.sub(" ", raw)
     text = re.sub(r"\s+", " ", text).strip()
 
     city = _CITY_RE.search(title)

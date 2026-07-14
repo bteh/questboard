@@ -45,16 +45,24 @@ class CarecomSitemapTest(unittest.TestCase):
         for vertical in ("childcare", "petcare", "specialneeds", "seniorcare", "housekeeping"):
             self.assertTrue(any(f"/job/{vertical}/" in u for u in self.urls))
 
-    def test_keeps_lane_verticals_and_sorts_newest_first(self) -> None:
+    def test_round_robins_verticals_pets_first(self) -> None:
+        # kept verticals only, round-robined with pets leading so high-volume
+        # childcare can't crowd pet-care out of the fetch cap; newest-first
+        # within each vertical.
         ordered = self.mod._newest_first(self.urls)
         self.assertEqual(len(ordered), 5)
         for url in ordered:
             self.assertNotIn("/job/seniorcare/", url)
             self.assertNotIn("/job/housekeeping/", url)
-        ids = [int(self.mod._JOB_URL_RE.match(u).group(2)) for u in ordered]
-        self.assertEqual(ids, sorted(ids, reverse=True))
-        self.assertEqual(ids[0], 35318774)  # the petcare entry, highest id
-        self.assertEqual(ids[-1], 34839620)
+        matches = [self.mod._JOB_URL_RE.match(u) for u in ordered]
+        verts = [m.group(1) for m in matches]
+        ids = [int(m.group(2)) for m in matches]
+        self.assertEqual(verts[0], "petcare")     # pets lead the round-robin
+        self.assertEqual(ids[0], 35318774)         # highest petcare id, first slot
+        self.assertIn(34839620, ids)               # nothing kept is dropped
+        for v in set(verts):                       # newest-first within each vertical
+            v_ids = [i for i, vv in zip(ids, verts) if vv == v]
+            self.assertEqual(v_ids, sorted(v_ids, reverse=True))
 
     def test_duplicate_ids_dedupe(self) -> None:
         self.assertEqual(

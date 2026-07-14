@@ -138,6 +138,14 @@ def _parse_cards(html: str) -> list[dict]:
     return cards
 
 
+# FocusGroups.org lists focus groups/surveys AND clinical trials together.
+# Trials are the medical kind people find scary, so they belong in "Join a
+# study" (body), not the friendly opinion lane ("study" -> Tell them what you
+# think). A plain "Focus Group on <disease>" stays opinion; only explicit
+# clinical-trial language reroutes.
+_CLINICAL_RE = re.compile(r"\bclinical\s+(?:trial|research|stud)|\btrials?\b", re.IGNORECASE)
+
+
 def _normalize_card(card: dict) -> dict | None:
     """Map one parsed card to a quest row, or None when unusable."""
     title = card.get("title") or ""
@@ -179,7 +187,7 @@ def _normalize_card(card: dict) -> dict | None:
         "location": "Online" if online else "",
         "url": url,
         "source": "focusgroups_org",
-        "vertical": "study",
+        "vertical": "body" if _CLINICAL_RE.search(title) else "study",
         # Cards carry no description body; surface the structured chips.
         "description": "; ".join(parts),
         # Consumer research needs no prior experience or portfolio; screeners

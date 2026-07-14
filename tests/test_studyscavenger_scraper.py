@@ -68,6 +68,28 @@ class StudyScavengerTest(unittest.TestCase):
         for bad in (None, {}, "x", 42):
             self.assertEqual(self._search(bad), [])
 
+    def test_divi_shortcodes_are_stripped_from_description(self) -> None:
+        # studyscavenger.com is a Divi/WordPress site; content.rendered carries
+        # page-builder shortcodes that aren't HTML tags. They must not leak into
+        # the description; the inner text must survive.
+        post = {
+            "title": {"rendered": "COPD Study - Lenexa, KS"},
+            "link": "https://studyscavenger.com/study/copd/",
+            "content": {"rendered": (
+                '[et_pb_section fb_built="1" _builder_version="4.16"]'
+                "[et_pb_row][et_pb_column][et_pb_text]"
+                "Seeking adults 40+ with COPD. Compensation up to $500 for 3 visits."
+                "[/et_pb_text][/et_pb_column][/et_pb_row][/et_pb_section]"
+            )},
+        }
+        row = self.mod._normalize_post(post)
+        self.assertIsNotNone(row)
+        desc = row["description"]
+        self.assertNotIn("et_pb_", desc)
+        self.assertNotIn("[", desc)
+        self.assertIn("Seeking adults 40+ with COPD", desc)
+        self.assertEqual(row["salary_max"], 500.0)  # comp still parses from clean text
+
 
 if __name__ == "__main__":
     unittest.main()
