@@ -4,7 +4,7 @@
    The route composes the bring line's inline fit action itself. */
 
 import { kindForVertical } from '@questboard/kinds';
-import { toBoardCard, type BoardCardModel } from '@/utils/board-card';
+import { cleanCompany, toBoardCard, type BoardCardModel } from '@/utils/board-card';
 import { kindCopy, type KindCopy } from '@/features/board/kind-copy';
 import { getCompanyLogoUrl } from '@/utils/company-domains';
 import type { ApplicationResponse } from '@/types/application';
@@ -72,6 +72,6 @@ export function toPoster(app: ApplicationResponse, sourceLabel: string): PosterM
     hasFit,
     tags: tags.slice(0, 2),
     rotateDeg: rotationFor(app.id),
-    logoUrl: getCompanyLogoUrl(app.company || '', 64, app.job_url) ?? undefined,
+    logoUrl: getCompanyLogoUrl(cleanCompany(app.company), 64, app.job_url) ?? undefined,
   };
 }

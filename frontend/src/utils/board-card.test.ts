@@ -95,6 +95,18 @@ describe('career card grammar', () => {
     // remote is stated once (on the meta), never repeated
     expect(card.meta.match(/remote/g) ?? []).toHaveLength(1);
   });
+
+  it('never prints a JSON-key placeholder as the company', () => {
+    // A mis-mapped scraper once stored the literal "name"; the card must read
+    // as if no company was stated, leading with the source instead.
+    const card = toBoardCard(
+      makeApp({ job_title: 'Strategy Consultant', company: 'name', is_remote: true }),
+      'Himalayas',
+    );
+    expect(card.meta).not.toContain('name,');
+    expect(card.meta.startsWith('Himalayas')).toBe(true);
+    expect(card.meta).toContain('remote');
+  });
 });
 
 describe('needs line', () => {
@@ -175,6 +187,11 @@ describe('pay honesty', () => {
     expect(formatStatedPay(170000, null)).toBe('$170k+');
     expect(formatStatedPay(null, 95000)).toBe('up to $95k');
     expect(formatStatedPay(null, null)).toBe('');
+  });
+
+  it('collapses an equal-bounds range to one figure', () => {
+    expect(formatStatedPay(60, 60)).toBe('$60');
+    expect(formatStatedPay(200000, 200000)).toBe('$200k');
   });
 });
 
