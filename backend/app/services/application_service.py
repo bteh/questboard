@@ -34,20 +34,31 @@ TIME_SENSITIVE_SHELF_DAYS = 30
 def time_sensitive_stale(model, now: datetime | None = None):
     """A SQLAlchemy condition that is TRUE for a stale time-sensitive quest.
 
+    Two prongs: any vertical whose event day (UTC) has already passed, and
+    the camera shelf life for casting calls that carry no event date at all.
     Negate with ``~`` to keep everything else. ``model`` is the caller's
     ApplicationRecord class (board_summary imports a different one), so the
     filter binds to that module's mapped columns.
     """
     ref = now or datetime.now(timezone.utc)
     cutoff = (ref - timedelta(days=TIME_SENSITIVE_SHELF_DAYS)).strftime("%Y-%m-%dT%H:%M:%S")
-    return and_(
-        model.vertical.in_(TIME_SENSITIVE_VERTICALS),
-        model.event_start.is_(None),
-        # Only a real ISO date_posted expires. The >= "2000-01-01" floor drops
-        # empty strings and free text ("Reposted 9 days ago"), which sort below
-        # a real year and would otherwise look "older than the cutoff".
-        model.date_posted >= "2000-01-01",
-        model.date_posted < cutoff,
+    today = ref.strftime("%Y-%m-%d")
+    return or_(
+        # A dated event strictly before today has happened; the row leaves the
+        # board whatever its vertical. SQLite stores event_start as text, so
+        # go through date(), which yields the ISO day for real datetimes and
+        # NULL for free text; coalesce turns that NULL into "keep", so a value
+        # that cannot prove the event passed never hides a row.
+        func.coalesce(func.date(model.event_start) < today, False),
+        and_(
+            model.vertical.in_(TIME_SENSITIVE_VERTICALS),
+            model.event_start.is_(None),
+            # Only a real ISO date_posted expires. The >= "2000-01-01" floor drops
+            # empty strings and free text ("Reposted 9 days ago"), which sort below
+            # a real year and would otherwise look "older than the cutoff".
+            model.date_posted >= "2000-01-01",
+            model.date_posted < cutoff,
+        ),
     )
 
 
@@ -405,7 +416,7 @@ def check_urls(
 
     # Classify ONE url. Only a definitive 404/410 means the posting is gone.
     # 403/405/429/5xx are usually bot-blocks or HEAD-not-supported, and
-    # timeouts/connection errors are transient — none of those should mark a
+    # timeouts/connection errors are transient, none of those should mark a
     # live job dead (that would hide good postings). Those map to "unknown".
     def _classify(url: str) -> str:
         try:
