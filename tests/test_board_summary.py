@@ -148,7 +148,14 @@ def test_dead_personal_and_past_event_rows_never_count(api_client) -> None:
             vertical="camera",
             event_start=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=2),
         )
-        session.add_all([dead, personal, past_taping])
+        past_sit = ApplicationRecord(
+            job_title="Last week's sit",
+            company="Sittercity",
+            job_url="https://example.com/quests/past-sit",
+            vertical="lookafter",
+            event_start=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=7),
+        )
+        session.add_all([dead, personal, past_taping, past_sit])
         session.commit()
     finally:
         session.close()
@@ -211,6 +218,132 @@ def test_stale_casting_by_publish_date_never_counts(api_client) -> None:
     payload = client.get("/api/v1/board/summary").json()
     # seed camera (1) + fresh + freetext + future_event = 4; only `stale` drops
     assert _kind(payload, "perform")["count"] == 4
+
+
+def test_past_event_day_is_stale_for_every_vertical(api_client) -> None:
+    """The read-time stale filter: an event day (UTC) that already passed
+    expires the row no matter the vertical. Today and future events stay,
+    rows with no event date pass untouched, and the camera publish-date
+    shelf life keeps working."""
+    _, jf_db = api_client
+
+    session = jf_db._SessionLocal()
+    try:
+        from datetime import datetime, timedelta, timezone
+
+        from app.services.application_service import time_sensitive_stale
+        from job_finder.models.database import ApplicationRecord
+
+        now = datetime(2026, 7, 14, 12, 0, tzinfo=timezone.utc)
+
+        rows = {
+            "past_camera": ApplicationRecord(
+                job_title="Taping two days ago",
+                company="Studio",
+                job_url="https://example.com/quests/stale-past-camera",
+                vertical="camera",
+                event_start=datetime(2026, 7, 12, 21, 15),
+            ),
+            "past_lookafter": ApplicationRecord(
+                job_title="Sit last night",
+                company="Sittercity",
+                job_url="https://example.com/quests/stale-past-sit",
+                vertical="lookafter",
+                event_start=datetime(2026, 7, 13, 23, 0),
+            ),
+            "today_body": ApplicationRecord(
+                job_title="Session earlier today still shows",
+                company="Clinic",
+                job_url="https://example.com/quests/stale-today-body",
+                vertical="body",
+                event_start=datetime(2026, 7, 14, 0, 30),
+            ),
+            "future_camera": ApplicationRecord(
+                job_title="Taping next week",
+                company="Studio",
+                job_url="https://example.com/quests/stale-future-camera",
+                vertical="camera",
+                event_start=datetime(2026, 7, 21, 20, 0),
+            ),
+            "no_date_study": ApplicationRecord(
+                job_title="Rolling signup, no date",
+                company="Fieldwork",
+                job_url="https://example.com/quests/stale-no-date",
+                vertical="study",
+            ),
+            "shelf_camera": ApplicationRecord(
+                job_title="Old casting call, date only in the text",
+                company="AuditionsFree",
+                job_url="https://example.com/quests/stale-shelf-camera",
+                vertical="camera",
+                date_posted=(now - timedelta(days=40)).strftime("%Y-%m-%dT%H:%M:%S"),
+            ),
+        }
+        session.add_all(rows.values())
+        session.commit()
+        ids = {name: row.id for name, row in rows.items()}
+
+        kept = {
+            row_id
+            for (row_id,) in session.query(ApplicationRecord.id)
+            .filter(ApplicationRecord.id.in_(list(ids.values())))
+            .filter(~time_sensitive_stale(ApplicationRecord, now=now))
+        }
+    finally:
+        session.close()
+
+    assert ids["past_camera"] not in kept
+    assert ids["past_lookafter"] not in kept
+    assert ids["shelf_camera"] not in kept
+    assert ids["today_body"] in kept
+    assert ids["future_camera"] in kept
+    assert ids["no_date_study"] in kept
+
+
+def test_free_text_event_start_is_conservatively_kept(api_client) -> None:
+    """SQLite happily stores text in a datetime column. Text that is not an
+    ISO date can't prove the event passed, so the row stays on the board,
+    same stance as free-text date_posted."""
+    _, jf_db = api_client
+
+    session = jf_db._SessionLocal()
+    try:
+        from datetime import datetime, timezone
+
+        from sqlalchemy import text as sql_text
+
+        from app.services.application_service import time_sensitive_stale
+        from job_finder.models.database import ApplicationRecord
+
+        row = ApplicationRecord(
+            job_title="Casting call, date buried in the text",
+            company="AuditionsFree",
+            job_url="https://example.com/quests/free-text-event",
+            vertical="camera",
+            date_posted=datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),
+        )
+        session.add(row)
+        session.commit()
+        row_id = row.id
+        # the ORM refuses a str for a DateTime column, so plant it raw,
+        # the same way junk lands in a live SQLite file
+        session.execute(
+            sql_text("UPDATE applications SET event_start = 'auditions June 15' WHERE id = :id"),
+            {"id": row_id},
+        )
+        session.commit()
+
+        now = datetime(2026, 7, 14, 12, 0, tzinfo=timezone.utc)
+        kept = (
+            session.query(ApplicationRecord.id)
+            .filter(ApplicationRecord.id == row_id)
+            .filter(~time_sensitive_stale(ApplicationRecord, now=now))
+            .count()
+        )
+    finally:
+        session.close()
+
+    assert kept == 1
 
 
 def test_expired_tombstones_stay_off_the_board(api_client) -> None:

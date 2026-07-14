@@ -96,6 +96,31 @@ class BoardScheduler:
             except StopIteration:
                 pass
 
+    def _reverify_trials(self) -> None:
+        """One rolling batch of recruiting-status re-verification (sync, threaded).
+
+        ClinicalTrials.gov study pages answer 200 even after recruiting
+        closes, so the link pass above never catches a closed trial; only
+        the registry's own overallStatus can.
+        """
+        from app.models.database import get_db
+        from job_finder.trial_status import reverify_trials
+
+        db_gen = get_db()
+        try:
+            db = next(db_gen)
+            summary = reverify_trials(db, max_checks=self._reverify_batch)
+            if summary.get("expired"):
+                logger.info(
+                    "board scheduler: re-verified %d trials, %d no longer recruiting",
+                    summary.get("checked", 0), summary.get("expired", 0),
+                )
+        finally:
+            try:
+                next(db_gen)
+            except StopIteration:
+                pass
+
     async def tick(self) -> int:
         """Sweep every due source. Returns how many sources were swept."""
         if self._sweeping.locked():
@@ -107,6 +132,10 @@ class BoardScheduler:
                     await asyncio.to_thread(self._reverify_links)
                 except Exception:
                     logger.exception("board scheduler: link re-verification failed")
+                try:
+                    await asyncio.to_thread(self._reverify_trials)
+                except Exception:
+                    logger.exception("board scheduler: trial re-verification failed")
 
             from job_finder.schedule import due_sources
 
