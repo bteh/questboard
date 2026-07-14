@@ -112,11 +112,27 @@ def search_hn_hiring(
             if not title:
                 title = pipe_parts[1] if len(pipe_parts) > 1 else company
 
+            # A title is a role, not a link or a paragraph. Strip any URL, and
+            # drop the row when what's left isn't a plausible title (HN posts
+            # with no clean "Role" pipe, e.g. "https://matcha.fm Repeat founder
+            # building..."). Better no row than a garbage-title one.
+            title = re.sub(r"https?://\S+", " ", title)
+            title = re.sub(r"\s+", " ", title).strip(" |-,")
+            if not title or len(title) > 90:
+                continue
+
             if not _match_roles(title, roles, match_mode=match_mode, include_founding=include_founding):
                 continue
 
+            # Link to the poster's URL when they gave one, else the HN comment
+            # itself (always a real, actionable page) — never an empty link.
             url_match = re.search(r'https?://[^\s<"]+', text)
-            job_url = url_match.group(0) if url_match else ""
+            comment_id = comment.get("id") or comment.get("objectID")
+            job_url = url_match.group(0) if url_match else (
+                f"https://news.ycombinator.com/item?id={comment_id}" if comment_id else ""
+            )
+            if not job_url:
+                continue
 
             results.append({
                 "title": title[:200],
