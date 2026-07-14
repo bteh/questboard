@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { avatarColor } from '@/utils/colors';
-import { getCompanyLogoUrl, getCompanyLogoFallbackUrl } from '@/utils/company-domains';
+import { getCompanyLogoUrl } from '@/utils/company-domains';
 
 interface CompanyAvatarProps {
   company: string;
@@ -10,36 +10,27 @@ interface CompanyAvatarProps {
 }
 
 export function CompanyAvatar({ company, size = 40, url }: CompanyAvatarProps) {
-  const [imgStage, setImgStage] = useState<'primary' | 'fallback' | 'letter'>('primary');
+  // unavatar aggregates favicon + logo providers and 404s cleanly on a miss, so
+  // one lookup is enough: real logo, or fall straight to a colored initial.
+  const [failed, setFailed] = useState(false);
   const logoUrl = getCompanyLogoUrl(company, size >= 64 ? 128 : 64, url);
-  const fallbackUrl = getCompanyLogoFallbackUrl(company, size >= 64 ? 128 : 64, url);
   const bg = avatarColor(company);
   const initial = company ? company[0].toUpperCase() : '?';
 
-  const currentUrl = imgStage === 'primary' ? logoUrl
-    : imgStage === 'fallback' ? fallbackUrl
-    : null;
-
-  if (currentUrl) {
+  if (logoUrl && !failed) {
     return (
       <div
         className="flex items-center justify-center rounded-lg bg-bg-card border border-border-default overflow-hidden shrink-0"
         style={{ width: size, height: size }}
       >
         <img
-          src={currentUrl}
+          src={logoUrl}
           alt={`${company} logo`}
           width={Math.round(size * 0.7)}
           height={Math.round(size * 0.7)}
           className="object-contain"
           loading="lazy"
-          onError={() => {
-            if (imgStage === 'primary' && fallbackUrl) {
-              setImgStage('fallback');
-            } else {
-              setImgStage('letter');
-            }
-          }}
+          onError={() => setFailed(true)}
         />
       </div>
     );

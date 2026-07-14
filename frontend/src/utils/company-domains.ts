@@ -304,15 +304,8 @@ export function getCompanyDomain(companyName: string, url?: string | null): stri
 export function getCompanyLogoUrl(companyName: string, size = 128, url?: string | null): string | null {
   const domain = getCompanyDomain(companyName, url);
   if (!domain) return null;
+  // unavatar aggregates favicon + logo providers and, with fallback=false,
+  // returns a clean error on a miss, so the avatar falls straight to a colored
+  // initial (no second network source, no parked-domain favicon, no globe).
   return `https://unavatar.io/${domain}?fallback=false&size=${size}`;
-}
-
-/**
- * No second network source on purpose. unavatar already aggregates favicon +
- * logo providers, so if it misses (403) the company almost certainly has no
- * real logo, and a colored initial is cleaner than a parked-domain favicon or a
- * generic globe. Returning null sends the avatar straight to the letter.
- */
-export function getCompanyLogoFallbackUrl(_companyName: string, _size = 128, _url?: string | null): string | null {
-  return null;
 }
