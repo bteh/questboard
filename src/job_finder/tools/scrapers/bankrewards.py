@@ -1,29 +1,48 @@
-"""bankrewards.io (house kind): structured bank and brokerage bonuses.
+"""bankrewards.io (house kind): structured personal and business bank bonuses.
 
 A community tool (born on r/churning) with the cleanest fields of any bonus
-source: one POST returns JSON offers with a numeric ``bonus_cash``, state
-availability, and the requirement type::
+source: one POST returns JSON offers with a numeric ``bonus_cash``, a state
+array, and the requirement type::
 
     POST https://bankrewards.io/api/offers   {"limit": 100}
 
-Live-verified quirks (2026-07-09):
+Live-verified quirks (2026-07-15, plain Mozilla/5.0 UA, HTTP 200):
 
-- GET returns method-not-allowed; the API is POST-only.
-- ``limit`` caps at 100 and paging params are ignored; the top 100 active
-  offers are the whole feed, which is fine for a board.
-- It is a solo-maintained tool and could vanish; Doctor of Credit is the
-  canonical companion source, so losing this one degrades fields, not
-  coverage. The health endpoint will say so if it dies.
+- GET returns method-not-allowed; the API is POST-only. A normal browser UA
+  clears Cloudflare with no JS challenge.
+- ``limit`` caps near 100 (the D1 backend errors on too many SQL variables
+  past ~150); the top-scored 100 offers are the whole board feed.
+- ``location`` is ``["nationwide"]``, one state (``["MI"]``), or a state
+  array. The full 461-offer catalog is also enumerable via the sitemap at
+  https://www.bankrewards.io/sitemaps/offers.xml, but the POST feed is what
+  the board ingests.
+- ``offer_link`` is the real apply URL, but some rows carry bankrewards' own
+  referral or affiliate-network redirect (bilt.page/r/, *.sjv.io,
+  *.fintelconnect.com). Those are stripped (see below).
 
-Only cash bonuses are ingested (``bonus_cash`` > 0); points and stock
-offers would need a valuation we refuse to invent. Titles are composed
-from the source's own fields, and requirements go in the description in
-the source's own terms.
+This lane keeps only bank and business_bank offers. Credit cards go to
+card_onramps (Reg Z: we never quote a card's APR or fee), and brokerage
+offers need a valuation we refuse to invent. Filters run in this order,
+which is what kills the weak-lane junk (expired, tiny-geo, sub-$150):
+
+  (a) offer_type in {bank, business_bank}
+  (b) geo: nationwide, or available in at least three states
+  (c) bonus_cash >= 150
+  (d) recency: updated_at within ~90 days (presume older is dead)
+  (e) referral strip: drop rows whose offer_link carries someone's
+      referral/affiliate code (the feed exposes only offer_link, so there
+      is no issuer-direct fallback to swap in)
+
+Pay and terms render only as the source states them: the bonus is the stated
+``bonus_cash``, the requirement is the source's own ``requirement_type`` and
+``requirement_amount`` in plain words, and the geo is the stated state list.
 """
 
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timedelta, timezone
+from urllib.parse import parse_qs, urlparse
 
 import requests
 
@@ -33,21 +52,44 @@ from job_finder.tools.scrapers._utils import _HEADERS, _TIMEOUT
 logger = logging.getLogger(__name__)
 
 _API_URL = "https://bankrewards.io/api/offers"
-_OFFER_TYPES = {"bank", "business_bank", "brokerage"}
+_FETCH_LIMIT = 100
 
-_REQUIREMENT_WORDS = {
-    "direct_deposit": "direct deposit",
-    "debit_transactions": "debit card transactions",
-    "deposit": "a deposit",
-    "balance": "a minimum balance",
+# This lane's default set. Cards -> card_onramps, brokerage needs a valuation.
+_LANE_OFFER_TYPES = {"bank", "business_bank"}
+_MIN_BONUS_CASH = 150
+_RECENCY_DAYS = 90
+
+# requirement_type -> (plain phrase, amount_is_a_dollar_figure). transactions
+# amounts are sometimes a count and sometimes dollars in the feed, so we never
+# attach a number to them.
+_REQUIREMENT_PHRASES: dict[str, tuple[str, bool]] = {
+    "direct_deposit": ("a direct deposit", True),
+    "transfer": ("a transfer", True),
+    "deposit": ("a deposit", True),
+    "balance": ("a minimum balance", True),
+    "spend": ("spending", True),
+    "transactions": ("debit card transactions", False),
+    "debit_transactions": ("debit card transactions", False),
 }
+
+# Hosts that redirect through an affiliate/referral network carrying
+# bankrewards' own tracking code; feeding these hands our traffic to a
+# competitor. bilt.page/r/ is the task-named example, sjv.io = Sovrn/Impact,
+# fintelconnect = an affiliate network, and any bankrewards.io host is a
+# self-redirect.
+_REFERRAL_HOSTS = ("bilt.page", "sjv.io", "fintelconnect.com", "bankrewards.io")
+
+
+def _now() -> datetime:
+    """Naive UTC now; a seam tests patch for a stable recency window."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def _fetch_offers() -> list[dict]:
     try:
         resp = requests.post(
             _API_URL,
-            json={"limit": 100},
+            json={"limit": _FETCH_LIMIT},
             headers={**_HEADERS, "Content-Type": "application/json"},
             timeout=_TIMEOUT,
         )
@@ -56,65 +98,99 @@ def _fetch_offers() -> list[dict]:
     except Exception as exc:
         logger.warning("bankrewards.io fetch failed: %s", exc)
         return []
-    if isinstance(data, list):
-        return data
     if isinstance(data, dict):
-        inner = data.get("offers") or data.get("data")
+        inner = data.get("data") or data.get("offers")
         return inner if isinstance(inner, list) else []
-    return []
+    return data if isinstance(data, list) else []
+
+
+def _parse_updated(value: object) -> datetime | None:
+    """Parse an ISO timestamp (``...Z`` or ``+00:00``) to naive UTC."""
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        dt = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
+
+
+def _is_referral_link(url: str) -> bool:
+    """True when offer_link carries someone's referral or affiliate code."""
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return False
+    host = parsed.netloc.lower().split(":", 1)[0]
+    if any(host == h or host.endswith("." + h) for h in _REFERRAL_HOSTS):
+        return True
+    path = parsed.path.lower()
+    if "/r/" in path or "referral" in path:
+        return True
+    return "ref" in parse_qs(parsed.query)
+
+
+def _passes_geo(location: object) -> bool:
+    if not isinstance(location, list) or not location:
+        return False
+    if len(location) == 1 and str(location[0]).lower() == "nationwide":
+        return True
+    return len(location) >= 3
 
 
 def _requirement_text(offer: dict) -> str:
-    req_type = (offer.get("requirement_type") or "").strip()
-    if not req_type:
+    phrase_pair = _REQUIREMENT_PHRASES.get((offer.get("requirement_type") or "").strip())
+    if not phrase_pair:
         return ""
-    words = _REQUIREMENT_WORDS.get(req_type, req_type.replace("_", " "))
+    phrase, amount_is_dollars = phrase_pair
     amount = offer.get("requirement_amount")
-    if amount:
-        return f"Requires {words} of ${amount:,.0f}."
-    return f"Requires {words}."
+    if amount_is_dollars and isinstance(amount, (int, float)) and amount > 0:
+        return f"{phrase} of ${amount:,.0f}"
+    return phrase
 
 
-def _normalize_offer(offer: dict) -> dict | None:
-    """One API offer to a house-kind quest row, or None to skip."""
-    if offer.get("offer_type") not in _OFFER_TYPES:
+def _normalize_offer(offer: dict, cutoff: datetime) -> dict | None:
+    """One API offer to a house-kind quest row, or None to skip.
+
+    Filters in the order (a)-(e) documented at the top of the module.
+    """
+    if offer.get("offer_type") not in _LANE_OFFER_TYPES:
+        return None
+    location = offer.get("location")
+    if not _passes_geo(location):
         return None
     bonus = offer.get("bonus_cash")
-    if not isinstance(bonus, (int, float)) or bonus <= 0:
+    if not isinstance(bonus, (int, float)) or bonus < _MIN_BONUS_CASH:
+        return None
+    updated = _parse_updated(offer.get("updated_at"))
+    if updated is None or updated < cutoff:
+        return None
+    link = (offer.get("offer_link") or "").strip()
+    if not link.startswith("http") or _is_referral_link(link):
         return None
     name = (offer.get("name") or "").strip()
-    link = (offer.get("offer_link") or "").strip()
-    if not name or not link.startswith("http"):
+    if not name:
         return None
 
-    subtitle = (offer.get("name_subtitle") or "").strip()
-    title = f"{name} ${bonus:,.0f} Bonus"
-    if subtitle:
-        title = f"{name} ${bonus:,.0f} {subtitle} Bonus"
+    states = [str(s) for s in location]
+    nationwide = len(states) == 1 and states[0].lower() == "nationwide"
+    location_field = "" if nationwide else ", ".join(states)
+    geo_phrase = "nationwide" if nationwide else f"{', '.join(states)} only"
 
-    states = offer.get("location")
-    location = ", ".join(states) if isinstance(states, list) and states else ""
+    requirement = _requirement_text(offer)
+    listed = f"{updated.year:04d}-{updated.month:02d}"
 
-    parts = [_requirement_text(offer)]
-    fee = offer.get("termination_fee")
-    if isinstance(fee, (int, float)) and fee > 0:
-        parts.append(f"Early termination fee ${fee:,.0f}.")
-    description = " ".join(p for p in parts if p)
-
-    quest = {
-        key: offer[field]
-        for field, key in (
-            ("requirement_type", "requirement_type"),
-            ("requirement_amount", "requirement_amount"),
-            ("expiration", "expires"),
-        )
-        if offer.get(field)
-    }
+    # "$550 after a direct deposit of $500, nationwide, as listed 2026-06"
+    lead = f"${bonus:,.0f} after {requirement}" if requirement else f"${bonus:,.0f}"
+    description = ", ".join([lead, geo_phrase, f"as listed {listed}"])
+    catch = "; ".join(b for b in (requirement, geo_phrase) if b)
 
     row: dict = {
-        "title": title,
+        "title": f"{name} ${bonus:,.0f} bonus",
         "company": name,
-        "location": location,
+        "location": location_field,
         "url": link,
         "source": "bankrewards",
         "vertical": "house",
@@ -122,11 +198,10 @@ def _normalize_offer(offer: dict) -> dict | None:
         "salary_min": float(bonus),
         "salary_max": float(bonus),
         "salary_source": "reported",
+        "date_posted": updated.date().isoformat(),
     }
-    if quest:
-        row["quest"] = quest
-    if offer.get("created_at"):
-        row["date_posted"] = str(offer["created_at"])
+    if catch:
+        row["quest"] = {"catch": catch}
     return row
 
 
@@ -134,7 +209,7 @@ def _normalize_offer(offer: dict) -> dict | None:
     name="bankrewards",
     display_name="BankRewards.io",
     url="https://bankrewards.io",
-    description="Structured bank and brokerage cash bonuses with state availability and requirement type",
+    description="Structured nationwide and multi-state bank cash bonuses with the requirement in the source's own terms",
     category="house",
     kind="house",
     # one POST returns the entire active set, so absence proves removal
@@ -148,12 +223,13 @@ def search_bankrewards(
     max_results: int = 50,
     **kwargs,
 ) -> list[dict]:
-    """Fetch active cash bonuses from bankrewards.io.
+    """Fetch nationwide and multi-state bank cash bonuses from bankrewards.io.
 
     ``roles`` is ignored on purpose: bonuses are not career titles.
     """
-    logger.info("Fetching cash bonuses from bankrewards.io...")
+    logger.info("Fetching bank cash bonuses from bankrewards.io...")
     offers = _fetch_offers()
+    cutoff = _now() - timedelta(days=_RECENCY_DAYS)
 
     results: list[dict] = []
     seen_urls: set[str] = set()
@@ -162,11 +238,11 @@ def search_bankrewards(
             break
         if not isinstance(offer, dict):
             continue
-        row = _normalize_offer(offer)
+        row = _normalize_offer(offer, cutoff)
         if row is None or row["url"] in seen_urls:
             continue
         seen_urls.add(row["url"])
         results.append(row)
 
-    logger.info("bankrewards.io: %d cash bonuses", len(results))
+    logger.info("bankrewards.io: %d bank cash bonuses", len(results))
     return results

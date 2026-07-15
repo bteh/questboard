@@ -108,3 +108,53 @@ resale, the lowest-stakes place to prove the machinery.
 Adopted 2026-07-14 after an octo:council pressure-test (strategy,
 security, and code-review seats all returned "adopt, but revise";
 resale-first and the pay-blind sort test are theirs).
+
+---
+
+## Second addendum: one labeled sponsor (2026-07-15)
+
+The original rule said "no ads, ever." That was really two rules wearing
+one word: no money may move what ranks or what gets on the board (keep
+this forever), and no annoying ad-network junk (keep this too). This
+addendum keeps both and opens one narrow, honest door.
+
+**The narrowing, stated once: the digest and a lane may each carry a
+single clearly labeled sponsor. A sponsor buys a spot to say hello, never
+a rank, never inclusion of a listing, never a quest.**
+
+Adopted. Kept banned.
+
+- **Adopt:** the pay-blind affiliate model (already live); one labeled
+  sponsor on the digest; one "presented by" patron per lane, a neutral
+  party only.
+- **Stay banned, forever:** all programmatic display, banner, and
+  ad-network units; pop-ups, interstitials, autoplay, sticky/anchored
+  units; retargeting and any third-party tracking pixel; pay-to-rank or
+  pay-for-placement of any listing; employer or counterparty money that
+  buys a row's inclusion or position; sponsored quests (a paid posting in
+  the ranked set). These are the moat.
+
+The guardrails, written so they bind:
+
+1. **Labeled, unmissable.** Every paid element wears a fixed label
+   ("Sponsor", "Paid link", "Presented by"), adjacent to the item and
+   visible at the same time, never behind a hover (FTC clear-and-
+   conspicuous; "paid link", not "affiliate link").
+2. **Never in the ranked set.** A sponsor sits in a fixed labeled slot
+   outside the sorted rows and never interleaves with them. The sort
+   engine cannot read a sponsor or a payout field.
+3. **Same actionability bar.** Nothing paid lowers the row contract; a
+   sponsor is not a quest and is not counted as one.
+4. **One per surface.** At most one sponsor visible at once (one on the
+   digest, one per lane). The density cap is the "not annoying" contract.
+5. **No counterparty conflict.** A sponsor may never be the counterparty
+   of a listing it sits beside; prefer neutral tools over parties who
+   benefit from being listed.
+6. **Killable.** A global switch removes every paid element with zero
+   product regression. Nothing structural depends on one advertiser.
+
+The line that protects the whole board: money may attach to an outcome
+you wanted, but it may never move what ranks or what gets in.
+
+Adopted 2026-07-15. Scope confirmed by the owner (affiliate plus one
+labeled sponsor; display advertising stays banned).

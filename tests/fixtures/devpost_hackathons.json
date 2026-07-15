@@ -1,0 +1,257 @@
+{
+  "hackathons": [
+    {
+      "id": 29541,
+      "title": "Build with Gemini XPRIZE",
+      "displayed_location": {
+        "icon": "globe",
+        "location": "Online"
+      },
+      "open_state": "open",
+      "thumbnail_url": "//d112y698adiu2z.cloudfront.net/photos/production/challenge_thumbnails/004/686/462/datas/medium_square.png",
+      "analytics_identifier": "Build with Gemini XPRIZE (29541)",
+      "url": "https://xprize.devpost.com/",
+      "time_left_to_submission": "about 1 month left",
+      "submission_period_dates": "May 19 - Aug 17, 2026",
+      "themes": [
+        {
+          "id": 6,
+          "name": "Machine Learning/AI"
+        },
+        {
+          "id": 19,
+          "name": "Education"
+        },
+        {
+          "id": 11,
+          "name": "Productivity"
+        }
+      ],
+      "prize_amount": "$<span data-currency-value>2,000,000</span>",
+      "prizes_counts": {
+        "cash": 1,
+        "other": 0
+      },
+      "registrations_count": 19713,
+      "featured": false,
+      "organization_name": "XPRIZE",
+      "winners_announced": false,
+      "submission_gallery_url": "https://xprize.devpost.com/project-gallery",
+      "start_a_submission_url": "https://xprize.devpost.com/challenges/start_a_submission",
+      "invite_only": false,
+      "eligibility_requirement_invite_only_description": null,
+      "managed_by_devpost_badge": true
+    },
+    {
+      "id": 30223,
+      "title": "OpenAI Build Week",
+      "displayed_location": {
+        "icon": "globe",
+        "location": "Online"
+      },
+      "open_state": "open",
+      "thumbnail_url": "//d112y698adiu2z.cloudfront.net/photos/production/challenge_thumbnails/004/872/093/datas/medium_square.png",
+      "analytics_identifier": "OpenAI Build Week (30223)",
+      "url": "https://openai.devpost.com/",
+      "time_left_to_submission": "6 days left",
+      "submission_period_dates": "Jul 13 - 21, 2026",
+      "themes": [
+        {
+          "id": 6,
+          "name": "Machine Learning/AI"
+        },
+        {
+          "id": 2,
+          "name": "DevOps"
+        },
+        {
+          "id": 11,
+          "name": "Productivity"
+        }
+      ],
+      "prize_amount": "$<span data-currency-value>100,000</span>",
+      "prizes_counts": {
+        "cash": 8,
+        "other": 0
+      },
+      "registrations_count": 19080,
+      "featured": true,
+      "organization_name": "OpenAI",
+      "winners_announced": false,
+      "submission_gallery_url": "https://openai.devpost.com/project-gallery",
+      "start_a_submission_url": "https://openai.devpost.com/challenges/start_a_submission",
+      "invite_only": false,
+      "eligibility_requirement_invite_only_description": null,
+      "managed_by_devpost_badge": true
+    },
+    {
+      "id": 29411,
+      "title": "Galuxium Nexus V2",
+      "displayed_location": {
+        "icon": "globe",
+        "location": "Online"
+      },
+      "open_state": "open",
+      "thumbnail_url": "//d112y698adiu2z.cloudfront.net/photos/production/challenge_thumbnails/004/684/795/datas/medium_square.png",
+      "analytics_identifier": "Galuxium Nexus V2 (29411)",
+      "url": "https://galuxium-nexus-v2-29411.devpost.com/",
+      "time_left_to_submission": "17 days left",
+      "submission_period_dates": "Jul 15 - Aug 01, 2026",
+      "themes": [
+        {
+          "id": 21,
+          "name": "Enterprise"
+        },
+        {
+          "id": 6,
+          "name": "Machine Learning/AI"
+        },
+        {
+          "id": 11,
+          "name": "Productivity"
+        }
+      ],
+      "prize_amount": "₹ <span data-currency-value>100,000</span>",
+      "prizes_counts": {
+        "cash": 1,
+        "other": 3
+      },
+      "registrations_count": 144,
+      "featured": false,
+      "organization_name": "Galuxium",
+      "winners_announced": false,
+      "submission_gallery_url": "https://galuxium-nexus-v2-29411.devpost.com/project-gallery",
+      "start_a_submission_url": "https://galuxium-nexus-v2-29411.devpost.com/challenges/start_a_submission",
+      "invite_only": false,
+      "eligibility_requirement_invite_only_description": null,
+      "managed_by_devpost_badge": false
+    },
+    {
+      "id": 30047,
+      "title": "SMU .Hack Enrichment Application Programme 2026",
+      "displayed_location": {
+        "icon": "map-marker-alt",
+        "location": "Singapore Management University"
+      },
+      "open_state": "open",
+      "thumbnail_url": "//d112y698adiu2z.cloudfront.net/photos/production/challenge_thumbnails/004/660/374/datas/medium_square.png",
+      "analytics_identifier": "SMU .Hack Enrichment Application Programme 2026 (30047)",
+      "url": "https://dothack-heap-2026.devpost.com/",
+      "time_left_to_submission": "8 days left",
+      "submission_period_dates": "May 15 - Jul 24, 2026",
+      "themes": [
+        {
+          "id": 23,
+          "name": "Beginner Friendly"
+        },
+        {
+          "id": 22,
+          "name": "Open Ended"
+        },
+        {
+          "id": 25,
+          "name": "Web"
+        }
+      ],
+      "prize_amount": "$<span data-currency-value>1,750</span>",
+      "prizes_counts": {
+        "cash": 3,
+        "other": 0
+      },
+      "registrations_count": 34,
+      "featured": false,
+      "organization_name": "Singapore Management University",
+      "winners_announced": false,
+      "submission_gallery_url": "https://dothack-heap-2026.devpost.com/project-gallery",
+      "start_a_submission_url": "https://dothack-heap-2026.devpost.com/challenges/start_a_submission",
+      "invite_only": true,
+      "eligibility_requirement_invite_only_description": "Pre-registered SMU Undergraduates",
+      "managed_by_devpost_badge": false
+    },
+    {
+      "id": 30283,
+      "title": "DIVE 2026",
+      "displayed_location": {
+        "icon": "map-marker-alt",
+        "location": "4F, BEXCO Exhibition Center 2"
+      },
+      "open_state": "upcoming",
+      "thumbnail_url": "//d112y698adiu2z.cloudfront.net/photos/production/challenge_thumbnails/004/725/842/datas/medium_square.png",
+      "analytics_identifier": "DIVE 2026 (30283)",
+      "url": "https://dive2026.devpost.com/",
+      "time_left_to_submission": "Upcoming",
+      "submission_period_dates": "Jul 25 - 26, 2026",
+      "themes": [
+        {
+          "id": 28,
+          "name": "Databases"
+        },
+        {
+          "id": 6,
+          "name": "Machine Learning/AI"
+        }
+      ],
+      "prize_amount": "$<span data-currency-value>2,900</span>",
+      "prizes_counts": {
+        "cash": 3,
+        "other": 0
+      },
+      "registrations_count": 11,
+      "featured": false,
+      "organization_name": "BTP",
+      "winners_announced": false,
+      "submission_gallery_url": "https://dive2026.devpost.com/project-gallery",
+      "start_a_submission_url": "https://dive2026.devpost.com/challenges/start_a_submission",
+      "invite_only": false,
+      "eligibility_requirement_invite_only_description": null,
+      "managed_by_devpost_badge": false
+    },
+    {
+      "id": 30611,
+      "title": "RecT Solutions Hackathon: Beyond the CV 2026",
+      "displayed_location": {
+        "icon": "map-marker-alt",
+        "location": "IDEA Spaces Saldanha"
+      },
+      "open_state": "upcoming",
+      "thumbnail_url": "//d112y698adiu2z.cloudfront.net/photos/production/challenge_thumbnails/004/857/455/datas/medium_square.png",
+      "analytics_identifier": "RecT Solutions Hackathon: Beyond the CV 2026 (30611)",
+      "url": "https://rect-hackathon.devpost.com/",
+      "time_left_to_submission": "Upcoming",
+      "submission_period_dates": "Oct 10 - 11, 2026",
+      "themes": [
+        {
+          "id": 28,
+          "name": "Databases"
+        },
+        {
+          "id": 2,
+          "name": "DevOps"
+        },
+        {
+          "id": 6,
+          "name": "Machine Learning/AI"
+        }
+      ],
+      "prize_amount": "€<span data-currency-value>2,000</span>",
+      "prizes_counts": {
+        "cash": 1,
+        "other": 0
+      },
+      "registrations_count": 3,
+      "featured": false,
+      "organization_name": "RecT Solutions",
+      "winners_announced": false,
+      "submission_gallery_url": "https://rect-hackathon.devpost.com/project-gallery",
+      "start_a_submission_url": "https://rect-hackathon.devpost.com/challenges/start_a_submission",
+      "invite_only": false,
+      "eligibility_requirement_invite_only_description": null,
+      "managed_by_devpost_badge": false
+    }
+  ],
+  "meta": {
+    "total_count": 6,
+    "per_page": 9,
+    "fuzzy": false
+  }
+}

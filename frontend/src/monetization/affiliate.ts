@@ -25,6 +25,12 @@ const PROGRAMS: AffiliateRegistry = {
   'mercari.com': { program: 'Mercari referral program', tag: null, disclosure: disclosureFor('Mercari') },
   'turo.com': { program: 'Turo referral program', tag: null, disclosure: disclosureFor('Turo') },
   'depop.com': { program: 'Depop referral program', tag: null, disclosure: disclosureFor('Depop') },
+  'rover.com': { program: 'Rover via FlexOffers', tag: null, disclosure: disclosureFor('Rover') },
+  'trustedhousesitters.com': {
+    program: 'TrustedHousesitters via Impact',
+    tag: null,
+    disclosure: disclosureFor('TrustedHousesitters'),
+  },
 };
 
 export function decoratePosterLink(

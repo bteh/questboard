@@ -198,6 +198,10 @@ def _normalize_post(post: dict) -> dict | None:
     refresh_hours=12,
     allowed_url_hosts=("doctorofcredit.com",),
     enabled_by_default=False,
+    # Demoted 2026-07-15: a 491KB prose page with no machine-readable expiry
+    # produced the tiny-geo/expired noise on the board; keep it as a human
+    # radar feed, not board rows. bankrewards is the structured source now.
+    research_only=True,
 )
 def search_doctorofcredit(
     roles: list[str] | None = None,

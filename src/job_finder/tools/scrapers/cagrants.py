@@ -233,6 +233,9 @@ def _normalize_record(record: dict) -> dict | None:
     # precedent); rows must be https instead
     allowed_url_hosts=None,
     enabled_by_default=False,
+    # off-ICP for the builder-funding lane (state grants for CA businesses,
+    # not funding for young founders/students); kept as code, off the board
+    research_only=True,
 )
 def search_cagrants(
     roles: list[str] | None = None,
