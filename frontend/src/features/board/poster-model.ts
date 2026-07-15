@@ -7,7 +7,16 @@ import { kindForVertical } from '@questboard/kinds';
 import { cleanCompany, toBoardCard, type BoardCardModel } from '@/utils/board-card';
 import { kindCopy, type KindCopy } from '@/features/board/kind-copy';
 import { getCompanyLogoUrl } from '@/utils/company-domains';
+import { avatarColor } from '@/utils/colors';
 import type { ApplicationResponse } from '@/types/application';
+
+/** The career poster's fixed logo tile; the monogram fallback derives
+    deterministically from the company name (CompanyAvatar's pattern). */
+export interface PosterLogoWell {
+  src?: string;
+  initial: string;
+  color: string;
+}
 
 export interface PosterModel {
   kind: string;
@@ -21,6 +30,8 @@ export interface PosterModel {
   rotateDeg: number;
   /** the company/source logo, resolved from the poster's own company + url */
   logoUrl?: string;
+  /** career rows only: the 40px logo well beside the title */
+  logoWell?: PosterLogoWell;
 }
 
 /** First sentence of the posting's own description, capped for scanning.
@@ -76,6 +87,15 @@ export function toPoster(app: ApplicationResponse, sourceLabel: string): PosterM
     ? []
     : [wt];
 
+  const company = cleanCompany(app.company);
+  const logoUrl = getCompanyLogoUrl(company, 64, app.job_url) ?? undefined;
+  /* career posters carry the fixed logo well; quests keep the small giver
+     logo. The well needs a real company name for its monogram fallback. */
+  const logoWell: PosterLogoWell | undefined =
+    isCareer && company
+      ? { src: logoUrl, initial: company[0].toUpperCase(), color: avatarColor(company) }
+      : undefined;
+
   return {
     kind,
     card,
@@ -84,6 +104,7 @@ export function toPoster(app: ApplicationResponse, sourceLabel: string): PosterM
     hasFit,
     tags: tags.slice(0, 2),
     rotateDeg: rotationFor(app.id),
-    logoUrl: getCompanyLogoUrl(cleanCompany(app.company), 64, app.job_url) ?? undefined,
+    logoUrl: logoWell ? undefined : logoUrl,
+    logoWell,
   };
 }

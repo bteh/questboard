@@ -91,6 +91,21 @@ describe('the poster model', () => {
     expect(scannableDesc(long)!.length).toBeLessThanOrEqual(140);
   });
 
+  it('gives career posters the logo well, quests the small giver logo', () => {
+    const career = toPoster(app({ vertical: 'career', company: 'Stripe' }), 'BuiltIn');
+    expect(career.logoWell).toBeDefined();
+    expect(career.logoWell!.initial).toBe('S');
+    expect(career.logoWell!.color).toMatch(/^#/);
+    expect(career.logoUrl).toBeUndefined();
+
+    const quest = toPoster(app({ vertical: 'study' }), 'Fieldwork');
+    expect(quest.logoWell).toBeUndefined();
+
+    /* placeholder company tokens never earn a monogram */
+    const blank = toPoster(app({ vertical: 'career', company: 'null' }), 'BuiltIn');
+    expect(blank.logoWell).toBeUndefined();
+  });
+
   it('tilts each poster deterministically within the tack-up range', () => {
     for (const id of [1, 2, 3, 99, 1234]) {
       const deg = rotationFor(id);

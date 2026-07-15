@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createRoute, Link, redirect, useNavigate } from '@tanstack/react-router';
+import { useQueries } from '@tanstack/react-query';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { CoinsDollarIcon, Search01Icon } from '@hugeicons/core-free-icons';
 import { Route as appRoute } from './app';
@@ -7,11 +8,11 @@ import {
   Chip,
   LedgerRow,
   PlainButton,
-  Poster,
   Sheet,
   StampDefs,
   TextLink,
 } from '@questboard/ui';
+import { getApplications } from '@/api/applications';
 import { useApplications, useUpdateStatus } from '@/hooks/use-applications';
 import { useSourceLabels, resolveSourceLabel } from '@/hooks/use-scrapers';
 import { ExplainSheet } from '@/components/board/explain-sheet';
@@ -37,9 +38,16 @@ import { checkedAgoLabel } from '@/features/board/freshness';
 import { isCareerKind, kindParams, type KindKey } from '@/features/board/kind-params';
 import { KindRail } from '@/features/board/kind-rail';
 import { PlacePicker } from '@/features/board/place-picker';
-import { JobsCallout } from '@/features/board/jobs-callout';
-import { toPoster } from '@/features/board/poster-model';
-import { decoratePosterLink } from '@/monetization/affiliate';
+import { JobsSetupStrip } from '@/features/board/jobs-callout';
+import { WorkToolbar } from '@/features/board/work-toolbar';
+import {
+  advanceWorkCutoff,
+  countNewSince,
+  newSinceLine,
+  readWorkCutoff,
+} from '@/features/board/new-since';
+import { JobDetailSheet } from '@/features/board/job-detail-sheet';
+import { PosterWall } from '@/features/board/poster-wall';
 import { useBoardSummary } from '@/hooks/use-board-summary';
 import type { ApplicationFilters, ApplicationResponse, RequirementMatch } from '@/types/application';
 import '@/components/board/board.css';
@@ -60,6 +68,9 @@ export const Route = createRoute({
        reader clearing chips, and re-applying saved state would snap the
        filters right back */
     if (cause !== 'enter') return;
+    /* a shared ?job link is about the one posting; redirecting to saved
+       filters would drop it */
+    if (search.job !== undefined) return;
     if (hasBoardParams(search)) return;
     const saved = readSavedBoardState();
     if (saved && hasBoardParams(saved)) {
@@ -150,83 +161,6 @@ function HouseRules() {
       <p>No MLMs, no pay-to-start, nothing adult. The risky ones carry their catch in plain words.</p>
       <p className="qb-house-sig">If it's pinned here, it's real.</p>
     </aside>
-  );
-}
-
-function BoardPosters({
-  filters,
-  payCeiling,
-  labels,
-  onOpenSheet,
-  onExplain,
-}: {
-  filters: ApplicationFilters;
-  payCeiling: number | null;
-  labels: Record<string, string>;
-  onOpenSheet: (app: ApplicationResponse) => void;
-  onExplain: (app: ApplicationResponse) => void;
-}) {
-  const { data } = useApplications(filters);
-  const updateStatus = useUpdateStatus();
-  if (!data) return null;
-  /* The API only takes the floor today, so the typed to-bound trims the
-     loaded page client-side with the same keep-unknown-pay semantics. */
-  const items = data.items.filter((app) => withinPayCeiling(app, payCeiling));
-  return (
-    <>
-      {items.map((app) => {
-        const poster = toPoster(app, resolveSourceLabel(app.source, labels));
-        const { card } = poster;
-        /* render edge only: decoration runs after ordering, so the bounty
-           can never touch what shows or the order */
-        const link = decoratePosterLink(card.href, Boolean(poster.copy.catchLine));
-        /* career rows bring their real resume fit; the kind template yields */
-        const bring: ReactNode = poster.hasFit ? (
-          <>
-            a resume. this one covers {card.fit!.strong} of the {card.fit!.total} things they ask for
-            {card.fit!.missing > 0 && (
-              <>
-                {' '}
-                <button
-                  type="button"
-                  className="qb-textlink"
-                  style={{ fontSize: 'inherit' }}
-                  onClick={() => onOpenSheet(app)}
-                >
-                  see the {card.fit!.missing} missing
-                </button>
-              </>
-            )}
-          </>
-        ) : (
-          poster.copy.bring
-        );
-        return (
-          <Poster
-            key={app.id}
-            kind={poster.kind}
-            title={card.title}
-            href={link.href}
-            giver={card.meta}
-            giverLogoUrl={poster.logoUrl}
-            desc={poster.desc}
-            bring={bring}
-            bringFree={poster.copy.bringFree && !poster.hasFit}
-            catchLine={poster.copy.catchLine}
-            disclosure={link.disclosure}
-            tags={poster.tags}
-            pay={card.pay}
-            payUnit={card.payUnit}
-            applied={card.applied}
-            clippedDate={card.clippedDate}
-            rotateDeg={poster.rotateDeg}
-            showExplain
-            onExplain={() => onExplain(app)}
-            onClip={() => updateStatus.mutate({ id: app.id, data: { status: CLIP_STATUS } })}
-          />
-        );
-      })}
-    </>
   );
 }
 
@@ -452,14 +386,47 @@ function BoardPage() {
   const filtersKey = JSON.stringify(baseFilters);
   const pages = pageState.key === filtersKey ? pageState.pages : 1;
 
-  const firstPage = useApplications({ ...baseFilters, page: 1 });
+  /* one query per loaded page, on the same ['applications', filters] keys
+     the rest of the app shares, flattened so the Jobs lane can group rows
+     across pages */
+  const pageQueries = useQueries({
+    queries: Array.from({ length: pages }, (_, i) => ({
+      queryKey: ['applications', { ...baseFilters, page: i + 1 }],
+      queryFn: () => getApplications({ ...baseFilters, page: i + 1 }),
+    })),
+  });
+  const firstPage = pageQueries[0];
   const total = firstPage.data?.total;
+  /* The API only takes the floor today, so the typed to-bound trims the
+     loaded pages client-side with the same keep-unknown-pay semantics. */
+  const visibleItems = pageQueries
+    .flatMap((q) => q.data?.items ?? [])
+    .filter((app) => withinPayCeiling(app, payCeiling));
 
   /* careerOnly presets lean on fields only career rows carry (score,
      company type), and career rows only live in the Jobs lane now, so the
      presets show there and nowhere else */
   const careerLane = isCareerKind(kindKey);
   const visiblePresets = PRESETS.filter((p) => !p.careerOnly || careerLane);
+
+  /* the Jobs lane's last-visit cutoff: frozen at page load, advanced once
+     after the lane's first successful render, so labels hold still */
+  const [workCutoff] = useState(() => readWorkCutoff());
+  const cutoffAdvanced = useRef(false);
+  const laneLoaded = firstPage.isSuccess;
+  useEffect(() => {
+    if (!careerLane || !laneLoaded || cutoffAdvanced.current) return;
+    cutoffAdvanced.current = true;
+    advanceWorkCutoff();
+  }, [careerLane, laneLoaded]);
+
+  const newSince = careerLane
+    ? countNewSince(visibleItems, workCutoff, {
+        newestFirst: sortNewest,
+        hasMore: total === undefined || pages * PAGE_SIZE < total,
+      })
+    : null;
+  const sinceLine = newSince ? newSinceLine(newSince, workCutoff) : null;
 
   function selectKind(key: KindKey) {
     void navigate({
@@ -505,6 +472,22 @@ function BoardPage() {
     if (!activeKeys.has('noexp')) toggle('noexp');
   }
 
+  /* the detail sheet rides the URL (?job=), so refresh and share reopen it;
+     the board stays mounted underneath, so closing never loses the scroll */
+  function openDetail(app: ApplicationResponse) {
+    void navigate({
+      to: '/board',
+      search: (prev: BoardParams) => ({ ...prev, job: app.id }),
+    });
+  }
+  function closeDetail() {
+    void navigate({
+      to: '/board',
+      search: (prev: BoardParams) => ({ ...prev, job: undefined }),
+      replace: true,
+    });
+  }
+
   /* count as if this chip were switched on alongside the current filters */
   function countFilters(preset: Preset): ApplicationFilters {
     const probe = new Set(activeKeys);
@@ -539,7 +522,8 @@ function BoardPage() {
           </button>
         </div>
 
-        <RestockLine />
+        {/* the Jobs lane's toolbar owns its own run door and status line */}
+        {!careerLane && <RestockLine />}
 
         <KindRail selected={kindKey} onSelect={selectKind} />
 
@@ -555,64 +539,23 @@ function BoardPage() {
           ))}
         </div>
 
-        <div className="qb-tray" role="search">
-          <label className="qb-tray-field qb-tray-grow">
-            <HugeiconsIcon icon={Search01Icon} size={16} strokeWidth={1.7} />
-            <input
-              placeholder="Search the board"
-              aria-label="Search the board"
-              value={searchRaw}
-              onChange={(e) => setSearchRaw(e.target.value)}
-            />
-          </label>
-          <PlacePicker
-            value={placeRaw}
-            onChange={setPlaceRaw}
-            ariaLabel="Filter by place; remote quests pass unless near me only is on"
-            className="qb-tray-field qb-tray-place"
-          />
-          <label className="qb-tray-field qb-tray-pay">
-            <HugeiconsIcon icon={CoinsDollarIcon} size={16} strokeWidth={1.7} />
-            <input
-              inputMode="numeric"
-              placeholder="pay from 150k"
-              aria-label="Pay floor, a year"
-              value={payFromRaw}
-              onChange={(e) => setPayFromRaw(e.target.value)}
-            />
-            <span className="qb-tray-to">to</span>
-            <input
-              inputMode="numeric"
-              placeholder="210k"
-              aria-label="Pay ceiling, a year"
-              value={payToRaw}
-              onChange={(e) => setPayToRaw(e.target.value)}
-            />
-          </label>
-        </div>
-        <p className="qb-tray-note">
-          {placeRaw.trim() ? (
-            <>
-              <label className="qb-nearme">
-                <input
-                  type="checkbox"
-                  checked={nearOnly}
-                  onChange={(e) => setNearOnly(e.target.checked)}
-                />
-                near me only
-              </label>
-              {nearOnly
-                ? ' Showing only quests in that place. Remote and no-place quests are hidden.'
-                : ' A place keeps remote and no-place quests too. Tick near me only to hide them.'}
-            </>
-          ) : (
-            'Pay counts only what the posting states; no stated pay keeps a quest on the board. A place keeps remote and no-place quests too.'
-          )}
-        </p>
-
         {careerLane ? (
           <>
-            <JobsCallout />
+            <JobsSetupStrip />
+            <WorkToolbar
+              kindKey={kindKey}
+              checkedAgo={checkedAgo}
+              search={searchRaw}
+              onSearch={setSearchRaw}
+              place={placeRaw}
+              onPlace={setPlaceRaw}
+              nearOnly={nearOnly}
+              onNearOnly={setNearOnly}
+              payFrom={payFromRaw}
+              onPayFrom={setPayFromRaw}
+              payTo={payToRaw}
+              onPayTo={setPayToRaw}
+            />
             <p className="qb-jobs-bridge">
               Landed something? A new paycheck is the best moment for a{' '}
               <button type="button" className="qb-textlink" onClick={() => selectKind('house')}>
@@ -622,7 +565,63 @@ function BoardPage() {
             </p>
           </>
         ) : (
-          <FirstRunNotice onStartHere={startHere} />
+          <>
+            <div className="qb-tray" role="search">
+              <label className="qb-tray-field qb-tray-grow">
+                <HugeiconsIcon icon={Search01Icon} size={16} strokeWidth={1.7} />
+                <input
+                  placeholder="Search the board"
+                  aria-label="Search the board"
+                  value={searchRaw}
+                  onChange={(e) => setSearchRaw(e.target.value)}
+                />
+              </label>
+              <PlacePicker
+                value={placeRaw}
+                onChange={setPlaceRaw}
+                ariaLabel="Filter by place; remote quests pass unless near me only is on"
+                className="qb-tray-field qb-tray-place"
+              />
+              <label className="qb-tray-field qb-tray-pay">
+                <HugeiconsIcon icon={CoinsDollarIcon} size={16} strokeWidth={1.7} />
+                <input
+                  inputMode="numeric"
+                  placeholder="pay from 150k"
+                  aria-label="Pay floor, a year"
+                  value={payFromRaw}
+                  onChange={(e) => setPayFromRaw(e.target.value)}
+                />
+                <span className="qb-tray-to">to</span>
+                <input
+                  inputMode="numeric"
+                  placeholder="210k"
+                  aria-label="Pay ceiling, a year"
+                  value={payToRaw}
+                  onChange={(e) => setPayToRaw(e.target.value)}
+                />
+              </label>
+            </div>
+            <p className="qb-tray-note">
+              {placeRaw.trim() ? (
+                <>
+                  <label className="qb-nearme">
+                    <input
+                      type="checkbox"
+                      checked={nearOnly}
+                      onChange={(e) => setNearOnly(e.target.checked)}
+                    />
+                    near me only
+                  </label>
+                  {nearOnly
+                    ? ' Showing only quests in that place. Remote and no-place quests are hidden.'
+                    : ' A place keeps remote and no-place quests too. Tick near me only to hide them.'}
+                </>
+              ) : (
+                'Pay counts only what the posting states; no stated pay keeps a quest on the board. A place keeps remote and no-place quests too.'
+              )}
+            </p>
+            <FirstRunNotice onStartHere={startHere} />
+          </>
         )}
 
         {firstPage.isError && (
@@ -641,19 +640,37 @@ function BoardPage() {
           </p>
         )}
 
+        {careerLane && sinceLine && (
+          <p className="qb-sinceline">
+            {sinceLine}
+            {!sortNewest && (
+              <>
+                {' '}
+                <button
+                  type="button"
+                  className="qb-textlink"
+                  style={{ fontSize: 'inherit' }}
+                  onClick={() => setSortNewest(true)}
+                >
+                  show new first
+                </button>
+              </>
+            )}
+          </p>
+        )}
+
         {total !== undefined && total > 0 && (
           <div className="qb-felt">
             <div className="qb-wall">
-              {Array.from({ length: pages }, (_, i) => (
-                <BoardPosters
-                  key={i + 1}
-                  filters={{ ...baseFilters, page: i + 1 }}
-                  payCeiling={payCeiling}
-                  labels={labels}
-                  onOpenSheet={setSheetApp}
-                  onExplain={setExplainApp}
-                />
-              ))}
+              <PosterWall
+                items={visibleItems}
+                labels={labels}
+                cutoff={careerLane ? workCutoff : undefined}
+                grouped={careerLane && sortNewest}
+                onOpenSheet={setSheetApp}
+                onExplain={setExplainApp}
+                onOpenDetail={careerLane ? openDetail : undefined}
+              />
               <HouseRules />
             </div>
             {pages * PAGE_SIZE < total && (
@@ -686,6 +703,7 @@ function BoardPage() {
 
       <RequirementSheet app={sheetApp} labels={labels} onClose={() => setSheetApp(null)} />
       <ExplainSheet app={explainApp} labels={labels} onClose={() => setExplainApp(null)} />
+      <JobDetailSheet jobId={params.job ?? null} labels={labels} onClose={closeDetail} />
     </>
   );
 }

@@ -44,6 +44,92 @@
 .qb-rail-work-label { display: block; margin-bottom: 8px; }
 .qb-rail-work .qb-rail { margin-bottom: 0; }
 
+/* the Jobs lane's quiet last-visit summary, above the felt */
+.qb-sinceline {
+  margin: 14px 0 -6px;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  color: var(--mute);
+}
+.qb-sinceline .qb-textlink { font-family: var(--sans); }
+
+/* the rule between since-your-last-visit and earlier, spanning the felt */
+.qb-since-rule {
+  column-span: all;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0 30px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .04em;
+  color: var(--soft);
+}
+.qb-since-line { flex: 1; border-top: 1px solid rgba(90, 74, 52, .38); }
+
+/* the Jobs toolbar: one block; filters bite instantly, one button runs.
+   The fields reuse the shared tray grammar from board.css. */
+.qb-worktool { margin-top: 12px; }
+.qb-worktool .qb-tray { margin-top: 0; }
+.qb-tray-label { font-family: var(--mono); font-size: 11px; color: var(--mute); white-space: nowrap; }
+.qb-tray-minpay { flex: 0 0 auto; }
+.qb-tray-minpay input { width: 64px; }
+.qb-tray-run { display: flex; align-items: center; padding: 4px 4px 4px 12px; margin-left: auto; }
+.qb-workchips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+.qb-workchip-x { color: var(--mute); font-size: 13px; line-height: 1; }
+.qb-workchips .qb-pchip:hover .qb-workchip-x { color: var(--ink); }
+
+/* the persistent status line: cached count, honest freshness, live runs */
+.qb-workline {
+  display: flex; align-items: center; gap: 10px; margin: 8px 0 0;
+  font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-size: 12.5px; color: var(--mute); min-height: 19px;
+}
+.qb-workline .qb-textlink { font-family: var(--sans); }
+.qb-workline-track {
+  flex: 0 0 120px; height: 3px; border-radius: 2px;
+  background: var(--step4); overflow: hidden;
+}
+.qb-workline-fill { display: block; height: 100%; background: var(--sage); transition: width .3s ease-out; }
+.qb-workline-fill.qb-indet { width: 36%; animation: qb-worksweep 1.4s ease-in-out infinite; }
+@keyframes qb-worksweep {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(360%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qb-workline-fill { transition: none; }
+  .qb-workline-fill.qb-indet { animation: none; }
+}
+
+@media (max-width: 700px) {
+  .qb-tray-minpay { flex: 1 1 100%; }
+  .qb-tray-run { flex: 1 1 100%; margin-left: 0; padding: 6px 8px 8px; }
+  .qb-tray-run .qb-btn-sage { width: 100%; min-height: 44px; }
+  .qb-workchips .qb-pchip { min-height: 44px; }
+}
+
+/* the job detail sheet: stated facts, then the full stored description */
+.qb-jd-facts {
+  border: 1px solid var(--hair); border-bottom-color: var(--edge);
+  border-radius: 10px; background: var(--paper);
+  padding: 10px 18px; margin-top: 14px;
+}
+.qb-jd-fact { display: flex; gap: 14px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--hair); }
+.qb-jd-fact:last-child { border-bottom: 0; }
+.qb-jd-fact-label {
+  flex: none; width: 92px;
+  font-family: var(--mono); font-size: 11px; letter-spacing: .03em; color: var(--mute);
+}
+.qb-jd-fact-value { font-size: 14px; color: var(--soft); }
+.qb-jd-desc {
+  border: 1px dashed var(--step4); border-radius: 4px; background: var(--ground);
+  padding: 12px 14px; margin-top: 10px;
+  font-size: 14px; color: var(--soft); line-height: 1.55;
+  white-space: pre-wrap; overflow-wrap: break-word;
+  max-height: 44vh; overflow-y: auto;
+}
+
 /* the felt: a linen backing in a wood frame; posters get tacked to it */
 .qb-felt {
   --qb-felt: #C9C4B4;
