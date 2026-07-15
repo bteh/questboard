@@ -26,6 +26,8 @@
 /* buttons */
 .qb-btn-sage { background: var(--sage); color: #fff; border: 0; border-radius: 4px; padding: 8px 14px; font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
 .qb-btn-sage:hover { background: var(--sage-dark); }
+.qb-btn-sage:disabled { opacity: .55; cursor: default; }
+.qb-btn-sage:disabled:hover { background: var(--sage); }
 .qb-btn-sage.qb-lbig { font-size: 16.5px; padding: 13px 24px; }
 .qb-plainbtn { background: none; border: 0; color: var(--soft); font-family: inherit; font-size: 14px; cursor: pointer; }
 .qb-plainbtn:hover { color: var(--ink); }
@@ -214,14 +216,41 @@
 .qb-p-head svg { flex: none; }
 .qb-p-kind { font-size: 11.5px; font-weight: 700; letter-spacing: .01em; }
 .qb-p-posted { margin-left: auto; font-family: var(--mono); font-size: 10.5px; color: var(--mute); }
+/* quiet last-visit marker: plain text, never a badge or a dot */
+.qb-p-new { color: var(--sage); font-weight: 500; }
 .qb-p-title { font-family: var(--serif); font-variation-settings: 'opsz' 40; font-weight: 560; font-size: 19px; line-height: 1.18; letter-spacing: -.01em; margin: 0 0 6px; }
+/* career logo well: a fixed square tile on light paper so logos survive the
+   cream card; top-aligned to the title's first line, never shifting layout */
+.qb-p-titlerow { display: flex; gap: 10px; align-items: flex-start; margin: 0 0 6px; }
+.qb-p-titlerow .qb-p-title { margin: 0; }
+.qb-p-well {
+  flex: none; width: 40px; height: 40px; padding: 5px;
+  background: #fff; border-radius: 6px;
+  box-shadow: inset 0 0 0 1px var(--edge);
+  display: grid; place-items: center;
+}
+.qb-p-well img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.qb-p-well-mono {
+  width: 100%; height: 100%; border-radius: 4px;
+  display: grid; place-items: center;
+  color: #fff; font-weight: 600; font-size: 15px; line-height: 1;
+  /* darken the tint so the white initial holds contrast on the light
+     palette entries too (the tile color rides background-color) */
+  background-image: linear-gradient(rgba(31, 41, 33, 0.34), rgba(31, 41, 33, 0.34));
+}
 .qb-p-title a { color: var(--ink); text-decoration: none; }
 .qb-p-title a:hover { text-decoration: underline; text-decoration-thickness: 1px; }
 .qb-p-giver { font-family: var(--mono); font-size: 11.5px; color: var(--mute); margin-bottom: 10px; display: flex; align-items: baseline; gap: 10px; }
 .qb-p-logo { width: 18px; height: 18px; border-radius: 4px; object-fit: contain; align-self: center; flex: none; background: #fff; box-shadow: inset 0 0 0 1px var(--edge); }
 .qb-p-explain { margin-left: auto; background: none; border: 0; padding: 0; font-family: inherit; font-size: 11.5px; color: var(--mute); cursor: pointer; text-decoration: underline; text-decoration-color: var(--edge); }
 .qb-p-explain:hover { color: var(--ink); }
-.qb-p-desc { font-size: 13px; color: var(--soft); line-height: 1.5; margin: 0 0 11px; }
+/* two actions on the giver line: only the first takes the auto gap */
+.qb-p-explain ~ .qb-p-explain { margin-left: 0; }
+/* the scannable line holds to two lines; the detail sheet has the rest */
+.qb-p-desc {
+  font-size: 13px; color: var(--soft); line-height: 1.5; margin: 0 0 11px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
 .qb-p-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
 .qb-p-tag { font-size: 11px; color: var(--soft); background: rgba(28, 27, 23, .05); border-radius: 4px; padding: 3px 8px; }
 

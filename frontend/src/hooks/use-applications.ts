@@ -53,7 +53,9 @@ export function patchApplicationLists(
 
 export function useApplication(id: number) {
   return useQuery({
-    queryKey: ['applications', id],
+    // single-record namespace: list patchers map over ['applications']-prefixed
+    // entries and must never meet a record-shaped one
+    queryKey: ['application', id],
     queryFn: () => getApplication(id),
     enabled: id > 0,
   });
@@ -157,7 +159,7 @@ export function useUpdateFeedback() {
       queryClient.setQueriesData<ApplicationListResponse>(
         { queryKey: ['applications'] },
         (old) => {
-          if (!old) return old;
+          if (!old || !Array.isArray(old.items)) return old;
           return {
             ...old,
             items: old.items.map((item: ApplicationResponse) =>

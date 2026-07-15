@@ -80,6 +80,18 @@ describe('validateBoardSearch', () => {
     const params = validateBoardSearch({ q: 'editor', from: '150k', to: '', p: 'remote' });
     expect(params).toEqual({ v: undefined, q: 'editor', from: '150k', to: undefined, p: 'remote' });
   });
+
+  it('parses ?job however the router round-trips it, dropping junk', () => {
+    expect(validateBoardSearch({ job: 123 }).job).toBe(123);
+    expect(validateBoardSearch({ job: '123' }).job).toBe(123);
+    expect(validateBoardSearch({ job: 'abc' }).job).toBeUndefined();
+    expect(validateBoardSearch({ job: -4 }).job).toBeUndefined();
+    expect(validateBoardSearch({}).job).toBeUndefined();
+  });
+
+  it('never persists an open detail sheet', () => {
+    expect(hasBoardParams({ job: 123 })).toBe(false);
+  });
 });
 
 describe('hasBoardParams', () => {

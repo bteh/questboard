@@ -28,6 +28,9 @@ export interface BoardParams {
   to?: string;
   /** Active preset keys, comma list ("noexp,remote"). */
   p?: string;
+  /** Open job detail sheet (?job=123). Never persisted: a share or refresh
+      reopens it from the URL alone. */
+  job?: number;
 }
 
 /** The persisted shape: the URL params plus the sort toggle. */
@@ -37,6 +40,13 @@ export interface SavedBoardState extends BoardParams {
 
 function cleanString(value: unknown): string | undefined {
   return typeof value === 'string' && value !== '' ? value : undefined;
+}
+
+/** The router may hand ?job=123 back as a number or a string. */
+function cleanId(value: unknown): number | undefined {
+  const n =
+    typeof value === 'number' ? value : typeof value === 'string' ? Number(value) : NaN;
+  return Number.isInteger(n) && n > 0 ? n : undefined;
 }
 
 export function validateBoardSearch(search: Record<string, unknown>): BoardParams {
@@ -52,9 +62,13 @@ export function validateBoardSearch(search: Record<string, unknown>): BoardParam
     from: cleanString(search.from),
     to: cleanString(search.to),
     p: cleanString(search.p),
+    job: cleanId(search.job),
   };
 }
 
+/* job stays out on purpose: a shared ?job link is about the one posting,
+   not a filtered board, so it must not block the saved-state redirect
+   test in beforeLoad (which skips redirecting when job is set). */
 export function hasBoardParams(params: BoardParams): boolean {
   return Boolean(
     params.v || params.q || params.place || params.near || params.from || params.to || params.p,

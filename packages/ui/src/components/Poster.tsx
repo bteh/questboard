@@ -22,6 +22,38 @@ function GiverLogo({ src, alt }: { src?: string; alt: string }) {
   );
 }
 
+export interface PosterLogoWellProps {
+  src?: string;
+  /** monogram fallback, deterministic from the company name */
+  initial?: string;
+  color?: string;
+}
+
+/* Career posters: a fixed square tile beside the title so logos survive the
+   cream paper and the layout never shifts. A failed or missing image falls
+   to the monogram. alt stays empty: the company name is adjacent text. */
+function LogoWell({ src, initial, color }: PosterLogoWellProps) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <span className="qb-p-well" aria-hidden="true">
+      {src && !failed ? (
+        <img
+          src={src}
+          alt=""
+          width={30}
+          height={30}
+          loading="lazy"
+          onError={() => setFailed(true)}
+        />
+      ) : initial ? (
+        <span className="qb-p-well-mono" style={{ background: color }}>
+          {initial}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 /* A quest poster: cream paper pinned to the felt. The pin stays upright in
    the slot while the paper tilts; the reward rides a tear-off tab; the
    bring line states the kind's true requirement and the catch names the
@@ -35,10 +67,14 @@ export interface PosterProps {
   giver: string;
   /** optional company/source logo shown before the giver name */
   giverLogoUrl?: string;
+  /** career posters: the fixed logo tile beside the title */
+  logoWell?: PosterLogoWellProps;
   /** where, e.g. "Chicago" or "remote" */
   place?: string;
   /** honest freshness, e.g. "first seen Jul 2" or "posted yesterday" */
   posted?: string;
+  /** landed after the reader's last visit; a quiet text label, never a badge */
+  newHere?: boolean;
   /** the scannable one-liner, from the posting's own text */
   desc?: string;
   /** what to bring; a node so the fit line can carry an inline action */
@@ -61,6 +97,8 @@ export interface PosterProps {
   showExplain?: boolean;
   onClip?: () => void;
   onExplain?: () => void;
+  /** opens the poster's own detail sheet (the Jobs lane) */
+  onDetails?: () => void;
 }
 
 export function Poster({
@@ -69,8 +107,10 @@ export function Poster({
   href = '#',
   giver,
   giverLogoUrl,
+  logoWell,
   place,
   posted,
+  newHere,
   desc,
   bring,
   bringFree,
@@ -85,6 +125,7 @@ export function Poster({
   showExplain,
   onClip,
   onExplain,
+  onDetails,
 }: PosterProps) {
   const meta = kindById(kind);
   const hue = meta?.hue ?? 'var(--ink)';
@@ -104,15 +145,35 @@ export function Poster({
         <div className="qb-p-head">
           <KindStamp kind={kind} size={24} />
           <span className="qb-p-kind" style={{ color: hue }}>{meta?.label ?? kind}</span>
-          {posted && <span className="qb-p-posted">{posted}</span>}
+          {(posted || newHere) && (
+            <span className="qb-p-posted">
+              {posted}
+              {posted && newHere ? ' · ' : ''}
+              {newHere && <span className="qb-p-new">new here</span>}
+            </span>
+          )}
         </div>
-        <h3 className="qb-p-title">
-          <a href={href} target="_blank" rel="noreferrer">{title}</a>
-        </h3>
+        {logoWell ? (
+          <div className="qb-p-titlerow">
+            <LogoWell {...logoWell} />
+            <h3 className="qb-p-title">
+              <a href={href} target="_blank" rel="noreferrer">{title}</a>
+            </h3>
+          </div>
+        ) : (
+          <h3 className="qb-p-title">
+            <a href={href} target="_blank" rel="noreferrer">{title}</a>
+          </h3>
+        )}
         <div className="qb-p-giver">
           <GiverLogo src={giverLogoUrl} alt={giver} />
           {giver}
           {place ? ` · ${place}` : ''}
+          {onDetails && (
+            <button type="button" className="qb-p-explain" onClick={onDetails}>
+              details
+            </button>
+          )}
           {showExplain && onExplain && (
             <button type="button" className="qb-p-explain" onClick={onExplain}>
               explain
