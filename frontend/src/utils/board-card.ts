@@ -285,6 +285,20 @@ export function cleanCompany(raw: string | null | undefined): string {
   return COMPANY_PLACEHOLDERS.has(c.toLowerCase()) ? '' : c;
 }
 
+/** "Remote, India" -> "remote (India)": a remote row's stated scope shows on
+    the card, because remote is not remote-for-you when the posting restricts
+    it. Bare or long wording stays plain "remote" (the detail sheet has the
+    full text); the leftover must contain a letter so "()" never renders. */
+export function remotePlaceLabel(location: string | null | undefined): string {
+  const rest = (location || '')
+    .replace(/\b(remote|online|work from home|wfh|friendly|only|based)\b/gi, ' ')
+    .replace(/[|;,/()[\]-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!rest || rest.length > 30 || !/[a-z]/i.test(rest)) return 'remote';
+  return `remote (${rest})`;
+}
+
 /** Career meta that leads with the company (so the company logo pairs with it),
     then the source, then place, then freshness. The role is the title, so the
     company never appears twice. "remote" lives here once, never also as a tag. */
@@ -292,7 +306,7 @@ export function careerMeta(app: ApplicationResponse, sourceLabel?: string): stri
   const company = cleanCompany(app.company);
   const source = sourceLabel || app.source || '';
   const posted = postedAgoLabel(app.date_posted, app.date_confidence);
-  const place = app.is_remote ? 'remote' : app.location || '';
+  const place = app.is_remote ? remotePlaceLabel(app.location) : app.location || '';
   const namesSource = company && normalizeName(company) === normalizeName(source);
   const lead = company && !namesSource ? [company, source ? `via ${source}` : ''] : [source];
   return [...lead, place, posted ? posted.toLowerCase() : ''].filter(Boolean).join(', ');
