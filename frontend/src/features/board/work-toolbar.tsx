@@ -57,7 +57,7 @@ function StatusLine({ kindKey, checkedAgo }: { kindKey: KindKey; checkedAgo: str
         ? Math.min(100, Math.round(progress.percent))
         : null;
     const text = src
-      ? `Checking the sources, ${src.done} of ${src.total} in.`
+      ? `Checking ${src.total} job sites, ${src.done} reported so far.`
       : progress?.stage_label
         ? `${progress.stage_label}.`
         : 'Checking the sources.';
