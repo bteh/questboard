@@ -58,6 +58,9 @@ class ApplicationResponse(ApplicationBase):
     culture_fit_score: float | None = None
     career_progression_score: float | None = None
     recommendation: str = ""
+    # Which scale scored the row: 'ai' (LLM) | 'keyword' (offline fallback,
+    # lenient thresholds) | None (unscored). Mirrored by the frontend types.
+    score_source: str | None = None
     score_reasoning: str = ""
     key_strengths: list[str] = []
     key_gaps: list[str] = []

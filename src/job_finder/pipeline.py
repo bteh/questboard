@@ -1978,6 +1978,8 @@ class JobFinderPipeline:
         key = ai_score_cache_key(workspace_id, resume_text, job, scoring_cfg)
         cached = load_cached_ai_score(key)
         if cached:
+            # Stamp here too: entries cached before provenance shipped lack it.
+            cached["score_source"] = "ai"
             return cached
 
         user_msg = JD_SCORER_USER_TEMPLATE.format(
@@ -1997,6 +1999,7 @@ class JobFinderPipeline:
             result = self.llm.chat_json(scorer_prompt, user_msg)
 
         if isinstance(result, dict) and result:
+            result["score_source"] = "ai"
             save_cached_ai_score(key, result)
         return result
 
@@ -2728,6 +2731,7 @@ class JobFinderPipeline:
                 culture_fit_score=job.get("culture_fit_score"),
                 career_progression_score=job.get("career_progression_score"),
                 recommendation=job.get("recommendation"),
+                score_source=job.get("score_source"),
                 score_reasoning=job.get("score_reasoning"),
                 score_evidence=job.get("score_evidence"),
                 key_strengths=json.dumps(job.get("key_strengths", [])),

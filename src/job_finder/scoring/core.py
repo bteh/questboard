@@ -318,6 +318,9 @@ def score_job_basic(
         "career_progression_score": round(progression, 1),
         "recommendation": rec,
         "scoring_method": scoring_method,
+        # This scorer is always the keyword scale, even when AI company intel
+        # informed the baselines; the LLM path stamps 'ai' in the pipeline.
+        "score_source": "keyword",
         "score_reasoning": (
             f"Scoring ({source}): {overall:.0f}/100 overall. "
             f"Technical {technical:.0f}, leadership {leadership:.0f}, "

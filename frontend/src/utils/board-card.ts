@@ -43,6 +43,9 @@ export interface BoardCardModel {
   fit: RequirementFit | null;
   /** The full report backing the fit, for the requirement ledger sheet. */
   report: EvaluationReport | null;
+  /** Career rows: which scale scored the row ('ai' or 'keyword'). Keyword
+      scores are rough guesses and must never wear the AI stamp treatment. */
+  scoreSource?: 'ai' | 'keyword' | null;
   pay?: string;
   payUnit?: string;
   /** e.g. "Applied, Jun 30"; set for statuses that mean an application went out. */
@@ -379,6 +382,7 @@ export function toBoardCard(app: ApplicationResponse, sourceLabel?: string): Boa
     needs: needsLine(fit),
     fit,
     report,
+    scoreSource: app.score_source ?? null,
   };
 
   const pay = formatStatedPay(app.salary_min, app.salary_max);

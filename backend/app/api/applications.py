@@ -104,6 +104,7 @@ def _to_response(record) -> ApplicationResponse:
         culture_fit_score=record.culture_fit_score,
         career_progression_score=record.career_progression_score,
         recommendation=record.recommendation or "",
+        score_source=getattr(record, "score_source", None),
         score_reasoning=record.score_reasoning or "",
         key_strengths=strengths,
         key_gaps=gaps,
@@ -144,6 +145,10 @@ def list_applications(
     ),
     min_score: float | None = None,
     recommendation: str | None = None,
+    score_source: str | None = Query(
+        None,
+        description="Scoring provenance: 'ai' keeps only LLM-scored rows, 'keyword' only fallback-scored rows",
+    ),
     source: str | None = None,
     search: str | None = None,
     company_type: str | None = None,
@@ -221,6 +226,7 @@ def list_applications(
             status=status,
             min_score=min_score,
             recommendation=recommendation,
+            score_source=score_source,
             source=source,
             search=search,
             company_type=company_type,
@@ -310,13 +316,16 @@ def export_csv(
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["Company", "Title", "Score", "Recommendation", "Status", "URL"])
+    writer.writerow(["Company", "Title", "Score", "Recommendation", "Scored by", "Status", "URL"])
     for r in items:
         writer.writerow([
             r.company,
             r.job_title,
             r.overall_score or "",
             r.recommendation or "",
+            # provenance travels with the label: a keyword-scale STRONG_APPLY
+            # must not read as AI-grade confidence in a spreadsheet
+            getattr(r, "score_source", None) or "",
             r.status or "found",
             r.job_url or "",
         ])

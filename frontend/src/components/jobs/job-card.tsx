@@ -169,7 +169,12 @@ export function JobCard({ app, sourceLabels, latestRunId }: JobCardProps) {
     );
   };
 
-  const borderColor = REC_BORDER_COLORS[app.recommendation] || REC_BORDER_COLORS.SKIP;
+  // Keyword-scored rows never wear the recommendation-colored border: the
+  // offline scale is lenient and its stamps are rough guesses, not AI calls.
+  const keywordScored = app.score_source === 'keyword';
+  const borderColor = keywordScored
+    ? REC_BORDER_COLORS.SKIP
+    : REC_BORDER_COLORS[app.recommendation] || REC_BORDER_COLORS.SKIP;
   const recency = getRecencyLabel(app.date_found);
   const salaryText = formatSalary(app.salary_min, app.salary_max);
 
@@ -265,7 +270,7 @@ export function JobCard({ app, sourceLabels, latestRunId }: JobCardProps) {
           {/* Slim badge row — primary signals only. Company-type and funding
               live in the expanded detail to keep the card scannable. */}
           <div className="mt-3 flex flex-wrap items-center gap-1.5">
-            <RecommendationBadge recommendation={app.recommendation} />
+            <RecommendationBadge recommendation={app.recommendation} scoreSource={app.score_source} />
             <WorkTypeBadge workType={app.work_type} isRemote={app.is_remote} />
             {isDirect && (
               <span

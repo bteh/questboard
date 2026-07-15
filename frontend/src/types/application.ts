@@ -101,6 +101,10 @@ export interface ApplicationResponse extends ApplicationBase {
   culture_fit_score: number | null;
   career_progression_score: number | null;
   recommendation: string;
+  // Which scale scored the row: 'ai' (LLM) or 'keyword' (offline fallback
+  // with lenient thresholds). Null/absent means unscored. Keyword rows must
+  // never wear the AI-grade recommendation stamp.
+  score_source?: 'ai' | 'keyword' | null;
   score_reasoning: string;
   key_strengths: string[];
   key_gaps: string[];
@@ -188,6 +192,8 @@ export interface ApplicationFilters {
   event_within_days?: number;
   status?: string;
   recommendation?: string;
+  /** Scoring provenance: 'ai' keeps only LLM-scored rows, 'keyword' only fallback-scored rows. */
+  score_source?: 'ai' | 'keyword';
   company_type?: string;
   work_type?: string;
   /** place text; remote/online/nationwide and no-place rows always pass */

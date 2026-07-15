@@ -106,7 +106,10 @@ const PRESETS: Preset[] = [
   { key: 'noexp', label: 'no experience needed', params: { first_quest_ok: true } },
   { key: 'remote', label: 'remote', params: { is_remote: true } },
   { key: 'fresh', label: 'new this week', params: { posted_within_days: 7 } },
-  { key: 'strong', label: 'strong apply', params: { recommendation: 'STRONG_APPLY' }, careerOnly: true },
+  /* score_source narrows to AI-scored rows: the keyword fallback stamps
+     STRONG_APPLY on a lenient scale, and those guesses must not pad this
+     chip's count or ride its filter */
+  { key: 'strong', label: 'strong apply', params: { recommendation: 'STRONG_APPLY', score_source: 'ai' }, careerOnly: true },
   { key: 'score50', label: 'scored 50 or better', params: { min_score: 50 }, careerOnly: true },
   { key: 'early', label: 'early startup', params: { company_type: 'Early Startup' }, group: 'company', careerOnly: true },
   { key: 'bigtech', label: 'big tech', params: { company_type: 'Big Tech' }, group: 'company', careerOnly: true },

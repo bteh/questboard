@@ -510,7 +510,7 @@ function ReviewStep({
           <p className="text-xs text-text-secondary mt-0.5">{prepareData.company}</p>
           <div className="flex items-center gap-2 mt-2">
             <ScoreCircle score={app.overall_score} size="sm" />
-            <RecommendationBadge recommendation={app.recommendation} />
+            <RecommendationBadge recommendation={app.recommendation} scoreSource={app.score_source} />
           </div>
         </div>
       </div>
