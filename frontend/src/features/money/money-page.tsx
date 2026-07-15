@@ -52,15 +52,18 @@ export function MoneyPage() {
         listings never carry one.
       </Block>
 
-      <Block idx="05" title="No ads">
-        Not now, not later.
+      <Block idx="05" title="One sponsor, clearly marked">
+        The digest and some lanes may carry a single sponsor, always
+        labeled and never a quest. A sponsor buys a spot to say hello, never
+        a rank and never a place on the board. No banner ads, no ad
+        networks, no pop-ups, no tracking.
       </Block>
 
       <p className="qb-money-why">
         This is strict on purpose. A board that takes listing money ends up
         showing you whatever paid to be shown. Everything here rides on the
-        promise that what you see is real, and selling placement would
-        spend it.
+        promise that what you see is real. Money may ride along with an
+        outcome you wanted, but it never moves what ranks or what gets in.
       </p>
       <p className="qb-money-foot">the payment constitution, adopted 2026-07-10</p>
     </div>

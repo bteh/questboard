@@ -274,6 +274,9 @@ def _enrich_from_detail(row: dict, detail: dict) -> None:
     refresh_hours=24,
     allowed_url_hosts=("sbir.gov",),
     enabled_by_default=False,
+    # off-ICP for the builder-funding lane (federal R&D topics for US small
+    # businesses, not funding for young founders/students); kept as code
+    research_only=True,
 )
 def search_sbir(
     roles: list[str] | None = None,

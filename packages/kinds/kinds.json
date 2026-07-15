@@ -14,17 +14,28 @@
         {
           "id": "focus",
           "label": "focus groups",
-          "terms": ["focus group"]
+          "terms": [
+            "focus group"
+          ]
         },
         {
           "id": "usertests",
           "label": "user tests",
-          "terms": ["user test", "usability", "user research", "user interview"]
+          "terms": [
+            "user test",
+            "usability",
+            "user research",
+            "user interview"
+          ]
         },
         {
           "id": "juries",
           "label": "mock juries",
-          "terms": ["mock jury", "mock juror", "mock trial"]
+          "terms": [
+            "mock jury",
+            "mock juror",
+            "mock trial"
+          ]
         }
       ]
     },
@@ -39,17 +50,35 @@
         {
           "id": "pets",
           "label": "pets",
-          "terms": ["pet", "dog", "cat", "puppy", "kitten"]
+          "terms": [
+            "pet",
+            "dog",
+            "cat",
+            "puppy",
+            "kitten"
+          ]
         },
         {
           "id": "kids",
           "label": "kids",
-          "terms": ["babysit", "child", "kid", "nanny", "toddler", "infant"]
+          "terms": [
+            "babysit",
+            "child",
+            "kid",
+            "nanny",
+            "toddler",
+            "infant"
+          ]
         },
         {
           "id": "houses",
           "label": "houses",
-          "terms": ["house sit", "housesit", "house-sit", "home sit"]
+          "terms": [
+            "house sit",
+            "housesit",
+            "house-sit",
+            "home sit"
+          ]
         }
       ]
     },
@@ -64,12 +93,18 @@
         {
           "id": "bank",
           "label": "bank accounts",
-          "terms": ["bank", "checking", "savings"]
+          "terms": [
+            "bank",
+            "checking",
+            "savings"
+          ]
         },
         {
           "id": "cards",
           "label": "credit cards",
-          "terms": ["credit card"]
+          "terms": [
+            "credit card"
+          ]
         }
       ]
     },
@@ -96,17 +131,28 @@
         {
           "id": "casting",
           "label": "casting",
-          "terms": ["casting", "audition", "acting", "actor"]
+          "terms": [
+            "casting",
+            "audition",
+            "acting",
+            "actor"
+          ]
         },
         {
           "id": "voice",
           "label": "voice",
-          "terms": ["voice"]
+          "terms": [
+            "voice"
+          ]
         },
         {
           "id": "music",
           "label": "music",
-          "terms": ["music", "singer", "vocalist"]
+          "terms": [
+            "music",
+            "singer",
+            "vocalist"
+          ]
         }
       ]
     },
@@ -153,12 +199,20 @@
         {
           "id": "selling",
           "label": "selling",
-          "terms": ["sell", "resell", "flip"]
+          "terms": [
+            "sell",
+            "resell",
+            "flip"
+          ]
         },
         {
           "id": "renting",
           "label": "renting",
-          "terms": ["rent out", "renting", "rental"]
+          "terms": [
+            "rent out",
+            "renting",
+            "rental"
+          ]
         }
       ]
     },
@@ -173,7 +227,7 @@
     {
       "id": "pitch",
       "label": "Pitch it",
-      "sub": "grants, accelerators, competitions",
+      "sub": "funding, hackathons, accelerators",
       "hue": "#585089",
       "order": 12,
       "legacy_verticals": []

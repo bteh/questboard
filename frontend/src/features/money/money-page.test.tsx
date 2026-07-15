@@ -30,7 +30,9 @@ describe('the money page', () => {
     expect(screen.getByRole('heading', { name: 'The people listed here never pay us' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'You can pay us' })).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Some side-quest links may carry a referral' })).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'No ads' })).toBeTruthy();
+    expect(
+      screen.getByRole('heading', { name: 'One sponsor, clearly marked' }),
+    ).toBeTruthy();
 
     expect(screen.getByText(/never a subscription dressed up as one/)).toBeTruthy();
     expect(screen.getByText(/the poster says so right next to it/)).toBeTruthy();

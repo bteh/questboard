@@ -396,7 +396,7 @@ def test_schedule_endpoint_reports_due_state(api_client) -> None:
         [
             {"source": "bankrewards", "vertical": "house",
              "started_at": now - timedelta(hours=1), "finish_reason": "ok", "rows_found": 80},
-            {"source": "doctorofcredit", "vertical": "house",
+            {"source": "userinterviews", "vertical": "think",
              "started_at": now - timedelta(hours=20), "finish_reason": "ok", "rows_found": 50},
         ]
     )
@@ -409,12 +409,13 @@ def test_schedule_endpoint_reports_due_state(api_client) -> None:
     entries = {s["source"]: s for s in body["sources"]}
     assert entries["bankrewards"]["due_now"] is False
     # 20h old attempt on a 12h cadence: overdue
-    assert entries["doctorofcredit"]["due_now"] is True
+    assert entries["userinterviews"]["due_now"] is True
     # never-ran sources are due immediately with no due_at
     assert entries["clinicaltrials"]["due_now"] is True
     assert entries["clinicaltrials"]["due_at"] is None
-    # research-only sources never appear
+    # research-only sources never appear (doctorofcredit was demoted 2026-07-15)
     assert "reddit-pkmntcgdeals" not in entries
+    assert "doctorofcredit" not in entries
 
 
 def test_lifespan_does_not_start_scheduler_when_disabled(api_client) -> None:
