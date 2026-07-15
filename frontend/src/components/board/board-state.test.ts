@@ -76,6 +76,16 @@ describe('validateBoardSearch', () => {
     expect(validateBoardSearch({ v: 'all' }).v).toBeUndefined();
   });
 
+  it('threads a facet only alongside the kind that carries it', () => {
+    expect(validateBoardSearch({ v: 'lookafter', f: 'pets' }).f).toBe('pets');
+    /* a legacy kind spelling normalizes first, then the facet check runs */
+    expect(validateBoardSearch({ v: 'camera', f: 'casting' }).f).toBe('casting');
+    /* another kind's facet, junk, or a facet with no kind all drop */
+    expect(validateBoardSearch({ v: 'lookafter', f: 'casting' }).f).toBeUndefined();
+    expect(validateBoardSearch({ v: 'lookafter', f: '' }).f).toBeUndefined();
+    expect(validateBoardSearch({ f: 'pets' }).f).toBeUndefined();
+  });
+
   it('keeps text params and drops empties', () => {
     const params = validateBoardSearch({ q: 'editor', from: '150k', to: '', p: 'remote' });
     expect(params).toEqual({ v: undefined, q: 'editor', from: '150k', to: undefined, p: 'remote' });
@@ -103,6 +113,7 @@ describe('hasBoardParams', () => {
   it('is true for any set param', () => {
     expect(hasBoardParams({ q: 'editor' })).toBe(true);
     expect(hasBoardParams({ v: 'study' })).toBe(true);
+    expect(hasBoardParams({ v: 'lookafter', f: 'pets' })).toBe(true);
     expect(hasBoardParams({ p: 'noexp' })).toBe(true);
   });
 });
@@ -147,6 +158,15 @@ describe('board state persistence', () => {
     const store = stubStorage();
     saveBoardState({ q: 'editor' });
     expect(JSON.parse(store.get(BOARD_STATE_KEY)!)).toEqual({ q: 'editor' });
+  });
+
+  it('persists a facet with its kind and validates it on read', () => {
+    stubStorage();
+    saveBoardState({ v: 'lookafter', f: 'pets' });
+    expect(readSavedBoardState()?.f).toBe('pets');
+    /* a saved facet from a kind that no longer carries it drops on read */
+    stubStorage({ [BOARD_STATE_KEY]: JSON.stringify({ v: 'think', f: 'pets' }) });
+    expect(readSavedBoardState()?.f).toBeUndefined();
   });
 
   it('reads null when nothing is saved', () => {

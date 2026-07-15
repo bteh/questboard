@@ -68,6 +68,9 @@
 }
 .qb-since-line { flex: 1; border-top: 1px solid rgba(90, 74, 52, .38); }
 
+/* facet chips: a kind's own sub-filters, one quiet row under the rail */
+.qb-facet-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+
 /* the Jobs toolbar: one block; filters bite instantly, one button runs.
    The fields reuse the shared tray grammar from board.css. */
 .qb-worktool { margin-top: 12px; }

@@ -1,5 +1,5 @@
 {
-  "$comment": "The single source of truth for Questboard's quest kinds. Both the TypeScript wrapper (packages/kinds/src/index.ts) and the Python loader (src/job_finder/kinds.py) read this file; sync tests on both sides fail if either drifts. Adding a kind: add an entry here (id, label, sub, hue, order) plus a stamp in @questboard/ui. legacy_verticals maps historical DB vertical values onto kinds at read time so old rows never need a migration. Taxonomy rationale lives in docs/sidequest-research.md and docs/quest-taxonomy-rework.md.",
+  "$comment": "The single source of truth for Questboard's quest kinds. Both the TypeScript wrapper (packages/kinds/src/index.ts) and the Python loader (src/job_finder/kinds.py) read this file; sync tests on both sides fail if either drifts. Adding a kind: add an entry here (id, label, sub, hue, order) plus a stamp in @questboard/ui. legacy_verticals maps historical DB vertical values onto kinds at read time so old rows never need a migration. A kind may carry facets: its own sub-filters (id, label, terms), where terms are the words the API matches against a row's title and description. Taxonomy rationale lives in docs/sidequest-research.md and docs/quest-taxonomy-rework.md.",
   "kinds": [
     {
       "id": "think",
@@ -9,6 +9,23 @@
       "order": 1,
       "legacy_verticals": [
         "study"
+      ],
+      "facets": [
+        {
+          "id": "focus",
+          "label": "focus groups",
+          "terms": ["focus group"]
+        },
+        {
+          "id": "usertests",
+          "label": "user tests",
+          "terms": ["user test", "usability", "user research", "user interview"]
+        },
+        {
+          "id": "juries",
+          "label": "mock juries",
+          "terms": ["mock jury", "mock juror", "mock trial"]
+        }
       ]
     },
     {
@@ -17,7 +34,24 @@
       "sub": "dogs, cats, houses, kids",
       "hue": "#6B6A34",
       "order": 2,
-      "legacy_verticals": []
+      "legacy_verticals": [],
+      "facets": [
+        {
+          "id": "pets",
+          "label": "pets",
+          "terms": ["pet", "dog", "cat", "puppy", "kitten"]
+        },
+        {
+          "id": "kids",
+          "label": "kids",
+          "terms": ["babysit", "child", "kid", "nanny", "toddler", "infant"]
+        },
+        {
+          "id": "houses",
+          "label": "houses",
+          "terms": ["house sit", "housesit", "house-sit", "home sit"]
+        }
+      ]
     },
     {
       "id": "house",
@@ -25,7 +59,19 @@
       "sub": "bank & card sign-up bonuses",
       "hue": "#2F7A5E",
       "order": 3,
-      "legacy_verticals": []
+      "legacy_verticals": [],
+      "facets": [
+        {
+          "id": "bank",
+          "label": "bank accounts",
+          "terms": ["bank", "checking", "savings"]
+        },
+        {
+          "id": "cards",
+          "label": "credit cards",
+          "terms": ["credit card"]
+        }
+      ]
     },
     {
       "id": "skill",
@@ -45,14 +91,39 @@
       "order": 5,
       "legacy_verticals": [
         "camera"
+      ],
+      "facets": [
+        {
+          "id": "casting",
+          "label": "casting",
+          "terms": ["casting", "audition", "acting", "actor"]
+        },
+        {
+          "id": "voice",
+          "label": "voice",
+          "terms": ["voice"]
+        },
+        {
+          "id": "music",
+          "label": "music",
+          "terms": ["music", "singer", "vocalist"]
+        }
       ]
+    },
+    {
+      "id": "audience",
+      "label": "Be in the audience",
+      "sub": "tapings, game shows, live TV",
+      "hue": "#96437E",
+      "order": 6,
+      "legacy_verticals": []
     },
     {
       "id": "body",
       "label": "Join a study",
       "sub": "sleep labs, plasma, trials",
       "hue": "#7D3B4C",
-      "order": 6,
+      "order": 7,
       "legacy_verticals": []
     },
     {
@@ -60,7 +131,7 @@
       "label": "Odd jobs",
       "sub": "help a neighbor, one-days",
       "hue": "#7A5C3E",
-      "order": 7,
+      "order": 8,
       "legacy_verticals": []
     },
     {
@@ -68,7 +139,7 @@
       "label": "Deliver & drive",
       "sub": "packages and rides",
       "hue": "#44607A",
-      "order": 8,
+      "order": 9,
       "legacy_verticals": []
     },
     {
@@ -76,15 +147,27 @@
       "label": "Flip & rent",
       "sub": "cards, thrift, your car",
       "hue": "#6B5081",
-      "order": 9,
-      "legacy_verticals": []
+      "order": 10,
+      "legacy_verticals": [],
+      "facets": [
+        {
+          "id": "selling",
+          "label": "selling",
+          "terms": ["sell", "resell", "flip"]
+        },
+        {
+          "id": "renting",
+          "label": "renting",
+          "terms": ["rent out", "renting", "rental"]
+        }
+      ]
     },
     {
       "id": "speak",
       "label": "Take the stage",
       "sub": "talks, panels, CFPs",
       "hue": "#2E6472",
-      "order": 10,
+      "order": 11,
       "legacy_verticals": []
     },
     {
@@ -92,7 +175,7 @@
       "label": "Pitch it",
       "sub": "grants, accelerators, competitions",
       "hue": "#585089",
-      "order": 11,
+      "order": 12,
       "legacy_verticals": []
     },
     {
@@ -100,7 +183,7 @@
       "label": "Party quests",
       "sub": "gather friends, make one",
       "hue": "#A65A6E",
-      "order": 12,
+      "order": 13,
       "legacy_verticals": [
         "party"
       ]
@@ -110,7 +193,7 @@
       "label": "Find work",
       "sub": "jobs, full-time, contract",
       "hue": "#3D4756",
-      "order": 13,
+      "order": 14,
       "legacy_verticals": [
         "career"
       ]

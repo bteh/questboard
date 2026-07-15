@@ -250,7 +250,7 @@ class SearchTest(unittest.TestCase):
 
 
 class RegistryTest(unittest.TestCase):
-    def test_registered_as_camera_quest_scraper(self) -> None:
+    def test_registered_as_audience_quest_scraper(self) -> None:
         from job_finder.tools.scrapers import get_registry
         from job_finder.tools.scrapers._registry import default_scraper_names
         import job_finder.tools.scrapers.standingroomonly  # noqa: F401
@@ -258,8 +258,8 @@ class RegistryTest(unittest.TestCase):
         reg = get_registry()
         self.assertIn("standingroomonly", reg)
         meta = reg["standingroomonly"]
-        self.assertEqual(meta.vertical, "camera")
-        self.assertEqual(meta.category, "camera")
+        self.assertEqual(meta.vertical, "audience")
+        self.assertEqual(meta.category, "audience")
         self.assertFalse(meta.enabled_by_default)
         self.assertTrue(callable(meta.search_fn))
         # Quest scrapers never join the default career sweep.

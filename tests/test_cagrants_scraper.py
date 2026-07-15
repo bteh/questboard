@@ -1,19 +1,30 @@
 """Contract tests for the California Grants Portal scraper (pitch kind).
 
-Fixture is 5 trimmed REAL records from the data.ca.gov CKAN datastore
-(resource 111c8c88-21f6-453c-ae2c-b4785a0624f5, captured live
-2026-07-12, HTTP 200, 174 active records): a Business grant with an
-exact stated range and a dated deadline, a Business grant with an
-"Ongoing" deadline and prose amounts, a nonprofit-only grant (proves
-the Business gate), a Business grant with prose amounts and a dated
-deadline, and a Business grant whose GrantURL is http:// (proves the
-https requirement). No active record in the live set had a past
-deadline, so the past-deadline drop is proven by freezing the clock
-past a real record's deadline instead of fabricating a row.
-Pins: Business-only gate, exact range to salary_min/max, "Up to $X" as
-a ceiling never a floor, prose amounts verbatim in quest.pay_note with
-no salary keys, Ongoing rows publish without apply_by, past deadlines
-drop. No live HTTP inside tests.
+Fixture is 7 trimmed REAL records from the data.ca.gov CKAN datastore
+(resource 111c8c88-21f6-453c-ae2c-b4785a0624f5; 5 captured live
+2026-07-12, HTTP 200, 174 active records; 2 more captured live
+2026-07-15, HTTP 200, 177 active records, for the eligibility gate):
+
+- Tire Incentive Program: Business, exact stated range, dated deadline (keeps)
+- Geothermal cost-share: Business + Individual, Ongoing, prose amounts (keeps)
+- Wildfire Resilience Block Grants: no Business or Individual type (drops)
+- EVITP Fund 2.0: Business, prose amounts, dated deadline (keeps)
+- Boating pumpout grant: notes state "marina owners", URL is http:// (drops)
+- RUST underground storage tank grant: states Business, but its own
+  purpose and notes state a facility-owner compliance program (drops)
+- EPIC cost-share: Individual with no Business token (keeps; proves
+  the Individual side of the gate)
+
+No active record in the live set had a past deadline, so the
+past-deadline drop is proven by freezing the clock past a real record's
+deadline instead of fabricating a row.
+Pins: the applicant-type gate (Business or Individual, the portal's own
+field), the facility-compliance drop (stated in the record's own text),
+nonprofit/agency-only rows out, exact range to salary_min/max, "Up to
+$X" as a ceiling never a floor, prose amounts verbatim in
+quest.pay_note with no salary keys, Ongoing rows publish without
+apply_by, past deadlines drop, https required. No live HTTP inside
+tests.
 """
 
 from __future__ import annotations
@@ -55,10 +66,12 @@ class CaGrantsTest(unittest.TestCase):
              patch.object(self.mod, "_utcnow", return_value=now):
             return self.mod.search_cagrants(**kw)
 
-    def test_business_grants_publish_from_real_capture(self) -> None:
+    def test_eligible_grants_publish_from_real_capture(self) -> None:
         rows = self._search(_envelope(_records()))
-        # 5 fixture records: the nonprofit-only and http-URL rows drop
-        self.assertEqual(len(rows), 3)
+        # 7 fixture records: the nonprofit/agency-only row, the two
+        # facility-compliance rows (RUST tanks, marina pumpout), and the
+        # http-URL row drop
+        self.assertEqual(len(rows), 4)
         for row in rows:
             self.assertEqual(row["source"], "cagrants")
             self.assertEqual(row["vertical"], "pitch")
@@ -77,8 +90,27 @@ class CaGrantsTest(unittest.TestCase):
 
     def test_nonprofit_only_grants_stay_out(self) -> None:
         titles = [r["title"] for r in self._search(_envelope(_records()))]
-        # real fixture record whose ApplicantType names no Business
+        # real fixture record whose ApplicantType names no Business or Individual
         self.assertNotIn("2026 Wildfire Resilience Block Grants", titles)
+
+    def test_facility_compliance_grants_stay_out(self) -> None:
+        # the RUST grant states ApplicantType Business, but its own purpose
+        # and notes state a program for underground storage tank owners
+        titles = [r["title"] for r in self._search(_envelope(_records()))]
+        self.assertNotIn(
+            "Replacing, Removing, or Upgrading Underground Storage Tanks Grant",
+            titles,
+        )
+
+    def test_individual_eligible_grants_publish(self) -> None:
+        # the EPIC cost-share names Individual and not Business, so the
+        # Individual token is what keeps it
+        record = next(r for r in _records() if "EPIC" in r["Title"])
+        self.assertNotIn("Business", record["ApplicantType"])
+        rows = self._search(_envelope(_records()))
+        epic = next(r for r in rows if "EPIC" in r["title"])
+        self.assertEqual(epic["company"], "CA Energy Commission")
+        self.assertNotIn("apply_by", epic.get("quest", {}))
 
     def test_exact_stated_range_maps_to_salary(self) -> None:
         rows = self._search(_envelope(_records()))
@@ -117,10 +149,11 @@ class CaGrantsTest(unittest.TestCase):
         self.assertIn("ongoing basis", geo["description"].lower())
 
     def test_past_deadline_rows_drop(self) -> None:
-        # EVITP closes 2026-07-31; Tire closes 2026-08-19; Ongoing never does
+        # EVITP closes 2026-07-31; Tire closes 2026-08-19; the Geothermal
+        # and EPIC cost-shares are Ongoing and never do
         later = datetime(2026, 8, 5, tzinfo=timezone.utc)
         titles = [r["title"] for r in self._search(_envelope(_records()), now=later)]
-        self.assertEqual(len(titles), 2)
+        self.assertEqual(len(titles), 3)
         self.assertNotIn(
             "The Electric Vehicle Infrastructure Training Program Fund (EVITP Fund) 2.0",
             titles,
@@ -130,6 +163,17 @@ class CaGrantsTest(unittest.TestCase):
     def test_http_grant_urls_drop(self) -> None:
         titles = [r["title"] for r in self._search(_envelope(_records()))]
         self.assertFalse(any("Boating and Waterways" in t for t in titles))
+        # the real record also trips the facility gate ("marina owners"
+        # in its notes), so prove the https rule on its own: with that
+        # text cleared the http URL still drops it, and https would not
+        record = next(r for r in _records() if "Boating and Waterways" in r["Title"])
+        cleared = {**record, "ApplicantTypeNotes": None}
+        with patch.object(self.mod, "_utcnow", return_value=FROZEN_NOW):
+            self.assertIsNone(self.mod._normalize_record(cleared))
+            https_url = str(cleared["GrantURL"]).replace("http://", "https://")
+            self.assertIsNotNone(
+                self.mod._normalize_record({**cleared, "GrantURL": https_url})
+            )
 
     def test_query_targets_the_active_dataset(self) -> None:
         captured: list[dict] = []

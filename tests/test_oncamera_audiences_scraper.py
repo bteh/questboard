@@ -1,4 +1,4 @@
-"""Contract tests for the On Camera Audiences scraper (camera kind).
+"""Contract tests for the On Camera Audiences scraper (audience kind).
 
 Fixtures are trimmed REAL pages captured live 2026-07-14 (HTTP 200):
 
@@ -53,12 +53,12 @@ class OnCameraAudiencesTest(unittest.TestCase):
     def _by_slug(self, rows, slug):
         return next(r for r in rows if r["quest"]["slug"] == slug)
 
-    def test_parses_shows_into_camera_rows(self) -> None:
+    def test_parses_shows_into_audience_rows(self) -> None:
         rows = self._search(INDEX)
         # 8 cards on the fixture, Jeopardy! twice; dedup by URL keeps 7 shows
         self.assertEqual(len(rows), 7)
         for row in rows:
-            self.assertEqual(row["vertical"], "camera")
+            self.assertEqual(row["vertical"], "audience")
             self.assertEqual(row["source"], "oncamera_audiences")
             self.assertTrue(row["title"].startswith("Be in the audience: "))
             self.assertTrue(row["first_quest_ok"])
@@ -165,13 +165,13 @@ class OnCameraAudiencesTest(unittest.TestCase):
 
 
 class RegistryTest(unittest.TestCase):
-    def test_registered_as_camera_quest_scraper(self) -> None:
+    def test_registered_as_audience_quest_scraper(self) -> None:
         from job_finder.tools.scrapers import get_registry
         import job_finder.tools.scrapers.oncamera_audiences  # noqa: F401
         reg = get_registry()
         self.assertIn("oncamera_audiences", reg)
         meta = reg["oncamera_audiences"]
-        self.assertEqual(meta.vertical, "camera")
+        self.assertEqual(meta.vertical, "audience")
         self.assertEqual(meta.refresh_hours, 24)
         self.assertTrue(meta.full_snapshot)
         self.assertEqual(meta.allowed_url_hosts, ("on-camera-audiences.com",))

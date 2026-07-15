@@ -4,7 +4,7 @@
    whole board: rows whose taping already happened drop, rows with no event
    date (career jobs) pass untouched. */
 
-import { KINDS, kindForVertical, verticalValuesFor } from '@questboard/kinds';
+import { KINDS, facetsFor, kindForVertical, verticalValuesFor } from '@questboard/kinds';
 import type { ApplicationFilters } from '@/types/application';
 
 export type KindKey = string; /* a kind id from @questboard/kinds, or 'all' */
@@ -49,4 +49,13 @@ export function normalizeKindKey(raw: string | undefined): KindKey | undefined {
   if (!raw || raw === 'all') return undefined;
   if (KIND_KEYS.includes(raw)) return raw;
   return kindForVertical(raw)?.id;
+}
+
+/** Keep a ?f= facet only when the active kind actually carries it. */
+export function normalizeFacetKey(
+  kind: KindKey | undefined,
+  raw: string | undefined,
+): string | undefined {
+  if (!kind || kind === 'all' || !raw) return undefined;
+  return facetsFor(kind).some((facet) => facet.id === raw) ? raw : undefined;
 }

@@ -8,7 +8,7 @@
    Storage access follows lib/entry.ts: every read and write in try/catch,
    a locked-down browser just gets the default board. */
 
-import { normalizeKindKey, type KindKey } from '@/features/board/kind-params';
+import { normalizeFacetKey, normalizeKindKey, type KindKey } from '@/features/board/kind-params';
 
 export const BOARD_STATE_KEY = 'questboard:board.v1';
 export const BOARD_NOTICE_KEY = 'questboard:board-notice';
@@ -16,6 +16,8 @@ export const BOARD_NOTICE_KEY = 'questboard:board-notice';
 export interface BoardParams {
   /** Kind tag; absent means All. Legacy vertical values normalize on read. */
   v?: KindKey;
+  /** Facet id within the kind (?f=pets); dropped unless the kind carries it. */
+  f?: string;
   /** Board search text. */
   q?: string;
   /** Place text ("Los Angeles", "NV"); remote and no-place rows always pass. */
@@ -50,9 +52,10 @@ function cleanId(value: unknown): number | undefined {
 }
 
 export function validateBoardSearch(search: Record<string, unknown>): BoardParams {
-  const v = cleanString(search.v);
+  const v = normalizeKindKey(cleanString(search.v));
   return {
-    v: normalizeKindKey(v),
+    v,
+    f: normalizeFacetKey(v, cleanString(search.f)),
     q: cleanString(search.q),
     place: cleanString(search.place),
     // the router may hand back near as the number 1, the string "1", or a
@@ -71,7 +74,8 @@ export function validateBoardSearch(search: Record<string, unknown>): BoardParam
    test in beforeLoad (which skips redirecting when job is set). */
 export function hasBoardParams(params: BoardParams): boolean {
   return Boolean(
-    params.v || params.q || params.place || params.near || params.from || params.to || params.p,
+    params.v || params.f || params.q || params.place || params.near ||
+      params.from || params.to || params.p,
   );
 }
 
@@ -103,7 +107,7 @@ export function readSavedBoardState(): SavedBoardState | null {
 export function saveBoardState(state: SavedBoardState): void {
   try {
     const compact: Record<string, string> = {};
-    for (const key of ['v', 'q', 'place', 'near', 'from', 'to', 'p', 'sort'] as const) {
+    for (const key of ['v', 'f', 'q', 'place', 'near', 'from', 'to', 'p', 'sort'] as const) {
       const value = state[key];
       if (value) compact[key] = value;
     }

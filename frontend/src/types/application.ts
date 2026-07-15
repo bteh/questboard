@@ -201,6 +201,9 @@ export interface ApplicationFilters {
   /** "near me only": with a location set, keep only rows that match it,
       dropping remote/nationwide/placeless. No-op without a location. */
   location_strict?: boolean;
+  /** a kind's own sub-filter (facet id from @questboard/kinds); needs the
+      kind in vertical, the API 400s otherwise */
+  facet?: string;
   source?: string;
   search?: string;
   sort_by?: string;
