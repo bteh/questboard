@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import raw from '../kinds.json';
-import { KINDS, KIND_IDS, kindById, kindForVertical, verticalValuesFor } from './index';
+import { KINDS, KIND_IDS, facetsFor, kindById, kindForVertical, verticalValuesFor } from './index';
 
 describe('the kinds registry', () => {
   it('exposes every kind from kinds.json, sorted by order', () => {
@@ -47,5 +47,29 @@ describe('the kinds registry', () => {
     expect(verticalValuesFor('work').sort()).toEqual(['career', 'work']);
     expect(verticalValuesFor('nope')).toEqual([]);
     expect(kindById('body')?.label).toBe('Join a study');
+  });
+
+  it('keeps audience as its own kind, right after perform', () => {
+    // audience seats are loved but they are a different quest from casting
+    const ids = KINDS.map((k) => k.id);
+    expect(ids.indexOf('audience')).toBe(ids.indexOf('perform') + 1);
+    expect(kindById('audience')?.hue).not.toBe(kindById('perform')?.hue);
+    expect(kindById('audience')?.legacy_verticals).toEqual([]);
+    // camera stays perform's legacy value so old rows keep resolving there
+    expect(kindForVertical('camera')?.id).toBe('perform');
+  });
+
+  it('exposes facets with terms, and [] for kinds without any', () => {
+    expect(facetsFor('lookafter').map((f) => f.id)).toEqual(['pets', 'kids', 'houses']);
+    for (const kind of KINDS) {
+      for (const facet of kind.facets) {
+        expect(facet.label.trim()).not.toBe('');
+        expect(facet.terms.length).toBeGreaterThan(0);
+      }
+    }
+    expect(facetsFor('odd')).toEqual([]);
+    expect(facetsFor('nope')).toEqual([]);
+    // legacy spellings resolve to their kind's facets
+    expect(facetsFor('camera').map((f) => f.id)).toEqual(['casting', 'voice', 'music']);
   });
 });

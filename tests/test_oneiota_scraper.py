@@ -1,11 +1,11 @@
-"""Contract tests for the 1iota TV-audience scraper (camera vertical).
+"""Contract tests for the 1iota TV-audience scraper (audience kind).
 
 Fixture is a trimmed REAL response from
 https://prod-tickets.1iota.com/api/event/list (captured live 2026-07-08,
 HTTP 200, 143 events; 5 representative events kept). Pins the quest-row
 contract: deep-link URL, event_start from the taping datetime (Z and no-Z
 forms), unpaid rows never carry salary keys, sold-out events are skipped,
-first_quest_ok, quest extras, and registry metadata (vertical camera,
+first_quest_ok, quest extras, and registry metadata (vertical audience,
 disabled by default). No live HTTP inside tests.
 """
 
@@ -46,7 +46,7 @@ class OneIotaParseTest(unittest.TestCase):
         self.assertEqual(daily["title"], "Audience seat: The Daily Show")
         self.assertEqual(daily["company"], "1iota")
         self.assertEqual(daily["source"], "1iota")
-        self.assertEqual(daily["vertical"], "camera")
+        self.assertEqual(daily["vertical"], "audience")
         self.assertEqual(daily["url"], "https://1iota.com/event/88956")
         self.assertEqual(daily["location"], "New York, NY")
 
@@ -134,13 +134,13 @@ class OneIotaParseTest(unittest.TestCase):
 
 
 class OneIotaRegistryTest(unittest.TestCase):
-    def test_registered_as_camera_quest_scraper(self) -> None:
+    def test_registered_as_audience_quest_scraper(self) -> None:
         from job_finder.tools.scrapers import get_registry
         import job_finder.tools.scrapers.oneiota  # noqa: F401
         reg = get_registry()
         self.assertIn("1iota", reg)
         meta = reg["1iota"]
-        self.assertEqual(meta.vertical, "camera")
+        self.assertEqual(meta.vertical, "audience")
         self.assertFalse(meta.enabled_by_default)
         self.assertTrue(callable(meta.search_fn))
 

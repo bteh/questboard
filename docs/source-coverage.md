@@ -57,7 +57,8 @@ false actionability. Debate record:
 |---|---|---|
 | skill | 18 career scrapers + JobSpy boards | stated ranges |
 | think | FocusGroups.org, **User Interviews** | per-session, stated |
-| perform | AuditionsFree, Casting Networks, 1iota, Project Casting, Standing Room Only | stated when posted |
+| perform | AuditionsFree, Casting Networks, Project Casting, Standing Room Only | stated when posted |
+| audience | 1iota, On Camera Audiences | never; seats are free tickets, not paid gigs |
 | odd | none (honest state; see the 2026-07-11 verdicts) | n/a |
 | flip | none, paused by curation verdict (was r/PKMNTCGDeals) | n/a |
 | deliver | none, by verdict (see below) | n/a |

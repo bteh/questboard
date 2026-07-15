@@ -1,4 +1,4 @@
-"""1iota (camera vertical): free TV studio-audience seats via the open ticket API.
+"""1iota (audience kind): free TV studio-audience seats via the open ticket API.
 
 1iota fills studio audiences for talk shows, late-night tapings, and fan
 events. The production ticket endpoint
@@ -31,7 +31,7 @@ _EVENT_URL = "https://1iota.com/event/{event_id}"
 
 
 def _normalize_event(event: dict) -> dict | None:
-    """Map one 1iota event object to a camera-vertical quest row, or None."""
+    """Map one 1iota event object to an audience quest row, or None."""
     event_id = event.get("eventId")
     show = (event.get("title") or "").strip()
     if not isinstance(event_id, int) or not show:
@@ -72,7 +72,7 @@ def _normalize_event(event: dict) -> dict | None:
         "location": location,
         "url": _EVENT_URL.format(event_id=event_id),
         "source": "1iota",
-        "vertical": "camera",
+        "vertical": "audience",
         "description": description,
         # Sitting in an audience needs no experience. No date_posted: the API
         # never states when an event was listed, and no salary keys ever.
@@ -93,8 +93,8 @@ def _normalize_event(event: dict) -> dict | None:
     display_name="1iota (TV audience seats)",
     url="https://1iota.com",
     description="Free studio-audience seats for TV tapings and fan events",
-    category="camera",
-    vertical="camera",
+    category="audience",
+    vertical="audience",
     # tapings announce days ahead
     refresh_hours=24,
     allowed_url_hosts=("1iota.com",),
@@ -107,7 +107,7 @@ def search_oneiota(
 ) -> list[dict]:
     """Fetch free TV-audience events from 1iota's open ticket API.
 
-    Role keywords are ignored on purpose: camera quests are shows, not job
+    Role keywords are ignored on purpose: audience quests are shows, not job
     titles, and filtering them against career roles would drop everything.
     Sold-out events are skipped because they are no longer requestable.
     """

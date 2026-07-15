@@ -8,12 +8,30 @@ this is a full snapshot: absence from a healthy run proves closure::
         ?resource_id=111c8c88-21f6-453c-ae2c-b4785a0624f5
         &filters={"Status": "active"}
 
-Live-verified quirks (2026-07-12, 174 active records):
+Live-verified quirks (2026-07-12, 174 active records; eligibility gate
+re-verified live 2026-07-15, 177 active records):
 
-- ``ApplicantType`` is a semicolon list ("Business; Nonprofit; ...").
-  Only grants that name Business publish: this lane is companies
-  landing funding, and nonprofit-only grants are out of scope for the
-  pilot.
+- ``ApplicantType`` is a semicolon list drawn from six portal values:
+  Business, Individual, Nonprofit, Public Agency, Tribal Government,
+  Other Legal Entity. The board's seekers are individuals and small
+  businesses (docs/icp.md), so only grants naming Business or
+  Individual publish. Nonprofit-only grants stay out of scope for the
+  pilot, and rows stating only government entities (Public Agency,
+  Tribal Government, Other Legal Entity) drop.
+- ``ApplicantType`` alone is too coarse: facility-compliance programs
+  state Business even though only the owner or operator of a regulated
+  facility can apply. The live example is the RUST underground storage
+  tank family, whose own Purpose and ApplicantTypeNotes require a UST
+  owner/operator bringing fuel tanks up to Health and Safety Code. The
+  portal's ``Categories`` values are broad topics ("Environment &
+  Water") with no applicant-fit value, so there is no clean stated
+  category to exclude. In its place, a narrow stated-text exclusion
+  drops rows whose own Title, Purpose, or ApplicantTypeNotes carry a
+  facility-compliance marker (underground storage tanks, marina
+  ownership, pollution control facilities). Live 2026-07-15 that drops
+  exactly 7 rows, every one a facility-owner program: the RUST grant
+  and loan, the UST Cleanup Fund, the Orphan Site Cleanup Fund, two
+  marina pumpout grants, and CPCFA facility bonds.
 - ``ApplicationDeadline`` is a datetime or the literal "Ongoing".
   Ongoing rows publish with no apply_by and say so in the description.
   A dated deadline already past drops the row (the dataset can lag).
@@ -84,9 +102,31 @@ def _fetch_records() -> list[dict]:
     return records
 
 
-def _open_to_business(record: dict) -> bool:
+_ELIGIBLE_APPLICANT_TYPES = {"business", "individual"}
+
+# facility-owner compliance programs state these in their own Title,
+# Purpose, or ApplicantTypeNotes; ApplicantType alone passes them
+# (see the module docstring)
+_FACILITY_MARKERS = (
+    "underground storage tank",
+    "marina owners",
+    "pollution control",
+)
+
+
+def _applicant_type_fits(record: dict) -> bool:
+    """The portal states an applicant type the board's seekers can be."""
     tokens = str(record.get("ApplicantType") or "").split(";")
-    return "business" in (t.strip().lower() for t in tokens)
+    return any(t.strip().lower() in _ELIGIBLE_APPLICANT_TYPES for t in tokens)
+
+
+def _facility_compliance(record: dict) -> bool:
+    """The record's own stated text marks a facility-owner program."""
+    stated = " ".join(
+        str(record.get(key) or "")
+        for key in ("Title", "Purpose", "ApplicantTypeNotes")
+    ).lower()
+    return any(marker in stated for marker in _FACILITY_MARKERS)
 
 
 def _parse_est_amounts(text: str | None) -> tuple[dict, str | None]:
@@ -127,7 +167,7 @@ def _parse_date(value: object) -> date | None:
 
 def _normalize_record(record: dict) -> dict | None:
     """One dataset record to a pitch-kind quest row, or None to skip."""
-    if not _open_to_business(record):
+    if not _applicant_type_fits(record) or _facility_compliance(record):
         return None
     title = _clean(record.get("Title"))
     agency = _clean(record.get("AgencyDept"))
@@ -181,7 +221,7 @@ def _normalize_record(record: dict) -> dict | None:
     name="cagrants",
     display_name="California Grants Portal",
     url="https://www.grants.ca.gov",
-    description="California state grants open to businesses, from the official data.ca.gov dataset",
+    description="California state grants open to individuals and small businesses, from the official data.ca.gov dataset",
     category="pitch",
     kind="pitch",
     # one filtered query returns every active grant, so absence proves closure
@@ -199,7 +239,7 @@ def search_cagrants(
     max_results: int = 50,
     **kwargs,
 ) -> list[dict]:
-    """Fetch active business-eligible grants from the California Grants Portal.
+    """Fetch active grants the board's seekers can apply for from the California Grants Portal.
 
     ``roles`` is ignored on purpose: grants are not career titles.
     """
@@ -222,5 +262,5 @@ def search_cagrants(
         seen.add(key)
         results.append(row)
 
-    logger.info("California Grants Portal: %d business grants", len(results))
+    logger.info("California Grants Portal: %d eligible grants", len(results))
     return results

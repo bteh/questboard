@@ -20,6 +20,15 @@ _KINDS_JSON = Path(__file__).resolve().parents[2] / "packages" / "kinds" / "kind
 
 
 @dataclass(frozen=True)
+class Facet:
+    """A kind's own sub-filter: terms match a row's title and description."""
+
+    id: str
+    label: str
+    terms: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class Kind:
     id: str
     label: str
@@ -27,6 +36,7 @@ class Kind:
     hue: str
     order: int
     legacy_verticals: tuple[str, ...]
+    facets: tuple[Facet, ...] = ()
 
 
 @lru_cache(maxsize=1)
@@ -42,6 +52,10 @@ def get_kinds() -> tuple[Kind, ...]:
             hue=entry["hue"],
             order=entry["order"],
             legacy_verticals=tuple(entry["legacy_verticals"]),
+            facets=tuple(
+                Facet(id=f["id"], label=f["label"], terms=tuple(f["terms"]))
+                for f in entry.get("facets", [])
+            ),
         )
         for entry in raw["kinds"]
     ]
@@ -74,3 +88,14 @@ def vertical_values_for(kind_id: str) -> list[str]:
         if kind.id == kind_id:
             return [kind.id, *kind.legacy_verticals]
     return []
+
+
+def facet_for(vertical: str, facet_id: str) -> Facet | None:
+    """A kind's facet by id; the kind may be named by a legacy spelling."""
+    kind = kind_for_vertical(vertical)
+    if kind is None:
+        return None
+    for facet in kind.facets:
+        if facet.id == facet_id:
+            return facet
+    return None

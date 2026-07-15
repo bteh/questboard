@@ -6,6 +6,13 @@
  */
 import raw from '../kinds.json';
 
+export interface KindFacet {
+  id: string;
+  label: string;
+  /** the words the API matches against a row's title and description */
+  terms: string[];
+}
+
 export interface Kind {
   id: string;
   label: string;
@@ -15,9 +22,15 @@ export interface Kind {
   order: number;
   /** historical DB `vertical` values this kind absorbs at read time */
   legacy_verticals: string[];
+  /** the kind's own sub-filters; [] for kinds without any */
+  facets: KindFacet[];
 }
 
-export const KINDS: readonly Kind[] = [...raw.kinds].sort((a, b) => a.order - b.order);
+type RawKind = Omit<Kind, 'facets'> & { facets?: KindFacet[] };
+
+export const KINDS: readonly Kind[] = (raw.kinds as RawKind[])
+  .map((k) => ({ ...k, facets: k.facets ?? [] }))
+  .sort((a, b) => a.order - b.order);
 
 export const KIND_IDS: readonly string[] = KINDS.map((k) => k.id);
 
@@ -44,4 +57,9 @@ export function verticalValuesFor(kindId: string): string[] {
   const kind = byId.get(kindId);
   if (!kind) return [];
   return [kind.id, ...kind.legacy_verticals];
+}
+
+/** A kind's facets ([] when it has none); legacy spellings resolve too. */
+export function facetsFor(kindId: string): KindFacet[] {
+  return toKind.get(kindId)?.facets ?? [];
 }

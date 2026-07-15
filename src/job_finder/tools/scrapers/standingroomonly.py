@@ -240,8 +240,8 @@ def _normalize_page(page: dict, today: date) -> dict | None:
     display_name="Standing Room Only",
     url="https://standingroomonly.tv",
     description="US TV audience seats and court-show casting calls from Standing Room Only",
-    category="camera",
-    vertical="camera",
+    category="audience",
+    vertical="audience",
     # audience calls post days ahead
     refresh_hours=24,
     allowed_url_hosts=("standingroomonly.tv",),

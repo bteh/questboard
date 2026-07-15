@@ -17,6 +17,7 @@ if str(ROOT / "src") not in sys.path:
 
 from job_finder.kinds import (  # noqa: E402
     _KINDS_JSON,
+    facet_for,
     get_kinds,
     kind_for_vertical,
     known_vertical_values,
@@ -73,6 +74,39 @@ def test_vertical_value_expansion_for_queries():
     assert sorted(vertical_values_for("skill")) == ["lens", "skill"]
     assert sorted(vertical_values_for("work")) == ["career", "work"]
     assert vertical_values_for("nope") == []
+
+
+def test_audience_is_its_own_kind_right_after_perform():
+    # audience seats are loved but they are a different quest from casting
+    kinds = get_kinds()
+    ids = [k.id for k in kinds]
+    audience = kind_for_vertical("audience")
+    perform = kind_for_vertical("perform")
+    assert audience is not None and audience.id == "audience"
+    assert ids.index("audience") == ids.index("perform") + 1
+    assert audience.hue != perform.hue
+    assert audience.legacy_verticals == ()
+    # camera stays perform's legacy value; old rows keep resolving there
+    assert kind_for_vertical("camera").id == "perform"
+
+
+def test_facets_load_with_their_terms():
+    lookafter = kind_for_vertical("lookafter")
+    assert [f.id for f in lookafter.facets] == ["pets", "kids", "houses"]
+    for kind in get_kinds():
+        for facet in kind.facets:
+            assert facet.label.strip()
+            assert facet.terms, f"facet {kind.id}/{facet.id} has no terms"
+    # kinds without facets carry an empty tuple, not a missing attribute
+    assert kind_for_vertical("odd").facets == ()
+
+
+def test_facet_lookup_is_kind_scoped_and_legacy_aware():
+    assert facet_for("lookafter", "pets").id == "pets"
+    # a legacy spelling resolves to its kind's facets
+    assert facet_for("camera", "casting").id == "casting"
+    assert facet_for("think", "pets") is None
+    assert facet_for("nope", "pets") is None
 
 
 def test_every_registered_scraper_sits_in_a_known_lane():

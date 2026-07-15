@@ -1,4 +1,4 @@
-"""On Camera Audiences (camera kind): studio-audience seats at TV tapings.
+"""On Camera Audiences (audience kind): studio-audience seats at TV tapings.
 
 OCA books audiences for AGT, Jeopardy!, The Price is Right and ~35 other
 shows, mostly around Los Angeles. Everything a row needs is server-rendered
@@ -51,7 +51,7 @@ _INDEX_URL = f"{_BASE_URL}/shows/"
 
 _HOST = "on-camera-audiences.com"
 _SOURCE = "oncamera_audiences"
-_VERTICAL = "camera"
+_VERTICAL = "audience"
 
 _FETCH_DELAY_S = 1.0
 _MAX_SHOW_PAGES = 40
@@ -195,7 +195,7 @@ def _parse_show_page(html: str) -> dict:
 
 
 def _build_row(card: dict, detail: dict, today: date) -> dict:
-    """One index card (plus its show page when fetched) to a camera quest row."""
+    """One index card (plus its show page when fetched) to an audience quest row."""
     name = card["name"]
     venue_lines = detail.get("venue_lines") or []
     venue = venue_lines[0] if venue_lines else ""
@@ -239,8 +239,8 @@ def _build_row(card: dict, detail: dict, today: date) -> dict:
     display_name="On Camera Audiences",
     url=_BASE_URL,
     description="Studio-audience seats at TV tapings (AGT, Jeopardy!, The Price is Right), mostly LA",
-    category="camera",
-    kind="camera",
+    category="audience",
+    kind="audience",
     # the shows index is the source's entire current lineup
     full_snapshot=True,
     # shows come and go over days; one polite crawl a day

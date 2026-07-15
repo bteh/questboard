@@ -76,6 +76,7 @@ def get_applications(
     work_type: str | None = None,
     location: str | None = None,
     location_strict: bool = False,
+    facet: str | None = None,
     salary_min: float | None = None,
     profile: str | None = None,
     workspace_id: str | None = None,
@@ -171,6 +172,37 @@ def get_applications(
                     and_(remote_ish, not_intl_only),
                 )
             )
+    if facet:
+        # A facet is a kind's own sub-shelf (packages/kinds/kinds.json):
+        # rows pass when any of its terms appears in the title or the
+        # description. Resolved against the requested verticals, so "pets"
+        # means something on the lookafter lane and 400s anywhere else.
+        from job_finder.kinds import facet_for
+
+        resolved = next(
+            (f for f in (facet_for(v, facet) for v in verticals or ()) if f is not None),
+            None,
+        )
+        if resolved is None:
+            raise ValueError(f"unknown facet {facet!r} for the requested verticals")
+        # Leading word boundary: match against ' '||field with a '% term%'
+        # pattern, so 'cat' finds "cat sitting" and "my cats" but never
+        # 'vacation', and 'pet' never matches 'carpet'. Suffix stays open on
+        # purpose (plurals and compounds like 'catsitter' should match).
+        padded_title = " " + func.lower(ApplicationRecord.job_title)
+        padded_desc = " " + func.lower(ApplicationRecord.description)
+        query = query.filter(
+            or_(
+                *(
+                    clause
+                    for term in resolved.terms
+                    for clause in (
+                        padded_title.like(f"% {term.lower()}%"),
+                        padded_desc.like(f"% {term.lower()}%"),
+                    )
+                )
+            )
+        )
     if salary_min is not None:
         # Annual pay floor. Mirrors job_finder.pipeline._job_salary_passes:
         # prefer annualized values, use the range midpoint when both ends are

@@ -35,6 +35,7 @@ import {
   withinPayCeiling,
 } from '@/utils/board-card';
 import { checkedAgoLabel } from '@/features/board/freshness';
+import { FacetChips } from '@/features/board/facet-chips';
 import { isCareerKind, kindParams, type KindKey } from '@/features/board/kind-params';
 import { KindRail } from '@/features/board/kind-rail';
 import { PlacePicker } from '@/features/board/place-picker';
@@ -77,7 +78,7 @@ export const Route = createRoute({
       throw redirect({
         to: '/board',
         search: {
-          v: saved.v, q: saved.q, place: saved.place, near: saved.near,
+          v: saved.v, f: saved.f, q: saved.q, place: saved.place, near: saved.near,
           from: saved.from, to: saved.to, p: saved.p,
         },
         replace: true,
@@ -360,6 +361,7 @@ function BoardPage() {
   useEffect(() => {
     saveBoardState({
       v: params.v,
+      f: params.f,
       q: params.q,
       place: params.place,
       near: params.near,
@@ -368,12 +370,13 @@ function BoardPage() {
       p: params.p,
       sort: sortNewest ? undefined : 'score',
     });
-  }, [params.v, params.q, params.place, params.near, params.from, params.to, params.p, sortNewest]);
+  }, [params.v, params.f, params.q, params.place, params.near, params.from, params.to, params.p, sortNewest]);
 
   const baseFilters = useMemo<ApplicationFilters>(
     () => ({
       ...kindParams(kindKey),
       ...presetParams(activeKeys),
+      facet: params.f,
       search: search || undefined,
       location: place || undefined,
       location_strict: nearParam ? true : undefined,
@@ -383,7 +386,7 @@ function BoardPage() {
       page_size: PAGE_SIZE,
       scope: 'board',
     }),
-    [kindKey, activeKeys, search, place, nearParam, payFloor, sortNewest],
+    [kindKey, activeKeys, params.f, search, place, nearParam, payFloor, sortNewest],
   );
 
   const filtersKey = JSON.stringify(baseFilters);
@@ -443,9 +446,19 @@ function BoardPage() {
         return {
           ...prev,
           v: key === 'all' ? undefined : key,
+          /* a facet belongs to its kind; switching lanes drops it */
+          f: (prev.v ?? 'all') === key ? prev.f : undefined,
           p: presetKeysTo(keys, PRESET_KEYS),
         };
       },
+    });
+  }
+
+  /* one facet at a time; clicking the active one clears it */
+  function toggleFacet(id: string) {
+    void navigate({
+      to: '/board',
+      search: (prev: BoardParams) => ({ ...prev, f: prev.f === id ? undefined : id }),
     });
   }
 
@@ -503,6 +516,7 @@ function BoardPage() {
     return {
       ...kindParams(kindKey),
       ...presetParams(probe),
+      facet: params.f,
       search: search || undefined,
       location: place || undefined,
       location_strict: nearParam ? true : undefined,
@@ -529,6 +543,15 @@ function BoardPage() {
         {!careerLane && <RestockLine />}
 
         <KindRail selected={kindKey} onSelect={selectKind} />
+
+        {kindKey !== 'all' && (
+          <FacetChips
+            kind={kindKey}
+            selected={params.f}
+            countBase={baseFilters}
+            onToggle={toggleFacet}
+          />
+        )}
 
         <div className="qb-preset-row">
           {visiblePresets.map((preset) => (

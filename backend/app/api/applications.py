@@ -163,6 +163,15 @@ def list_applications(
         False,
         description='"Near me only": with a location set, keeps only rows that match the place, dropping remote/nationwide/placeless. No-op without a location',
     ),
+    facet: str | None = Query(
+        None,
+        max_length=40,
+        description=(
+            "A kind's own sub-filter (a facet id from packages/kinds/kinds.json); "
+            "keeps rows whose title or description carries one of the facet's terms. "
+            "Resolved against vertical, so it 400s without a kind that carries it"
+        ),
+    ),
     salary_min: float | None = Query(
         None,
         ge=0,
@@ -234,6 +243,7 @@ def list_applications(
             work_type=work_type,
             location=location,
             location_strict=location_strict,
+            facet=facet,
             salary_min=salary_min,
             profile=None if ws_scope else profile,
             workspace_id=ws_scope,
