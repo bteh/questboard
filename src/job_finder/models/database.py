@@ -63,6 +63,10 @@ class ApplicationRecord(Base):
     # matches a typed state against this instead of guessing from prose;
     # see us_states for why parse-at-ingest beats query-time tokenizing.
     state_codes = Column(String(200), default="", index=True)
+    # The stated remote scope ('us'/'worldwide'/'intl'/''), parsed at ingest
+    # from the location text: a US place filter must not pass a job that is
+    # remote only for another country. See remote_scope.classify_remote_scope.
+    remote_scope = Column(String(12), default="", index=True)
     # Uniqueness is per POOL, not global (see __table_args__): the hosted
     # shared board keeps one row per URL in the NULL-workspace pool, and a
     # workspace's clone-on-touch copy of a shared quest row may carry the
@@ -464,6 +468,30 @@ def _migrate_db(engine) -> None:
                         text("UPDATE applications SET state_codes = :c WHERE id = :i"),
                         {"c": codes, "i": _id},
                     )
+        if "remote_scope" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN remote_scope VARCHAR(12) DEFAULT ''")
+            )
+        # Backfill remote scope the same idempotent way as state_codes: only
+        # rows with a location and no scope are read, only a non-empty
+        # classification writes.
+        if "location" in existing_cols:
+            from job_finder.remote_scope import classify_remote_scope
+
+            rows = conn.execute(
+                text(
+                    "SELECT id, location FROM applications "
+                    "WHERE location IS NOT NULL AND location != '' "
+                    "AND (remote_scope IS NULL OR remote_scope = '')"
+                )
+            ).fetchall()
+            for _id, _loc in rows:
+                scope = classify_remote_scope(_loc)
+                if scope:
+                    conn.execute(
+                        text("UPDATE applications SET remote_scope = :s WHERE id = :i"),
+                        {"s": scope, "i": _id},
+                    )
         if "date_posted" not in existing_cols:
             conn.execute(
                 text("ALTER TABLE applications ADD COLUMN date_posted VARCHAR(40) DEFAULT ''")
@@ -633,6 +661,12 @@ def _close_session() -> None:
         _SessionLocal.remove()
 
 
+def _remote_scope_field(location: str | None) -> str:
+    from job_finder.remote_scope import classify_remote_scope
+
+    return classify_remote_scope(location)
+
+
 def save_application(
     job_title: str,
     company: str,
@@ -752,6 +786,7 @@ def save_application(
 
                     existing.location = location
                     existing.state_codes = state_codes_field(location)
+                    existing.remote_scope = _remote_scope_field(location)
                     changed = True
                 elif not existing.state_codes and existing.location:
                     # backfill: rows saved before this column existed
@@ -890,6 +925,7 @@ def save_application(
             company=company,
             location=location,
             state_codes=state_codes_field(location),
+            remote_scope=_remote_scope_field(location),
             job_url=job_url,
             source=source,
             last_seen_at=_utcnow(),

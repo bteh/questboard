@@ -96,6 +96,23 @@ describe('career card grammar', () => {
     expect(card.meta.match(/remote/g) ?? []).toHaveLength(1);
   });
 
+  it('a remote row shows its stated scope, never a bare "remote" lie', () => {
+    const scoped = toBoardCard(
+      makeApp({ is_remote: true, location: 'Remote, India' }),
+      'Himalayas',
+    );
+    expect(scoped.meta).toContain('remote (India)');
+    const us = toBoardCard(
+      makeApp({ is_remote: true, location: 'Remote - USA' }),
+      'Himalayas',
+    );
+    expect(us.meta).toContain('remote (USA)');
+    // bare wording stays plain, and never renders empty parens
+    const bare = toBoardCard(makeApp({ is_remote: true, location: 'Remote' }), 'x');
+    expect(bare.meta).toContain('remote');
+    expect(bare.meta).not.toContain('(');
+  });
+
   it('never prints a JSON-key placeholder as the company', () => {
     // A mis-mapped scraper once stored the literal "name"; the card must read
     // as if no company was stated, leading with the source instead.

@@ -144,16 +144,28 @@ def get_applications(
             # the filter visibly bites. Remote and placeless supply drop.
             query = query.filter(place_match)
         else:
+            # Remote passes only when it is remote FOR YOU: a row whose
+            # stated scope names another country ("Remote, India",
+            # "Remote (UK Based only)") is not reachable from a US place
+            # and must earn its spot through the place match instead.
+            # Unstated scope ('' / NULL) stays conservatively kept.
+            not_intl_only = or_(
+                ApplicationRecord.remote_scope.is_(None),
+                ApplicationRecord.remote_scope != "intl",
+            )
+            remote_ish = or_(
+                ApplicationRecord.location.ilike("%remote%"),
+                ApplicationRecord.location.ilike("%online%"),
+                ApplicationRecord.location.ilike("%nationwide%"),
+                ApplicationRecord.location.ilike("%anywhere%"),
+                ApplicationRecord.is_remote.is_(True),
+            )
             query = query.filter(
                 or_(
                     place_match,
                     ApplicationRecord.location.is_(None),
                     ApplicationRecord.location == "",
-                    ApplicationRecord.location.ilike("%remote%"),
-                    ApplicationRecord.location.ilike("%online%"),
-                    ApplicationRecord.location.ilike("%nationwide%"),
-                    ApplicationRecord.location.ilike("%anywhere%"),
-                    ApplicationRecord.is_remote.is_(True),
+                    and_(remote_ish, not_intl_only),
                 )
             )
     if salary_min is not None:
