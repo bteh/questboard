@@ -25,7 +25,7 @@ export function RestockLine() {
     return (
       <p className="qb-restockline" role="status">
         {progress
-          ? `Checking the sources, ${progress.done} of ${progress.total} in.`
+          ? `Checking ${progress.total} sources, ${progress.done} reported so far.`
           : 'Checking the sources.'}
       </p>
     );
