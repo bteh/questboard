@@ -68,6 +68,7 @@ def get_applications(
     status: str | None = None,
     min_score: float | None = None,
     recommendation: str | None = None,
+    score_source: str | None = None,
     source: str | None = None,
     search: str | None = None,
     company_type: str | None = None,
@@ -112,6 +113,8 @@ def get_applications(
         query = query.filter(ApplicationRecord.overall_score >= min_score)
     if recommendation:
         query = query.filter(ApplicationRecord.recommendation == recommendation)
+    if score_source:
+        query = query.filter(ApplicationRecord.score_source == score_source)
     if source:
         query = query.filter(ApplicationRecord.source == source)
     if company_type:

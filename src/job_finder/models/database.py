@@ -98,6 +98,10 @@ class ApplicationRecord(Base):
     culture_fit_score = Column(Float, nullable=True)
     career_progression_score = Column(Float, nullable=True)
     recommendation = Column(String(50), default="")  # STRONG_APPLY, APPLY, MAYBE, SKIP
+    # Provenance: 'ai' (LLM scored the job) | 'keyword' (TF-IDF/keyword scorer,
+    # which uses lenient thresholds) | NULL (unscored). The two scales share the
+    # recommendation labels, so the UI needs to know which one wrote the row.
+    score_source = Column(String(40), nullable=True)
     score_reasoning = Column(Text, default="")
     key_strengths = Column(Text, default="")  # JSON array
     key_gaps = Column(Text, default="")  # JSON array
@@ -543,6 +547,26 @@ def _migrate_db(engine) -> None:
             conn.execute(
                 text("ALTER TABLE applications ADD COLUMN salary_source VARCHAR(40)")
             )
+        if "score_source" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN score_source VARCHAR(40)")
+            )
+        # Backfill score provenance, idempotent: only scored rows with no
+        # source are touched. The stored reasoning format tells the scales
+        # apart: the keyword/baseline scorer writes "Scoring (...)" reasoning,
+        # the LLM writes prose, and a score with empty reasoning also came
+        # from the keyword scorer.
+        if "overall_score" in existing_cols and "score_reasoning" in existing_cols:
+            conn.execute(
+                text(
+                    "UPDATE applications SET score_source = CASE "
+                    "WHEN score_reasoning LIKE 'Scoring (%' THEN 'keyword' "
+                    "WHEN score_reasoning IS NOT NULL AND score_reasoning != '' THEN 'ai' "
+                    "ELSE 'keyword' END "
+                    "WHERE overall_score IS NOT NULL "
+                    "AND (score_source IS NULL OR score_source = '')"
+                )
+            )
         if "evaluation_report_json" not in existing_cols:
             conn.execute(
                 text("ALTER TABLE applications ADD COLUMN evaluation_report_json TEXT DEFAULT ''")
@@ -710,6 +734,7 @@ def save_application(
     *,
     score_evidence: dict | str | None = None,
     salary_source: str | None = None,
+    score_source: str | None = None,
     date_posted: str | None = None,
     date_confidence: str | None = None,
     vertical: str = "career",
@@ -874,6 +899,7 @@ def save_application(
                             cand.culture_fit_score = culture_fit_score
                             cand.career_progression_score = career_progression_score
                             cand.recommendation = recommendation
+                            cand.score_source = score_source
                             cand.score_reasoning = score_reasoning
                             cand.key_strengths = key_strengths if isinstance(key_strengths, str) else json.dumps(key_strengths or [])
                             cand.key_gaps = key_gaps if isinstance(key_gaps, str) else json.dumps(key_gaps or [])
@@ -949,6 +975,7 @@ def save_application(
             culture_fit_score=culture_fit_score,
             career_progression_score=career_progression_score,
             recommendation=recommendation,
+            score_source=score_source,
             score_reasoning=score_reasoning,
             key_strengths=key_strengths,
             key_gaps=key_gaps,
@@ -1293,6 +1320,7 @@ def backfill_scores(
                 rec.culture_fit_score = score_data["culture_fit_score"]
                 rec.career_progression_score = score_data["career_progression_score"]
                 rec.recommendation = score_data["recommendation"]
+                rec.score_source = score_data.get("score_source", "keyword")
                 rec.score_reasoning = score_data.get("score_reasoning", "")
                 rec.key_strengths = json.dumps(score_data.get("key_strengths", []))
                 rec.key_gaps = json.dumps(score_data.get("key_gaps", []))

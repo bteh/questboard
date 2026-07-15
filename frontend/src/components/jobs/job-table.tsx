@@ -54,7 +54,12 @@ export function JobTable({ data, onRowClick, selectedId }: JobTableProps) {
     }),
     columnHelper.accessor('recommendation', {
       header: 'Match',
-      cell: (info) => <RecommendationBadge recommendation={info.getValue()} />,
+      cell: (info) => (
+        <RecommendationBadge
+          recommendation={info.getValue()}
+          scoreSource={info.row.original.score_source}
+        />
+      ),
     }),
     columnHelper.accessor('status', {
       header: 'Status',

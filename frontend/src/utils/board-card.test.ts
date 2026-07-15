@@ -277,6 +277,20 @@ describe('status mapping', () => {
   });
 });
 
+describe('score provenance', () => {
+  it('carries score_source onto the career card', () => {
+    const keyword = toBoardCard(makeApp({ score_source: 'keyword' }));
+    expect(keyword.scoreSource).toBe('keyword');
+    const ai = toBoardCard(makeApp({ score_source: 'ai' }));
+    expect(ai.scoreSource).toBe('ai');
+  });
+
+  it('maps missing provenance to null, never a guess', () => {
+    const card = toBoardCard(makeApp());
+    expect(card.scoreSource).toBeNull();
+  });
+});
+
 describe('quest rows', () => {
   it('maps an unpaid camera event honestly: no pay line, no resume line', () => {
     const card = toBoardCard(
