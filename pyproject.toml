@@ -38,7 +38,8 @@ dependencies = [
 [project.optional-dependencies]
 # Local semantic ranking (hybrid retrieval). Optional and ships dark: without
 # it, job_finder.embedder degrades to a no-op and ranking uses keywords/BM25.
-# fastembed is ONNX-based (no torch); the model downloads on first use.
+# fastembed is ONNX-based (no torch). Hosted images preload the artifact at
+# build time; local installs may download it on first use.
 embeddings = [
     "fastembed>=0.4",
 ]

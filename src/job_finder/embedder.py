@@ -14,6 +14,7 @@ product. They are stored as raw little-endian float32 bytes (see
 from __future__ import annotations
 
 import logging
+import os
 import threading
 from typing import Sequence
 
@@ -30,6 +31,18 @@ _load_lock = threading.Lock()
 _load_failed = False
 
 
+def _hosted_artifact_missing() -> bool:
+    """Hosted processes may only use a model artifact baked into the image."""
+    hosted = os.getenv("HOSTED_MODE", "").strip().lower() in {"1", "true", "yes", "on"}
+    cache_dir = os.getenv("JOB_FINDER_EMBEDDING_CACHE_DIR", "").strip()
+    has_files = bool(
+        cache_dir
+        and os.path.isdir(cache_dir)
+        and any(files for _root, _dirs, files in os.walk(cache_dir))
+    )
+    return bool(hosted and not has_files)
+
+
 def _load_model():
     """Load the model once, or record that it is unavailable. Never raises."""
     global _model, _load_failed
@@ -38,6 +51,13 @@ def _load_model():
     with _load_lock:
         if _model is not None or _load_failed:
             return _model
+        if _hosted_artifact_missing():
+            _load_failed = True
+            logger.warning(
+                "Embeddings unavailable: hosted mode requires a preloaded model artifact; "
+                "ranking falls back to BM25"
+            )
+            return None
         try:
             from fastembed import TextEmbedding  # heavy + optional
         except Exception as exc:  # not installed
@@ -49,7 +69,11 @@ def _load_model():
             )
             return None
         try:
-            _model = TextEmbedding(model_name=MODEL_NAME)
+            cache_dir = os.getenv("JOB_FINDER_EMBEDDING_CACHE_DIR", "").strip() or None
+            kwargs = {"model_name": MODEL_NAME}
+            if cache_dir:
+                kwargs["cache_dir"] = cache_dir
+            _model = TextEmbedding(**kwargs)
             logger.info("Loaded embedding model %s (%d-dim)", MODEL_NAME, DIM)
         except Exception as exc:  # weights download blocked / transient
             # Do NOT latch here. Unlike a missing package, a load failure is
