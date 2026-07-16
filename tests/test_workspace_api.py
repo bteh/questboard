@@ -470,7 +470,7 @@ class HostedWorkspaceApiTest(unittest.TestCase):
         db = self._get_db()
         snapshot = self.workspace_service.build_search_snapshot(
             self.workspace_service.get_workspace_preferences(db, workspace_a)
-        )
+        ).model_copy(update={"roles": ["Snapshot Data Manager"], "keywords": ["dbt"]})
         self.workspace_service.register_search_run(
             db,
             workspace_a,
@@ -510,7 +510,10 @@ class HostedWorkspaceApiTest(unittest.TestCase):
             "already running elsewhere",
         )
 
+        captured_execute: dict[str, object] = {}
+
         def fake_execute(run, roles, locations, *args, **kwargs):
+            captured_execute.update(kwargs)
             run.status = "completed"
             run.started_at = run.started_at or datetime.now(timezone.utc)
             run.completed_at = datetime.now(timezone.utc)
@@ -533,6 +536,10 @@ class HostedWorkspaceApiTest(unittest.TestCase):
             processed = self.pipeline_service.process_next_hosted_run("worker-1")
 
         self.assertTrue(processed)
+        self.assertEqual(
+            captured_execute["config_override"]["target_roles"],
+            ["Snapshot Data Manager"],
+        )
 
         runs_a = self.client.get("/api/v1/search/runs", headers=headers_a)
         self.assertEqual(runs_a.status_code, 200)

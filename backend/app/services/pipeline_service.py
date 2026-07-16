@@ -972,6 +972,18 @@ def process_next_hosted_run(worker_id: str | None = None) -> bool:
         _emit_stage_event(run, stage="searching", percent=3)
 
         prefs = workspace_service.get_workspace_preferences(db, record.workspace_id)
+        # The queue snapshot is the immutable intent for this run. Preferences
+        # may change while a run waits for a worker, and using the live row here
+        # would make sourcing terms and the primary-role gate disagree.
+        try:
+            from app.schemas.workspace import SearchSnapshot
+
+            snapshot = SearchSnapshot.model_validate_json(record.snapshot_json or "{}")
+            prefs = type(prefs).model_validate(
+                {**prefs.model_dump(), **snapshot.model_dump()}
+            )
+        except Exception:
+            logger.warning("Invalid search snapshot for run %s; using current preferences", record.run_id)
         llm = workspace_service.get_workspace_llm(db, record.workspace_id, fallback_to_global=True)
         config_override = workspace_service.build_pipeline_config_override(prefs, record.workspace_id)
 
