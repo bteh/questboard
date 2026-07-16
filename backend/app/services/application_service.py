@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import and_, func, or_
+from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import Session
 
 # The mandatory vertical scope. Every list-level read of applications goes
@@ -14,6 +14,7 @@ from app.models.application import ApplicationRecord
 _ALLOWED_SORT_BY = frozenset({
     "overall_score", "date_found", "company", "job_title", "salary_min", "salary_max",
     "event_start", "updated_at",
+    "rank",
 })
 
 
@@ -312,11 +313,20 @@ def get_applications(
     total = query.count()
 
     # Sorting
-    sort_col = getattr(ApplicationRecord, sort_by, ApplicationRecord.overall_score)
-    if sort_dir == "asc":
-        query = query.order_by(sort_col.asc().nullslast())
+    if sort_by == "rank":
+        bucket_order = case(
+            (ApplicationRecord.match_bucket == "primary", 0),
+            (ApplicationRecord.match_bucket == "adjacent", 1),
+            else_=2,
+        )
+        direction = ApplicationRecord.rank_score.asc().nullslast() if sort_dir == "asc" else ApplicationRecord.rank_score.desc().nullslast()
+        query = query.order_by(bucket_order.asc(), direction, ApplicationRecord.date_found.desc())
     else:
-        query = query.order_by(sort_col.desc().nullsfirst())
+        sort_col = getattr(ApplicationRecord, sort_by, ApplicationRecord.overall_score)
+        if sort_dir == "asc":
+            query = query.order_by(sort_col.asc().nullslast())
+        else:
+            query = query.order_by(sort_col.desc().nullsfirst())
 
     # Pagination
     offset = (page - 1) * page_size

@@ -669,6 +669,36 @@ async def suggest_search_params(
         limit=settings.search_rate_limit_per_minute,
         db=db,
     )
+    managed_workspace = bool(
+        workspace
+        and settings.hosted_mode
+        and settings.hosted_platform_managed_ai
+    )
+    if managed_workspace:
+        analysis, _status, _cached = workspace_service.get_or_create_resume_analysis(
+            db, workspace.workspace.id
+        )
+        prefs = workspace_service.get_workspace_preferences(db, workspace.workspace.id)
+        if analysis:
+            return SearchSuggestions(
+                roles=_clean_list(analysis.get("suggested_target_roles"), max_items=15),
+                keywords=_clean_list(analysis.get("suggested_keywords"), max_items=20),
+                locations=workspace_service.place_labels(prefs.preferred_places),
+                companies=prefs.companies,
+                summary=str(analysis.get("current_title") or analysis.get("industry") or "")[:300],
+            )
+        fallback_roles, fallback_keywords = workspace_service.derive_search_terms_from_resume(
+            db, workspace.workspace.id, prefs,
+        )
+        return SearchSuggestions(
+            roles=fallback_roles,
+            keywords=fallback_keywords,
+            locations=workspace_service.place_labels(prefs.preferred_places),
+            companies=prefs.companies,
+            summary="The AI result was unavailable or unreadable; using an editable local fallback.",
+            ai_failed=True,
+        )
+
     primary_llm = (
         workspace_service.get_workspace_llm(db, workspace.workspace.id, fallback_to_global=True)
         if workspace

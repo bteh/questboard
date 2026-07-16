@@ -1504,11 +1504,16 @@ class JobFinderPipeline:
             logger.warning("Could not load scraper registry: %s", e)
             watchlist_by_ats = {}
 
-        # Use AI to expand role keywords for better scraper filtering.
+        # Use AI to expand role keywords for source recall only. Hosted
+        # managed-AI disables this per-search call; confirmed roles remain the
+        # only route into the primary result bucket either way.
         # This helps non-tech profiles (nurse, marketer, etc.) by generating
         # related title keywords the LLM knows about, so scrapers can filter
         # more intelligently beyond just substring matching.
-        scraper_roles = self.expand_roles_with_ai(roles_raw, progress=progress)
+        if (self.config.get("search_settings") or {}).get("ai_expand_roles", True):
+            scraper_roles = self.expand_roles_with_ai(roles_raw, progress=progress)
+        else:
+            scraper_roles = list(roles_raw)
         # Store expanded roles so filter_by_role uses them too
         self._expanded_roles = scraper_roles
 
@@ -1790,7 +1795,7 @@ class JobFinderPipeline:
         # --- Role relevance filter ---
         pre_role = len(deduped)
         deduped = self.filter_by_role(deduped, filters=filter_settings, progress=progress)
-        target_roles = getattr(self, "_expanded_roles", None) or self.config.get("target_roles", [])
+        target_roles = self.config.get("target_roles", [])
         self._record_funnel_stage(
             "role", "Role relevance", pre_role, len(deduped), active=bool(target_roles),
         )
@@ -1828,14 +1833,11 @@ class JobFinderPipeline:
         profile seeing "Lead Software Engineer" because the search term
         "lead nurse practitioner" matched on "lead".
 
-        Uses the same ``_match_roles()`` logic as the scrapers for consistency.
-        When AI-expanded roles are available (from ``expand_roles_with_ai``),
-        those are used instead — they include related titles the LLM knows
-        about (e.g. "APRN" for a nurse profile) so legitimate jobs aren't
-        filtered out.
+        Confirmed target roles define the primary bucket. AI-expanded roles
+        may add a small, explicitly adjacent bucket when primary supply is
+        thin, but can never make an off-target result look primary.
         """
-        # Prefer AI-expanded roles (set by search_all_jobs) over raw config
-        target_roles = getattr(self, "_expanded_roles", None) or self.config.get("target_roles", [])
+        target_roles = list(self.config.get("target_roles", []) or [])
         # When resume analysis was starved and left no target_roles, fall back to
         # the resume's current title so the filter still bites instead of passing
         # the whole noisy pool. Guarded below: this fallback never zeroes the
@@ -1854,7 +1856,18 @@ class JobFinderPipeline:
         from job_finder.tools.scrapers._utils import job_passes_role_filter
 
         resolved = filters or _resolve_filter_settings(self.config)
-        include_founding = bool(resolved.get("include_founding_titles", True))
+        intent_text = " ".join(
+            target_roles + list(self.config.get("keyword_searches", []) or [])
+        ).lower()
+        wants_founding = any(
+            term in intent_text
+            for term in ("founding", "startup", "early-stage", "early stage", "first hire")
+        )
+        wants_crypto = any(
+            term in intent_text
+            for term in ("crypto", "web3", "blockchain", "defi", "solidity", "ethereum")
+        )
+        include_founding = bool(resolved.get("include_founding_titles", True)) and wants_founding
         match_mode = str(resolved.get("role_match_mode", "all_significant"))
         strictness = str(resolved.get("strictness", _DEFAULT_STRICTNESS))
 
@@ -1864,15 +1877,40 @@ class JobFinderPipeline:
         # filter and the purge on the same predicate ensures the pipeline never
         # surfaces a job this run while deleting that same record from the DB.
         pre_count = len(jobs)
-        filtered = [
+        primary = [
             j for j in jobs
             if job_passes_role_filter(
                 j, target_roles,
                 match_mode=match_mode,
                 include_founding=include_founding,
                 strictness=strictness,
+                allow_crypto_rescue=wants_crypto,
             )
         ]
+        for job in primary:
+            job["match_bucket"] = "primary"
+
+        adjacent: list[dict] = []
+        expanded_roles = list(getattr(self, "_expanded_roles", None) or [])
+        if len(primary) < 10 and expanded_roles:
+            primary_ids = {id(job) for job in primary}
+            for job in jobs:
+                if id(job) in primary_ids:
+                    continue
+                if job_passes_role_filter(
+                    job,
+                    expanded_roles,
+                    match_mode=match_mode,
+                    include_founding=include_founding,
+                    strictness=strictness,
+                    allow_crypto_rescue=wants_crypto,
+                ):
+                    job["match_bucket"] = "adjacent"
+                    adjacent.append(job)
+                    if len(adjacent) >= 20:
+                        break
+        filtered = primary + adjacent
+
         if title_fallback and not filtered:
             # The current-title guess matched nothing: a sourcing gap, not a bad
             # user. Keep the unfiltered set rather than surface an empty board.
@@ -1894,12 +1932,15 @@ class JobFinderPipeline:
         if not title_fallback:
             try:
                 from job_finder.models.database import purge_non_matching_roles
+                purge_roles = list(dict.fromkeys(target_roles + expanded_roles))
                 purged = purge_non_matching_roles(
-                    target_roles=target_roles,
+                    target_roles=purge_roles,
                     profile=self.profile_name,
+                    workspace_id=(self.config.get("workspace") or {}).get("workspace_id"),
                     match_mode=match_mode,
                     include_founding=include_founding,
                     strictness=strictness,
+                    allow_crypto_rescue=wants_crypto,
                 )
                 if purged and progress:
                     progress(f"Purged {purged} existing jobs not matching target roles")
@@ -2641,8 +2682,32 @@ class JobFinderPipeline:
             if progress:
                 progress("No resume found -- skipping scoring")
 
+        rank_enabled = bool(
+            (self.config.get("search_settings") or {}).get("hybrid_ranking_enabled", False)
+        )
+        rank_query = ""
+        if rank_enabled:
+            from job_finder.hybrid_ranker import rank_jobs
+
+            rank_query = "\n".join(
+                [
+                    *list(self.config.get("target_roles", []) or []),
+                    *list(self.config.get("keyword_searches", []) or []),
+                    str((self.config.get("career_baseline") or {}).get("current_title", "")),
+                ]
+            ).strip()
+            if not rank_query and has_resume:
+                rank_query = resume_text[:4000]
+            jobs = rank_jobs(jobs, query_text=rank_query, config=self.config)
+
         # 4. Enhance top jobs (AI only, when enhance=True)
-        ai_available = use_ai and enhance and self.llm and self.llm.is_configured
+        ai_available = (
+            use_ai
+            and enhance
+            and (self.config.get("search_settings") or {}).get("ai_enhance_jobs", True)
+            and self.llm
+            and self.llm.is_configured
+        )
         max_enhance = self.config.get("search_settings", {}).get("max_enhance", 10)
         strong = [j for j in jobs if j.get("recommendation") in ("STRONG_APPLY", "APPLY")][:max_enhance]
         enhanced_count = 0
@@ -2764,6 +2829,10 @@ class JobFinderPipeline:
                 career_progression_score=job.get("career_progression_score"),
                 recommendation=job.get("recommendation"),
                 score_source=job.get("score_source"),
+                rank_score=job.get("rank_score"),
+                rank_source=job.get("rank_source"),
+                match_bucket=job.get("match_bucket"),
+                match_reasons=job.get("match_reasons"),
                 score_reasoning=job.get("score_reasoning"),
                 score_evidence=job.get("score_evidence"),
                 key_strengths=json.dumps(job.get("key_strengths", [])),
@@ -2785,6 +2854,51 @@ class JobFinderPipeline:
             if rec:
                 job["db_id"] = rec.id
                 saved += 1
+
+        # Dense work belongs to the search worker, after the scrape/save hot
+        # path and against only this run's visible career row IDs. A missing or
+        # invalid model artifact keeps the lexical order.
+        if rank_enabled and has_resume:
+            candidate_ids = [int(job["db_id"]) for job in jobs if job.get("db_id")]
+            workspace_id = (self.config.get("workspace") or {}).get("workspace_id")
+            semantic_scores: dict[int, float] = {}
+            if candidate_ids:
+                try:
+                    from job_finder import embedder
+                    from job_finder.embeddings_index import index_embeddings, load_embeddings
+
+                    index_embeddings(
+                        application_ids=candidate_ids,
+                        workspace_id=workspace_id,
+                    )
+                    app_ids, matrix = load_embeddings(
+                        application_ids=candidate_ids,
+                        workspace_id=workspace_id,
+                    )
+                    semantic_query = f"{rank_query}\n{resume_text[:12000]}".strip()
+                    query_vector = embedder.encode_one(semantic_query, is_query=True)
+                    if matrix is not None and query_vector is not None:
+                        similarities = matrix @ query_vector
+                        semantic_scores = {
+                            app_id: float(similarity)
+                            for app_id, similarity in zip(app_ids, similarities)
+                        }
+                except Exception as exc:
+                    logger.warning("Semantic ranking unavailable; keeping BM25 order (%s)", exc)
+
+            from job_finder.hybrid_ranker import rank_jobs
+            from job_finder.models.database import save_application_ranks
+
+            jobs = rank_jobs(
+                jobs,
+                query_text=rank_query,
+                config=self.config,
+                semantic_scores=semantic_scores or None,
+            )
+            try:
+                save_application_ranks(jobs, workspace_id=workspace_id)
+            except Exception as exc:
+                logger.warning("Could not persist hybrid order (%s)", exc)
 
         # 6. Application kits (opt-in; nothing is ever transmitted)
         apply_config = self.config.get("auto_apply", {})

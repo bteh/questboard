@@ -876,6 +876,7 @@ def job_passes_role_filter(
     match_mode: str = "all_significant",
     include_founding: bool = True,
     strictness: str = "balanced",
+    allow_crypto_rescue: bool = True,
 ) -> bool:
     """Single source of truth for "does this job survive the role filter".
 
@@ -889,7 +890,7 @@ def job_passes_role_filter(
     mode = match_mode
     if strictness == "balanced" and match_mode == "all_significant" and not job.get("is_remote"):
         mode = "any_word"
-    if strictness != "strict" and job_is_crypto_domain(job):
+    if allow_crypto_rescue and strictness != "strict" and job_is_crypto_domain(job):
         return _match_roles_crypto(
             title, roles,
             match_mode=mode, include_founding=include_founding,

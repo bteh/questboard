@@ -313,8 +313,8 @@ class CryptoSourceRoleRescueTest(unittest.TestCase):
         }
         return pipe
 
-    def test_balanced_keeps_crypto_titles_from_cryptojobslist(self) -> None:
-        """Crypto-flavored titles from CryptoJobsList must survive role filtering."""
+    def test_balanced_does_not_rescue_crypto_without_user_intent(self) -> None:
+        """A crypto source alone must not override the user's confirmed family."""
         pipe = self._make_pipeline(["data engineer"])
         jobs = [
             # Crypto signal but no "data" + "engineer" word match
@@ -330,10 +330,19 @@ class CryptoSourceRoleRescueTest(unittest.TestCase):
         ]
         filtered = pipe.filter_by_role(jobs)
         titles = {j["title"] for j in filtered}
-        self.assertIn("Defi Associate", titles)
-        self.assertIn("Senior Solidity Engineer", titles)
-        self.assertIn("ZK Circuit Researcher", titles)
+        self.assertNotIn("Defi Associate", titles)
+        self.assertNotIn("Senior Solidity Engineer", titles)
+        self.assertNotIn("ZK Circuit Researcher", titles)
         self.assertIn("Senior Data Engineer", titles)
+
+    def test_balanced_rescues_crypto_when_user_asks_for_it(self) -> None:
+        pipe = self._make_pipeline(["data engineer"])
+        pipe.config["keyword_searches"] = ["web3"]
+        jobs = [
+            {"title": "Senior Solidity Engineer", "company": "X", "url": "http://b",
+             "is_remote": True, "source": "cryptojobslist"},
+        ]
+        self.assertEqual([job["title"] for job in pipe.filter_by_role(jobs)], ["Senior Solidity Engineer"])
 
     def test_non_crypto_remote_jobs_still_filtered_strictly(self) -> None:
         """The rescue is crypto-source-scoped — generic remote firehose stays strict."""
@@ -348,6 +357,19 @@ class CryptoSourceRoleRescueTest(unittest.TestCase):
         titles = {j["title"] for j in filtered}
         self.assertNotIn("Marketing Engineer", titles)
         self.assertIn("Senior Data Engineer", titles)
+
+    def test_ai_expansion_can_only_add_an_explicit_adjacent_bucket(self) -> None:
+        pipe = self._make_pipeline(["data engineer"])
+        pipe._expanded_roles = ["data engineer", "machine learning engineer"]
+        jobs = [
+            {"title": "Senior Data Engineer", "company": "A", "url": "http://a", "is_remote": True},
+            {"title": "Machine Learning Engineer", "company": "B", "url": "http://b", "is_remote": True},
+        ]
+        filtered = pipe.filter_by_role(jobs)
+        assert [(job["title"], job["match_bucket"]) for job in filtered] == [
+            ("Senior Data Engineer", "primary"),
+            ("Machine Learning Engineer", "adjacent"),
+        ]
 
     def test_strict_mode_still_filters_crypto_jobs(self) -> None:
         """Strict opt-in remains strict for everything — including crypto."""

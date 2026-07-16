@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_config, get_llm
+from app.config import get_settings
 from app.models.application import ApplicationRecord
 
 logger = logging.getLogger(__name__)
@@ -90,8 +91,13 @@ def prepare_application(
         workspace_llm = workspace_service.get_workspace_llm(db, workspace_id, fallback_to_global=True)
         if workspace_llm:
             llm = workspace_llm
+    managed_hosted = bool(
+        workspace_id
+        and get_settings().hosted_mode
+        and get_settings().hosted_platform_managed_ai
+    )
     pipeline = JobFinderPipeline(
-        llm=llm if llm.is_configured else None,
+        llm=None if managed_hosted else (llm if llm and llm.is_configured else None),
         profile=profile,
     )
 

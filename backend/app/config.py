@@ -52,7 +52,12 @@ class Settings(BaseSettings):
     supabase_jwt_secret: str = ""
     supabase_jwks_url: str = ""
     hosted_platform_managed_ai: bool = True
+    hosted_resume_analyses_per_month: int = 2
     hosted_allow_workspace_llm_config: bool = False
+    hybrid_ranking_enabled: bool = False
+    # Comma-separated workspace IDs for an owner/beta rollout. Empty means
+    # every workspace once the global flag is enabled.
+    hybrid_ranking_workspace_ids: str = ""
     worker_id: str = ""
     worker_poll_interval_seconds: float = 2.0
     worker_lease_seconds: int = 120

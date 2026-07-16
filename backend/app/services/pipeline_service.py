@@ -512,7 +512,12 @@ def _execute_pipeline(
         # This is what makes the search smarter than a basic aggregator:
         # the LLM reasons about which companies would want THIS person
         # based on their full background, not just role title keywords.
-        if pipeline.llm and pipeline.llm.is_configured and use_ai:
+        if (
+            pipeline.llm
+            and pipeline.llm.is_configured
+            and use_ai
+            and (pipeline.config.get("search_settings") or {}).get("ai_company_discovery", True)
+        ):
             _send_event(run, "progress", "AI is discovering companies that match your background...")
             discovered_companies = _ai_discover_companies(
                 pipeline, roles, target_companies or [], run,

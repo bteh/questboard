@@ -881,6 +881,113 @@ def get_resume_text(db: Session, workspace_id: str) -> str:
     return record.extracted_text
 
 
+def _cached_resume_analysis(record: WorkspaceResume | None) -> dict[str, Any] | None:
+    """Return the canonical analysis only when it matches the current file hash."""
+    if not record or not record.llm_summary or not record.file_sha256:
+        return None
+    try:
+        payload = json.loads(record.llm_summary)
+    except (json.JSONDecodeError, TypeError):
+        return None
+    if not isinstance(payload, dict) or payload.get("resume_hash") != record.file_sha256:
+        return None
+    analysis = payload.get("analysis")
+    return analysis if isinstance(analysis, dict) else None
+
+
+def _consume_managed_resume_analysis(db: Session, workspace_id: str) -> bool:
+    """Reserve one managed-AI resume analysis inside the monthly hard cap."""
+    settings = get_settings()
+    if not (settings.hosted_mode and settings.hosted_platform_managed_ai):
+        return True
+    limit = max(int(settings.hosted_resume_analyses_per_month), 0)
+    period_key = _utcnow().strftime("%Y-%m")
+    if limit <= 0:
+        return False
+    values = {
+        "workspace_id": workspace_id,
+        "metric": "resume_analysis",
+        "period_key": period_key,
+        "used_count": 1,
+        "limit_count": limit,
+    }
+    dialect = db.get_bind().dialect.name
+    if dialect in {"sqlite", "postgresql"}:
+        if dialect == "postgresql":
+            from sqlalchemy.dialects.postgresql import insert
+        else:
+            from sqlalchemy.dialects.sqlite import insert
+        statement = insert(UsageCounter).values(**values)
+        statement = statement.on_conflict_do_update(
+            index_elements=["workspace_id", "metric", "period_key"],
+            set_={
+                "used_count": UsageCounter.used_count + 1,
+                "limit_count": limit,
+                "updated_at": _utcnow(),
+            },
+            where=UsageCounter.used_count < limit,
+        ).returning(UsageCounter.used_count)
+        consumed = db.execute(statement).scalar_one_or_none()
+        db.commit()
+        return consumed is not None
+
+    # Conservative fallback for other SQLAlchemy dialects.
+    record = (
+        db.query(UsageCounter)
+        .filter(
+            UsageCounter.workspace_id == workspace_id,
+            UsageCounter.metric == "resume_analysis",
+            UsageCounter.period_key == period_key,
+        )
+        .with_for_update()
+        .first()
+    )
+    if record and int(record.used_count or 0) >= limit:
+        return False
+    if not record:
+        record = UsageCounter(**values)
+        db.add(record)
+    else:
+        record.used_count = int(record.used_count or 0) + 1
+        record.limit_count = limit
+    db.commit()
+    return True
+
+
+def get_or_create_resume_analysis(
+    db: Session,
+    workspace_id: str,
+) -> tuple[dict[str, Any] | None, str, bool]:
+    """Read or create the one canonical analysis for the current resume.
+
+    Returns ``(analysis, status, cached)``. Re-reading the same resume is free;
+    only a genuinely new analysis consumes the managed monthly allowance.
+    """
+    record = get_workspace_resume(db, workspace_id)
+    cached = _cached_resume_analysis(record)
+    if cached is not None:
+        return cached, "completed", True
+    if not record or not record.extracted_text:
+        return None, "failed", False
+    llm = get_workspace_llm(db, workspace_id, fallback_to_global=True)
+    if not getattr(llm, "is_configured", False):
+        return None, "skipped_no_llm", False
+    if not _consume_managed_resume_analysis(db, workspace_id):
+        return None, "quota_exhausted", False
+
+    from app.services.resume_analyzer import analyze_resume
+
+    analysis = analyze_resume(record.extracted_text, llm)
+    if not analysis:
+        return None, "analysis_error", False
+    record.llm_summary = json.dumps(
+        {"resume_hash": record.file_sha256, "analysis": analysis},
+        ensure_ascii=False,
+    )
+    db.commit()
+    return analysis, "completed", False
+
+
 def materialize_workspace_resume_pdf(db: Session, workspace_id: str) -> str:
     record = get_workspace_resume(db, workspace_id)
     if not record:
@@ -945,8 +1052,6 @@ def save_workspace_resume(
         raise HTTPException(status_code=400, detail=warning or "Upload rejected by scanner")
 
     from job_finder.tools.resume_parser_tool import parse_resume
-    from app.services.resume_analyzer import analyze_resume
-
     parsed_text = parse_resume(file_path=str(file_path))
     parse_status = "parsed"
     parse_warning = warning
@@ -1024,38 +1129,11 @@ def save_workspace_resume(
     # parse_code="SCANNED_PDF" below via the `scanned` check).
     analysis_status = "failed"
     if extracted_text:
-        llm = get_workspace_llm(db, workspace_id, fallback_to_global=True)
-        if not getattr(llm, "is_configured", False):
-            analysis_status = "skipped_no_llm"
-        else:
-            analysis = analyze_resume(extracted_text, llm)
-            if analysis:
-                analysis_status = "completed"
-                prefs = get_workspace_preferences(db, workspace_id)
-                updated = WorkspacePreferencesSchema.model_validate(
-                    {
-                        **prefs.model_dump(),
-                        "roles": analysis.get("suggested_target_roles", prefs.roles),
-                        "keywords": analysis.get("suggested_keywords", prefs.keywords),
-                        "current_title": analysis.get("current_title") or prefs.current_title,
-                        "current_level": analysis.get("seniority") or prefs.current_level,
-                    }
-                )
-                save_workspace_preferences(db, workspace_id, updated)
-                record.llm_summary = json.dumps(
-                    {
-                        "industry": analysis.get("industry", ""),
-                        "seniority": analysis.get("seniority", ""),
-                        "years_experience": analysis.get("years_experience", 0),
-                        "suggested_target_roles": analysis.get("suggested_target_roles", []),
-                        "suggested_keywords": analysis.get("suggested_keywords", []),
-                    }
-                )
-            else:
-                # Text read fine, but the LLM analysis step didn't finish.
-                # Distinct from "failed" so the UI tells the user to retry
-                # instead of blaming a file that was read perfectly.
-                analysis_status = "analysis_error"
+        # Flush the new hash/text first so the cache key is the uploaded file.
+        # Suggestions are returned for editing and are not preferences until
+        # the user explicitly saves the onboarding form.
+        db.flush()
+        analysis, analysis_status, _cached = get_or_create_resume_analysis(db, workspace_id)
 
     db.commit()
     try:
@@ -1197,10 +1275,13 @@ def derive_search_terms_from_resume(
     record = get_workspace_resume(db, workspace_id)
     if record and record.llm_summary:
         try:
-            summary = json.loads(record.llm_summary)
+            summary = _cached_resume_analysis(record) or json.loads(record.llm_summary)
             industry = summary.get("industry", "")
             if industry and industry != "unknown" and industry not in keywords:
                 keywords.append(industry)
+            analyzed_title = str(summary.get("current_title") or "").strip()
+            if analyzed_title and analyzed_title not in roles:
+                roles.append(analyzed_title)
             for role in summary.get("suggested_target_roles", []):
                 if role and role not in roles:
                     roles.append(role)
@@ -1713,7 +1794,17 @@ def build_pipeline_config_override(preferences: WorkspacePreferencesSchema, work
     # concurrent searches can't starve it. Desktop / BYOK users pay for their
     # own AI, so they keep per-job AI scoring.
     settings = get_settings()
-    ai_score_jobs = not (settings.hosted_mode and settings.hosted_platform_managed_ai)
+    managed_ai = settings.hosted_mode and settings.hosted_platform_managed_ai
+    ai_score_jobs = not managed_ai
+    ranking_allowlist = {
+        value.strip()
+        for value in settings.hybrid_ranking_workspace_ids.split(",")
+        if value.strip()
+    }
+    hybrid_ranking_enabled = bool(
+        settings.hybrid_ranking_enabled
+        and (not ranking_allowlist or workspace_id in ranking_allowlist)
+    )
 
     return {
         "target_roles": preferences.roles,
@@ -1748,6 +1839,10 @@ def build_pipeline_config_override(preferences: WorkspacePreferencesSchema, work
             "max_days_old": preferences.max_days_old,
             "exclude_staffing_agencies": preferences.exclude_staffing_agencies,
             "ai_score_jobs": ai_score_jobs,
+            "ai_expand_roles": not managed_ai,
+            "ai_company_discovery": not managed_ai,
+            "ai_enhance_jobs": not managed_ai,
+            "hybrid_ranking_enabled": hybrid_ranking_enabled,
         },
         "filters": {
             "strictness": preferences.match_strictness,
