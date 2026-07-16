@@ -1836,8 +1836,20 @@ class JobFinderPipeline:
         """
         # Prefer AI-expanded roles (set by search_all_jobs) over raw config
         target_roles = getattr(self, "_expanded_roles", None) or self.config.get("target_roles", [])
+        # When resume analysis was starved and left no target_roles, fall back to
+        # the resume's current title so the filter still bites instead of passing
+        # the whole noisy pool. Guarded below: this fallback never zeroes the
+        # board and never purges the DB (a single guessed title is too weak to
+        # delete rows on).
+        title_fallback = False
         if not target_roles:
-            return jobs  # no roles configured → pass everything
+            current_title = str(
+                (self.config.get("career_baseline") or {}).get("current_title", "") or ""
+            ).strip()
+            if not current_title:
+                return jobs  # nothing to filter on → pass everything
+            target_roles = [current_title]
+            title_fallback = True
 
         from job_finder.tools.scrapers._utils import job_passes_role_filter
 
@@ -1861,6 +1873,14 @@ class JobFinderPipeline:
                 strictness=strictness,
             )
         ]
+        if title_fallback and not filtered:
+            # The current-title guess matched nothing: a sourcing gap, not a bad
+            # user. Keep the unfiltered set rather than surface an empty board.
+            logger.info(
+                "Role filter: current-title fallback matched 0/%d jobs; keeping unfiltered",
+                pre_count,
+            )
+            return jobs
         dropped = pre_count - len(filtered)
         if dropped:
             logger.info("Role filter: removed %d/%d jobs not matching target roles", dropped, pre_count)
@@ -1869,19 +1889,22 @@ class JobFinderPipeline:
 
         # Also purge existing DB records that don't match roles — using the SAME
         # matching settings so it can't delete a job filter_by_role just kept.
-        try:
-            from job_finder.models.database import purge_non_matching_roles
-            purged = purge_non_matching_roles(
-                target_roles=target_roles,
-                profile=self.profile_name,
-                match_mode=match_mode,
-                include_founding=include_founding,
-                strictness=strictness,
-            )
-            if purged and progress:
-                progress(f"Purged {purged} existing jobs not matching target roles")
-        except Exception as e:
-            logger.debug("DB role purge failed (non-fatal): %s", e)
+        # Skipped for the current-title fallback: a single guessed title is too
+        # weak a signal to delete stored rows on.
+        if not title_fallback:
+            try:
+                from job_finder.models.database import purge_non_matching_roles
+                purged = purge_non_matching_roles(
+                    target_roles=target_roles,
+                    profile=self.profile_name,
+                    match_mode=match_mode,
+                    include_founding=include_founding,
+                    strictness=strictness,
+                )
+                if purged and progress:
+                    progress(f"Purged {purged} existing jobs not matching target roles")
+            except Exception as e:
+                logger.debug("DB role purge failed (non-fatal): %s", e)
 
         return filtered
 
@@ -2036,9 +2059,13 @@ class JobFinderPipeline:
                 )
 
         ai_available = use_ai and self.llm and self.llm.is_configured
+        settings = self.config.get("search_settings") or {}
 
-        if ai_available:
-            settings = self.config.get("search_settings") or {}
+        # Hosted managed-AI keeps per-job scoring on keywords so many concurrent
+        # searches can't drain the shared platform LLM that the one-shot resume
+        # analysis needs to set target_roles. ai_score_top_n is NOT this lever
+        # (<=0 there means "AI-score every job"); ai_score_jobs is.
+        if ai_available and settings.get("ai_score_jobs", True):
             ai_score_top_n = int(settings.get("ai_score_top_n", 60) or 0)
             if ai_score_top_n > 0 and len(jobs) > ai_score_top_n:
                 if progress:
@@ -2167,7 +2194,12 @@ class JobFinderPipeline:
                 try:
                     job, ai_score = future.result()
                 except Exception as e:
+                    # Out of tokens / provider error: keyword-score this job so it
+                    # is never left unscored (an unscored job sorts at random, the
+                    # exact "results aren't the greatest" symptom when a shared
+                    # quota is exhausted mid-search).
                     logger.warning("AI scoring failed for a job: %s", e)
+                    self._keyword_score_single(futures[future], resume_text)
                     failed += 1
                     continue
                 done += 1
