@@ -10,7 +10,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install Python deps (main + backend)
 COPY pyproject.toml ./
 COPY src/ ./src/
-RUN pip install --no-cache-dir -e .
+RUN pip install --no-cache-dir -e ".[embeddings]"
+
+# Hosted ranking is network-free at runtime. Bake the small BGE ONNX artifact
+# into the image so a worker either loads it locally or falls back to BM25.
+ENV JOB_FINDER_EMBEDDING_CACHE_DIR=/app/.cache/fastembed
+RUN python -c "from fastembed import TextEmbedding; list(TextEmbedding(model_name='BAAI/bge-small-en-v1.5', cache_dir='/app/.cache/fastembed').embed(['artifact check']))"
+ENV HF_HUB_OFFLINE=1
 
 COPY backend/pyproject.toml ./backend/
 COPY backend/app/ ./backend/app/

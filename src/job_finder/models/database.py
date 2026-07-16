@@ -11,14 +11,16 @@ from typing import Callable, Optional
 logger = logging.getLogger(__name__)
 
 from sqlalchemy import (
+    Boolean,
     Column,
     DateTime,
     Float,
+    ForeignKey,
     Index,
     Integer,
+    LargeBinary,
     String,
     Text,
-    Boolean,
     create_engine,
     text as _sql_text,
 )
@@ -259,6 +261,33 @@ class ScrapeRunRecord(Base):
 
     def __repr__(self) -> str:
         return f"<ScrapeRun {self.source} {self.finish_reason} rows={self.rows_found}>"
+
+
+class JobEmbedding(Base):
+    """A dense vector for one application row, for semantic resume matching.
+
+    Ships dark: rows are written only by the batch indexer
+    (job_finder.embeddings_index) when the optional embedding model is
+    installed, and nothing reads them until the hybrid ranker turns on. One
+    row per application; ``content_hash`` gates re-embedding so an unchanged
+    re-scrape re-embeds nothing. The vector is raw little-endian float32
+    bytes, L2-normalized at encode time so cosine similarity is a dot product.
+    """
+
+    __tablename__ = "job_embeddings"
+
+    application_id = Column(
+        Integer,
+        ForeignKey("applications.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    # which model produced the vector, so a model swap re-embeds cleanly
+    model = Column(String(64), nullable=False)
+    dim = Column(Integer, nullable=False)
+    # sha256 of (model + embedded text); unchanged hash => skip re-embedding
+    content_hash = Column(String(64), nullable=False)
+    vector = Column(LargeBinary, nullable=False)
+    updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
 
 def record_scrape_runs(runs: list[dict]) -> None:
