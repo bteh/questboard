@@ -1708,6 +1708,13 @@ def build_pipeline_config_override(preferences: WorkspacePreferencesSchema, work
     if preferences.include_linkedin_jobs:
         job_boards.insert(1, _LINKEDIN_JOBSPY_BOARD)
 
+    # Hosted managed-AI reserves the shared platform LLM for the one-shot resume
+    # analysis that sets target_roles, so per-job scoring stays keyword-only and
+    # concurrent searches can't starve it. Desktop / BYOK users pay for their
+    # own AI, so they keep per-job AI scoring.
+    settings = get_settings()
+    ai_score_jobs = not (settings.hosted_mode and settings.hosted_platform_managed_ai)
+
     return {
         "target_roles": preferences.roles,
         "keyword_searches": preferences.keywords,
@@ -1740,6 +1747,7 @@ def build_pipeline_config_override(preferences: WorkspacePreferencesSchema, work
         "search_settings": {
             "max_days_old": preferences.max_days_old,
             "exclude_staffing_agencies": preferences.exclude_staffing_agencies,
+            "ai_score_jobs": ai_score_jobs,
         },
         "filters": {
             "strictness": preferences.match_strictness,
