@@ -6,7 +6,7 @@ export interface ResumeStatus {
   path: string;
 }
 
-export type ResumeAnalysisStatus = 'completed' | 'skipped_no_llm' | 'failed' | 'analysis_error';
+export type ResumeAnalysisStatus = 'completed' | 'skipped_no_llm' | 'failed' | 'analysis_error' | 'quota_exhausted';
 
 export type ResumeParseCode = 'SCANNED_PDF' | null;
 

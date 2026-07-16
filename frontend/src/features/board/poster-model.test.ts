@@ -47,6 +47,12 @@ describe('the poster model', () => {
       .toEqual([]);
   });
 
+  it('labels only the widened role bucket as adjacent', () => {
+    expect(toPoster(app({ vertical: 'career', match_bucket: 'primary' }), 'BuiltIn').tags).toEqual([]);
+    expect(toPoster(app({ vertical: 'career', match_bucket: 'adjacent' }), 'BuiltIn').tags)
+      .toEqual(['adjacent match']);
+  });
+
   it('a quest keeps a work type only when it adds something the meta lacks', () => {
     expect(toPoster(app({ vertical: 'camera', is_remote: true, work_type: 'remote' }), 'x').tags).toEqual([]);
     expect(toPoster(app({ vertical: 'lens', work_type: 'hybrid' }), 'x').tags).toEqual(['hybrid']);

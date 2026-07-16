@@ -381,7 +381,7 @@ function BoardPage() {
       location: place || undefined,
       location_strict: nearParam ? true : undefined,
       salary_min: payFloor ?? undefined,
-      sort_by: sortNewest ? 'date_found' : 'overall_score',
+      sort_by: sortNewest ? 'date_found' : 'rank',
       sort_order: 'desc',
       page_size: PAGE_SIZE,
       scope: 'board',

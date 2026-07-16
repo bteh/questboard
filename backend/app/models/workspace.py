@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Index, Integer, String, Text
 
 from app.models.database import Base
 
@@ -200,6 +200,16 @@ class UsageCounter(Base):
     limit_count = Column(Integer, nullable=True)
     created_at = Column(DateTime, default=_utcnow)
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+    __table_args__ = (
+        Index(
+            "uq_usage_counters_workspace_metric_period",
+            "workspace_id",
+            "metric",
+            "period_key",
+            unique=True,
+        ),
+    )
 
 
 class WorkerHeartbeat(Base):

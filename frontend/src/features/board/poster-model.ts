@@ -83,9 +83,9 @@ export function toPoster(app: ApplicationResponse, sourceLabel: string): PosterM
   // when it adds something the meta doesn't (hybrid/onsite, never "remote").
   const isCareer = (app.vertical || 'career') === 'career';
   const wt = (app.work_type || '').trim();
-  const tags: string[] = isCareer || !wt || wt === 'unknown' || wt.toLowerCase() === 'remote'
-    ? []
-    : [wt];
+  const tags: string[] = isCareer
+    ? (app.match_bucket === 'adjacent' ? ['adjacent match'] : [])
+    : (!wt || wt === 'unknown' || wt.toLowerCase() === 'remote' ? [] : [wt]);
 
   const company = cleanCompany(app.company);
   const logoUrl = getCompanyLogoUrl(company, 64, app.job_url) ?? undefined;

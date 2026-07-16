@@ -135,6 +135,22 @@ export function ExplainSheet({
     >
       {controller && (
         <>
+          {app?.match_reasons && app.match_reasons.length > 0 && (
+            <div className="qb-jd-facts" aria-label="Why this job is ordered here">
+              <div className="qb-jd-fact">
+                <span className="qb-jd-fact-label">why it surfaced</span>
+                <span className="qb-jd-fact-value">
+                  {app.match_reasons.map((reason) => reason.label).join(' · ')}
+                </span>
+              </div>
+              {app.match_bucket === 'adjacent' && (
+                <div className="qb-jd-fact">
+                  <span className="qb-jd-fact-label">scope</span>
+                  <span className="qb-jd-fact-value">adjacent to your confirmed target roles</span>
+                </div>
+              )}
+            </div>
+          )}
           <ExplainNote body={state.body} method={state.method} swap={state.swap} />
           <ConsentArea
             state={state}

@@ -106,10 +106,13 @@ class FoundingRoleSurvivesRoleFilterTest(unittest.TestCase):
             _match_roles("Founding Engineer", self._SOFTWARE_ROLES, include_founding=False),
         )
 
-    def test_founding_aliases_pass_through_pipeline_role_filter(self) -> None:
-        """End-to-end: pipeline.filter_by_role must keep founding titles."""
+    def test_founding_aliases_pass_pipeline_filter_when_intent_mentions_startups(self) -> None:
+        """End-to-end: the bypass requires an explicit startup signal."""
         pipe = JobFinderPipeline(llm=None, profile=None)
-        pipe.config = {"target_roles": self._SOFTWARE_ROLES}
+        pipe.config = {
+            "target_roles": self._SOFTWARE_ROLES,
+            "keyword_searches": ["startup", "founding"],
+        }
         jobs = [
             {"title": "Founding Engineer", "company": "Acme AI", "url": "http://a"},
             {"title": "Member of Technical Staff", "company": "Anthropic", "url": "http://b"},

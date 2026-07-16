@@ -50,6 +50,11 @@ export interface ScoreEvidenceEntry {
 /** Keyed by scoring dimension (technical_skills, leadership_signal, ...). */
 export type ScoreEvidence = Record<string, ScoreEvidenceEntry>;
 
+export interface MatchReason {
+  code: string;
+  label: string;
+}
+
 export interface ApplicationBase {
   job_title: string;
   company: string;
@@ -105,6 +110,10 @@ export interface ApplicationResponse extends ApplicationBase {
   // with lenient thresholds). Null/absent means unscored. Keyword rows must
   // never wear the AI-grade recommendation stamp.
   score_source?: 'ai' | 'keyword' | null;
+  /** Retrieval provenance; raw fusion scores are intentionally not exposed. */
+  rank_source?: 'hybrid' | 'lexical' | null;
+  match_bucket?: 'primary' | 'adjacent' | null;
+  match_reasons?: MatchReason[];
   score_reasoning: string;
   key_strengths: string[];
   key_gaps: string[];

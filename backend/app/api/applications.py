@@ -58,12 +58,24 @@ def _to_response(record) -> ApplicationResponse:
     except (json.JSONDecodeError, TypeError):
         pass
     quest = None
+    match_reasons = []
     try:
         raw_quest = getattr(record, "quest_json", "") or ""
         if raw_quest:
             parsed = json.loads(raw_quest)
             if isinstance(parsed, dict):
                 quest = parsed
+    except (json.JSONDecodeError, TypeError):
+        pass
+    try:
+        raw_match_reasons = getattr(record, "match_reasons_json", "") or ""
+        parsed_reasons = json.loads(raw_match_reasons) if raw_match_reasons else []
+        if isinstance(parsed_reasons, list):
+            match_reasons = [
+                {"code": str(item.get("code", "")), "label": str(item.get("label", ""))}
+                for item in parsed_reasons
+                if isinstance(item, dict) and item.get("code") and item.get("label")
+            ][:3]
     except (json.JSONDecodeError, TypeError):
         pass
 
@@ -105,6 +117,9 @@ def _to_response(record) -> ApplicationResponse:
         career_progression_score=record.career_progression_score,
         recommendation=record.recommendation or "",
         score_source=getattr(record, "score_source", None),
+        rank_source=getattr(record, "rank_source", None),
+        match_bucket=getattr(record, "match_bucket", None),
+        match_reasons=match_reasons,
         score_reasoning=record.score_reasoning or "",
         key_strengths=strengths,
         key_gaps=gaps,

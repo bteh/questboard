@@ -42,6 +42,7 @@ class HostedWorkspaceApiTest(unittest.TestCase):
             "ALLOW_RUNTIME_LLM_CONFIG",
             "HOSTED_ALLOW_WORKSPACE_LLM_CONFIG",
             "HOSTED_PLATFORM_MANAGED_AI",
+            "HOSTED_RESUME_ANALYSES_PER_MONTH",
             "SUPABASE_URL",
             "SUPABASE_JWT_SECRET",
             "SUPABASE_JWT_AUDIENCE",
@@ -66,6 +67,7 @@ class HostedWorkspaceApiTest(unittest.TestCase):
         os.environ["ALLOW_RUNTIME_LLM_CONFIG"] = "false"
         os.environ["HOSTED_ALLOW_WORKSPACE_LLM_CONFIG"] = "false"
         os.environ["HOSTED_PLATFORM_MANAGED_AI"] = "true"
+        os.environ["HOSTED_RESUME_ANALYSES_PER_MONTH"] = "2"
         os.environ["SUPABASE_URL"] = "https://example.supabase.co"
         os.environ["SUPABASE_JWT_SECRET"] = TEST_JWT_SECRET
         os.environ["SUPABASE_JWT_AUDIENCE"] = "authenticated"
@@ -193,9 +195,10 @@ class HostedWorkspaceApiTest(unittest.TestCase):
         self.assertEqual(payload["analysis"]["current_title"], "Nurse Practitioner")
 
         state = self.client.get("/api/v1/onboarding/state", headers=headers).json()
-        self.assertEqual(state["preferences"]["roles"], ["Nurse Practitioner"])
-        self.assertEqual(state["preferences"]["keywords"], ["Primary Care", "Telehealth"])
-        self.assertEqual(state["preferences"]["current_level"], "senior")
+        # Upload analysis is a suggestion, not consent to rewrite preferences.
+        # The editable onboarding form persists these only when the user saves.
+        self.assertEqual(state["preferences"]["roles"], [])
+        self.assertEqual(state["preferences"]["keywords"], [])
 
         db = self._get_db()
         resume_record = self.workspace_service.get_workspace_resume(db, me["workspace"]["id"])
@@ -295,6 +298,39 @@ class HostedWorkspaceApiTest(unittest.TestCase):
         self.assertEqual(payload["resume"]["parse_status"], "parsed")
         self.assertEqual(payload["analysis_status"], "analysis_error")
         self.assertIsNone(payload["parse_code"])
+
+    def test_managed_resume_analysis_is_cached_by_hash_and_capped_monthly(self) -> None:
+        headers = self._auth_headers()
+        self.client.get("/api/v1/me", headers=headers)
+
+        with patch.object(
+            self.workspace_service,
+            "get_workspace_llm",
+            return_value=SimpleNamespace(is_configured=True),
+        ), patch(
+            "job_finder.tools.resume_parser_tool.parse_resume",
+            side_effect=["resume one", "resume one", "resume two", "resume three"],
+        ), patch(
+            "app.services.resume_analyzer.analyze_resume",
+            side_effect=lambda text, _llm: {"current_title": text},
+        ) as analyze:
+            def upload(suffix: bytes):
+                return self.client.post(
+                    "/api/v1/onboarding/resume",
+                    headers=headers,
+                    files={"file": ("resume.pdf", b"%PDF-1.4\n" + suffix, "application/pdf")},
+                )
+
+            first = upload(b"same")
+            same_hash = upload(b"same")
+            second = upload(b"second")
+            capped = upload(b"third")
+
+        self.assertEqual(first.json()["analysis_status"], "completed")
+        self.assertEqual(same_hash.json()["analysis_status"], "completed")
+        self.assertEqual(second.json()["analysis_status"], "completed")
+        self.assertEqual(capped.json()["analysis_status"], "quota_exhausted")
+        self.assertEqual(analyze.call_count, 2)
 
     def test_search_defaults_reflect_workspace_preferences(self) -> None:
         headers = self._auth_headers()
@@ -434,7 +470,7 @@ class HostedWorkspaceApiTest(unittest.TestCase):
         db = self._get_db()
         snapshot = self.workspace_service.build_search_snapshot(
             self.workspace_service.get_workspace_preferences(db, workspace_a)
-        )
+        ).model_copy(update={"roles": ["Snapshot Data Manager"], "keywords": ["dbt"]})
         self.workspace_service.register_search_run(
             db,
             workspace_a,
@@ -474,7 +510,10 @@ class HostedWorkspaceApiTest(unittest.TestCase):
             "already running elsewhere",
         )
 
+        captured_execute: dict[str, object] = {}
+
         def fake_execute(run, roles, locations, *args, **kwargs):
+            captured_execute.update(kwargs)
             run.status = "completed"
             run.started_at = run.started_at or datetime.now(timezone.utc)
             run.completed_at = datetime.now(timezone.utc)
@@ -497,6 +536,10 @@ class HostedWorkspaceApiTest(unittest.TestCase):
             processed = self.pipeline_service.process_next_hosted_run("worker-1")
 
         self.assertTrue(processed)
+        self.assertEqual(
+            captured_execute["config_override"]["target_roles"],
+            ["Snapshot Data Manager"],
+        )
 
         runs_a = self.client.get("/api/v1/search/runs", headers=headers_a)
         self.assertEqual(runs_a.status_code, 200)

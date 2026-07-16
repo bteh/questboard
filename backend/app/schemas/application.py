@@ -36,6 +36,11 @@ class ApplicationBase(BaseModel):
     direct_from_company: bool = False
 
 
+class MatchReason(BaseModel):
+    code: str
+    label: str
+
+
 class ApplicationResponse(ApplicationBase):
     id: int
     # Quest verticals. vertical matches packages/ui/src/tokens.ts
@@ -61,6 +66,9 @@ class ApplicationResponse(ApplicationBase):
     # Which scale scored the row: 'ai' (LLM) | 'keyword' (offline fallback,
     # lenient thresholds) | None (unscored). Mirrored by the frontend types.
     score_source: str | None = None
+    rank_source: Literal["hybrid", "lexical"] | None = None
+    match_bucket: Literal["primary", "adjacent"] | None = None
+    match_reasons: list[MatchReason] = Field(default_factory=list)
     score_reasoning: str = ""
     key_strengths: list[str] = []
     key_gaps: list[str] = []

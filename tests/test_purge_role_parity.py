@@ -28,7 +28,7 @@ class PurgeRoleParityTest(unittest.TestCase):
     def _titles(self) -> set[str]:
         return {a.job_title for a in database.get_all_applications()}
 
-    def test_purge_keeps_crypto_record_from_cryptojobslist(self) -> None:
+    def test_purge_keeps_crypto_record_only_with_explicit_rescue(self) -> None:
         database.save_application(
             job_title="Solidity Developer", company="Re7", job_url="u1",
             source="cryptojobslist", profile="p",
@@ -37,7 +37,9 @@ class PurgeRoleParityTest(unittest.TestCase):
             job_title="Registered Nurse", company="Hosp", job_url="u2",
             source="remotive", profile="p",
         )
-        deleted = database.purge_non_matching_roles(["software engineer"], profile="p")
+        deleted = database.purge_non_matching_roles(
+            ["software engineer"], profile="p", allow_crypto_rescue=True,
+        )
         remaining = self._titles()
         self.assertIn("Solidity Developer", remaining)     # crypto kept
         self.assertNotIn("Registered Nurse", remaining)    # non-match purged
@@ -48,7 +50,9 @@ class PurgeRoleParityTest(unittest.TestCase):
             job_title="Smart Contract Engineer", company="Alchemy", job_url="u1",
             source="ashby", profile="p",
         )
-        database.purge_non_matching_roles(["data engineer"], profile="p")
+        database.purge_non_matching_roles(
+            ["data engineer"], profile="p", allow_crypto_rescue=True,
+        )
         self.assertIn("Smart Contract Engineer", self._titles())
 
     def test_purge_keeps_founding_title(self) -> None:
@@ -56,7 +60,9 @@ class PurgeRoleParityTest(unittest.TestCase):
             job_title="Founding Engineer", company="Seed", job_url="u1",
             source="workatastartup", profile="p",
         )
-        database.purge_non_matching_roles(["data engineer"], profile="p")
+        database.purge_non_matching_roles(
+            ["data engineer"], profile="p", include_founding=True,
+        )
         self.assertIn("Founding Engineer", self._titles())
 
     def test_purge_matches_filter_by_role_exactly(self) -> None:
@@ -87,7 +93,8 @@ class PurgeRoleParityTest(unittest.TestCase):
             )
         database.purge_non_matching_roles(
             ["data engineer"], profile="p",
-            match_mode="all_significant", include_founding=True, strictness="balanced",
+            match_mode="all_significant", include_founding=False, strictness="balanced",
+            allow_crypto_rescue=False,
         )
         self.assertEqual(kept_titles, self._titles())
 

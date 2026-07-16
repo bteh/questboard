@@ -104,6 +104,13 @@ class ApplicationRecord(Base):
     # which uses lenient thresholds) | NULL (unscored). The two scales share the
     # recommendation labels, so the UI needs to know which one wrote the row.
     score_source = Column(String(40), nullable=True)
+    # Retrieval order is intentionally separate from the legacy 0-100 fit
+    # score. The raw value is internal; clients receive only provenance,
+    # bucket, and deterministic reasons.
+    rank_score = Column(Float, nullable=True)
+    rank_source = Column(String(20), nullable=True)  # hybrid | lexical
+    match_bucket = Column(String(20), nullable=True)  # primary | adjacent
+    match_reasons_json = Column(Text, default="")
     score_reasoning = Column(Text, default="")
     key_strengths = Column(Text, default="")  # JSON array
     key_gaps = Column(Text, default="")  # JSON array
@@ -188,6 +195,13 @@ class ApplicationRecord(Base):
         Index("ix_applications_vertical", "vertical"),
         Index("ix_applications_vertical_status", "vertical", "status"),
         Index("ix_applications_event_start", "event_start"),
+        Index(
+            "ix_applications_workspace_rank",
+            "workspace_id",
+            "vertical",
+            "match_bucket",
+            "rank_score",
+        ),
         # one row per URL inside a workspace (NULLs compare distinct, so
         # the shared pool needs its own partial index below)
         Index("uq_applications_url_workspace", "job_url", "workspace_id", unique=True),
@@ -580,6 +594,14 @@ def _migrate_db(engine) -> None:
             conn.execute(
                 text("ALTER TABLE applications ADD COLUMN score_source VARCHAR(40)")
             )
+        if "rank_score" not in existing_cols:
+            conn.execute(text("ALTER TABLE applications ADD COLUMN rank_score FLOAT"))
+        if "rank_source" not in existing_cols:
+            conn.execute(text("ALTER TABLE applications ADD COLUMN rank_source VARCHAR(20)"))
+        if "match_bucket" not in existing_cols:
+            conn.execute(text("ALTER TABLE applications ADD COLUMN match_bucket VARCHAR(20)"))
+        if "match_reasons_json" not in existing_cols:
+            conn.execute(text("ALTER TABLE applications ADD COLUMN match_reasons_json TEXT DEFAULT ''"))
         # Backfill score provenance, idempotent: only scored rows with no
         # source are touched. The stored reasoning format tells the scales
         # apart: the keyword/baseline scorer writes "Scoring (...)" reasoning,
@@ -646,6 +668,10 @@ def _migrate_db(engine) -> None:
             conn.execute(text(
                 "CREATE INDEX IF NOT EXISTS ix_applications_vertical_status ON applications (vertical, status)"
             ))
+        conn.execute(text(
+            "CREATE INDEX IF NOT EXISTS ix_applications_workspace_rank "
+            "ON applications (workspace_id, vertical, match_bucket, rank_score)"
+        ))
         conn.execute(text(
             "CREATE INDEX IF NOT EXISTS ix_applications_event_start ON applications (event_start)"
         ))
@@ -764,6 +790,10 @@ def save_application(
     score_evidence: dict | str | None = None,
     salary_source: str | None = None,
     score_source: str | None = None,
+    rank_score: float | None = None,
+    rank_source: str | None = None,
+    match_bucket: str | None = None,
+    match_reasons: list[dict] | str | None = None,
     date_posted: str | None = None,
     date_confidence: str | None = None,
     vertical: str = "career",
@@ -787,6 +817,13 @@ def save_application(
         score_evidence_json = score_evidence
     else:
         score_evidence_json = ""
+
+    if isinstance(match_reasons, list):
+        match_reasons_json = json.dumps(match_reasons)
+    elif isinstance(match_reasons, str):
+        match_reasons_json = match_reasons
+    else:
+        match_reasons_json = ""
 
     session = get_session()
     try:
@@ -1005,6 +1042,10 @@ def save_application(
             career_progression_score=career_progression_score,
             recommendation=recommendation,
             score_source=score_source,
+            rank_score=rank_score,
+            rank_source=rank_source,
+            match_bucket=match_bucket,
+            match_reasons_json=match_reasons_json,
             score_reasoning=score_reasoning,
             key_strengths=key_strengths,
             key_gaps=key_gaps,
@@ -1053,6 +1094,42 @@ def save_application(
             except Exception:
                 pass
             return None
+        raise
+    finally:
+        _close_session()
+
+
+def save_application_ranks(
+    ranked_jobs: list[dict],
+    *,
+    workspace_id: str | None = None,
+) -> int:
+    """Persist internal retrieval order for explicitly identified career rows."""
+    updates = [job for job in ranked_jobs if job.get("db_id")]
+    if not updates:
+        return 0
+    session = get_session()
+    try:
+        ids = [int(job["db_id"]) for job in updates]
+        query = session.query(ApplicationRecord).filter(
+            ApplicationRecord.id.in_(ids),
+            ApplicationRecord.vertical == "career",
+        )
+        if workspace_id is not None:
+            query = query.filter(ApplicationRecord.workspace_id == workspace_id)
+        rows = {row.id: row for row in query.all()}
+        for job in updates:
+            row = rows.get(int(job["db_id"]))
+            if row is None:
+                continue
+            row.rank_score = job.get("rank_score")
+            row.rank_source = job.get("rank_source")
+            row.match_bucket = job.get("match_bucket")
+            row.match_reasons_json = json.dumps(job.get("match_reasons") or [])
+        session.commit()
+        return len(rows)
+    except Exception:
+        session.rollback()
         raise
     finally:
         _close_session()
@@ -1194,8 +1271,9 @@ def purge_non_matching_roles(
     workspace_id: str | None = None,
     *,
     match_mode: str = "all_significant",
-    include_founding: bool = True,
+    include_founding: bool = False,
     strictness: str = "balanced",
+    allow_crypto_rescue: bool = False,
 ) -> int:
     """Delete existing records whose titles don't match any target role.
 
@@ -1234,6 +1312,7 @@ def purge_non_matching_roles(
                 match_mode=match_mode,
                 include_founding=include_founding,
                 strictness=strictness,
+                allow_crypto_rescue=allow_crypto_rescue,
             ):
                 session.delete(rec)
                 deleted += 1

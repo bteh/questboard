@@ -50,6 +50,51 @@ def _cache_put(workspace_id: str, resume_hash: str, payload: dict) -> None:
     _GENERATED_PROFILE_CACHE[(workspace_id, resume_hash)] = (time.time(), payload)
 
 
+def _profile_from_canonical_analysis(analysis: dict) -> dict:
+    """Project the one paid resume analysis into the legacy profile shape."""
+    roles = [str(value) for value in analysis.get("suggested_target_roles") or []][:6]
+    skills = [str(value) for value in analysis.get("skills") or []][:15]
+    leadership = [str(value) for value in analysis.get("leadership_signals") or []][:8]
+    keywords = [str(value) for value in analysis.get("suggested_keywords") or []][:8]
+    title = str(analysis.get("current_title") or (roles[0] if roles else "your next role"))
+    seniority = str(analysis.get("seniority") or "mid")
+    industry = str(analysis.get("industry") or "your field")
+    return {
+        "detected_archetype": f"{seniority.title()} {industry.title()}",
+        "confidence": 0.75 if roles else 0.5,
+        "reasoning": "Built from the resume analysis shown in onboarding; confirm or edit every suggestion before saving.",
+        "closest_template": None,
+        "career_target": f"Find {title} opportunities aligned with the resume's confirmed skills.",
+        "seniority_signal": seniority,
+        "scoring": {
+            "technical_skills": 0.25,
+            "leadership_signal": 0.15,
+            "career_progression": 0.15,
+            "platform_building": 0.13,
+            "comp_potential": 0.12,
+            "company_trajectory": 0.10,
+            "culture_fit": 0.10,
+        },
+        "keywords": {
+            "technical": skills,
+            "leadership": leadership,
+            "signal_terms": keywords,
+        },
+        "target_roles": roles,
+        "compensation": {
+            "currency": "USD",
+            "pay_period": "annual",
+            "min_base": 0,
+            "target_total_comp": 0,
+            "include_equity": False,
+        },
+        "enabled_scrapers": [],
+        "recommended_external_boards": [],
+        "primary_strengths": skills[:5],
+        "development_areas": [],
+    }
+
+
 @router.get("/state", response_model=OnboardingState)
 def get_state(
     context = Depends(get_workspace_context),
@@ -220,6 +265,20 @@ def generate_workspace_profile(
     if cached:
         logger.info("generate_profile: cache hit for workspace=%s", context.workspace.id)
         return GeneratedProfileResponse(**{**cached, "cached": True})
+
+    if settings.hosted_mode and settings.hosted_platform_managed_ai:
+        analysis, status, was_cached = workspace_service.get_or_create_resume_analysis(
+            db, context.workspace.id
+        )
+        if not analysis:
+            code = 429 if status == "quota_exhausted" else 503
+            raise HTTPException(
+                status_code=code,
+                detail="Resume analysis is unavailable. Edit your search profile manually or try again after the monthly allowance resets.",
+            )
+        profile = _profile_from_canonical_analysis(analysis)
+        _cache_put(context.workspace.id, resume_hash, profile)
+        return GeneratedProfileResponse(**{**profile, "cached": was_cached})
 
     llm = workspace_service.get_workspace_llm(db, context.workspace.id, fallback_to_global=True)
     if not llm or not llm.is_configured:

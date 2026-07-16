@@ -34,7 +34,12 @@ SUPABASE_STORAGE_BUCKET=questboard-private
 SUPABASE_JWT_AUDIENCE=authenticated
 
 HOSTED_PLATFORM_MANAGED_AI=true
+HOSTED_RESUME_ANALYSES_PER_MONTH=2
 HOSTED_ALLOW_WORKSPACE_LLM_CONFIG=false
+
+# Ship dark, then allowlist the owner workspace before widening beta.
+HYBRID_RANKING_ENABLED=false
+HYBRID_RANKING_WORKSPACE_IDS=
 ```
 
 If your Supabase project still uses the legacy shared JWT secret, set `SUPABASE_JWT_SECRET`. Otherwise leave it blank and the backend will verify bearer tokens against the project JWKS endpoint.
@@ -69,6 +74,13 @@ Render worker command:
 ```bash
 python -m app.worker
 ```
+
+The worker image preloads `BAAI/bge-small-en-v1.5`; hosted processes do not
+download model files at runtime. If the artifact cannot load, ordering falls
+back to BM25 plus structured intent signals. Managed platform AI is reserved
+for the cached resume analysis (two new resume hashes per workspace per
+calendar month by default); searches, company discovery, role expansion,
+per-job scoring, and application drafting do not spend shared LLM tokens.
 
 Health checks:
 
