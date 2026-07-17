@@ -5,6 +5,14 @@ verification of ~17 competitor pricing pages, offer-moment/outcome-model analysi
 this was designed within (already decided, not re-litigated): free tier forever, browsing never
 needs an account, no ads, no employer/poster money, one-time purchases over subscriptions.
 
+> July 16, 2026 update: the local-agent pivot supersedes any proposal to sell
+> Questboard-funded “AI tailoring depth” or fit credits. The user's connected
+> agent owns model usage. Paid value may cover distribution, source monitoring,
+> alerts, and workflow convenience; it never covers access to organic results or
+> the local MCP connection. The later sponsor and affiliate addenda in
+> [payment-constitution.md](payment-constitution.md) govern the narrow free-user
+> revenue exceptions.
+
 ---
 
 ## The blunt headline

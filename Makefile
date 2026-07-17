@@ -1,9 +1,9 @@
-.PHONY: help start setup dev dev-hosted stop-dev backend frontend search clean clean-data docker doctor doctor-env dev-hosted-reset desktop-dev desktop-build desktop-install desktop-smoke reauth-claude
+.PHONY: help start setup dev dev-hosted stop-dev backend frontend search clean clean-data docker doctor doctor-env dev-hosted-reset desktop-dev desktop-build desktop-install desktop-smoke agent-mcp agent-install reauth-claude
 
 # ── Venv detection ────────────────────────────────────────────────────
 # All Python commands run through the venv. `make setup` creates it.
 PYTHON := .venv/bin/python
-PIP    := .venv/bin/pip
+PIP    := $(PYTHON) -m pip
 
 # Default target
 help: ## Show this help
@@ -213,6 +213,12 @@ desktop-install: .venv desktop-build ## Install the latest built Questboard.app 
 
 desktop-smoke: .venv ## Run the desktop UX smoke test against the local runtime + web UI
 	cd frontend && pnpm run desktop:smoke
+
+agent-mcp: .venv ## Run the local Questboard MCP server over stdio
+	@.venv/bin/questboard-mcp --data-dir "$(CURDIR)/data"
+
+agent-install: .venv ## Connect Questboard to installed Codex/Claude Code clients
+	@$(PYTHON) scripts/install_agent_integration.py --client $${CLIENT:-all}
 
 dev-hosted-reset: ## Remove local hosted sandbox data after stopping dev processes
 	@$(MAKE) stop-dev >/dev/null 2>&1 || true

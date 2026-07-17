@@ -1,8 +1,10 @@
 # Hosted Deployment
 
-> Status: **deprioritized after the desktop-first decision on April 3, 2026.**
+> Status: **parked after the local-agent decision on July 16, 2026.**
 >
-> This document is kept for future hosted work and for local hosted-sandbox testing, but Questboard's next major product milestone is the desktop app plan in [docs/desktop-first.md](desktop-first.md).
+> This document is retained as a legacy deployment reference and for the local hosted sandbox. It is not the implementation plan for the personalized product. Current direction: [local-agent-product.md](local-agent-product.md).
+
+Do not deploy hosted resume ranking, remote MCP OAuth, or Questboard-funded inference from this branch. A future hosted surface may provide marketing, downloads, source-status facts, or a non-personalized preview without becoming the user's ranking runtime.
 
 Questboard now supports two operating modes:
 

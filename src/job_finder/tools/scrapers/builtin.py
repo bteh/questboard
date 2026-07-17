@@ -11,6 +11,7 @@ import json
 import logging
 import re
 import time
+from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -65,6 +66,14 @@ _HEADERS = {
 _TIMEOUT = 20
 _PAGE_DELAY = 1.0  # seconds between page requests
 _RESULTS_PER_PAGE = 25
+_DIRECT_JOB_HOSTS = (
+    "ashbyhq.com",
+    "greenhouse.io",
+    "lever.co",
+    "myworkdayjobs.com",
+    "smartrecruiters.com",
+    "workable.com",
+)
 
 
 def _fetch_page(url: str) -> str | None:
@@ -105,6 +114,53 @@ def _parse_jsonld_jobs(html: str) -> list[dict]:
     return jobs
 
 
+def fetch_builtin_detail(url: str) -> dict:
+    """Fetch one BuiltIn finalist and recover the detail card omitted by search.
+
+    Search cards intentionally stay cheap and contain no description.  Agent
+    matching needs requirements only for a few finalists, so hydrate lazily
+    instead of adding dozens of detail requests to every source refresh.
+    """
+
+    if not url.startswith("https://builtin.com/job/"):
+        return {}
+    html = _fetch_page(url)
+    if not html:
+        return {}
+    soup = BeautifulSoup(html, "html.parser")
+    body = soup.select_one("div[id^='job-post-body-']")
+    description = body.get_text("\n", strip=True) if body else ""
+    description = "\n".join(
+        line for line in (re.sub(r"\s+", " ", value).strip() for value in description.splitlines()) if line
+    )
+
+    date_posted = ""
+    for value in soup.stripped_strings:
+        text = re.sub(r"\s+", " ", value).strip()
+        if re.fullmatch(
+            r"(?:Posted|Reposted)\s+(?:Today|Yesterday|\d+\s+(?:Hours?|Days?)\s+Ago)",
+            text,
+            flags=re.IGNORECASE,
+        ):
+            date_posted = text
+            break
+
+    direct_url = ""
+    for link in soup.find_all("a", href=True):
+        href = str(link.get("href") or "").strip()
+        host = (urlparse(href).hostname or "").lower()
+        if any(host == allowed or host.endswith(f".{allowed}") for allowed in _DIRECT_JOB_HOSTS):
+            direct_url = href
+            break
+
+    return {
+        "description": description,
+        "date_posted": date_posted,
+        "date_confidence": "fuzzy" if date_posted else "missing",
+        "direct_application_url": direct_url,
+    }
+
+
 def _icon_sibling_text(card, icon_class: str) -> str:
     """Find the text next to a FontAwesome icon inside a card.
 
@@ -134,6 +190,7 @@ def _parse_html_jobs(
     roles: list[str] | None,
     max_results: int,
     *,
+    max_days_old: int = 14,
     match_mode: str = "all_significant",
     include_founding: bool = True,
 ) -> list[dict]:
@@ -194,13 +251,22 @@ def _parse_html_jobs(
 
         is_remote = "remote" in work_type.lower() or "remote" in location.lower()
 
-        # Date posted — first span with time-related text
+        # Date posted. Use a complete phrase: substring matching "ago" once
+        # misclassified the company name "Dragos" as a posting date.
         date_posted = ""
         for span in card.select("span"):
-            text = span.get_text(strip=True)
-            if any(w in text.lower() for w in ("ago", "posted", "today", "yesterday")):
+            text = re.sub(r"\s+", " ", span.get_text(" ", strip=True)).strip()
+            if re.fullmatch(
+                r"(?:Posted|Reposted)?\s*(?:Today|Yesterday|\d+\s+(?:Hours?|Days?)\s+Ago)",
+                text,
+                flags=re.IGNORECASE,
+            ):
                 date_posted = text
                 break
+
+        age_match = re.search(r"(\d+)\s+Days?\s+Ago", date_posted, re.IGNORECASE)
+        if age_match and int(age_match.group(1)) > max_days_old:
+            continue
 
         results.append({
             "title": title[:200],
@@ -214,6 +280,7 @@ def _parse_html_jobs(
             "salary_min": sal_min,
             "salary_max": sal_max,
             "date_posted": date_posted,
+            "date_confidence": "fuzzy" if date_posted else "missing",
             "is_remote": is_remote,
             "company_size": "",
         })
@@ -331,6 +398,7 @@ def search_builtin(
                 html,
                 roles,
                 max_results - len(all_jobs),
+                max_days_old=max_days_old,
                 match_mode=match_mode,
                 include_founding=include_founding,
             )

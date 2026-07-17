@@ -1,6 +1,7 @@
 # Architecture conventions
 
-Written 2026-07-09, at the end of the board wiring (PRs #55-#58). This is the map of where code
+Written 2026-07-09, at the end of the board wiring (PRs #55-#58). Local-agent boundary updated
+2026-07-16. This is the map of where code
 goes and why; `docs/board-wiring-plan.md` holds the build history, `docs/adding-a-source.md` the
 growth contract.
 
@@ -33,9 +34,10 @@ frontend/src/
   utils/ lib/ types/     # feature-agnostic helpers
 
 backend/app/
+  local_mcp.py           # local stdio MCP transport, no hosted auth or model calls
   api/                   # one router per resource (board.py, applications.py, ...)
   schemas/               # pydantic shapes, one module per resource
-  services/              # business logic shared across routers
+  services/              # business logic shared across REST and MCP
 
 src/job_finder/
   kinds.py               # Python side of the registry (loads packages/kinds/kinds.json)
@@ -68,3 +70,10 @@ src/job_finder/
   URL uniqueness is per pool, never global. The visibility contract is
   `backend/app/services/row_scope.py`; reads declare `scope=board` (the felt) or `scope=mine`
   (the log). Local/desktop own one NULL pool, where both scopes are identical.
+- **MCP stays thin.** Put search, serialization, profile selection, and state behavior in
+  `services/local_agent_service.py`; MCP decorators adapt those functions to stdio. Tools never
+  construct an LLM. The client owns reasoning and model cost.
+- **Retrieval is not fit.** Deterministic rank fields may retrieve candidates but cannot be named
+  or displayed as resume confidence. Fit requires requirement evidence from the connected agent.
+- **Work and Side Quests are separate contracts.** Work may use a resume after consent. Side
+  Quests use goals and constraints and never require a resume.

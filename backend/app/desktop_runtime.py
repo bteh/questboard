@@ -59,6 +59,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--resume-dir", default=str(default_resume_dir))
     parser.add_argument("--config-dir", default=str(default_config_dir))
     parser.add_argument("--dev-origin", default="http://127.0.0.1:5173")
+    parser.add_argument(
+        "--mcp",
+        action="store_true",
+        help="Run the local stdio MCP server instead of the desktop HTTP API",
+    )
     return parser.parse_args()
 
 
@@ -71,6 +76,15 @@ def main() -> None:
         config_dir=Path(args.config_dir),
         dev_origin=args.dev_origin,
     )
+    if args.mcp:
+        # The packaged desktop sidecar doubles as the agent integration, so a
+        # user installs one signed artifact rather than a second Python tool.
+        from app.local_mcp import mcp
+        from app.models.database import init_db
+
+        init_db()
+        mcp.run(transport="stdio")
+        return
     uvicorn.run("app.main:app", host=args.host, port=args.port, reload=False, log_level="info")
 
 

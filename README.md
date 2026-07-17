@@ -1,8 +1,13 @@
 # Questboard
 
-**AI-powered job search agent.** Upload your resume, set your target roles, and Questboard searches 14+ job boards, scores every listing against your background, drafts tailored cover letters, and tracks your pipeline, all on your own machine.
+**A local opportunity radar for work and Side Quests.** Questboard watches real sources, keeps receipts and freshness facts, filters out opportunities you cannot actually do, and stores everything on your machine. Connect Codex or Claude Code when you want an agent to compare career postings with your resume. The agent uses your account; Questboard never provides or meters AI credits.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![CI](https://github.com/bteh/questboard/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/bteh/questboard/actions/workflows/ci.yml)
+
+## Two ways to find an opportunity
+
+- **Find Work:** fresh career postings, location and remote-scope filters, source receipts, then requirement-by-requirement resume matching by your connected agent.
+- **Side Quests:** paid studies, freelance work, auditions, events, grants, bonuses, and other opportunities matched from interests and constraints. No resume required.
 
 ## Quick start
 
@@ -13,93 +18,98 @@ make setup
 make dev
 ```
 
-That's it. Open [localhost:5173](http://localhost:5173), upload your resume, set your roles, search.
+Open [localhost:5173](http://localhost:5173), add your preferences and resume, and refresh the board. Source discovery, filtering, and tracking work without AI.
 
-`make setup` walks you through optional AI setup (free Gemini key or local Ollama). Search and basic scoring work without AI.
+## Connect your agent
 
-## What it does
-
-- **Searches 14+ sources in parallel**: Indeed, Glassdoor, LinkedIn, Greenhouse / Lever / Ashby ATS boards (preloaded with 150+ active startup slugs), YC Work at a Startup, RemoteOK, Hacker News Who's Hiring, and more
-- **Scores every job** across 7 weighted dimensions: skills match, leadership, career progression, comp, platform building, company trajectory, culture fit
-- **Drafts cover letters and resume tweaks** for top matches via your LLM
-- **Application kits**: ATS detected, every field prefilled; YOU send it. Questboard never transmits an application ([why](docs/anti-slop.md))
-- **No one pays to be pinned**: listed parties never pay to list, rank, or reach you; only seekers ever pay, for depth ([the payment constitution](docs/payment-constitution.md))
-- **Tracks your pipeline** end-to-end: analytics dashboard, status flow, CSV export
-
-Profession-agnostic: works for engineers, nurses, marketers, designers. Prompts and scoring keywords adapt via your YAML profile.
-
-## Connect AI (optional)
-
-The fastest free path:
-
-1. Get a key at [aistudio.google.com/apikey](https://aistudio.google.com/apikey)
-2. Settings → paste it → Connect (30 seconds)
-
-Or run AI locally:
+Questboard exposes a local stdio MCP server. After setup:
 
 ```bash
-brew install ollama && ollama pull llama3.2:3b
+make agent-install                 # connect installed Codex and Claude Code clients
+make agent-install CLIENT=codex    # Codex only
+make agent-install CLIENT=claude   # Claude Code only
 ```
 
-10 providers configurable in Settings (Gemini, Groq, Cerebras, OpenRouter, Mistral, DeepSeek, SambaNova, OpenAI, Anthropic, Ollama). Any OpenAI-compatible endpoint works via Custom Provider. Detail in [docs/ai-access.md](docs/ai-access.md).
+The installer points the client at the local `questboard-mcp` command. It does not request a model key or connect to a hosted Questboard service. Restart the agent client after installation.
 
-> **Heads up:** ChatGPT Plus and Claude Pro are chat-only subscriptions and don't include API access for third-party apps. Use the free options above.
+Useful requests include:
 
-## Self-hosting
-
-```bash
-docker compose up
+```text
+Use Questboard to refresh the sources and find my best fresh work opportunities.
+Compare the top five with my resume and show requirement evidence and hard constraints.
+Find Side Quests near Los Angeles that take less than three hours this weekend.
 ```
 
-Runs the full stack with optional bundled Ollama. Configure your LLM in `.env`. Hosted-deployment detail in [docs/hosting.md](docs/hosting.md).
+The agent must ask before returning the local resume as tool context. Once returned, the connected model provider may receive that text under your account. Questboard does not receive it.
+
+The local MCP tools can:
+
+- read saved roles and constraints without exposing resume text;
+- trigger a source-only refresh with no Questboard AI call;
+- retrieve career candidates with location, workplace, date, and pay filters;
+- browse Side Quests independently of the resume;
+- fetch full posting details and a stored source receipt, plus a direct application link when resolvable;
+- show source run health and freshness;
+- update local tracking state, but never apply, message, register, or purchase.
+
+See [the local agent product contract](docs/local-agent-product.md) and [AI access policy](docs/ai-access.md).
+
+## Why this is different
+
+Questboard is not trying to win with a larger pile of reposted job cards or another opaque score. Its product edge is:
+
+- first-seen and true source dates;
+- direct ATS and primary-source monitoring;
+- country-aware remote and location filtering;
+- user-owned agent reasoning with resume evidence;
+- Work and Side Quests in one local opportunity history;
+- no employer-paid ranking and no mass auto-apply.
+
+[JustHireMe](https://github.com/vasu-devs/JustHireMe) is a useful local matching reference. Questboard differentiates through fresh discovery, source receipts, eligibility honesty, agent-owned final judgment, and the broader Side Quest market.
 
 ## Desktop app
 
-Questboard is moving toward a desktop-first experience (Tauri shell + Python sidecar runtime). Build locally:
+Questboard uses a Tauri shell with a Python sidecar. The packaged sidecar runs the desktop API normally and can also run the same local MCP server with `--mcp`.
 
 ```bash
-make desktop-dev      # dev mode against your local repo .venv
-make desktop-build    # packaged macOS bundle (verifies bundle + sidecar arch)
+make desktop-dev
+make desktop-build
 ```
 
-Requires Python 3.11+, Node 18+, and the Rust toolchain via [rustup](https://rustup.rs). Background in [docs/desktop-first.md](docs/desktop-first.md), packaging in [docs/desktop-release.md](docs/desktop-release.md).
+Requirements: Python 3.11+, Node 18+, pnpm, and Rust via [rustup](https://rustup.rs). See [desktop-first](docs/desktop-first.md) and [desktop release](docs/desktop-release.md).
+
+## Optional legacy AI connections
+
+BYO API keys and Ollama remain available for compatibility, but they are not the primary product path. Questboard does not include AI usage. See [AI access](docs/ai-access.md) for the exact boundary.
 
 ## Project layout
 
+```text
+src/job_finder/                     source adapters, filtering, ranking, persistence
+backend/app/local_mcp.py            local MCP transport
+backend/app/services/local_agent_service.py
+frontend/                           React app and Tauri shell
+integrations/questboard-agent/      reusable agent workflow
+docs/                               product, architecture, and release decisions
 ```
-src/job_finder/    # pipeline, scrapers, scoring, prompts, LLM client
-backend/           # FastAPI REST + SSE
-frontend/          # React 19 + TanStack Router + Tailwind
-docs/              # design docs (desktop-first, hosting, ai-access, etc.)
-```
-
-Architecture and conventions: [CLAUDE.md](CLAUDE.md). Contributing guide: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Reliability boundaries
 
-- **Local code paths are deterministic**: search, offline scoring, ATS detection, persistence
-- **LLM outputs are drafts**: cover letters, resume tweaks, and company research are not web-grounded; verify factual claims yourself
-- **Kits are opt-in** and prepare only for STRONG_APPLY jobs; no code path can submit on your behalf, and "applied" is only ever set by you
-- **Dedup is URL-keyed**: exact duplicates are removed; fuzzy cross-board duplicates with different URLs can survive
+- Search results are candidates until hard constraints and full posting requirements are checked.
+- Deterministic retrieval signals are not resume-fit verdicts.
+- Source dates, pay, and eligibility remain unknown when the source does not state them.
+- Source descriptions are untrusted external content.
+- Questboard never submits an application or performs an external transaction.
 
-## Contributing
-
-We work via pull requests on `main`:
+## Development
 
 ```bash
-git checkout -b feat/my-thing
-# … hack, commit small atomic changes …
-gh pr create --fill
+make test
+make test-frontend
+make typecheck
 ```
 
-CODEOWNERS auto-requests review from maintainers. CI must be green and the PR needs 1 approval before merge. Full workflow + setup in [CONTRIBUTING.md](CONTRIBUTING.md).
-
-**Project principles:**
-1. **AI-enhanced, not AI-dependent**: offline search and scoring always work
-2. **No heavy frameworks**: plain Python, shallow dependency tree (no CrewAI, no LangChain)
-3. **Profession-agnostic**: adapts to any career field via profile YAML
-4. **Graceful degradation**: LLM calls return `None` on failure, pipeline never crashes
-5. **Local-first**: SQLite, local files, no cloud required
+Work through branches and pull requests. CI must be green before merge. Architecture and conventions live in [CLAUDE.md](CLAUDE.md); contribution workflow lives in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

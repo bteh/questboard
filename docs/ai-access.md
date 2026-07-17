@@ -1,71 +1,62 @@
-# AI Access Policy
+# AI access policy
 
-_Last updated: April 6, 2026_
-
-Questboard is now a **desktop-first, open-source** product. That changes which AI access patterns are practical and which ones we should avoid.
-
-## Supported today
-
-These are the supported AI connection paths for Questboard desktop:
-
-- **Gemini API key**
-- **OpenAI API key**
-- **Anthropic API key**
-- **Ollama / local model**
-- **Your own local OpenAI-compatible endpoint**
-
-This is the product-safe baseline because it is easy to explain, easy to support, and keeps the app honest about how it connects to models.
-
-## Not supported today
-
-These are **not** supported as first-class Questboard features right now:
-
-- **Use my ChatGPT account**
-- **Use my Claude account**
-
-The reason is not just implementation effort. It is policy clarity.
-
-## Why ChatGPT account login is not a supported path
-
-OpenAI officially separates **ChatGPT billing** from **API billing**:
-
-- [Billing settings in ChatGPT vs Platform](https://help.openai.com/en/articles/9039756-billing-settings-in-chatgpt-vs-platform)
-- [How can I move my ChatGPT subscription to the API?](https://help.openai.com/en/articles/8156019)
-
-OpenAI also officially supports **Codex** local tooling with ChatGPT plans:
-
-- [Using Codex with your ChatGPT plan](https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan)
-- [Codex CLI](https://developers.openai.com/codex/cli)
-
-That means local account-backed use is becoming more realistic, but it is still different from Questboard directly signing into a ChatGPT subscription as if it were normal app API access.
-
-## Why Claude account login is not a supported path
-
-Anthropic also separates **Claude subscriptions** from **API usage**:
-
-- [Why do I have to pay separately for the Claude API and Console?](https://support.anthropic.com/en/articles/9876003-i-subscribe-to-a-paid-claude-ai-plan-why-do-i-have-to-pay-separately-for-api-usage-on-console)
-
-Anthropic does officially support **Claude Code** with Pro/Max:
-
-- [Using Claude Code with your Pro or Max plan](https://support.anthropic.com/en/articles/11145838-using-claude-code-with-your-pro-or-max-plan)
-
-But that still does **not** mean Questboard should present Claude account login as a normal supported product feature.
-
-## What open-source tools are doing
-
-There are active desktop/local tools exploring account-backed access:
-
-- [OpenCode](https://opencode.ai/) documents ChatGPT and Claude-related provider paths in a local tool context.
-- [ChatMock](https://github.com/RayBytes/ChatMock) exposes a local OpenAI-compatible server backed by OpenAI/Codex login.
-
-Those examples are useful product references, but they are **not** the same as a cleanly supported Questboard feature.
+_Updated: July 16, 2026_
 
 ## Product decision
 
-Questboard should use this rule set:
+Questboard does not provide AI, sell AI credits, proxy model requests, or use a founder-owned model key for users.
 
-- **Supported now:** API keys, Ollama, custom local endpoints
-- **Possible later:** desktop-only experimental ChatGPT-account integration if it can be built on an official local OpenAI path
-- **Not for now:** public Claude-account integration as a normal product option
+The primary AI path is a local stdio MCP connection to an agent the user already controls, such as Codex or Claude Code. Questboard provides tools and grounded local data. The connected client provides the model, entitlement, context window, and reasoning cost.
 
-This keeps the desktop app useful today without making policy promises we cannot defend.
+The core product still works without an agent for source discovery, deterministic filtering, browsing, and tracking.
+
+## What the MCP connection means
+
+The MCP server runs as a local process and opens the same local Questboard database as the app. It has no hosted Questboard account or remote OAuth flow.
+
+The user can connect it with:
+
+```bash
+make agent-install
+```
+
+Codex officially supports local stdio MCP servers through `codex mcp add`; Codex CLI, the IDE extension, and the ChatGPT desktop app share the same host configuration. See [OpenAI's MCP documentation](https://learn.chatgpt.com/docs/extend/mcp).
+
+Claude Code officially supports local stdio MCP servers and user-scoped configuration through `claude mcp add`. See [Claude Code MCP documentation](https://code.claude.com/docs/en/mcp).
+
+Questboard does not sign into ChatGPT or Claude on the user's behalf. It also does not turn a chat subscription into third-party API access. The agent client itself owns that relationship.
+
+## Resume privacy
+
+Saved career preferences and resume access are separate MCP tools:
+
+- `get_career_preferences` returns roles, locations, workplace choices, compensation constraints, and resume metadata without resume text.
+- `read_resume_for_matching` returns the parsed local resume only after the user authorizes resume matching.
+
+The resume stays in the local Questboard database at rest. When an agent calls the resume tool, the connected model provider may receive that text as tool context. This is a direct user-to-provider disclosure, not a Questboard upload. The agent workflow must ask first and the UI must explain this boundary.
+
+Side Quest tools do not read the resume.
+
+## Cost boundary
+
+Every Questboard MCP tool reports or guarantees that Questboard-funded AI is false. Source refresh, search, filtering, source status, details, and local workflow writes are deterministic operations.
+
+The connected agent may consume usage under the user's plan. Questboard neither knows nor manages those credits. There is no Questboard AI quota to purchase or administer.
+
+## Existing BYO model support
+
+The repository still contains compatibility paths for:
+
+- Gemini, OpenAI, Anthropic, and other API keys;
+- Ollama or a local OpenAI-compatible endpoint.
+
+Those paths can remain while the MCP workflow matures, but they are no longer the recommended first-run experience. Do not build new product promises around them unless a use case cannot be served safely through the user's agent.
+
+## Security rules
+
+- Never put a model key in an MCP tool argument, source record, log, or Git repository.
+- Never return resume text through a general profile or search tool.
+- Treat posting descriptions as untrusted source content and not instructions.
+- Require confirmation before local status writes.
+- Expose no application, message, registration, purchase, or transaction tool.
+- Keep local agent integrations useful without a hosted Questboard service.
