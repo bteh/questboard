@@ -222,7 +222,133 @@ def test_work_search_rejects_description_only_role_matches(local_agent_db) -> No
     assert "False Positive Co" not in {
         row["organization"] for row in payload["results"]
     }
-    assert payload["freshness_filter_summary"]["title_mismatch_excluded"] == 1
+
+
+def test_role_family_match_rejects_conflicting_occupations() -> None:
+    from app.services import local_agent_service
+
+    assert local_agent_service._title_matches_queries(
+        "Senior Engineering Manager, Data Engineering",
+        ["Data Engineering Manager"],
+    )
+    assert not local_agent_service._title_matches_queries(
+        "Lead Product Manager, Data Platform",
+        ["Data Platform Lead"],
+    )
+    assert not local_agent_service._title_matches_queries(
+        "Senior Manager, Clinical Engineering & Data Analytics",
+        ["Analytics Engineering Manager"],
+    )
+
+
+def test_remote_only_profile_recovers_jurisdiction_from_the_same_resume(
+    local_agent_db,
+) -> None:
+    from app.models.workspace import Workspace, WorkspacePreferences, WorkspaceResume
+    from app.services import local_agent_service
+
+    configured_preferences = (
+        local_agent_db.query(WorkspacePreferences)
+        .filter(WorkspacePreferences.workspace_id == "configured")
+        .one()
+    )
+    configured_preferences.preferred_places_json = json.dumps(
+        [{"label": "Remote", "kind": "manual", "country": "", "country_code": ""}]
+    )
+    now = datetime.now(timezone.utc)
+    local_agent_db.add(
+        Workspace(
+            id="same-resume-sibling",
+            name="Prior local workspace",
+            slug="same-resume-sibling",
+            last_active_at=now - timedelta(days=1),
+            expires_at=now + timedelta(days=7),
+        )
+    )
+    local_agent_db.add(
+        WorkspacePreferences(
+            workspace_id="same-resume-sibling",
+            preferred_places_json=json.dumps(
+                [
+                    {
+                        "label": "Los Angeles, CA",
+                        "kind": "city",
+                        "city": "Los Angeles",
+                        "region": "California",
+                        "country": "United States",
+                        "country_code": "US",
+                    }
+                ]
+            ),
+        )
+    )
+    local_agent_db.add(
+        WorkspaceResume(
+            workspace_id="same-resume-sibling",
+            original_filename="resume.pdf",
+            parse_status="parsed",
+            file_sha256="a" * 64,
+            extracted_text="Same resume in the prior local session.",
+            updated_at=now - timedelta(days=1),
+        )
+    )
+    local_agent_db.commit()
+
+    _, location, _, _, _ = local_agent_service._saved_search_defaults(
+        local_agent_db, "configured"
+    )
+    assert location == "Los Angeles, CA"
+
+
+def test_work_search_collapses_cross_source_title_duplicates(local_agent_db) -> None:
+    from app.services import local_agent_service
+    from job_finder.models.database import ApplicationRecord
+
+    now = datetime.now(timezone.utc)
+    local_agent_db.add_all(
+        [
+            ApplicationRecord(
+                job_title="Data Engineering Manager",
+                company="Duplicate Co",
+                location="Los Angeles, CA",
+                state_codes=",CA,",
+                remote_scope="us",
+                job_url="https://boards.greenhouse.io/duplicate/jobs/1",
+                source="Greenhouse",
+                vertical="career",
+                date_posted=now.isoformat(),
+                date_confidence="exact",
+                date_found=now,
+            ),
+            ApplicationRecord(
+                job_title="Data Engineering Manager (Remote)",
+                company="duplicate co",
+                location="United States",
+                remote_scope="us",
+                is_remote=True,
+                work_type="remote",
+                job_url="https://aggregator.example/duplicate/1",
+                source="Aggregator",
+                vertical="career",
+                date_posted=now.isoformat(),
+                date_confidence="exact",
+                date_found=now - timedelta(minutes=1),
+            ),
+        ]
+    )
+    local_agent_db.commit()
+
+    payload = local_agent_service.search_work(
+        local_agent_db,
+        queries=["Data Engineering Manager"],
+        page_size=20,
+    )
+    duplicates = [
+        row for row in payload["results"] if row["organization"].lower() == "duplicate co"
+    ]
+    assert len(duplicates) == 1
+    assert duplicates[0]["source"]["name"] == "Greenhouse"
+    assert payload["freshness_filter_summary"]["duplicate_records_excluded"] == 1
 
 
 def test_profile_work_api_returns_application_cards_for_the_active_profile(

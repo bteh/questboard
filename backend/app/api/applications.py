@@ -367,7 +367,7 @@ def list_profile_work(
     offset = (page - 1) * page_size
     page_records = ordered[offset : offset + page_size]
     places = preferences.get("preferred_places") or []
-    jurisdiction_configured = bool(location) or any(
+    jurisdiction_configured = bool(payload["filters_applied"].get("location")) or any(
         str(place.get("country_code") or place.get("country") or "").strip()
         for place in places
         if isinstance(place, dict)

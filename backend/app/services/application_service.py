@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import and_, case, func, or_
@@ -72,6 +71,7 @@ def get_applications(
     score_source: str | None = None,
     source: str | None = None,
     search: str | None = None,
+    title_token_groups: list[list[str]] | None = None,
     company_type: str | None = None,
     is_remote: bool | None = None,
     work_type: str | None = None,
@@ -309,6 +309,45 @@ def get_applications(
                 ApplicationRecord.location.ilike(pattern),
             )
         )
+    if title_token_groups:
+        # Role-family retrieval is order-independent: "Manager, Data
+        # Engineering" must answer the saved role "Data Engineering
+        # Manager". Callers still apply an exact token check after retrieval;
+        # these SQL predicates keep the candidate pool bounded and indexed
+        # filters (location, freshness, status) ahead of that check.
+        variants = {
+            "architect": ("architect", "architecture"),
+            "engineer": ("engineer", "engineering"),
+            "manager": ("manager", "mgr"),
+            "ops": ("ops", "operations"),
+            "senior": ("senior", "sr"),
+            "steward": ("steward", "stewardship"),
+        }
+        lowered_title = func.lower(ApplicationRecord.job_title)
+        role_groups = []
+        for raw_group in title_token_groups[:20]:
+            tokens = [
+                token.lower()
+                for token in raw_group[:12]
+                if token and token.isalnum()
+            ]
+            if not tokens:
+                continue
+            role_groups.append(
+                and_(
+                    *(
+                        or_(
+                            *(
+                                lowered_title.like(f"%{variant}%")
+                                for variant in variants.get(token, (token,))
+                            )
+                        )
+                        for token in tokens
+                    )
+                )
+            )
+        if role_groups:
+            query = query.filter(or_(*role_groups))
 
     total = query.count()
 

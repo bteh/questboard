@@ -211,6 +211,39 @@ def _saved_search_defaults(
         ),
         "",
     )
+    if not place:
+        # Local browser sessions historically created duplicate workspaces.
+        # If the current one says only "Remote" (no country), recover the
+        # last concrete jurisdiction saved alongside the exact same resume.
+        current_resume = (
+            db.query(WorkspaceResume)
+            .filter(WorkspaceResume.workspace_id == workspace.id)
+            .first()
+        )
+        if current_resume and current_resume.file_sha256:
+            sibling_ids = [
+                row.workspace_id
+                for row in db.query(WorkspaceResume)
+                .filter(
+                    WorkspaceResume.file_sha256 == current_resume.file_sha256,
+                    WorkspaceResume.workspace_id != workspace.id,
+                )
+                .order_by(WorkspaceResume.updated_at.desc())
+                .all()
+            ]
+            for sibling_id in sibling_ids:
+                sibling = workspace_service.get_workspace_preferences(db, sibling_id)
+                place = next(
+                    (
+                        item.label
+                        for item in sibling.preferred_places
+                        if item.label.strip().lower() not in {"remote", "anywhere"}
+                        and (item.country_code or item.country or item.city or item.region)
+                    ),
+                    "",
+                )
+                if place:
+                    break
     floor = preferences.compensation.min_base or preferences.compensation.min_acceptable_tc
     role_queries = list(preferences.roles)
     if not role_queries and preferences.current_title:
@@ -299,10 +332,18 @@ _ROLE_TOKEN_ALIASES = {
     "engineering": "engineer",
     "mgr": "manager",
     "operations": "ops",
+    "products": "product",
+    "programs": "program",
+    "projects": "project",
+    "scientist": "science",
+    "scientists": "science",
     "stewardship": "steward",
     "sr": "senior",
 }
 _ROLE_FILLER_TOKENS = frozenset({"a", "an", "and", "of", "the"})
+_OCCUPATION_CONFLICT_TOKENS = frozenset(
+    {"center", "centre", "clinical", "product", "program", "project", "science"}
+)
 
 
 def _role_tokens(value: str | None) -> set[str]:
@@ -323,9 +364,38 @@ def _title_matches_queries(title: str | None, queries: list[str]) -> bool:
     """
 
     title_tokens = _role_tokens(title)
-    return any(
-        bool(query_tokens) and query_tokens.issubset(title_tokens)
-        for query_tokens in (_role_tokens(query) for query in queries)
+    title_conflicts = title_tokens & _OCCUPATION_CONFLICT_TOKENS
+    for query in queries:
+        query_tokens = _role_tokens(query)
+        if not query_tokens or not query_tokens.issubset(title_tokens):
+            continue
+        query_conflicts = query_tokens & _OCCUPATION_CONFLICT_TOKENS
+        if title_conflicts - query_conflicts:
+            continue
+        return True
+    return False
+
+
+def _dedupe_work_key(record: ApplicationRecord) -> tuple[str, tuple[str, ...]]:
+    company_tokens = [
+        token
+        for token in re.findall(r"[a-z0-9]+", (record.company or "").lower())
+        if token not in {"co", "company", "corp", "corporation", "inc", "llc", "ltd"}
+    ]
+    title_tokens = _role_tokens(record.job_title)
+    title_tokens.difference_update({"hybrid", "remote", "us", "usa"})
+    return "".join(company_tokens), tuple(sorted(title_tokens))
+
+
+def _dedupe_work_priority(record: ApplicationRecord) -> tuple[Any, ...]:
+    age_days = _source_age_days(record.date_posted)
+    found = record.date_found or datetime.min
+    return (
+        age_days is not None,
+        -int(age_days) if age_days is not None else float("-inf"),
+        is_direct_source(record.source or ""),
+        bool(record.description),
+        found,
     )
 
 
@@ -411,43 +481,51 @@ def search_work(
     if effective_freshness_window is None and use_saved_preferences:
         effective_freshness_window = max(1, min(int(saved_days), 365))
     page_size = max(1, min(int(page_size), _MAX_RESULTS))
-    candidate_page_size = min(100, max(page_size * 4, page_size))
+    candidate_page_size = min(500, max(page_size * 10, 200))
 
-    # One blank query means "show the board".  Multiple role families are
-    # searched independently and merged, avoiding an accidental AND query.
-    search_terms: list[str | None] = terms or [None]
-    merged: dict[int, ApplicationRecord] = {}
-    for term in search_terms:
-        rows, _ = application_service.get_applications(
-            db,
-            search=term,
-            is_remote=True if effective_workplace == "remote_only" else None,
-            location=effective_location or None,
-            location_strict=bool(
-                effective_location and effective_workplace == "location_only"
-            ),
-            salary_min=effective_floor,
-            exclude_dead=True,
-            # Source dates are a mixture of ISO timestamps and labels such as
-            # "Reposted 8 Days Ago". Filter them consistently after retrieval.
-            posted_within_days=None,
-            sort_by="date_found",
-            sort_dir="desc",
-            page=1,
-            page_size=candidate_page_size,
-            verticals=["career", "work"],
-        )
-        for row in rows:
-            merged[row.id] = row
+    # Saved role families are token groups, not exact phrases. This retrieves
+    # "Manager, Data Engineering" for "Data Engineering Manager" while the
+    # Python check below prevents description-only and substring false hits.
+    rows, _ = application_service.get_applications(
+        db,
+        title_token_groups=[sorted(_role_tokens(term)) for term in terms] or None,
+        is_remote=True if effective_workplace == "remote_only" else None,
+        location=effective_location or None,
+        location_strict=bool(
+            effective_location and effective_workplace == "location_only"
+        ),
+        salary_min=effective_floor,
+        exclude_dead=True,
+        # Source dates are a mixture of ISO timestamps and labels such as
+        # "Reposted 8 Days Ago". Filter them consistently after retrieval.
+        posted_within_days=None,
+        sort_by="date_found",
+        sort_dir="desc",
+        page=1,
+        page_size=candidate_page_size,
+        verticals=["career", "work"],
+    )
 
     stale_excluded = 0
     unknown_freshness_excluded = 0
     title_mismatch_excluded = 0
-    filtered: list[ApplicationRecord] = []
-    for row in merged.values():
+    duplicate_records_excluded = 0
+    unique: dict[tuple[str, tuple[str, ...]], ApplicationRecord] = {}
+    for row in rows:
         if terms and not _title_matches_queries(row.job_title, terms):
             title_mismatch_excluded += 1
             continue
+        key = _dedupe_work_key(row)
+        existing = unique.get(key)
+        if existing is None:
+            unique[key] = row
+            continue
+        duplicate_records_excluded += 1
+        if _dedupe_work_priority(row) > _dedupe_work_priority(existing):
+            unique[key] = row
+
+    filtered: list[ApplicationRecord] = []
+    for row in unique.values():
         age_days = _source_age_days(row.date_posted)
         if effective_freshness_window is not None and age_days is not None:
             if age_days > effective_freshness_window:
@@ -483,6 +561,7 @@ def search_work(
             "known_stale_excluded": stale_excluded,
             "unknown_date_excluded": unknown_freshness_excluded,
             "title_mismatch_excluded": title_mismatch_excluded,
+            "duplicate_records_excluded": duplicate_records_excluded,
         },
         "ranking_owner": "connected_agent",
         "server_funded_ai": False,
