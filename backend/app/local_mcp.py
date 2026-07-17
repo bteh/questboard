@@ -49,8 +49,10 @@ SOURCE_READ = ToolAnnotations(
 )
 REFRESH = ToolAnnotations(
     readOnlyHint=False,
+    # Each call re-scrapes sources and writes rows, so it is not idempotent;
+    # the in-flight dedup is a convenience, not a repeat-safe guarantee.
     destructiveHint=False,
-    idempotentHint=True,
+    idempotentHint=False,
     openWorldHint=True,
 )
 WRITE = ToolAnnotations(

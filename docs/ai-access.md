@@ -39,7 +39,7 @@ Side Quest tools do not read the resume.
 
 ## Cost boundary
 
-Every Questboard MCP tool reports or guarantees that Questboard-funded AI is false. Source refresh, search, filtering, source status, details, and local workflow writes are deterministic operations.
+The guarantee is structural: the Questboard MCP server never calls a model, so no tool can spend Questboard-funded AI. Source refresh, search, filtering, source status, details, and local workflow writes are deterministic operations, and the main tool payloads (`server_info`, `search_work`, `search_side_quests`, `refresh_work`, `get_refresh_status`) carry an explicit `questboard_funded_ai: false` flag.
 
 The connected agent may consume usage under the user's plan. Questboard neither knows nor manages those credits. There is no Questboard AI quota to purchase or administer.
 

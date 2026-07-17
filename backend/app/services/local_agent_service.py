@@ -319,7 +319,9 @@ def _candidate_payload(record: ApplicationRecord, *, detail: bool = False) -> di
                 "description": record.description or "",
                 "description_is_untrusted_source_content": True,
                 "content_hash": _content_hash(record),
-                "requirements_evidence": record.score_evidence,
+                # A legacy keyword-scorer artifact, NOT a computed resume-fit
+                # verdict. Named so the agent can't mistake it for one.
+                "legacy_keyword_score_evidence": record.score_evidence,
                 "quest_details": _json_object(record.quest_json),
                 "event_start": _iso(record.event_start),
                 "event_end": _iso(record.event_end),
@@ -528,22 +530,15 @@ def search_work(
     unknown_freshness_excluded = 0
     title_mismatch_excluded = 0
     duplicate_records_excluded = 0
-    unique: dict[tuple[str, tuple[str, ...]], ApplicationRecord] = {}
+
+    # Apply title + freshness BEFORE dedup. Deduping first let a stale-known
+    # record win its key and then get freshness-excluded, silently evicting a
+    # still-live unknown-date duplicate that shared the key.
+    survivors: list[ApplicationRecord] = []
     for row in rows:
         if terms and not _title_matches_queries(row.job_title, terms):
             title_mismatch_excluded += 1
             continue
-        key = _dedupe_work_key(row)
-        existing = unique.get(key)
-        if existing is None:
-            unique[key] = row
-            continue
-        duplicate_records_excluded += 1
-        if _dedupe_work_priority(row) > _dedupe_work_priority(existing):
-            unique[key] = row
-
-    filtered: list[ApplicationRecord] = []
-    for row in unique.values():
         age_days = _source_age_days(row.date_posted)
         if effective_freshness_window is not None and age_days is not None:
             if age_days > effective_freshness_window:
@@ -554,10 +549,21 @@ def search_work(
             # defaults stay recall-friendly and let the agent demote unknowns.
             unknown_freshness_excluded += 1
             continue
-        filtered.append(row)
+        survivors.append(row)
+
+    unique: dict[tuple[str, tuple[str, ...]], ApplicationRecord] = {}
+    for row in survivors:
+        key = _dedupe_work_key(row)
+        existing = unique.get(key)
+        if existing is None:
+            unique[key] = row
+            continue
+        duplicate_records_excluded += 1
+        if _dedupe_work_priority(row) > _dedupe_work_priority(existing):
+            unique[key] = row
 
     rows = sorted(
-        filtered,
+        unique.values(),
         key=lambda item: item.date_found or datetime.min,
         reverse=True,
     )[:page_size]
@@ -582,7 +588,7 @@ def search_work(
             "duplicate_records_excluded": duplicate_records_excluded,
         },
         "ranking_owner": "connected_agent",
-        "server_funded_ai": False,
+        "questboard_funded_ai": False,
         "note": (
             "These are source-grounded candidates in newest-first order. "
             "Retrieval signals are not a resume-fit verdict."
@@ -612,6 +618,18 @@ def search_side_quests(
         for value in vertical_values_for(kind_id)
         if value not in {"career", "work"}
     ]
+    if not verticals:
+        # Never fall through to get_applications with an empty vertical list:
+        # scoped_applications silently defaults to the career scope, which would
+        # leak career jobs into the resume-independent Side Quest lane.
+        return {
+            "results": [],
+            "result_count": 0,
+            "total_matching": 0,
+            "kinds": selected,
+            "resume_used": False,
+            "questboard_funded_ai": False,
+        }
     page_size = max(1, min(int(page_size), _MAX_RESULTS))
     rows, total = application_service.get_applications(
         db,
@@ -633,7 +651,7 @@ def search_side_quests(
         "total_matching": total,
         "kinds": selected,
         "resume_used": False,
-        "server_funded_ai": False,
+        "questboard_funded_ai": False,
     }
 
 
@@ -714,5 +732,5 @@ def source_status(db: Session, *, limit: int = 50) -> dict[str, Any]:
             for run in latest.values()
         ],
         "source_count": len(latest),
-        "server_funded_ai": False,
+        "questboard_funded_ai": False,
     }

@@ -6,6 +6,7 @@ from app.api import (
     board,
     dev_auth,
     health,
+    local_agent,
     locations,
     me,
     onboarding,
@@ -36,5 +37,6 @@ api_router.include_router(onboarding.router, prefix="/api/v1")
 api_router.include_router(locations.router, prefix="/api/v1")
 api_router.include_router(settings.router, prefix="/api/v1")
 api_router.include_router(resume.router, prefix="/api/v1")
+api_router.include_router(local_agent.router, prefix="/api/v1")
 api_router.include_router(scrapers.router, prefix="/api/v1")
 api_router.include_router(watchlist.router, prefix="/api/v1")

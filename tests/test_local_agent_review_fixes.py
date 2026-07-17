@@ -178,3 +178,144 @@ def test_consent_file_is_the_only_grant_path(agent_db):
     tool_names = {name for name in dir(local_mcp) if not name.startswith("_")}
     grant_like = {n for n in tool_names if "consent" in n.lower() or "grant" in n.lower()}
     assert grant_like == set(), f"MCP module must expose no consent-grant tool: {grant_like}"
+
+
+# ── LOW polish ──
+
+
+def test_get_opportunity_labels_the_legacy_score_honestly(agent_db):
+    from app.services import local_agent_service
+    from job_finder.models.database import ApplicationRecord
+
+    opp_id = agent_db.query(ApplicationRecord.id).first()[0]
+    detail = local_agent_service.get_opportunity(agent_db, opp_id)
+    # the legacy keyword-scorer artifact is named so the agent can't read it as
+    # a computed resume-fit verdict, and there is no "requirements_evidence"
+    assert "requirements_evidence" not in detail
+    assert "legacy_keyword_score_evidence" in detail
+    assert detail["retrieval"]["is_fit_assessment"] is False
+
+
+def test_freshness_filter_precedes_dedup(agent_db):
+    # A stale-known posting and a still-live unknown-date posting share a dedup
+    # key (saved defaults keep unknown dates for agent review). Freshness must
+    # run first so the live one survives instead of being evicted by the stale
+    # duplicate that dedup would otherwise keep.
+    from datetime import datetime, timezone
+    from app.services import local_agent_service
+    from job_finder.models.database import ApplicationRecord
+
+    agent_db.add_all(
+        [
+            ApplicationRecord(
+                job_title="Data Scientist",
+                company="Same Co",
+                location="Remote, US",
+                vertical="career",
+                date_posted="Reposted 40 Days Ago",  # stale, beyond saved window (30)
+                date_found=datetime.now(timezone.utc),
+            ),
+            ApplicationRecord(
+                job_title="Data Scientist",
+                company="Same Co",
+                location="Remote, US",
+                vertical="career",
+                date_posted="",  # unknown date -> kept for agent review
+                date_found=datetime.now(timezone.utc),
+            ),
+        ]
+    )
+    agent_db.commit()
+
+    # saved preferences (max_days_old=30), no explicit override
+    result = local_agent_service.search_work(agent_db, queries=["Data Scientist"])
+    titles = [r["title"] for r in result["results"]]
+    assert "Data Scientist" in titles  # the live unknown-date posting survives
+
+
+def test_search_payloads_flag_no_questboard_ai(agent_db):
+    from app.services import local_agent_service
+
+    work = local_agent_service.search_work(agent_db, queries=["Data Scientist"])
+    quests = local_agent_service.search_side_quests(agent_db)
+    assert work["questboard_funded_ai"] is False
+    assert quests["questboard_funded_ai"] is False
+
+
+def test_refresh_work_spends_no_questboard_ai(agent_db, monkeypatch):
+    import asyncio
+    from types import SimpleNamespace
+    from app import local_mcp
+    from app.services import pipeline_service
+
+    captured: dict = {}
+
+    def _stub_start_run(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(run_id="r1", status="running")
+
+    monkeypatch.setattr(pipeline_service, "start_run", _stub_start_run)
+    asyncio.run(local_mcp.refresh_work(roles=["Data Scientist"]))
+    assert captured.get("use_ai") is False
+
+
+def test_refresh_is_not_advertised_idempotent():
+    from app import local_mcp
+
+    assert local_mcp.REFRESH.idempotentHint is False
+
+
+def test_conflict_rejection_covers_the_domain_tokens():
+    from app.services.local_agent_service import _title_matches_queries
+
+    # query is a token-subset of the title but a conflict token differs -> reject
+    assert not _title_matches_queries("Data Science Manager", ["Data Manager"])
+    assert not _title_matches_queries("Program Manager, Data", ["Data Manager"])
+    assert not _title_matches_queries("Data Center Engineer", ["Data Engineer"])
+    assert not _title_matches_queries("Project Manager, Data", ["Data Manager"])
+    # no conflict token -> keep
+    assert _title_matches_queries("Senior Data Engineer", ["Data Engineer"])
+
+
+def test_source_age_days_parses_relative_and_unix():
+    from app.services.local_agent_service import _source_age_days
+
+    assert _source_age_days("Posted Today") == 0.0
+    assert _source_age_days("Reposted Yesterday") == 1.0
+    assert _source_age_days("Reposted 5 Days Ago") == 5.0
+    # unix seconds and the same instant as 13-digit millis agree
+    import time
+
+    two_days_secs = str(int(time.time()) - 2 * 86_400)
+    assert 1.5 < _source_age_days(two_days_secs) < 2.5
+    assert 1.5 < _source_age_days(two_days_secs + "000") < 2.5
+    assert _source_age_days("not a date") is None
+
+
+def test_service_validation_raises_valueerror(agent_db):
+    from app.services import local_agent_service
+
+    with pytest.raises(ValueError):
+        local_agent_service.search_side_quests(agent_db, kinds=["not-a-real-kind"])
+    with pytest.raises(ValueError):
+        local_agent_service.get_opportunity(agent_db, 999999)
+
+
+def test_remove_command_covers_codex_and_claude():
+    from scripts.install_agent_integration import remove_command
+
+    assert remove_command("codex") == ["codex", "mcp", "remove", "questboard"]
+    assert remove_command("claude")[:3] == ["claude", "mcp", "remove"]
+
+
+def test_consent_endpoint_grants_and_revokes(agent_db):
+    # the Settings surface (a human action) grants/revokes without the CLI
+    from app.api.local_agent import get_agent_consent, set_agent_consent
+    from app.schemas.resume import AgentConsentRequest
+
+    assert get_agent_consent(agent_db).granted is False
+    granted = set_agent_consent(AgentConsentRequest(grant=True), agent_db)
+    assert granted.granted is True
+    assert get_agent_consent(agent_db).granted is True
+    set_agent_consent(AgentConsentRequest(grant=False), agent_db)
+    assert get_agent_consent(agent_db).granted is False

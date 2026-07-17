@@ -8,6 +8,7 @@ import { ResumeAnalysisPanel } from '@/components/settings/resume-analysis-panel
 import { ResumeAnalysisBanner } from '@/components/shared/resume-analysis-banner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAgentConsent, useSetAgentConsent } from '@/hooks/use-agent-consent';
 import { useUploadWorkspaceResume } from '@/hooks/use-workspace';
 import { normalizeWorkspaceUpload, type NormalizedResumeUpload } from '@/lib/resume-analysis';
 import { buildDefaultWorkspacePreferences } from '@/lib/profile-preferences';
@@ -20,6 +21,8 @@ interface ResumeTabProps {
 
 export function ResumeTab({ onboarding, navigate }: ResumeTabProps) {
   const uploadResume = useUploadWorkspaceResume();
+  const consent = useAgentConsent();
+  const setConsent = useSetAgentConsent();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [lastUpload, setLastUpload] = useState<NormalizedResumeUpload | null>(null);
   // Re-mounts the analysis panel with fresh chip state on every new upload.
@@ -81,6 +84,38 @@ export function ResumeTab({ onboarding, navigate }: ResumeTabProps) {
           ) : (
             <p className="text-sm text-text-tertiary">No resume uploaded yet. Upload one so your connected agent can compare job requirements with your experience.</p>
           )}
+        </div>
+
+        <div className="rounded-xl border border-border-default bg-bg-subtle/40 p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-text-primary">Let your agent read your resume</p>
+              <p className="mt-1 text-xs text-text-muted">
+                {consent.data?.granted
+                  ? 'Allowed. Your connected Codex or Claude can read your resume to match jobs. Questboard never sends it anywhere.'
+                  : 'Off. Your agent can browse jobs but cannot read your resume until you allow it.'}
+              </p>
+            </div>
+            <Button
+              variant={consent.data?.granted ? 'outline' : 'default'}
+              size="sm"
+              disabled={setConsent.isPending || consent.isLoading}
+              onClick={() =>
+                setConsent.mutate(!consent.data?.granted, {
+                  onSuccess: (data) =>
+                    toast.success(
+                      data.granted
+                        ? 'Agent can now read your resume'
+                        : 'Agent resume access turned off',
+                    ),
+                  onError: (error) =>
+                    toast.error(error instanceof Error ? error.message : 'Could not update access'),
+                })
+              }
+            >
+              {consent.data?.granted ? 'Turn off' : 'Allow'}
+            </Button>
+          </div>
         </div>
 
         {onboarding?.resume.exists && (

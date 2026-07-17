@@ -6,6 +6,12 @@ export interface ResumeStatus {
   path: string;
 }
 
+export interface AgentConsentStatus {
+  granted: boolean;
+  granted_at: string | null;
+  expires_at: string | null;
+}
+
 export type ResumeAnalysisStatus = 'completed' | 'skipped_no_llm' | 'failed' | 'analysis_error' | 'quota_exhausted';
 
 export type ResumeParseCode = 'SCANNED_PDF' | null;

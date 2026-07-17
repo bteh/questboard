@@ -197,7 +197,7 @@ def test_work_search_applies_saved_location_and_excludes_foreign_remote(local_ag
     assert [row["organization"] for row in payload["results"]] == ["Local Co"]
     assert payload["filters_applied"]["location"] == "Los Angeles, CA"
     assert payload["ranking_owner"] == "connected_agent"
-    assert payload["server_funded_ai"] is False
+    assert payload["questboard_funded_ai"] is False
     assert payload["results"][0]["retrieval"]["is_fit_assessment"] is False
 
 
@@ -500,7 +500,7 @@ def test_opportunity_detail_receipt_status_and_source_health(local_agent_db) -> 
 
     health = local_agent_service.source_status(local_agent_db)
     assert health["sources"][0]["source"] == "Greenhouse"
-    assert health["server_funded_ai"] is False
+    assert health["questboard_funded_ai"] is False
 
 
 def test_builtin_finalist_is_hydrated_on_demand(local_agent_db) -> None:

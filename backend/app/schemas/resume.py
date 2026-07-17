@@ -11,6 +11,19 @@ class ResumeStatus(BaseModel):
     path: str = ""
 
 
+class AgentConsentStatus(BaseModel):
+    """Whether the connected agent may read the local resume."""
+
+    granted: bool = False
+    granted_at: str | None = None
+    expires_at: str | None = None
+
+
+class AgentConsentRequest(BaseModel):
+    grant: bool
+    ttl_hours: int | None = None
+
+
 class ResumeAnalysisSummary(BaseModel):
     """Summary of what resume analysis extracted, echoed in the upload response."""
 
