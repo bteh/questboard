@@ -88,7 +88,15 @@ def _content_hash(record: ApplicationRecord) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def resolve_local_workspace(db: Session) -> Workspace | None:
+def _requested_workspace(db: Session, workspace_id: str | None = None) -> Workspace | None:
+    if workspace_id:
+        return db.get(Workspace, workspace_id)
+    return None
+
+
+def resolve_local_workspace(
+    db: Session, workspace_id: str | None = None
+) -> Workspace | None:
     """Choose the meaningful local workspace, not the newest empty session.
 
     Browser reloads can leave several anonymous local workspaces behind.  A
@@ -96,6 +104,10 @@ def resolve_local_workspace(db: Session) -> Workspace | None:
     then recent activity.  This keeps MCP aligned with the profile the person
     actually configured in the app.
     """
+
+    requested = _requested_workspace(db, workspace_id)
+    if requested is not None:
+        return requested
 
     resume_workspace = (
         db.query(Workspace)
@@ -127,8 +139,10 @@ def resolve_local_workspace(db: Session) -> Workspace | None:
     return db.query(Workspace).order_by(Workspace.last_active_at.desc()).first()
 
 
-def career_preferences(db: Session) -> dict[str, Any]:
-    workspace = resolve_local_workspace(db)
+def career_preferences(
+    db: Session, workspace_id: str | None = None
+) -> dict[str, Any]:
+    workspace = resolve_local_workspace(db, workspace_id)
     if workspace is None:
         return {
             "configured": False,
@@ -154,10 +168,12 @@ def career_preferences(db: Session) -> dict[str, Any]:
     }
 
 
-def resume_for_matching(db: Session) -> dict[str, Any]:
+def resume_for_matching(
+    db: Session, workspace_id: str | None = None
+) -> dict[str, Any]:
     """Return the local resume only for an explicitly requested agent match."""
 
-    workspace = resolve_local_workspace(db)
+    workspace = resolve_local_workspace(db, workspace_id)
     if workspace is None:
         return {"available": False, "resume_text": "", "reason": "No local profile"}
     resume = workspace_service.get_workspace_resume(db, workspace.id)
@@ -180,8 +196,10 @@ def resume_for_matching(db: Session) -> dict[str, Any]:
     }
 
 
-def _saved_search_defaults(db: Session) -> tuple[list[str], str, str, int, float | None]:
-    workspace = resolve_local_workspace(db)
+def _saved_search_defaults(
+    db: Session, workspace_id: str | None = None
+) -> tuple[list[str], str, str, int, float | None]:
+    workspace = resolve_local_workspace(db, workspace_id)
     if workspace is None:
         return [], "", "remote_friendly", 14, None
     preferences = workspace_service.get_workspace_preferences(db, workspace.id)
@@ -276,6 +294,41 @@ def clean_terms(values: list[str] | None, *, limit: int = 12) -> list[str]:
     return cleaned
 
 
+_ROLE_TOKEN_ALIASES = {
+    "architectural": "architect",
+    "engineering": "engineer",
+    "mgr": "manager",
+    "operations": "ops",
+    "stewardship": "steward",
+    "sr": "senior",
+}
+_ROLE_FILLER_TOKENS = frozenset({"a", "an", "and", "of", "the"})
+
+
+def _role_tokens(value: str | None) -> set[str]:
+    tokens: set[str] = set()
+    for raw in re.findall(r"[a-z0-9]+", str(value or "").lower()):
+        if raw in _ROLE_FILLER_TOKENS:
+            continue
+        tokens.add(_ROLE_TOKEN_ALIASES.get(raw, raw))
+    return tokens
+
+
+def _title_matches_queries(title: str | None, queries: list[str]) -> bool:
+    """Require a candidate title to contain one configured role family.
+
+    The generic application search also scans descriptions and companies.
+    That is useful for free-text browsing but made the profile board admit
+    unrelated jobs merely because their description mentioned a target role.
+    """
+
+    title_tokens = _role_tokens(title)
+    return any(
+        bool(query_tokens) and query_tokens.issubset(title_tokens)
+        for query_tokens in (_role_tokens(query) for query in queries)
+    )
+
+
 def _source_age_days(value: str | None) -> float | None:
     """Normalize exact and human-readable source dates into an age in days."""
 
@@ -302,6 +355,17 @@ def _source_age_days(value: str | None) -> float | None:
             return amount / 24
         return float(amount)
 
+    if re.fullmatch(r"\d{10,13}", normalized):
+        timestamp = int(normalized)
+        if len(normalized) == 13:
+            timestamp /= 1000
+        try:
+            posted = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+        except (OverflowError, OSError, ValueError):
+            return None
+        elapsed = datetime.now(timezone.utc) - posted
+        return max(0.0, elapsed.total_seconds() / 86_400)
+
     try:
         posted = datetime.fromisoformat(normalized.replace("Z", "+00:00"))
     except ValueError:
@@ -322,9 +386,10 @@ def search_work(
     posted_within_days: int | None = None,
     page_size: int = 20,
     use_saved_preferences: bool = True,
+    workspace_id: str | None = None,
 ) -> dict[str, Any]:
     saved_terms, saved_location, saved_workplace, saved_days, saved_floor = (
-        _saved_search_defaults(db)
+        _saved_search_defaults(db, workspace_id)
     )
     terms = clean_terms(queries)
     if not terms and use_saved_preferences:
@@ -377,8 +442,12 @@ def search_work(
 
     stale_excluded = 0
     unknown_freshness_excluded = 0
+    title_mismatch_excluded = 0
     filtered: list[ApplicationRecord] = []
     for row in merged.values():
+        if terms and not _title_matches_queries(row.job_title, terms):
+            title_mismatch_excluded += 1
+            continue
         age_days = _source_age_days(row.date_posted)
         if effective_freshness_window is not None and age_days is not None:
             if age_days > effective_freshness_window:
@@ -413,6 +482,7 @@ def search_work(
         "freshness_filter_summary": {
             "known_stale_excluded": stale_excluded,
             "unknown_date_excluded": unknown_freshness_excluded,
+            "title_mismatch_excluded": title_mismatch_excluded,
         },
         "ranking_owner": "connected_agent",
         "server_funded_ai": False,

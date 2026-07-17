@@ -79,19 +79,19 @@ export function ResumeTab({ onboarding, navigate }: ResumeTabProps) {
               </div>
             </div>
           ) : (
-            <p className="text-sm text-text-tertiary">No resume uploaded yet. Upload one to unlock resume-matched scoring.</p>
+            <p className="text-sm text-text-tertiary">No resume uploaded yet. Upload one so your connected agent can compare job requirements with your experience.</p>
           )}
         </div>
 
         {onboarding?.resume.exists && (
           <div className="rounded-xl border border-success/20 bg-success/5 p-3 text-sm text-text-secondary">
-            Resume saved. Next, run a search and every job comes back ranked to how well you fit it.{' '}
+            Resume saved locally. Next, restock the board; Questboard will retrieve your target roles and your connected agent can evaluate the finalists.{' '}
             <button
               type="button"
               onClick={() => navigate({ to: '/restock' })}
               className="font-medium text-brand underline underline-offset-2"
             >
-              Find &amp; rank jobs →
+              Find target-role jobs →
             </button>
           </div>
         )}

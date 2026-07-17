@@ -5,6 +5,7 @@ import json
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -188,6 +189,83 @@ def test_work_search_applies_saved_location_and_excludes_foreign_remote(local_ag
     assert payload["ranking_owner"] == "connected_agent"
     assert payload["server_funded_ai"] is False
     assert payload["results"][0]["retrieval"]["is_fit_assessment"] is False
+
+
+def test_work_search_rejects_description_only_role_matches(local_agent_db) -> None:
+    from app.services import local_agent_service
+    from job_finder.models.database import ApplicationRecord
+
+    now = datetime.now(timezone.utc)
+    local_agent_db.add(
+        ApplicationRecord(
+            job_title="Project Manager",
+            company="False Positive Co",
+            location="Los Angeles, CA",
+            state_codes=",CA,",
+            remote_scope="us",
+            job_url="https://false-positive.example/jobs/project",
+            source="Greenhouse",
+            description="Partners closely with the Data Engineering Manager.",
+            vertical="career",
+            date_posted=now.isoformat(),
+            date_confidence="exact",
+            date_found=now,
+        )
+    )
+    local_agent_db.commit()
+
+    payload = local_agent_service.search_work(
+        local_agent_db,
+        queries=["Data Engineering Manager"],
+        page_size=20,
+    )
+    assert "False Positive Co" not in {
+        row["organization"] for row in payload["results"]
+    }
+    assert payload["freshness_filter_summary"]["title_mismatch_excluded"] == 1
+
+
+def test_profile_work_api_returns_application_cards_for_the_active_profile(
+    local_agent_db,
+) -> None:
+    from app.api.applications import list_profile_work
+    from job_finder.models.database import ApplicationRecord
+
+    now = datetime.now(timezone.utc)
+    local_agent_db.add(
+        ApplicationRecord(
+            job_title="Data Engineering Manager",
+            company="Profile Match Co",
+            location="Los Angeles, CA",
+            state_codes=",CA,",
+            remote_scope="us",
+            job_url="https://profile-match.example/jobs/data",
+            source="Greenhouse",
+            vertical="career",
+            date_posted=now.isoformat(),
+            date_confidence="exact",
+            date_found=now,
+        )
+    )
+    local_agent_db.commit()
+
+    response = list_profile_work(
+        search=None,
+        location=None,
+        location_strict=False,
+        salary_min=None,
+        is_remote=None,
+        posted_within_days=None,
+        page=1,
+        page_size=24,
+        workspace=SimpleNamespace(workspace=SimpleNamespace(id="configured")),
+        db=local_agent_db,
+    )
+    assert response.profile_configured is True
+    assert response.resume_available is True
+    assert response.jurisdiction_configured is True
+    assert [item.company for item in response.items] == ["Profile Match Co"]
+    assert response.ranking_owner == "connected_agent"
 
 
 def test_work_search_enforces_fuzzy_freshness_without_hiding_default_unknowns(

@@ -125,6 +125,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
               setState('completed');
               abortRef.current = null;
               queryClient.invalidateQueries({ queryKey: ['applications'] });
+              queryClient.invalidateQueries({ queryKey: ['profile-work'] });
               queryClient.invalidateQueries({ queryKey: ['analytics'] });
               return;
             }
@@ -134,6 +135,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
               setState('failed');
               abortRef.current = null;
               queryClient.invalidateQueries({ queryKey: ['applications'] });
+              queryClient.invalidateQueries({ queryKey: ['profile-work'] });
             }
           },
         },
@@ -183,6 +185,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
       es.close();
       esRef.current = null;
       queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['profile-work'] });
       queryClient.invalidateQueries({ queryKey: ['analytics'] });
     });
 
@@ -197,6 +200,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
         es.close();
         esRef.current = null;
         queryClient.invalidateQueries({ queryKey: ['applications'] });
+        queryClient.invalidateQueries({ queryKey: ['profile-work'] });
       }
     });
 

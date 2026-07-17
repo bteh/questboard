@@ -167,7 +167,7 @@ export function SearchPrefsTab({ onboarding, navigate }: SearchPrefsTabProps) {
                 placeholder="150,000"
               />
             </div>
-            <p className="text-xs text-text-muted">Jobs near or above this score higher.</p>
+            <p className="text-xs text-text-muted">Your connected agent can use this when prioritizing finalists.</p>
           </div>
         </div>
 
@@ -246,7 +246,7 @@ export function SearchPrefsTab({ onboarding, navigate }: SearchPrefsTabProps) {
                     onChange={(event) => setPrefsForm((prev) => ({ ...prev, current_title: event.target.value }))}
                     placeholder="e.g. Senior Engineer"
                   />
-                  <p className="text-xs text-text-muted">Used to score career progression.</p>
+                  <p className="text-xs text-text-muted">Helps your connected agent judge level and career progression.</p>
                 </div>
                 <div className="space-y-1.5">
                   <Label>Current level</Label>

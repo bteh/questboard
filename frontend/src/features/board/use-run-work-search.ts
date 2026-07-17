@@ -6,7 +6,6 @@
 import { toast } from 'sonner';
 import { useProfile } from '@/contexts/profile-context';
 import { useSearchContext } from '@/contexts/search-context';
-import { useLLMStatus } from '@/hooks/use-settings';
 import { useOnboardingState } from '@/hooks/use-workspace';
 import { useSearchDefaults, useStartSearch } from '@/hooks/use-search';
 import { getSearchAreaSummary } from '@/lib/search-area';
@@ -20,7 +19,6 @@ import {
 export function useRunWorkSearch() {
   const { profile } = useProfile();
   const { data: searchDefaults } = useSearchDefaults(profile);
-  const { data: llm } = useLLMStatus();
   const { data: onboarding } = useOnboardingState();
   const startSearch = useStartSearch();
   const { state, activate } = useSearchContext();
@@ -43,9 +41,9 @@ export function useRunWorkSearch() {
       maxDaysOld: seed.maxDaysOld,
       includeLinkedInJobs: seed.includeLinkedInJobs,
       matchStrictness: seed.matchStrictness,
-      useAi: llm?.available === true,
+      useAi: false,
       profile,
-      mode: 'search_score',
+      mode: 'search_only',
     });
     const snapshot = buildSearchRunSnapshot({
       request,
@@ -53,7 +51,7 @@ export function useRunWorkSearch() {
       metadata: resolveSearchSnapshotMetadata(searchDefaults, onboarding?.preferences),
     });
     startSearch.mutate(request, {
-      onSuccess: (data) => activate(data.run_id, 'search_score', snapshot),
+      onSuccess: (data) => activate(data.run_id, 'search_only', snapshot),
       onError: (error) => {
         const message = error instanceof Error ? error.message : 'The search did not start';
         if (message.includes('At least one role or keyword')) {

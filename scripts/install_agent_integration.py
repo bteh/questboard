@@ -52,7 +52,7 @@ def source_runtime() -> tuple[list[str], str]:
         raise SystemExit(
             "Questboard's MCP entrypoint is not installed. Run `make install` first."
         )
-    return [str(executable), "--data-dir", str(root / "data")], "source checkout"
+    return [str(executable), "--data-dir", str(root / "backend" / "data")], "source checkout"
 
 
 def resolve_runtime(preference: str) -> tuple[list[str], str]:

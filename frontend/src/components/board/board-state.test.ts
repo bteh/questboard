@@ -44,7 +44,7 @@ afterEach(() => {
   delete (globalThis as MutableGlobal).window;
 });
 
-const PRESET_ORDER = ['noexp', 'remote', 'strong', 'score50', 'early', 'bigtech'];
+const PRESET_ORDER = ['noexp', 'remote', 'fresh'];
 
 describe('validateBoardSearch', () => {
   it('carries the place filter and drops an empty one', () => {
@@ -134,7 +134,7 @@ describe('preset keys round-trip', () => {
   });
 
   it('round-trips exactly', () => {
-    const keys = new Set(['strong', 'noexp']);
+    const keys = new Set(['fresh', 'noexp']);
     const wire = presetKeysTo(keys, PRESET_ORDER);
     expect(presetKeysFrom(wire, PRESET_ORDER)).toEqual(keys);
   });

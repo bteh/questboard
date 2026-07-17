@@ -342,7 +342,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Questboard local MCP server")
     parser.add_argument(
         "--data-dir",
-        default=os.getenv("QUESTBOARD_DATA_DIR", str(repo_root / "data")),
+        default=os.getenv("QUESTBOARD_DATA_DIR", str(repo_root / "backend" / "data")),
         help="Questboard data directory containing job_tracker.db",
     )
     parser.add_argument("--database-url", default=os.getenv("DATABASE_URL", ""))

@@ -1,5 +1,5 @@
 import { apiGet, apiGetBlob, apiPost, apiPatch, apiDelete } from '@/lib/api-client';
-import type { ApplicationListResponse, ApplicationResponse, ApplicationCreate, ApplicationUpdate, StatusUpdate, ApplicationFilters } from '@/types/application';
+import type { ApplicationListResponse, ProfileWorkListResponse, ApplicationResponse, ApplicationCreate, ApplicationUpdate, StatusUpdate, ApplicationFilters } from '@/types/application';
 
 export function getApplications(filters: ApplicationFilters = {}): Promise<ApplicationListResponse> {
   const params: Record<string, string | number | boolean | undefined> = { ...filters };
@@ -9,6 +9,20 @@ export function getApplications(filters: ApplicationFilters = {}): Promise<Appli
     delete params.sort_order;
   }
   return apiGet<ApplicationListResponse>('/applications', params);
+}
+
+/** Profile-role retrieval for the local Work lane; the connected agent owns fit. */
+export function getProfileWork(filters: ApplicationFilters = {}): Promise<ProfileWorkListResponse> {
+  return apiGet<ProfileWorkListResponse>('/applications/profile-work', {
+    search: filters.search,
+    location: filters.location,
+    location_strict: filters.location_strict,
+    salary_min: filters.salary_min,
+    is_remote: filters.is_remote,
+    posted_within_days: filters.posted_within_days,
+    page: filters.page,
+    page_size: filters.page_size,
+  });
 }
 
 export function getApplication(id: number): Promise<ApplicationResponse> {

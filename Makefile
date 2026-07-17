@@ -55,7 +55,7 @@ start: .venv ## Start Questboard — local, one command (http://localhost:5173)
 	@echo ""
 	@$(MAKE) --no-print-directory stop-dev >/dev/null 2>&1 || true
 	@trap 'kill 0' EXIT; \
-		cd backend && PYTHONPATH=../src $(CURDIR)/$(PYTHON) -m uvicorn app.main:app --reload --reload-dir . --reload-dir ../src --host 127.0.0.1 --port 8000 & \
+		cd backend && DATA_DIR=$(CURDIR)/backend/data JOB_FINDER_DATA_DIR=$(CURDIR)/backend/data PYTHONPATH=../src $(CURDIR)/$(PYTHON) -m uvicorn app.main:app --reload --reload-dir . --reload-dir ../src --host 127.0.0.1 --port 8000 & \
 		cd frontend && pnpm run dev & \
 		wait
 
@@ -166,7 +166,7 @@ stop-dev: ## Stop Questboard dev servers started from this repo
 	fi
 
 backend: .venv ## Start only the backend (FastAPI)
-	cd backend && PYTHONPATH=../src $(CURDIR)/$(PYTHON) -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+	cd backend && DATA_DIR=$(CURDIR)/backend/data JOB_FINDER_DATA_DIR=$(CURDIR)/backend/data PYTHONPATH=../src $(CURDIR)/$(PYTHON) -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 frontend: ## Start only the frontend (Vite)
 	cd frontend && pnpm run dev
@@ -215,7 +215,7 @@ desktop-smoke: .venv ## Run the desktop UX smoke test against the local runtime 
 	cd frontend && pnpm run desktop:smoke
 
 agent-mcp: .venv ## Run the local Questboard MCP server over stdio
-	@.venv/bin/questboard-mcp --data-dir "$(CURDIR)/data"
+	@.venv/bin/questboard-mcp --data-dir "$(CURDIR)/backend/data"
 
 agent-install: .venv ## Connect Questboard to installed Codex/Claude Code clients
 	@$(PYTHON) scripts/install_agent_integration.py --client $${CLIENT:-all}

@@ -12,7 +12,7 @@ This does not remove older blobs from existing Git history. If the repository wa
 
 ### Two local data roots
 
-Source development currently uses `data/job_tracker.db`. The packaged Tauri app uses the platform application-data directory. The MCP installer detects the packaged app first and otherwise uses the source checkout, but Settings should eventually display the exact active data root and connection status.
+Source development currently uses `backend/data/job_tracker.db`; the Makefile and source MCP installer now point to that same file explicitly. The packaged Tauri app uses the platform application-data directory. Settings should eventually display the exact active data root and connection status, and a reviewed migration should consolidate legacy source databases without silently overwriting user data.
 
 ### Local refresh concurrency
 

@@ -12,7 +12,7 @@ import {
   StampDefs,
   TextLink,
 } from '@questboard/ui';
-import { getApplications } from '@/api/applications';
+import { getApplications, getProfileWork } from '@/api/applications';
 import { useApplications, useUpdateStatus } from '@/hooks/use-applications';
 import { useSourceLabels, resolveSourceLabel } from '@/hooks/use-scrapers';
 import { ExplainSheet } from '@/components/board/explain-sheet';
@@ -110,10 +110,6 @@ const PRESETS: Preset[] = [
   /* score_source narrows to AI-scored rows: the keyword fallback stamps
      STRONG_APPLY on a lenient scale, and those guesses must not pad this
      chip's count or ride its filter */
-  { key: 'strong', label: 'strong apply', params: { recommendation: 'STRONG_APPLY', score_source: 'ai' }, careerOnly: true },
-  { key: 'score50', label: 'scored 50 or better', params: { min_score: 50 }, careerOnly: true },
-  { key: 'early', label: 'early startup', params: { company_type: 'Early Startup' }, group: 'company', careerOnly: true },
-  { key: 'bigtech', label: 'big tech', params: { company_type: 'Big Tech' }, group: 'company', careerOnly: true },
 ];
 
 const PRESET_KEYS = PRESETS.map((p) => p.key);
@@ -397,12 +393,17 @@ function BoardPage() {
      across pages */
   const pageQueries = useQueries({
     queries: Array.from({ length: pages }, (_, i) => ({
-      queryKey: ['applications', { ...baseFilters, page: i + 1 }],
-      queryFn: () => getApplications({ ...baseFilters, page: i + 1 }),
+      queryKey: [careerLane ? 'profile-work' : 'applications', { ...baseFilters, page: i + 1 }],
+      queryFn: () => careerLane
+        ? getProfileWork({ ...baseFilters, page: i + 1 })
+        : getApplications({ ...baseFilters, page: i + 1 }),
     })),
   });
   const firstPage = pageQueries[0];
   const total = firstPage.data?.total;
+  const workMeta = firstPage.data && 'profile_configured' in firstPage.data
+    ? firstPage.data
+    : undefined;
   /* The API only takes the floor today, so the typed to-bound trims the
      loaded pages client-side with the same keep-unknown-pay semantics. */
   const visibleItems = pageQueries
@@ -413,7 +414,9 @@ function BoardPage() {
      company type), and career rows only live in the Jobs lane now, so the
      presets show there and nowhere else */
   const careerLane = isCareerKind(kindKey);
-  const visiblePresets = PRESETS.filter((p) => !p.careerOnly || careerLane);
+  const visiblePresets = careerLane
+    ? []
+    : PRESETS.filter((p) => !p.careerOnly);
 
   /* the Jobs lane's last-visit cutoff: frozen at page load, advanced once
      after the lane's first successful render, so labels hold still */
@@ -534,9 +537,13 @@ function BoardPage() {
         <div className="qb-board-head">
           <h1>The board</h1>
           <span className="qb-live">{total !== undefined ? `${total} live` : 'loading'}</span>
-          <button type="button" className="qb-sort" onClick={() => setSortNewest((v) => !v)}>
-            Sort: <b>{sortNewest ? 'newly found' : 'best score'}</b>
-          </button>
+          {careerLane ? (
+            <span className="qb-sort">Profile-role candidates · newest first</span>
+          ) : (
+            <button type="button" className="qb-sort" onClick={() => setSortNewest((v) => !v)}>
+              Sort: <b>{sortNewest ? 'newly found' : 'best score'}</b>
+            </button>
+          )}
         </div>
 
         {/* the Jobs lane's toolbar owns its own run door and status line */}
@@ -567,10 +574,13 @@ function BoardPage() {
 
         {careerLane ? (
           <>
-            <JobsSetupStrip />
+            <JobsSetupStrip
+              profileConfigured={workMeta?.profile_configured}
+              jurisdictionConfigured={workMeta?.jurisdiction_configured}
+            />
             <WorkToolbar
-              kindKey={kindKey}
               checkedAgo={checkedAgo}
+              candidateCount={total}
               search={searchRaw}
               onSearch={setSearchRaw}
               place={placeRaw}
