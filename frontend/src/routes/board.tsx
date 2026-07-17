@@ -50,7 +50,12 @@ import {
 import { JobDetailSheet } from '@/features/board/job-detail-sheet';
 import { PosterWall } from '@/features/board/poster-wall';
 import { useBoardSummary } from '@/hooks/use-board-summary';
-import type { ApplicationFilters, ApplicationResponse, RequirementMatch } from '@/types/application';
+import type {
+  ApplicationFilters,
+  ApplicationResponse,
+  ProfileWorkListResponse,
+  RequirementMatch,
+} from '@/types/application';
 import '@/components/board/board.css';
 import '@/features/board/board-felt.css';
 
@@ -387,6 +392,7 @@ function BoardPage() {
 
   const filtersKey = JSON.stringify(baseFilters);
   const pages = pageState.key === filtersKey ? pageState.pages : 1;
+  const careerLane = isCareerKind(kindKey);
 
   /* one query per loaded page, on the same ['applications', filters] keys
      the rest of the app shares, flattened so the Jobs lane can group rows
@@ -401,8 +407,8 @@ function BoardPage() {
   });
   const firstPage = pageQueries[0];
   const total = firstPage.data?.total;
-  const workMeta = firstPage.data && 'profile_configured' in firstPage.data
-    ? firstPage.data
+  const workMeta = careerLane
+    ? firstPage.data as ProfileWorkListResponse | undefined
     : undefined;
   /* The API only takes the floor today, so the typed to-bound trims the
      loaded pages client-side with the same keep-unknown-pay semantics. */
@@ -413,7 +419,6 @@ function BoardPage() {
   /* careerOnly presets lean on fields only career rows carry (score,
      company type), and career rows only live in the Jobs lane now, so the
      presets show there and nowhere else */
-  const careerLane = isCareerKind(kindKey);
   const visiblePresets = careerLane
     ? []
     : PRESETS.filter((p) => !p.careerOnly);
