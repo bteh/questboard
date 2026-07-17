@@ -176,6 +176,24 @@ def resume_for_matching(
     workspace = resolve_local_workspace(db, workspace_id)
     if workspace is None:
         return {"available": False, "resume_text": "", "reason": "No local profile"}
+    # The resume is PII. Return it only when a PERSON has granted consent from
+    # the Questboard app / CLI; no MCP tool can grant it. This makes the
+    # "only after explicit permission" promise real in code, not just in the
+    # agent instructions (which a prompt-injected source description could
+    # ignore).
+    from app.services import resume_consent
+
+    if not resume_consent.is_granted(workspace.id):
+        return {
+            "available": False,
+            "resume_text": "",
+            "reason": (
+                "Resume access is not authorized. A person must grant it in "
+                "Questboard (Settings, or `make agent-consent-grant`); the "
+                "connected agent cannot grant it itself."
+            ),
+            "consent_required": True,
+        }
     resume = workspace_service.get_workspace_resume(db, workspace.id)
     if resume is None or not resume.extracted_text:
         return {

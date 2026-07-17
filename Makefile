@@ -1,4 +1,4 @@
-.PHONY: help start setup dev dev-hosted stop-dev backend frontend search clean clean-data docker doctor doctor-env dev-hosted-reset desktop-dev desktop-build desktop-install desktop-smoke agent-mcp agent-install reauth-claude
+.PHONY: help start setup dev dev-hosted stop-dev backend frontend search clean clean-data docker doctor doctor-env dev-hosted-reset desktop-dev desktop-build desktop-install desktop-smoke agent-mcp agent-install agent-consent-grant agent-consent-revoke reauth-claude
 
 # ── Venv detection ────────────────────────────────────────────────────
 # All Python commands run through the venv. `make setup` creates it.
@@ -219,6 +219,12 @@ agent-mcp: .venv ## Run the local Questboard MCP server over stdio
 
 agent-install: .venv ## Connect Questboard to installed Codex/Claude Code clients
 	@$(PYTHON) scripts/install_agent_integration.py --client $${CLIENT:-all}
+
+agent-consent-grant: .venv ## Allow the connected agent to read your resume (a human action)
+	@$(PYTHON) scripts/resume_consent.py grant
+
+agent-consent-revoke: .venv ## Revoke the connected agent's resume access
+	@$(PYTHON) scripts/resume_consent.py revoke
 
 dev-hosted-reset: ## Remove local hosted sandbox data after stopping dev processes
 	@$(MAKE) stop-dev >/dev/null 2>&1 || true

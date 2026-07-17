@@ -4,11 +4,45 @@ _Updated: July 16, 2026_
 
 ## Must resolve before a public local-agent release
 
-### Personalized AI cache existed in Git history
+### Personal data in Git history (blocker for a public repo)
 
-Sixty generated `src/data/cache/ai_scores/*.json` files were tracked on `main`. Some contain personalized resume reasoning. The local-agent branch removes them from the index and ignores the directory while preserving the user's local files.
+Two kinds of personal data live in history and must be purged in ONE rewrite
+before the repo goes public:
 
-This does not remove older blobs from existing Git history. If the repository was public or shared, clean the remote history with a reviewed `git filter-repo` procedure and invalidate old clones. Do not force-push that rewrite without an explicit maintainer decision.
+1. ~61 generated `src/data/cache/ai_scores/*.json` files (personalized resume
+   reasoning tied to a named person). Removed from the index on this branch, but
+   still present in older blobs.
+2. The owner's actual resume PDFs — `backend/knowledge/*.pdf` / `knowledge/*.pdf`
+   — added in `1a268d3`, removed from tracking in `c1b6616`, still in history.
+   The branch's cache cleanup did NOT cover these.
+
+Removing files from the index does not remove them from history. Keep the
+GitHub repo **private** until the rewrite runs. Reviewed procedure (run on a
+fresh clone, requires `git filter-repo`):
+
+```bash
+# 0) confirm what's still in history
+git log --all --oneline -- 'src/data/cache/**' 'backend/knowledge/*.pdf' 'knowledge/*.pdf'
+
+# 1) rewrite ALL history to drop caches + resume PDFs in one pass
+git filter-repo --force \
+  --path src/data/cache \
+  --path-glob 'backend/knowledge/*.pdf' \
+  --path-glob 'knowledge/*.pdf' \
+  --invert-paths
+
+# 2) re-add the remote (filter-repo drops it) and force-push every ref
+git remote add origin git@github.com:bteh/questboard.git
+git push --force --all origin
+git push --force --tags origin
+
+# 3) verify the blobs are gone (expect empty output)
+git log --all --oneline -- 'src/data/cache/**' 'backend/knowledge/*.pdf' 'knowledge/*.pdf'
+```
+
+This is destructive and rewrites every commit hash: it needs an explicit
+maintainer decision, and all existing clones/forks must be re-cloned (old copies
+still carry the blobs). Do not run it as part of normal CI.
 
 ### Two local data roots
 

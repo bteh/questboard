@@ -320,6 +320,10 @@ def get_applications(
             "engineer": ("engineer", "engineering"),
             "manager": ("manager", "mgr"),
             "ops": ("ops", "operations"),
+            # the role-token alias maps scientist/scientists -> "science", which
+            # is NOT a substring of the words in real titles, so expand it back
+            # to the surface forms or every Scientist row is dropped here.
+            "science": ("science", "scientist", "scientists"),
             "senior": ("senior", "sr"),
             "steward": ("steward", "stewardship"),
         }

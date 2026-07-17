@@ -171,6 +171,16 @@ def test_profile_resolution_prefers_the_workspace_with_a_resume(local_agent_db) 
     assert profile["resume"]["available"] is True
     assert profile["raw_resume_returned"] is False
 
+    from app.services import resume_consent
+
+    # career_preferences must never leak resume TEXT, only the availability flag
+    # ("leader with Snowflake" is a phrase unique to the extracted resume text,
+    # not the saved keywords).
+    assert "leader with Snowflake" not in json.dumps(profile)
+
+    # resume text is gated: refused until a person grants consent
+    assert local_agent_service.resume_for_matching(local_agent_db)["available"] is False
+    resume_consent.grant(profile["workspace_id"])
     resume = local_agent_service.resume_for_matching(local_agent_db)
     assert resume["available"] is True
     assert "Snowflake" in resume["resume_text"]

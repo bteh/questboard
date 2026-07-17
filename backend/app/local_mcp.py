@@ -59,6 +59,14 @@ WRITE = ToolAnnotations(
     idempotentHint=True,
     openWorldHint=False,
 )
+# The resume is PII and gated by human consent, so it is not an ordinary
+# idempotent metadata read; keep its own annotation so hosts can flag it.
+RESUME_PII = ToolAnnotations(
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=False,
+    openWorldHint=False,
+)
 
 
 @contextmanager
@@ -113,9 +121,14 @@ def get_career_preferences() -> dict[str, Any]:
         return local_agent_service.career_preferences(db)
 
 
-@mcp.tool(annotations=READ_ONLY, structured_output=True)
+@mcp.tool(annotations=RESUME_PII, structured_output=True)
 def read_resume_for_matching() -> dict[str, Any]:
-    """Return the private local resume to the connected AI for an authorized match."""
+    """Return the local resume (PII) only after a human granted consent.
+
+    Ask the user before calling this. Returns available=False with
+    consent_required=True when no person has authorized resume access; the
+    connected agent cannot grant that consent itself.
+    """
 
     with _database_session() as db:
         return local_agent_service.resume_for_matching(db)

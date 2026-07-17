@@ -39,6 +39,14 @@ def configure_desktop_environment(
     os.environ["WORKSPACE_STORAGE_DIR"] = str(workspace_storage_dir)
     os.environ["RESUME_DIR"] = str(resume_dir)
     os.environ["CONFIG_DIR"] = str(config_dir)
+    # Point the job_finder pipeline/scraper engine at the SAME sqlite file as
+    # the app engine. In --mcp mode the FastAPI lifespan (which normally sets
+    # these) never runs, so without this the pipeline logs scrape runs and
+    # cadence to a different DB and get_source_status reads none of them.
+    resolved_db = f"sqlite:///{data_dir / 'job_tracker.db'}"
+    os.environ["DATABASE_URL"] = resolved_db
+    os.environ["JOB_FINDER_DATABASE_URL"] = resolved_db
+    os.environ["JOB_FINDER_DATA_DIR"] = str(data_dir)
     os.environ["MANAGE_SCHEMA_ON_STARTUP"] = "true"
     os.environ["CORS_ORIGINS"] = ",".join(desktop_cors_origins(dev_origin))
     os.environ["QUESTBOARD_DESKTOP_MODE"] = "true"
