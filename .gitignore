@@ -9,6 +9,7 @@ venv/
 src/job_finder/tools/scrapers/data/cache/
 src/job_finder/data/cache/
 data/cache/ai_scores/
+src/data/cache/ai_scores/
 
 # Python
 __pycache__/
@@ -44,6 +45,7 @@ data/*.sqlite
 **/*.sqlite-wal
 **/*.sqlite-shm
 data/dev-hosted/
+data/expanded_roles_*.json
 
 # Output
 src/job_finder/output/*.json
