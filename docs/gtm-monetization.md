@@ -5,6 +5,24 @@ monetization, comparable teardowns, free-tool wedge, willingness-to-pay) +
 synthesis + an adversarial critic. Real numbers from FlexJobs, Kickresume,
 Jobscan, Teal, User Interviews, Doctor of Credit, plus first-person Reddit.
 
+## July 16 local-agent correction
+
+Questboard no longer plans to fund or resell resume-ranking inference. The free
+local core and local MCP connection include useful search, source receipts,
+filters, tracking, and access to the user's own agent. There are no Questboard
+AI credits and the agent connection is not the paywall.
+
+This changes the paid career thesis from “better AI access” to durable
+convenience: signed releases, automatic updates, premium source packs,
+higher-frequency local watches, change alerts, digests, and deeper application
+memory. A one-search-season pass may still fit the churn shape, but it must not
+unlock listings or make the free results intentionally worse.
+
+Free-user revenue stays outside organic ranking: one labeled, non-tracking
+sponsor on an owned digest or public guide, plus constitution-compliant Side
+Quest affiliate links whose payout cannot affect inclusion or order. Agent tool
+results should remain free of sponsored insertions.
+
 ## Can we get users? Yes, slowly, and it's fragile.
 
 - **The only live engine in year 1 is Reddit**, as a genuine participant (95/5,

@@ -1,10 +1,10 @@
 # Desktop-First Plan
 
-_Decision date: April 3, 2026_
+_Decision date: April 3, 2026. Agent architecture updated July 16, 2026._
 
-Questboard should move to a **desktop-first** product strategy before investing further in a public hosted SaaS.
+Questboard is a **desktop-first, local-agent-first** product before it is a public hosted SaaS.
 
-Desktop does not mean "anything local goes." We still need a narrow, supportable AI story. The current product policy is documented in [ai-access.md](./ai-access.md).
+Desktop does not mean "anything local goes." The primary AI story is now narrow: Questboard exposes local MCP tools and the user's Codex, Claude Code, or compatible client supplies the model. Questboard does not provide AI credits. The full policy is documented in [ai-access.md](./ai-access.md).
 
 ## Ease-of-adoption principles
 
@@ -16,6 +16,7 @@ For Questboard, ease of adoption should mean:
 - signed builds from the first public release
 - no required hosted account just to try the product
 - no required AI setup before a user can upload a resume and see value
+- one clear control to connect or repair a supported local agent
 - sensible local defaults, with AI and advanced automation layered in after first-run value
 - clear release channels: stable first, experimental later
 - a clear line between **supported AI connections** and **experimental research paths**
@@ -37,6 +38,7 @@ Questboard is strongest when it can:
 - avoid asking mainstream users to understand API billing on day one
 - run browser automation and long-running job workflows locally
 - ship a “download, open, upload your resume, search” flow without multi-tenant hosted complexity
+- let the user's existing agent reason over grounded Questboard tools without a Questboard model bill
 
 For this product, desktop-first removes several problems that are harder than the product itself right now:
 
@@ -101,6 +103,7 @@ Reference:
 
 - replace “hosted product first” with **desktop product first**
 - add a **desktop runtime entrypoint** that starts Questboard locally for the Tauri shell
+- let the packaged sidecar run the same services as a local stdio MCP server
 - collapse the current hosted web/worker concerns into a simpler local runtime model
 
 ### Recommended runtime model
@@ -122,6 +125,15 @@ That means Questboard desktop should feel like:
 - prepare applications
 
 without the user needing to care that a local API exists under the hood.
+
+### Local agent runtime
+
+The packaged Python sidecar has two entry modes:
+
+- normal desktop mode starts the local FastAPI runtime for the React/Tauri UI;
+- `--mcp` starts the local stdio MCP server for Codex, Claude Code, or another compatible client.
+
+Both modes use the same service layer and local SQLite database. The MCP process contributes source data, receipts, filters, and workflow memory only. The connected client performs optional resume reasoning. See [local-agent-product.md](./local-agent-product.md).
 
 ## Packaging best practices
 

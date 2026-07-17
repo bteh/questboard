@@ -1,16 +1,17 @@
 # CLAUDE.md -- Questboard
 
-AI-powered job search agent. Searches 14+ job boards, scores jobs against your resume
-using 7-dimension weighted scoring, generates tailored application materials via LLM,
-and prepares application kits (ATS detected, every field prefilled) for Greenhouse and
-Lever links. Questboard never transmits an application: the human sends it
-(docs/anti-slop.md). Works for any profession -- not just tech.
+Local opportunity radar with two workflows: Find Work for career opportunities and
+Side Quests for paid studies, gigs, events, grants, bonuses, and other non-career
+opportunities. Questboard owns source discovery, freshness, hard filters, receipts,
+and local workflow memory. A user's Codex, Claude Code, or compatible MCP client may
+perform resume reasoning; Questboard does not provide AI credits. The product contract
+is PRODUCT.md and docs/local-agent-product.md.
 
 ## Architecture
 
 ```
 src/job_finder/
-  pipeline.py              # 7-stage orchestrator: search -> parse -> score -> optimize -> cover letter -> research -> application kits
+  pipeline.py              # source/search pipeline; legacy scoring and drafting remain compatibility paths
   llm_client.py            # Unified OpenAI-compatible client (10 provider presets, health check, JSON parsing)
   scorer.py                # TF-IDF + keyword scoring, 7 dimensions, no LLM needed
   company_classifier.py    # 8-tier company classification (FAANG+ through Unknown) + location filtering
@@ -40,9 +41,10 @@ src/job_finder/
 backend/
   app/
     main.py                # FastAPI application entry point
+    local_mcp.py           # local stdio MCP entry point; never constructs or funds an LLM
     api/                   # REST endpoints (search, applications, settings, analytics, scrapers, etc.)
     schemas/               # Pydantic request/response models
-    services/              # Business logic (pipeline orchestration, settings persistence)
+    services/              # Shared business logic, including local_agent_service.py
 
 frontend/
   src/
@@ -77,6 +79,9 @@ python -m job_finder.main search --profile default
 # Install
 make setup              # installs Python + Node deps, creates .env
 
+# Connect the local MCP server to installed user-owned agents
+make agent-install
+
 # Tests
 pytest tests/
 cd frontend && pnpm run typecheck
@@ -94,13 +99,13 @@ cd frontend && pnpm run test   # vitest unit tests
 - **Config**: YAML profiles loaded via `_load_search_config(profile)`. Profile name threads through pipeline/tools/DB
 - **Naming**: snake_case everywhere. Files match their primary class/function
 
-## LLM Integration -- AI-First with Offline Fallback
+## Agent and AI boundary
 
-1. **No LLM** (default): `search_jobs()` + `score_job_basic()` work completely offline. TF-IDF + keyword matching provides baseline scoring.
-
-2. **LLM Scoring** (AI-first): When `llm.is_configured`, ALL jobs are scored by the LLM in parallel (8 workers). Individual failures fall back to keyword scoring. AI role expansion enriches search terms before scraping.
-
-3. **Full AI Pipeline**: For STRONG_APPLY/APPLY jobs -- generates resume tweaks, cover letters, and company-research drafts. All via `llm.chat_json()`.
+1. **Core product:** source discovery, filtering, browsing, persistence, source health, and tracking work without a model.
+2. **Primary reasoning path:** `backend/app/local_mcp.py` exposes grounded local tools. The connected user-owned client performs optional resume analysis and ranking.
+3. **Resume access:** `get_career_preferences` never returns raw text. `read_resume_for_matching` is a separate consent-gated tool. Side Quest tools never read the resume.
+4. **Legacy compatibility:** BYO API and Ollama scoring/drafting remain in the pipeline. Do not make them the first-run dependency or add new Questboard-funded inference.
+5. **No external action:** no MCP, REST, or pipeline path may submit, message, register, purchase, or transact.
 
 ## Reliability Boundaries
 
@@ -118,7 +123,12 @@ def new_feature(self, ...) -> dict | None:
     return self.llm.chat_json(system_prompt, user_msg)
 ```
 
-## Scoring System
+## Legacy scoring system
+
+The seven-dimension score remains for compatibility. It is not the MCP product's
+fit contract and must not be presented as proof that a role matches a resume.
+MCP search returns retrieval provenance only; the connected agent maps posting
+requirements to resume evidence and owns the final fit label.
 
 7 weighted dimensions (must sum to 1.0):
 - `technical_skills` (0.25) -- TF-IDF cosine similarity + keyword saturation curve
@@ -138,7 +148,7 @@ Recommendations: STRONG_APPLY (>=70), APPLY (>=55), MAYBE (>=40), SKIP (<40). Th
 
 After search, jobs pass through 5 filters in order:
 1. **Deduplication** -- URL-based cross-source dedup, keeps richest record
-2. **Location filter** -- Matches preferred states/cities, remote always passes
+2. **Location filter** -- Matches preferred states/cities; remote passes only when its stated country scope is compatible
 3. **Salary filter** -- Hard floor at 70% of `min_base` (keeps jobs with unknown salary)
 4. **Level filter** -- Rejects jobs 2+ levels above/below current title
 5. **Role relevance filter** -- Uses `_match_roles()` to reject titles that don't match target roles (catches JobSpy noise like "Software Engineer" appearing in nurse searches)
@@ -199,6 +209,9 @@ is judged by `GET /api/v1/scrapers/health`.
 
 - Add framework dependencies (no CrewAI, LangChain, etc.) -- the pipeline is intentionally framework-free
 - Require an LLM for basic functionality -- search and keyword scoring must always work offline
+- Add Questboard-funded inference, AI-credit accounting, hosted resume ranking, or remote MCP auth to the local-agent branch
+- Treat retrieval order, a legacy score, or source freshness as a resume-fit verdict
+- Read a resume for Side Quest matching unless the user explicitly asks
 - Use `print()` in library code -- use `logger` and progress callbacks
 - Store secrets in YAML profiles -- use `.env` for API keys
 - Add any code path that transmits an application -- kits prefill, the human sends (docs/anti-slop.md)

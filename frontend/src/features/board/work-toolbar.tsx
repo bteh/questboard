@@ -8,18 +8,16 @@ import { Link } from '@tanstack/react-router';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { CoinsDollarIcon, Search01Icon } from '@hugeicons/core-free-icons';
 import { SageButton } from '@questboard/ui';
-import { useApplications } from '@/hooks/use-applications';
 import { useSearchContext } from '@/contexts/search-context';
 import { restockProgress } from '@/components/board/restock-logic';
-import { kindParams, type KindKey } from '@/features/board/kind-params';
 import { PlacePicker } from '@/features/board/place-picker';
 import { useRunWorkSearch } from '@/features/board/use-run-work-search';
 import { formatStatedPay, parseAmount } from '@/utils/board-card';
 
 interface WorkToolbarProps {
-  kindKey: KindKey;
   /** the board summary's honest "sources checked Xh ago", or null */
   checkedAgo: string | null;
+  candidateCount?: number;
   search: string;
   onSearch: (value: string) => void;
   place: string;
@@ -42,11 +40,15 @@ interface FilterChip {
 
 const TIMED_OUT_RE = /^\s+.+: timed out$/;
 
-function StatusLine({ kindKey, checkedAgo }: { kindKey: KindKey; checkedAgo: string | null }) {
+function StatusLine({
+  checkedAgo,
+  candidateCount,
+}: {
+  checkedAgo: string | null;
+  candidateCount?: number;
+}) {
   const { state, messages, progress, result, error } = useSearchContext();
-  /* the lane's whole cache, apart from whatever filters are typed in */
-  const { data } = useApplications({ ...kindParams(kindKey), page: 1, page_size: 1, scope: 'board' });
-  const cached = data ? `${data.total} jobs cached` : null;
+  const cached = candidateCount === undefined ? null : `${candidateCount} profile candidates`;
   const cachedLine = [cached, checkedAgo].filter(Boolean).join(', ');
 
   if (state === 'running') {
@@ -100,8 +102,8 @@ function StatusLine({ kindKey, checkedAgo }: { kindKey: KindKey; checkedAgo: str
 }
 
 export function WorkToolbar({
-  kindKey,
   checkedAgo,
+  candidateCount,
   search,
   onSearch,
   place,
@@ -202,7 +204,7 @@ export function WorkToolbar({
           )}
         </div>
       )}
-      <StatusLine kindKey={kindKey} checkedAgo={checkedAgo} />
+      <StatusLine checkedAgo={checkedAgo} candidateCount={candidateCount} />
     </div>
   );
 }

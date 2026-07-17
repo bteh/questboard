@@ -83,6 +83,8 @@ def build_sidecar(*, target_arch: str = "") -> Path:
         # share config via the same Keychain entry.
         "--collect-all",
         "keyring",
+        "--collect-all",
+        "mcp",
         "--hidden-import",
         "keyring.backends.macOS",
         "--hidden-import",

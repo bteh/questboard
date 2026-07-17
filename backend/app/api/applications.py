@@ -11,16 +11,18 @@ from sqlalchemy.orm import Session
 
 from job_finder.job_trust import is_direct_source
 from app.models.database import get_db
+from app.models.application import ApplicationRecord
 from app.schemas.application import (
     ApplicationCreate,
     ApplicationListResponse,
+    ProfileWorkListResponse,
     ApplicationResponse,
     ApplicationUpdate,
     FeedbackUpdate,
     StatusUpdate,
 )
 from app.schemas.apply import KitRequest, KitResponse, PrepareResponse
-from app.services import application_service
+from app.services import application_service, local_agent_service
 from app.services import apply_service
 from app.dependencies import (
     get_active_workspace_context,
@@ -283,6 +285,108 @@ def list_applications(
         total=total,
         page=page,
         page_size=page_size,
+    )
+
+
+@router.get("/profile-work", response_model=ProfileWorkListResponse)
+def list_profile_work(
+    search: str | None = Query(None, max_length=120),
+    location: str | None = Query(None, max_length=120),
+    location_strict: bool = False,
+    salary_min: float | None = Query(None, ge=0),
+    is_remote: bool | None = None,
+    posted_within_days: int | None = Query(None, ge=1, le=365),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(24, ge=1, le=50),
+    workspace = Depends(get_active_workspace_context),
+    db: Session = Depends(get_db),
+):
+    """Return profile-role candidates for the local Work board.
+
+    This is deterministic candidate retrieval, not a resume-fit score. The
+    user's connected agent owns requirement-level judgment after retrieval.
+    """
+
+    reject_legacy_route_in_hosted_mode(
+        "Profile Work retrieval is available through the local Questboard app"
+    )
+    workspace_id = workspace.workspace.id if workspace is not None else None
+    profile = local_agent_service.career_preferences(db, workspace_id)
+    preferences = profile.get("preferences") or {}
+    configured_roles = local_agent_service.clean_terms(preferences.get("roles"))
+    if not configured_roles:
+        return ProfileWorkListResponse(
+            items=[],
+            total=0,
+            page=page,
+            page_size=page_size,
+            profile_configured=False,
+            resume_available=bool(profile.get("resume", {}).get("available")),
+            retrieval_note="Add target roles to your local profile before browsing Work.",
+        )
+
+    workplace = "remote_only" if is_remote else "saved"
+    if location and location_strict:
+        workplace = "location_only"
+    payload = local_agent_service.search_work(
+        db,
+        location=location or "",
+        workplace_preference=workplace,
+        compensation_floor=salary_min,
+        posted_within_days=posted_within_days,
+        page_size=50,
+        use_saved_preferences=True,
+        workspace_id=workspace_id,
+    )
+    candidate_ids = [row["opportunity_id"] for row in payload["results"]]
+    records_by_id = {
+        record.id: record
+        for record in db.query(ApplicationRecord)
+        .filter(ApplicationRecord.id.in_(candidate_ids))
+        .all()
+    } if candidate_ids else {}
+    ordered = [records_by_id[item_id] for item_id in candidate_ids if item_id in records_by_id]
+
+    if search:
+        needle = search.casefold().strip()
+        ordered = [
+            record
+            for record in ordered
+            if needle
+            in " ".join(
+                (
+                    record.job_title or "",
+                    record.company or "",
+                    record.description or "",
+                    record.location or "",
+                )
+            ).casefold()
+        ]
+
+    total = len(ordered)
+    offset = (page - 1) * page_size
+    page_records = ordered[offset : offset + page_size]
+    places = preferences.get("preferred_places") or []
+    jurisdiction_configured = bool(payload["filters_applied"].get("location")) or any(
+        str(place.get("country_code") or place.get("country") or "").strip()
+        for place in places
+        if isinstance(place, dict)
+    )
+    return ProfileWorkListResponse(
+        items=[_to_response(record) for record in page_records],
+        total=total,
+        page=page,
+        page_size=page_size,
+        profile_configured=True,
+        resume_available=bool(profile.get("resume", {}).get("available")),
+        jurisdiction_configured=jurisdiction_configured,
+        candidate_queries=payload["candidate_queries"],
+        filters_applied=payload["filters_applied"],
+        ranking_owner=payload["ranking_owner"],
+        retrieval_note=(
+            "Target-role candidates only. Use your connected agent for "
+            "requirement-by-requirement resume fit."
+        ),
     )
 
 

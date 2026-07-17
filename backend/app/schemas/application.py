@@ -115,6 +115,16 @@ class ApplicationListResponse(BaseModel):
     page_size: int = 25
 
 
+class ProfileWorkListResponse(ApplicationListResponse):
+    profile_configured: bool = False
+    resume_available: bool = False
+    jurisdiction_configured: bool = False
+    candidate_queries: list[str] = Field(default_factory=list)
+    filters_applied: dict = Field(default_factory=dict)
+    ranking_owner: str = "connected_agent"
+    retrieval_note: str = ""
+
+
 class ApplicationUpdate(BaseModel):
     status: str | None = None
     notes: str | None = None

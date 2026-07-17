@@ -1,0 +1,11 @@
+interface:
+  display_name: "Questboard Opportunity Agent"
+  short_description: "Find fresh work and Side Quests with Questboard"
+  default_prompt: "Use $questboard-agent to find and explain my best current opportunities."
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "questboard"
+      description: "Questboard local opportunity, source, profile, and workflow tools"
+      transport: "stdio"

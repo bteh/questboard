@@ -156,6 +156,16 @@ export interface ApplicationListResponse {
   page_size: number;
 }
 
+export interface ProfileWorkListResponse extends ApplicationListResponse {
+  profile_configured: boolean;
+  resume_available: boolean;
+  jurisdiction_configured: boolean;
+  candidate_queries: string[];
+  filters_applied: Record<string, unknown>;
+  ranking_owner: 'connected_agent';
+  retrieval_note: string;
+}
+
 export interface ApplicationCreate {
   job_title: string;
   company: string;
