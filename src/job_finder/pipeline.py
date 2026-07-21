@@ -1315,7 +1315,12 @@ class JobFinderPipeline:
         locations = locations or self.config.get("locations", ["Los Angeles, CA"])
         settings = self.config.get("search_settings") or {}
         results_per_board = max(1, settings.get("results_per_board", 50))
-        results_per_additional = max(1, settings.get("results_per_additional_source", 100))
+        # Per-source cap. The ATS scrapers scan hundreds of company boards, so a
+        # low cap truncated real matches (a targeted role at a seeded company
+        # like ALO) in arbitrary completion order before the location filter saw
+        # them. 300 keeps company jobs without flooding; role-matching still
+        # bounds it, and downstream location/freshness/dedup trim the rest.
+        results_per_additional = max(1, settings.get("results_per_additional_source", 300))
         max_days_old = max(1, settings.get("max_days_old", 30))
         search_distance = settings.get("search_radius_miles")  # None = JobSpy default (50 miles)
         jobspy_boards = self.config.get("job_boards") or None  # None → default boards
