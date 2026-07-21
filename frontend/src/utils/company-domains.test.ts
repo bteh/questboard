@@ -54,10 +54,9 @@ describe('domainFromUrl', () => {
 });
 
 describe('getCompanyLogoUrl', () => {
-  it('builds an unavatar URL with a clean-miss fallback', () => {
+  it('builds a DuckDuckGo icon URL for the resolved domain', () => {
     const u = getCompanyLogoUrl('Twilio', 64);
-    expect(u).toContain('unavatar.io/twilio.com');
-    expect(u).toContain('fallback=false');
+    expect(u).toContain('icons.duckduckgo.com/ip3/twilio.com');
   });
   it('is null when no domain can be guessed', () => {
     expect(getCompanyLogoUrl('')).toBeNull();

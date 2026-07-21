@@ -4,7 +4,9 @@
    touches the network, through the same pipeline the Restock page runs.
    The status line under it states only what the data backs. */
 
+import { useEffect, useRef, useState } from 'react';
 import { Link } from '@tanstack/react-router';
+import { toast } from 'sonner';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { CoinsDollarIcon, Search01Icon } from '@hugeicons/core-free-icons';
 import { SageButton } from '@questboard/ui';
@@ -51,6 +53,25 @@ function StatusLine({
   const cached = candidateCount === undefined ? null : `${candidateCount} profile candidates`;
   const cachedLine = [cached, checkedAgo].filter(Boolean).join(', ');
 
+  // A running clock so the wait shows life, plus a toast on the running->done
+  // transition so you know it finished even if you'd tabbed away.
+  const [elapsed, setElapsed] = useState(0);
+  const prevState = useRef(state);
+  useEffect(() => {
+    if (state !== 'running') {
+      setElapsed(0);
+      return;
+    }
+    const id = setInterval(() => setElapsed((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, [state]);
+  useEffect(() => {
+    if (prevState.current === 'running' && state === 'completed') {
+      toast.success(result?.jobs_found ? `Board updated · ${result.jobs_found} found` : 'Board updated');
+    }
+    prevState.current = state;
+  }, [state, result]);
+
   if (state === 'running') {
     const src = restockProgress(messages);
     const pct = src
@@ -59,10 +80,11 @@ function StatusLine({
         ? Math.min(100, Math.round(progress.percent))
         : null;
     const text = src
-      ? `Checking ${src.total} job sites, ${src.done} reported so far.`
+      ? `Checking ${src.total} job sites · ${src.done} reported`
       : progress?.stage_label
-        ? `${progress.stage_label}.`
-        : 'Checking the sources.';
+        ? progress.stage_label
+        : 'Checking the sources';
+    const clock = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
     return (
       <p className="qb-workline" role="status">
         <span className="qb-workline-track" aria-hidden="true">
@@ -71,7 +93,7 @@ function StatusLine({
             style={pct === null ? undefined : { width: `${pct}%` }}
           />
         </span>
-        {text} Results stay usable while it runs.
+        {text} · <span className="qb-num">{clock}</span>. Keep browsing while it runs.
       </p>
     );
   }
@@ -91,8 +113,8 @@ function StatusLine({
     const timeouts = messages.filter((m) => TIMED_OUT_RE.test(m)).length;
     return (
       <p className="qb-workline" role="status">
-        Run done, {result.jobs_found} found
-        {timeouts > 0 ? `, ${timeouts} source${timeouts === 1 ? '' : 's'} timed out` : ''}.
+        Board updated · {result.jobs_found} found
+        {timeouts > 0 ? ` · ${timeouts} source${timeouts === 1 ? '' : 's'} timed out` : ''}.
         {cachedLine ? ` ${cachedLine}.` : ''}
       </p>
     );

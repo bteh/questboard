@@ -304,8 +304,12 @@ export function getCompanyDomain(companyName: string, url?: string | null): stri
 export function getCompanyLogoUrl(companyName: string, size = 128, url?: string | null): string | null {
   const domain = getCompanyDomain(companyName, url);
   if (!domain) return null;
-  // unavatar aggregates favicon + logo providers and, with fallback=false,
-  // returns a clean error on a miss, so the avatar falls straight to a colored
-  // initial (no second network source, no parked-domain favicon, no globe).
-  return `https://unavatar.io/${domain}?fallback=false&size=${size}`;
+  // DuckDuckGo's icon service returns the company's real favicon with no rate
+  // limit or API key. We switched off unavatar.io because its free anonymous
+  // tier now hard-rate-limits (429), so real logos stopped loading and every
+  // card fell back to the monogram. `size` is unused here (DDG serves a fixed
+  // icon); the caller still renders the colored-initial monogram on a network
+  // error via the <img> onError handler.
+  void size;
+  return `https://icons.duckduckgo.com/ip3/${domain}.ico`;
 }

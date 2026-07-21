@@ -127,6 +127,9 @@ export function SearchProvider({ children }: { children: ReactNode }) {
               queryClient.invalidateQueries({ queryKey: ['applications'] });
               queryClient.invalidateQueries({ queryKey: ['profile-work'] });
               queryClient.invalidateQueries({ queryKey: ['analytics'] });
+              // Refresh the "sources checked" freshness so it stops showing a
+              // stale "6h ago" the moment a fresh run finishes.
+              queryClient.invalidateQueries({ queryKey: ['board-summary'] });
               return;
             }
 
@@ -136,6 +139,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
               abortRef.current = null;
               queryClient.invalidateQueries({ queryKey: ['applications'] });
               queryClient.invalidateQueries({ queryKey: ['profile-work'] });
+              queryClient.invalidateQueries({ queryKey: ['board-summary'] });
             }
           },
         },
@@ -187,6 +191,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
       queryClient.invalidateQueries({ queryKey: ['applications'] });
       queryClient.invalidateQueries({ queryKey: ['profile-work'] });
       queryClient.invalidateQueries({ queryKey: ['analytics'] });
+      queryClient.invalidateQueries({ queryKey: ['board-summary'] });
     });
 
     // Server-sent error events have data; native connection errors don't.
@@ -201,6 +206,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
         esRef.current = null;
         queryClient.invalidateQueries({ queryKey: ['applications'] });
         queryClient.invalidateQueries({ queryKey: ['profile-work'] });
+        queryClient.invalidateQueries({ queryKey: ['board-summary'] });
       }
     });
 
