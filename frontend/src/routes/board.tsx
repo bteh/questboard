@@ -41,6 +41,7 @@ import { KindRail } from '@/features/board/kind-rail';
 import { PlacePicker } from '@/features/board/place-picker';
 import { JobsSetupStrip } from '@/features/board/jobs-callout';
 import { WorkToolbar } from '@/features/board/work-toolbar';
+import { SourceCategoryChips } from '@/features/board/source-category-chips';
 import {
   advanceWorkCutoff,
   countNewSince,
@@ -286,6 +287,8 @@ function BoardPage() {
   /* newest first by default: the API's score sort floats unscored rows to
      the top (desc nullsfirst), which reads as noise on a board */
   const [sortNewest, setSortNewest] = useState(() => readSavedBoardState()?.sort !== 'score');
+  /* browse the full career inventory by source kind (null = your target roles) */
+  const [sourceCategory, setSourceCategory] = useState<string | null>(null);
   /* pages loaded, keyed to the filters that loaded them: any filter change
      starts back at one page without an effect */
   const [pageState, setPageState] = useState<{ key: string; pages: number }>({ key: '', pages: 1 });
@@ -382,12 +385,13 @@ function BoardPage() {
       location: place || undefined,
       location_strict: nearParam ? true : undefined,
       salary_min: payFloor ?? undefined,
+      source_category: sourceCategory ?? undefined,
       sort_by: sortNewest ? 'date_found' : 'rank',
       sort_order: 'desc',
       page_size: PAGE_SIZE,
       scope: 'board',
     }),
-    [kindKey, activeKeys, params.f, search, place, nearParam, payFloor, sortNewest],
+    [kindKey, activeKeys, params.f, search, place, nearParam, payFloor, sortNewest, sourceCategory],
   );
 
   const filtersKey = JSON.stringify(baseFilters);
@@ -596,6 +600,11 @@ function BoardPage() {
               onPayFrom={setPayFromRaw}
               payTo={payToRaw}
               onPayTo={setPayToRaw}
+            />
+            <SourceCategoryChips
+              counts={workMeta?.source_categories}
+              selected={sourceCategory}
+              onSelect={setSourceCategory}
             />
             <p className="qb-jobs-bridge">
               Landed something? A new paycheck is the best moment for a{' '}

@@ -175,6 +175,8 @@ export interface ProfileWorkListResponse extends ApplicationListResponse {
   candidate_queries: string[];
   filters_applied: Record<string, unknown>;
   ranking_owner: 'connected_agent';
+  /** source kind -> count across the full career inventory, for browse chips */
+  source_categories?: Record<string, number>;
   retrieval_note: string;
 }
 
@@ -236,6 +238,8 @@ export interface ApplicationFilters {
       kind in vertical, the API 400s otherwise */
   facet?: string;
   source?: string;
+  /** Browse by source kind: remote | ats | startup | crypto | community | jobspy */
+  source_category?: string;
   search?: string;
   sort_by?: string;
   sort_order?: 'asc' | 'desc';
