@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, Outlet, useMatchRoute, useMatches, useNavigate } from '@tanstack/react-router';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
+  Briefcase01Icon,
   Home01Icon,
   Menu01Icon,
   Notebook01Icon,
@@ -65,7 +66,12 @@ export function AppShell() {
   }, [matches]);
 
   const onHome = Boolean(matchRoute({ to: '/home' }));
-  const onBoard = Boolean(matchRoute({ to: '/board' }));
+  const onBoardRoute = Boolean(matchRoute({ to: '/board' }));
+  /* the board's Find Work lane (?v=work) is the second workflow's door and
+     lights its own nav entry; the quest board keeps the rest */
+  const lastSearch = (matches[matches.length - 1]?.search ?? {}) as { v?: string };
+  const onWork = onBoardRoute && lastSearch.v === 'work';
+  const onBoard = onBoardRoute && !onWork;
   /* fuzzy so the ledger and the numbers keep the log tab lit */
   const onLog = Boolean(matchRoute({ to: '/log', fuzzy: true }));
   const onSettings = Boolean(matchRoute({ to: '/settings' }));
@@ -80,6 +86,7 @@ export function AppShell() {
           onClose={closeMenu}
           onHome={onHome}
           onBoard={onBoard}
+          onWork={onWork}
           onLog={onLog}
           onSettings={onSettings}
           onHealth={onHealth}
@@ -117,6 +124,10 @@ export function AppShell() {
             <Link to="/board" className={cx('qb-stub', onBoard && 'qb-stub-on')}>
               <HugeiconsIcon icon={PinIcon} size={18} strokeWidth={1.7} />
               The board
+            </Link>
+            <Link to="/board" search={{ v: 'work' }} className={cx('qb-stub', onWork && 'qb-stub-on')}>
+              <HugeiconsIcon icon={Briefcase01Icon} size={18} strokeWidth={1.7} />
+              Find work
             </Link>
             <Link to="/log" className={cx('qb-stub', onLog && 'qb-stub-on')}>
               <HugeiconsIcon icon={Notebook01Icon} size={18} strokeWidth={1.7} />

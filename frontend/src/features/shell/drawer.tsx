@@ -4,6 +4,7 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import {
   Activity01Icon,
   ArrowDown01Icon,
+  Briefcase01Icon,
   Cancel01Icon,
   Coins01Icon,
   Home01Icon,
@@ -111,13 +112,15 @@ export interface DrawerProps {
   onClose: () => void;
   onHome: boolean;
   onBoard: boolean;
+  /** the board's Find Work lane (?v=work); onBoard excludes it */
+  onWork: boolean;
   onLog: boolean;
   onSettings: boolean;
   onHealth: boolean;
   onMoney: boolean;
 }
 
-export function Drawer({ open, onClose, onHome, onBoard, onLog, onSettings, onHealth, onMoney }: DrawerProps) {
+export function Drawer({ open, onClose, onHome, onBoard, onWork, onLog, onSettings, onHealth, onMoney }: DrawerProps) {
   const { data: summary } = useBoardSummary();
   const { hostedMode } = useWorkspace();
 
@@ -153,6 +156,17 @@ export function Drawer({ open, onClose, onHome, onBoard, onLog, onSettings, onHe
             <span className="qb-nico"><HugeiconsIcon icon={PinIcon} size={18} strokeWidth={STROKE} /></span>
             The board
             {summary && <span className="qb-nmeta">{summary.total.toLocaleString()} up</span>}
+          </Link>
+          {/* Find Work is the second workflow, not a quest kind, so it gets
+              its own standing door regardless of how many rows are live */}
+          <Link
+            to="/board"
+            search={{ v: 'work' }}
+            className={onWork ? 'qb-nav-item qb-active' : 'qb-nav-item'}
+            onClick={onClose}
+          >
+            <span className="qb-nico"><HugeiconsIcon icon={Briefcase01Icon} size={18} strokeWidth={STROKE} /></span>
+            Find work
           </Link>
           <Link to="/log" className={onLog ? 'qb-nav-item qb-active' : 'qb-nav-item'} onClick={onClose}>
             <span className="qb-nico"><HugeiconsIcon icon={Notebook01Icon} size={18} strokeWidth={STROKE} /></span>

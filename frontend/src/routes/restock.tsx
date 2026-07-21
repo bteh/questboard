@@ -31,6 +31,7 @@ import {
   resolveSavedSearchAreaDefaults,
   resolveSearchSnapshotMetadata,
 } from '@/lib/search-preferences';
+import { consumeFirstRunPending } from '@/components/onboarding/first-run';
 import { AssistantRunPanel } from '@/components/agent/AssistantRunPanel';
 import { SearchConfigForm } from '@/components/search/SearchConfigForm';
 import { SearchRunView } from '@/components/search/SearchRunView';
@@ -148,22 +149,11 @@ function RestockPage() {
 
   // First-run hand-off: when the brand-new user's very first restock lands,
   // ship them straight to the results so they don't get stranded staring at
-  // the run log. Only fires once: the flag is set in the onboarding wizard,
-  // then cleared here.
+  // the run log. Only fires once: the onboarding wizard marks the flag via
+  // markFirstRunPending, and consuming it here clears it.
   useEffect(() => {
     if (state !== 'completed' || !runId) return;
-    let pending: string | null = null;
-    try {
-      pending = window.localStorage.getItem('questboard:first-run-pending');
-    } catch {
-      pending = null;
-    }
-    if (pending !== '1') return;
-    try {
-      window.localStorage.removeItem('questboard:first-run-pending');
-    } catch {
-      // ignore
-    }
+    if (!consumeFirstRunPending()) return;
     toast.success('Your first restock is in. Opening your top matches.');
     navigate({
       to: '/log/ledger',
@@ -242,6 +232,16 @@ function RestockPage() {
   };
 
   const handleStart = () => {
+    // The form disables its start button on these, but guard here too so a
+    // first visit with nothing filled in never round-trips a server error.
+    if (missingSearchTerms) {
+      toast.error('Add at least one role or keyword first. Fill from resume works too.', { id: SEARCH_TOAST_ID });
+      return;
+    }
+    if (missingLocations) {
+      toast.error('Add a place first, or switch to remote.', { id: SEARCH_TOAST_ID });
+      return;
+    }
     const aiEnabledForRun = selectedMode !== 'search_only' && llmAvailable;
     const request: SearchRequest = buildSearchRequestFromForm({
       rolesText: roles,

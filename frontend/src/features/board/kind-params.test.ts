@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { isCareerKind, kindParams, normalizeFacetKey, questTotal } from './kind-params';
+import {
+  careerRailEntries,
+  isCareerKind,
+  kindParams,
+  normalizeFacetKey,
+  questRefreshVerticals,
+  questTotal,
+} from './kind-params';
 
 describe('the board kind params', () => {
   it('keeps career out of the default "all quests" board', () => {
@@ -38,6 +45,36 @@ describe('the board kind params', () => {
   it('keeps upcoming_only on so stale tapings never show', () => {
     expect(kindParams('all').upcoming_only).toBe(true);
     expect(kindParams('work').upcoming_only).toBe(true);
+  });
+
+  it('keeps the jobs door on the rail regardless of supply', () => {
+    // live summary row: its count rides along
+    expect(careerRailEntries([
+      { id: 'think', label: 'Tell them what you think', sub: 'focus groups', count: 40 },
+      { id: 'work', label: 'Find work', sub: 'jobs, full-time, contract', count: 7 },
+    ])).toEqual([
+      { id: 'work', label: 'Find work', sub: 'jobs, full-time, contract', count: 7 },
+    ]);
+    // zero rows: the door stays
+    expect(careerRailEntries([
+      { id: 'work', label: 'Find work', sub: 'jobs, full-time, contract', count: 0 },
+    ])[0].count).toBe(0);
+    // no career row in the summary at all: the registry fills the door in
+    const fallback = careerRailEntries([{ id: 'think', label: 'x', sub: 'y', count: 3 }]);
+    expect(fallback).toHaveLength(1);
+    expect(fallback[0].id).toBe('work');
+    expect(fallback[0].label).toBe('Find work');
+    expect(fallback[0].count).toBe(0);
+  });
+
+  it('refreshes quest verticals only, never the career pipeline', () => {
+    const verticals = questRefreshVerticals();
+    expect(verticals).toContain('think');
+    expect(verticals).toContain('skill');
+    // legacy stored values ride along so old-vocabulary scrapers still run
+    expect(verticals).toContain('study');
+    expect(verticals).not.toContain('career');
+    expect(verticals).not.toContain('work');
   });
 
   it('keeps a facet only when the kind carries it', () => {

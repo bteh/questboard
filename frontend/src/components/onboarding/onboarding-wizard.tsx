@@ -27,6 +27,7 @@ import {
   createManualPlace,
   normalizePlaceList,
 } from '@/lib/profile-preferences';
+import { markFirstRunPending } from '@/components/onboarding/first-run';
 import { normalizeWorkspaceUpload, type NormalizedResumeUpload } from '@/lib/resume-analysis';
 import { getSearchReadiness } from '@/lib/search-readiness';
 import { cn } from '@/lib/utils';
@@ -225,14 +226,12 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
     // never feels rushed past their settings.
     savePreferences.mutate(form, {
       onSuccess: () => {
-        try {
-          window.localStorage.setItem('questboard:onboarding-complete', '1');
-        } catch {
-          // localStorage may be disabled in some sandboxed shells; non-fatal.
-        }
+        // The restock page consumes this flag when the first run completes
+        // and opens the results, so the new user is never stranded.
+        markFirstRunPending();
         toast.success('Preferences saved. Review and start your search when ready.');
         onComplete();
-        navigate({ to: '/' });
+        navigate({ to: '/board' });
       },
       onError: (error) =>
         toast.error(error instanceof Error ? error.message : 'Failed to save preferences'),

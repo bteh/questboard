@@ -17,6 +17,8 @@ import { useApplications, useUpdateStatus } from '@/hooks/use-applications';
 import { useSourceLabels, resolveSourceLabel } from '@/hooks/use-scrapers';
 import { ExplainSheet } from '@/components/board/explain-sheet';
 import { RestockLine } from '@/components/board/restock-line';
+import { QuestRestockButton } from '@/components/board/quest-restock';
+import { boardEmptyState, boardFiltersActive } from '@/features/board/board-empty';
 import {
   dismissNotice,
   hasBoardParams,
@@ -443,6 +445,21 @@ function BoardPage() {
     advanceWorkCutoff();
   }, [careerLane, laneLoaded]);
 
+  /* which empty board is this: the filters cut everything, or nothing has
+     been fetched yet? The message must match the cause. */
+  const emptyState = boardEmptyState(
+    total,
+    boardFiltersActive({
+      search,
+      place,
+      payFrom,
+      payTo,
+      facet: params.f,
+      presetCount: activeKeys.size,
+      sourceCategory,
+    }),
+  );
+
   const newSince = careerLane
     ? countNewSince(visibleItems, workCutoff, {
         newestFirst: sortNewest && !hasAgentVerdicts,
@@ -692,10 +709,33 @@ function BoardPage() {
             loading the board
           </p>
         )}
-        {total === 0 && (
+        {emptyState === 'filtered-empty' && (
           <p style={{ marginTop: 40, fontSize: 14.5, color: 'var(--soft)' }}>
             Nothing on the board matches. Clear a chip or the search.
           </p>
+        )}
+        {/* nothing fetched, nothing set: the door is a restock, not a chip.
+            The career lane keeps its own empty state below. */}
+        {emptyState === 'truly-empty' && !careerLane && (
+          <div className="qb-board-empty" role="status">
+            <p className="qb-board-empty-lead">The board is empty right now.</p>
+            <p>No quests have come in yet. One check fills it from the live sources.</p>
+            <div style={{ marginTop: 14 }}>
+              <QuestRestockButton big />
+            </div>
+            <p style={{ marginTop: 14, fontSize: 13.5, color: 'var(--mute)' }}>
+              After a job instead?{' '}
+              <button
+                type="button"
+                className="qb-textlink"
+                style={{ fontSize: 'inherit' }}
+                onClick={() => selectKind('work')}
+              >
+                The work lane
+              </button>{' '}
+              runs on its own rules.
+            </p>
+          </div>
         )}
 
         {careerLane && sinceLine && (
