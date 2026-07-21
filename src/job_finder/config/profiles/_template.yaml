@@ -112,7 +112,7 @@ compensation:
 # --- SEARCH SETTINGS ---
 search_settings:
   results_per_board: 75               # Results per JobSpy board per query (75 × 3 boards = 225 raw)
-  results_per_additional_source: 150  # Per-plugin cap for additional scrapers (Remotive, HN, etc.)
+  results_per_additional_source: 500  # Per-plugin cap for additional scrapers (Remotive, HN, etc.)
   max_days_old: 30                    # Only show listings from the last N days
   exclude_staffing_agencies: true
   country: "USA"
