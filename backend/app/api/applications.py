@@ -46,6 +46,37 @@ def _parse_verticals(vertical: str | None) -> list[str] | None:
     return [v.strip() for v in vertical.split(",") if v.strip()]
 
 
+def _source_category_map() -> dict[str, str]:
+    """Lowercased source name -> its scraper category (remote/startup/crypto/...)."""
+    from job_finder.tools.scrapers import get_registry
+
+    return {name.lower(): getattr(meta, "category", "") for name, meta in get_registry().items()}
+
+
+def _diversify_by_source(records: list) -> list:
+    """Round-robin records across their source so no single source floods the
+    top of the board. Order within each source (recency) is preserved."""
+    buckets: dict[str, list] = {}
+    order: list[str] = []
+    for record in records:
+        key = (record.source or "").lower()
+        if key not in buckets:
+            order.append(key)
+            buckets[key] = []
+        buckets[key].append(record)
+    out: list = []
+    depth = 0
+    remaining = True
+    while remaining:
+        remaining = False
+        for key in order:
+            if depth < len(buckets[key]):
+                out.append(buckets[key][depth])
+                remaining = True
+        depth += 1
+    return out
+
+
 def _to_response(record) -> ApplicationResponse:
     strengths = []
     gaps = []
@@ -183,6 +214,10 @@ def list_applications(
         description="Scoring provenance: 'ai' keeps only LLM-scored rows, 'keyword' only fallback-scored rows",
     ),
     source: str | None = None,
+    source_category: str | None = Query(
+        None,
+        description="Browse by source kind: remote | ats | startup | crypto | community | jobspy",
+    ),
     search: str | None = None,
     company_type: str | None = None,
     is_remote: bool | None = None,
@@ -270,6 +305,7 @@ def list_applications(
             recommendation=recommendation,
             score_source=score_source,
             source=source,
+            source_category=source_category,
             search=search,
             company_type=company_type,
             is_remote=is_remote,
@@ -312,6 +348,10 @@ def list_profile_work(
     salary_min: float | None = Query(None, ge=0),
     is_remote: bool | None = None,
     posted_within_days: int | None = Query(None, ge=1, le=365),
+    source_category: str | None = Query(
+        None,
+        description="Browse by source kind: remote | ats | startup | crypto | community | jobspy",
+    ),
     page: int = Query(1, ge=1),
     page_size: int = Query(24, ge=1, le=50),
     workspace = Depends(get_active_workspace_context),
@@ -341,27 +381,64 @@ def list_profile_work(
             retrieval_note="Add target roles to your local profile before browsing Work.",
         )
 
+    # Category counts across the FULL career inventory (what's available), so
+    # the browse chips show the real breadth, not just the role-matched set.
+    cat_map = _source_category_map()
+    category_counts: dict[str, int] = {}
+    for (src,) in (
+        db.query(ApplicationRecord.source)
+        .filter(ApplicationRecord.vertical.in_(("career", "work")))
+        .all()
+    ):
+        cat = cat_map.get((src or "").lower())
+        if cat:
+            category_counts[cat] = category_counts.get(cat, 0) + 1
+
     workplace = "remote_only" if is_remote else "saved"
     if location and location_strict:
         workplace = "location_only"
-    payload = local_agent_service.search_work(
-        db,
-        location=location or "",
-        workplace_preference=workplace,
-        compensation_floor=salary_min,
-        posted_within_days=posted_within_days,
-        page_size=50,
-        use_saved_preferences=True,
-        workspace_id=workspace_id,
-    )
-    candidate_ids = [row["opportunity_id"] for row in payload["results"]]
-    records_by_id = {
-        record.id: record
-        for record in db.query(ApplicationRecord)
-        .filter(ApplicationRecord.id.in_(candidate_ids))
-        .all()
-    } if candidate_ids else {}
-    ordered = [records_by_id[item_id] for item_id in candidate_ids if item_id in records_by_id]
+
+    if source_category:
+        # Browse everything available in this source kind, beyond the user's
+        # configured roles. Honors the board's place / pay / remote filters.
+        # workspace_id stays None: local career rows live in the unscoped pool.
+        records, _ = application_service.get_applications(
+            db,
+            source_category=source_category,
+            location=location or None,
+            location_strict=bool(location and location_strict),
+            salary_min=salary_min,
+            is_remote=is_remote,
+            posted_within_days=posted_within_days,
+            sort_by="date_found",
+            sort_dir="desc",
+            page=1,
+            page_size=400,
+            verticals=["career", "work"],
+        )
+        ordered = list(records)
+        payload = {"candidate_queries": [], "filters_applied": {}, "ranking_owner": "connected_agent"}
+    else:
+        payload = local_agent_service.search_work(
+            db,
+            location=location or "",
+            workplace_preference=workplace,
+            compensation_floor=salary_min,
+            posted_within_days=posted_within_days,
+            # The human board browses the full in-lane set, not the agent's ~50.
+            page_size=300,
+            result_limit=300,
+            use_saved_preferences=True,
+            workspace_id=workspace_id,
+        )
+        candidate_ids = [row["opportunity_id"] for row in payload["results"]]
+        records_by_id = {
+            record.id: record
+            for record in db.query(ApplicationRecord)
+            .filter(ApplicationRecord.id.in_(candidate_ids))
+            .all()
+        } if candidate_ids else {}
+        ordered = [records_by_id[item_id] for item_id in candidate_ids if item_id in records_by_id]
 
     if search:
         needle = search.casefold().strip()
@@ -378,6 +455,10 @@ def list_profile_work(
                 )
             ).casefold()
         ]
+
+    # Round-robin across sources so no single source floods the top; recency
+    # is preserved within each source.
+    ordered = _diversify_by_source(ordered)
 
     total = len(ordered)
     offset = (page - 1) * page_size
@@ -399,6 +480,7 @@ def list_profile_work(
         candidate_queries=payload["candidate_queries"],
         filters_applied=payload["filters_applied"],
         ranking_owner=payload["ranking_owner"],
+        source_categories=category_counts,
         retrieval_note=(
             "Target-role candidates only. Use your connected agent for "
             "requirement-by-requirement resume fit."

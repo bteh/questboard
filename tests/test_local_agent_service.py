@@ -402,6 +402,7 @@ def test_profile_work_api_returns_application_cards_for_the_active_profile(
         salary_min=None,
         is_remote=None,
         posted_within_days=None,
+        source_category=None,
         page=1,
         page_size=24,
         workspace=SimpleNamespace(workspace=SimpleNamespace(id="configured")),

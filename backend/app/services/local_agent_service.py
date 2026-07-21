@@ -541,7 +541,10 @@ def search_work(
     page_size: int = 20,
     use_saved_preferences: bool = True,
     workspace_id: str | None = None,
+    result_limit: int | None = None,
 ) -> dict[str, Any]:
+    # The human browse board asks for the full in-lane set (result_limit); the
+    # agent's MCP path leaves it None and stays capped at _MAX_RESULTS.
     saved_terms, saved_location, saved_workplace, saved_days, saved_floor = (
         _saved_search_defaults(db, workspace_id)
     )
@@ -564,8 +567,9 @@ def search_work(
     effective_freshness_window = posted_within_days
     if effective_freshness_window is None and use_saved_preferences:
         effective_freshness_window = max(1, min(int(saved_days), 365))
-    page_size = max(1, min(int(page_size), _MAX_RESULTS))
-    candidate_page_size = min(500, max(page_size * 10, 200))
+    effective_cap = max(1, min(int(result_limit), 400)) if result_limit else _MAX_RESULTS
+    page_size = max(1, min(int(page_size), effective_cap))
+    candidate_page_size = min(1000, max(page_size * 10, 200))
 
     # Saved role families are token groups, not exact phrases. This retrieves
     # "Manager, Data Engineering" for "Data Engineering Manager" while the

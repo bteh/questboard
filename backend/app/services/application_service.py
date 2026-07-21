@@ -70,6 +70,7 @@ def get_applications(
     recommendation: str | None = None,
     score_source: str | None = None,
     source: str | None = None,
+    source_category: str | None = None,
     search: str | None = None,
     title_token_groups: list[list[str]] | None = None,
     company_type: str | None = None,
@@ -119,6 +120,22 @@ def get_applications(
         query = query.filter(ApplicationRecord.score_source == score_source)
     if source:
         query = query.filter(ApplicationRecord.source == source)
+    if source_category:
+        # Browse the board by the kind of source (remote / startup / crypto /
+        # company / big boards), resolving the category to its registered
+        # source names. Case-insensitive so stored "Himalayas" matches the
+        # registry key "himalayas".
+        from job_finder.tools.scrapers import get_registry
+
+        wanted = {
+            name.lower()
+            for name, meta in get_registry().items()
+            if getattr(meta, "category", "") == source_category
+        }
+        if wanted:
+            query = query.filter(func.lower(ApplicationRecord.source).in_(wanted))
+        else:
+            query = query.filter(func.lower(ApplicationRecord.source) == "\x00__none__")
     if company_type:
         query = query.filter(ApplicationRecord.company_type == company_type)
     if is_remote is not None:

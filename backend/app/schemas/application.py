@@ -134,6 +134,8 @@ class ProfileWorkListResponse(ApplicationListResponse):
     candidate_queries: list[str] = Field(default_factory=list)
     filters_applied: dict = Field(default_factory=dict)
     ranking_owner: str = "connected_agent"
+    # source kind -> count across the full in-lane set, for the browse chips.
+    source_categories: dict[str, int] = Field(default_factory=dict)
     retrieval_note: str = ""
 
 
