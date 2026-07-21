@@ -197,7 +197,7 @@ export function WorkToolbar({
         </label>
         <div className="qb-tray-run">
           <SageButton onClick={run} disabled={!ready}>
-            {running ? 'Running' : 'Run search'}
+            {running ? 'Getting jobs…' : 'Get new jobs'}
           </SageButton>
         </div>
       </div>

@@ -68,7 +68,7 @@ export function AssistantRunButton() {
         search={{ tab: 'assistant' }}
         className="text-sm font-medium text-brand underline underline-offset-2"
       >
-        Connect your assistant to find &amp; rank
+        Connect your assistant to rank these
       </Link>
     );
   }
@@ -81,7 +81,7 @@ export function AssistantRunButton() {
         className="inline-flex items-center gap-1.5 rounded-lg border border-brand bg-brand/10 px-3 py-2 text-sm font-medium text-brand transition-colors hover:bg-brand/15"
       >
         <Sparkles className="h-4 w-4" />
-        Find &amp; rank with your assistant
+        Rank these with your assistant
       </button>
       {error && <span className="text-xs text-amber-700 dark:text-amber-300">{error}</span>}
     </span>
