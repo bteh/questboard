@@ -15,6 +15,7 @@ from app.models.application import ApplicationRecord
 from app.schemas.application import (
     ApplicationCreate,
     ApplicationListResponse,
+    LocalFit,
     ProfileWorkListResponse,
     ApplicationResponse,
     ApplicationUpdate,
@@ -490,8 +491,17 @@ def list_profile_work(
         for place in places
         if isinstance(place, dict)
     )
+    # Fast offline skill-coverage hint on every row (instant, no LLM).
+    skill_terms = local_agent_service.clean_terms(preferences.get("keywords"))
+    page_items: list[ApplicationResponse] = []
+    for record in page_records:
+        resp = _to_response(record)
+        coverage = local_agent_service.local_relevance(record, skill_terms)
+        if coverage:
+            resp.local_fit = LocalFit(**coverage)
+        page_items.append(resp)
     return ProfileWorkListResponse(
-        items=[_to_response(record) for record in page_records],
+        items=page_items,
         total=total,
         page=page,
         page_size=page_size,

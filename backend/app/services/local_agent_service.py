@@ -468,6 +468,43 @@ def _title_is_in_lane(title: str | None, queries: list[str]) -> bool:
     return False
 
 
+def local_relevance(record: ApplicationRecord, skill_terms: list[str]) -> dict[str, Any] | None:
+    """A fast, offline skill-coverage signal for one job: which of the user's
+    saved skills the posting actually names.
+
+    This is NOT a fit verdict (that's the connected agent's job). It is a
+    keyword-overlap hint so every row shows something instantly, without waiting
+    on an LLM. Returns None when there are no skills to match on.
+    """
+    terms = [t for t in (skill_terms or []) if t and len(t) >= 2]
+    if not terms:
+        return None
+    description = record.description or ""
+    # Judge skills only when there's a real description to read; a title alone
+    # can't tell us "weak", it just means we haven't seen the requirements.
+    if len(description) < 120:
+        return None
+    text = f"{record.job_title or ''} {description}".lower()
+    matched: list[str] = []
+    seen: set[str] = set()
+    for term in terms:
+        low = term.lower()
+        if low in seen:
+            continue
+        seen.add(low)
+        if low in text:
+            matched.append(term)
+    count = len(matched)
+    coverage = count / max(1, len(seen))
+    if count >= 5 or coverage >= 0.4:
+        band = "close"
+    elif count >= 2 or coverage >= 0.2:
+        band = "partial"
+    else:
+        band = "weak"
+    return {"band": band, "skill_count": count, "matched_skills": matched[:8]}
+
+
 def _dedupe_work_key(record: ApplicationRecord) -> tuple[str, tuple[str, ...]]:
     company_tokens = [
         token

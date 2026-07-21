@@ -65,6 +65,13 @@ export interface AgentFit {
   caveat: string;
 }
 
+/** Fast offline skill-coverage hint (keyword overlap), shown before the agent runs. */
+export interface LocalFit {
+  band: 'close' | 'partial' | 'weak';
+  skill_count: number;
+  matched_skills: string[];
+}
+
 export interface ApplicationBase {
   job_title: string;
   company: string;
@@ -125,6 +132,8 @@ export interface ApplicationResponse extends ApplicationBase {
   match_bucket?: 'primary' | 'adjacent' | null;
   /** The connected assistant's own fit verdict from the last run, or null. */
   agent_fit?: AgentFit | null;
+  /** Fast offline skill-coverage hint, present on the browse board instantly. */
+  local_fit?: LocalFit | null;
   match_reasons?: MatchReason[];
   score_reasoning: string;
   key_strengths: string[];

@@ -89,6 +89,8 @@ export interface PosterProps {
   tags?: string[];
   /** the connected assistant's fit verdict for this row, from its last run */
   fitBadge?: { label: string; verdict: 'strong' | 'good' | 'reach' | 'skip' };
+  /** fast offline skill-coverage hint, shown until the agent's verdict lands */
+  skillBadge?: { label: string; band: 'close' | 'partial' | 'weak' };
   pay?: string;
   payUnit?: string;
   /** e.g. "Applied, Jun 30"; wins over clippedDate */
@@ -120,6 +122,7 @@ export function Poster({
   disclosure,
   tags = [],
   fitBadge,
+  skillBadge,
   pay,
   payUnit,
   applied,
@@ -156,9 +159,13 @@ export function Poster({
             </span>
           )}
         </div>
-        {fitBadge && (
+        {(fitBadge || skillBadge) && (
           <div className="qb-p-fitrow">
-            <span className={cx('qb-p-fit', `qb-p-fit-${fitBadge.verdict}`)}>{fitBadge.label}</span>
+            {fitBadge ? (
+              <span className={cx('qb-p-fit', `qb-p-fit-${fitBadge.verdict}`)}>{fitBadge.label}</span>
+            ) : skillBadge ? (
+              <span className={cx('qb-p-skill', `qb-p-skill-${skillBadge.band}`)}>{skillBadge.label}</span>
+            ) : null}
           </div>
         )}
         {logoWell ? (

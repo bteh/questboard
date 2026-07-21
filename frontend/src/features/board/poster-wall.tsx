@@ -90,6 +90,7 @@ export function PosterWall({
         disclosure={link.disclosure}
         tags={poster.tags}
         fitBadge={poster.fitBadge}
+        skillBadge={poster.skillBadge}
         pay={card.pay}
         payUnit={card.payUnit}
         applied={card.applied}

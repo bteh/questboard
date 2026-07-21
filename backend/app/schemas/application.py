@@ -50,6 +50,15 @@ class AgentFit(BaseModel):
     caveat: str = ""
 
 
+class LocalFit(BaseModel):
+    """A fast offline skill-coverage signal (keyword overlap), shown instantly
+    so every row has a hint before the agent's deeper verdict. Not a fit score."""
+
+    band: Literal["close", "partial", "weak"]
+    skill_count: int = 0
+    matched_skills: list[str] = Field(default_factory=list)
+
+
 class ApplicationResponse(ApplicationBase):
     id: int
     # Quest verticals. vertical matches packages/ui/src/tokens.ts
@@ -80,6 +89,8 @@ class ApplicationResponse(ApplicationBase):
     # The connected assistant's own fit verdict for this row from the last
     # headless run (set_work_fit). None until a run judges it.
     agent_fit: AgentFit | None = None
+    # Fast offline skill-coverage hint, present on the browse board immediately.
+    local_fit: LocalFit | None = None
     match_reasons: list[MatchReason] = Field(default_factory=list)
     score_reasoning: str = ""
     key_strengths: list[str] = []
