@@ -36,7 +36,7 @@ function FactRow({ label, value }: { label: string; value: string }) {
 }
 
 function Facts({ app, sourceLabel }: { app: ApplicationResponse; sourceLabel: string }) {
-  const pay = formatStatedPay(app.salary_min, app.salary_max);
+  const pay = formatStatedPay(app.salary_min, app.salary_max, app.salary_currency);
   const payUnit = payUnitFor(app);
   const payValue = pay
     ? [pay, payUnit].filter(Boolean).join(' ') +

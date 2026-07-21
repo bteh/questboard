@@ -13,7 +13,7 @@ import { StatusBadge } from '@/components/badges/status-badge';
 import { CompanyTypeBadge } from '@/components/badges/company-type-badge';
 import { WorkTypeBadge } from '@/components/badges/work-type-badge';
 import { resolveSourceLabel } from '@/hooks/use-scrapers';
-import { formatDate, formatSalary } from '@/utils/format';
+import { formatDate, formatSalary, toSalaryPeriod } from '@/utils/format';
 import { STATUS_LABELS } from '@/utils/constants';
 import type { ApplicationResponse } from '@/types/application';
 
@@ -80,7 +80,12 @@ export function JobTable({ data, onRowClick, selectedId }: JobTableProps) {
     columnHelper.accessor('salary_min', {
       header: 'Salary',
       cell: (info) => {
-        const salary = formatSalary(info.getValue(), info.row.original.salary_max);
+        const salary = formatSalary(
+          info.getValue(),
+          info.row.original.salary_max,
+          info.row.original.salary_currency,
+          toSalaryPeriod(info.row.original.salary_period),
+        );
         if (!salary) return <span className="text-xs text-text-muted">not stated</span>;
         const estimated = info.row.original.salary_source === 'parsed_from_description';
         return (
