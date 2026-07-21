@@ -11,13 +11,14 @@ import json
 import logging
 import re
 import time
+from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup
 
 from job_finder.tools.scrapers._registry import register_scraper
-from job_finder.tools.scrapers._utils import _match_roles, _parse_salary
+from job_finder.tools.scrapers._utils import _match_roles, extract_salary_range
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +75,31 @@ _DIRECT_JOB_HOSTS = (
     "smartrecruiters.com",
     "workable.com",
 )
+
+
+def _fuzzy_date_to_iso(prose: str) -> str:
+    """Convert BuiltIn's age phrase to a real ISO date (UTC), or ''.
+
+    'Reposted 20 Days Ago' -> today minus 20 days. The stored value must
+    parse with _parse_posted_date so the pipeline's max_days_old freshness
+    filter applies to builtin rows; callers keep date_confidence='fuzzy'
+    because the day count is approximate.
+    """
+    if not prose:
+        return ""
+    text = prose.strip().lower()
+    days: int | None = None
+    if "today" in text or re.search(r"\bhours?\s+ago\b", text):
+        days = 0
+    elif "yesterday" in text:
+        days = 1
+    else:
+        m = re.search(r"(\d+)\s+days?\s+ago", text)
+        if m:
+            days = int(m.group(1))
+    if days is None:
+        return ""
+    return (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
 
 
 def _fetch_page(url: str) -> str | None:
@@ -153,10 +179,11 @@ def fetch_builtin_detail(url: str) -> dict:
             direct_url = href
             break
 
+    posted_on = _fuzzy_date_to_iso(date_posted)
     return {
         "description": description,
-        "date_posted": date_posted,
-        "date_confidence": "fuzzy" if date_posted else "missing",
+        "date_posted": posted_on,
+        "date_confidence": "fuzzy" if posted_on else "missing",
         "direct_application_url": direct_url,
     }
 
@@ -247,7 +274,10 @@ def _parse_html_jobs(
         work_type = _icon_sibling_text(card, "fa-house-building")
         location = _icon_sibling_text(card, "fa-location-dot")
         salary_text = _icon_sibling_text(card, "fa-sack-dollar")
-        sal_min, sal_max = _parse_salary(salary_text)
+        # Period-aware extraction: '$50/hr' stays a raw 50.0 with
+        # salary_period='hourly' instead of becoming 50000 via the old
+        # x1000 heuristic in _parse_salary.
+        salary = extract_salary_range(salary_text)
 
         is_remote = "remote" in work_type.lower() or "remote" in location.lower()
 
@@ -268,19 +298,34 @@ def _parse_html_jobs(
         if age_match and int(age_match.group(1)) > max_days_old:
             continue
 
+        # Store a REAL date, not the prose phrase — the pipeline freshness
+        # filter parses date_posted, and 'Reposted 20 Days Ago' never parsed.
+        posted_on = _fuzzy_date_to_iso(date_posted)
+
+        loc_label = location or ("Remote" if is_remote else "Not specified")
+        # Listing cards carry no description body. Synthesize a one-line
+        # excerpt so downstream consumers (MCP rows, keyword scoring) never
+        # see an empty description.
+        excerpt_bits = [f"{title} at {company}" if company else title, loc_label]
+        if work_type and work_type.lower() not in loc_label.lower():
+            excerpt_bits.append(work_type)
+        if salary_text:
+            excerpt_bits.append(salary_text)
+        description = " · ".join(bit for bit in excerpt_bits if bit)
+
         results.append({
             "title": title[:200],
             "company": company[:100],
-            "location": location or ("Remote" if is_remote else "Not specified"),
+            "location": loc_label,
             "url": job_url,
             "source": "builtin",
-            # Listing cards carry no description body; the card reads complete
-            # from the role, company, pay and meta without a synthesized line.
-            "description": "",
-            "salary_min": sal_min,
-            "salary_max": sal_max,
-            "date_posted": date_posted,
-            "date_confidence": "fuzzy" if date_posted else "missing",
+            "description": description,
+            "salary_min": salary.salary_min,
+            "salary_max": salary.salary_max,
+            "salary_period": salary.period or "",
+            "salary_currency": salary.currency or "",
+            "date_posted": posted_on,
+            "date_confidence": "fuzzy" if posted_on else "missing",
             "is_remote": is_remote,
             "company_size": "",
         })

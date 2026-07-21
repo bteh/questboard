@@ -904,6 +904,13 @@ def _save_search_results(
             is_remote=job.get("is_remote", False),
             salary_min=job.get("salary_min"),
             salary_max=job.get("salary_max"),
+            # Pay provenance must survive this save path too — dropping these
+            # left ATS-reported figures serialized as source 'unknown'.
+            salary_currency=job.get("salary_currency", "") or "",
+            salary_period=job.get("salary_period", "") or "",
+            salary_min_annualized=job.get("salary_min_annualized"),
+            salary_max_annualized=job.get("salary_max_annualized"),
+            salary_source=job.get("salary_source"),
             profile=pipeline.profile_name,
             company_type=ct,
             work_type=wt,

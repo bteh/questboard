@@ -7,6 +7,7 @@ import re
 from datetime import datetime, timezone
 from html import unescape
 from pathlib import Path
+from typing import NamedTuple
 
 import requests
 
@@ -194,17 +195,24 @@ _SAL_NUM = r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?"
 _SAL_SEP = r"\s*(?:-|–|—|to)\s*"
 _SAL_HOURLY_SUFFIX = r"\s*(?:/\s*(?:hr|hour)\b|per\s+hour\b|an\s+hour\b|hourly\b)"
 
-# One salary amount: optional $, the number, optional k suffix. The leading
-# lookbehind keeps us from matching inside a larger token ("v2.140-170k").
-_SAL_AMOUNT = rf"(?<![A-Za-z0-9,.])(\$)?\s*({_SAL_NUM})\s*([kK])?"
+# Currency symbols we recognize in salary text. '$' stays currency-unknown
+# (USD/CAD/AUD are indistinguishable from the symbol alone); euro and pound
+# are unambiguous and map to a real ISO code.
+_SAL_CUR = r"[$€£]"
+_SAL_CURRENCY_CODES = {"€": "EUR", "£": "GBP"}
 
-_SAL_RANGE_RE = re.compile(rf"{_SAL_AMOUNT}{_SAL_SEP}(\$)?\s*({_SAL_NUM})\s*([kK])?")
+# One salary amount: optional currency symbol, the number, optional k suffix.
+# The leading lookbehind keeps us from matching inside a larger token
+# ("v2.140-170k").
+_SAL_AMOUNT = rf"(?<![A-Za-z0-9,.])({_SAL_CUR})?\s*({_SAL_NUM})\s*([kK])?"
+
+_SAL_RANGE_RE = re.compile(rf"{_SAL_AMOUNT}{_SAL_SEP}({_SAL_CUR})?\s*({_SAL_NUM})\s*([kK])?")
 _SAL_BETWEEN_RE = re.compile(
-    rf"between\s+{_SAL_AMOUNT}\s+and\s+(\$)?\s*({_SAL_NUM})\s*([kK])?",
+    rf"between\s+{_SAL_AMOUNT}\s+and\s+({_SAL_CUR})?\s*({_SAL_NUM})\s*([kK])?",
     re.IGNORECASE,
 )
 _SAL_HOURLY_RANGE_RE = re.compile(
-    rf"{_SAL_AMOUNT}{_SAL_SEP}(\$)?\s*({_SAL_NUM})\s*([kK])?{_SAL_HOURLY_SUFFIX}",
+    rf"{_SAL_AMOUNT}{_SAL_SEP}({_SAL_CUR})?\s*({_SAL_NUM})\s*([kK])?{_SAL_HOURLY_SUFFIX}",
     re.IGNORECASE,
 )
 _SAL_HOURLY_SINGLE_RE = re.compile(
@@ -270,20 +278,51 @@ def _sal_context_ok(text: str, start: int, end: int) -> bool:
     return not _SAL_BAD_LEAD_RE.search(text[max(0, start - 32):start])
 
 
-def extract_salary_range(text: str | None) -> tuple[float | None, float | None]:
-    """Extract an annual (salary_min, salary_max) from free text, or (None, None).
+class ExtractedSalary(NamedTuple):
+    """Result of :func:`extract_salary_range`.
+
+    ``salary_min``/``salary_max`` are RAW values in the stated pay period —
+    an hourly rate stays e.g. 45.0, never a fabricated annual figure.
+    ``period`` is 'hourly' | 'annual' | None (None when nothing matched).
+    ``currency`` is an ISO code only when the symbol is unambiguous
+    ('€' -> EUR, '£' -> GBP); '$' stays None.
+    """
+
+    salary_min: float | None
+    salary_max: float | None
+    period: str | None
+    currency: str | None
+
+
+_EMPTY_SALARY = ExtractedSalary(None, None, None, None)
+
+
+def _sal_currency(*symbols: str | None) -> str | None:
+    """ISO currency code for the first unambiguous symbol, else None."""
+    for sym in symbols:
+        if sym and sym in _SAL_CURRENCY_CODES:
+            return _SAL_CURRENCY_CODES[sym]
+    return None
+
+
+def extract_salary_range(text: str | None) -> ExtractedSalary:
+    """Extract a raw (salary_min, salary_max, period, currency) from free text.
 
     Deterministic, regex-based, deliberately conservative: a match must carry
-    a '$' or a 'k' suffix and survive plausibility bounds, so years of
-    experience, percentages, 401(k) mentions, and headcounts never parse as
-    salaries. Company-money figures — budgets, revenue/MRR/ARR, funding
-    rounds, valuations, transaction volume — are rejected via same-clause
-    context (:func:`_sal_context_ok`). Handles '$140k-$170k', '$140,000 to
-    $170,000', '140-170k', 'between $X and $Y', hourly rates ('$45/hr',
-    '$45 per hour' — annualized x2080), and 'up to $X' (max only).
+    a currency symbol or a 'k' suffix and survive plausibility bounds, so
+    years of experience, percentages, 401(k) mentions, and headcounts never
+    parse as salaries. Company-money figures — budgets, revenue/MRR/ARR,
+    funding rounds, valuations, transaction volume — are rejected via
+    same-clause context (:func:`_sal_context_ok`). Handles '$140k-$170k',
+    '$140,000 to $170,000', '140-170k', 'between $X and $Y', hourly rates
+    ('$45/hr', '$45 per hour'), and 'up to $X' (max only).
+
+    Values are returned RAW with the pay period alongside ('hourly' rates are
+    NOT annualized here — callers that need annual figures use the
+    ``salary_*_annualized`` convention, see :func:`finalize_scraper_jobs`).
     """
     if not text:
-        return None, None
+        return _EMPTY_SALARY
     # Cap the scan — salary lines live near the top or bottom of postings and
     # descriptions are already truncated by the scrapers.
     text = text[:6000]
@@ -295,32 +334,31 @@ def extract_salary_range(text: str | None) -> tuple[float | None, float | None]:
             continue
         lo, hi = _sal_value(n1, False), _sal_value(n2, False)
         if _SAL_HOURLY_MIN <= lo <= hi <= _SAL_HOURLY_MAX:
-            return lo * _HOURS_PER_YEAR, hi * _HOURS_PER_YEAR
+            return ExtractedSalary(lo, hi, "hourly", _sal_currency(d1, d2))
 
     # Annual ranges: 'between $X and $Y' plus the plain separator forms.
     for pattern in (_SAL_BETWEEN_RE, _SAL_RANGE_RE):
         for m in pattern.finditer(text):
             d1, n1, k1, d2, n2, k2 = m.groups()
             if not (d1 or d2 or k1 or k2):
-                continue  # no $ and no k — years, page ranges, dates, ...
+                continue  # no symbol and no k — years, page ranges, dates, ...
             if not _sal_context_ok(text, m.start(), m.end()):
                 continue
             lo = _sal_value(n1, bool(k1), other_has_k=bool(k2))
             hi = _sal_value(n2, bool(k2), other_has_k=bool(k1))
             if _SAL_ANNUAL_MIN <= lo <= hi <= _SAL_ANNUAL_MAX:
-                return lo, hi
+                return ExtractedSalary(lo, hi, "annual", _sal_currency(d1, d2))
 
     # Single hourly rate — the hourly marker itself is strong salary context.
     for m in _SAL_HOURLY_SINGLE_RE.finditer(text):
-        _d, n, k = m.groups()
+        d, n, k = m.groups()
         if k:
             continue
         val = _sal_value(n, False)
         if _SAL_HOURLY_MIN <= val <= _SAL_HOURLY_MAX:
-            annual = val * _HOURS_PER_YEAR
             if re.search(r"up\s+to\s*$", text[:m.start()], re.IGNORECASE):
-                return None, annual
-            return annual, None
+                return ExtractedSalary(None, val, "hourly", _sal_currency(d))
+            return ExtractedSalary(val, None, "hourly", _sal_currency(d))
 
     # 'up to $X' — max only.
     for m in _SAL_UP_TO_RE.finditer(text):
@@ -331,9 +369,18 @@ def extract_salary_range(text: str | None) -> tuple[float | None, float | None]:
             continue
         val = _sal_value(n, bool(k))
         if _SAL_ANNUAL_MIN <= val <= _SAL_ANNUAL_MAX:
-            return None, val
+            return ExtractedSalary(None, val, "annual", _sal_currency(d))
 
-    return None, None
+    return _EMPTY_SALARY
+
+
+def _annualized_or_none(value: float | None, period: str | None) -> float | None:
+    """Annualize a raw extracted value ('hourly' x2080, 'annual' as-is)."""
+    if value is None:
+        return None
+    if (period or "").lower() == "hourly":
+        return value * _HOURS_PER_YEAR
+    return value
 
 
 def finalize_scraper_jobs(jobs: list[dict]) -> list[dict]:
@@ -346,8 +393,13 @@ def finalize_scraper_jobs(jobs: list[dict]) -> list[dict]:
       'exact', absent/unparseable -> 'missing').
     - ``salary_source``: 'reported' when the scraper provided structured
       salary, 'parsed_from_description' when :func:`extract_salary_range`
-      recovers a range from the description (also fills salary_min/max),
-      else None.
+      recovers a range from the description (also fills salary_min/max RAW,
+      ``salary_period``, ``salary_currency`` when unambiguous, and the
+      ``salary_*_annualized`` fields), else None.
+    - ``salary_min_annualized``/``salary_max_annualized``: filled from the
+      raw values whenever ``salary_period`` is known and the scraper didn't
+      already annualize (JobSpy does its own; ATS scrapers stamp the period
+      and leave annualization here).
     - ``work_type_confidence``: 'reported' when the scraper carried a
       definitive remote flag (``remote_flag_reported``), else 'inferred'.
     """
@@ -359,6 +411,20 @@ def finalize_scraper_jobs(jobs: list[dict]) -> list[dict]:
         if job.get("salary_min") is not None or job.get("salary_max") is not None:
             if not job.get("salary_source"):
                 job["salary_source"] = "reported"
+            period = (job.get("salary_period") or "").strip().lower()
+            if (
+                period
+                and job.get("salary_min_annualized") is None
+                and job.get("salary_max_annualized") is None
+            ):
+                from job_finder.scoring.helpers import annualize_amount
+
+                job["salary_min_annualized"] = annualize_amount(
+                    job.get("salary_min"), period,
+                )
+                job["salary_max_annualized"] = annualize_amount(
+                    job.get("salary_max"), period,
+                )
         elif not job.get("salary_source"):
             if job.get("vertical") not in (None, "career"):
                 # Quest rows carry only pay their source states outright. A
@@ -366,10 +432,21 @@ def finalize_scraper_jobs(jobs: list[dict]) -> list[dict]:
                 # become a promised pay figure.
                 job["salary_source"] = None
             else:
-                lo, hi = extract_salary_range(job.get("description") or "")
-                if lo is not None or hi is not None:
-                    job["salary_min"] = lo
-                    job["salary_max"] = hi
+                extracted = extract_salary_range(job.get("description") or "")
+                if extracted.salary_min is not None or extracted.salary_max is not None:
+                    # RAW values + period; annualized figures go in the
+                    # dedicated fields (never fabricated into salary_min/max).
+                    job["salary_min"] = extracted.salary_min
+                    job["salary_max"] = extracted.salary_max
+                    job["salary_period"] = extracted.period
+                    if extracted.currency and not job.get("salary_currency"):
+                        job["salary_currency"] = extracted.currency
+                    job["salary_min_annualized"] = _annualized_or_none(
+                        extracted.salary_min, extracted.period,
+                    )
+                    job["salary_max_annualized"] = _annualized_or_none(
+                        extracted.salary_max, extracted.period,
+                    )
                     job["salary_source"] = "parsed_from_description"
                 else:
                     job["salary_source"] = None
@@ -457,8 +534,15 @@ def canonicalize_job_url(url: str | None) -> str:
 
 
 def _strip_html(html: str) -> str:
-    """Crude HTML tag stripper for description fields."""
-    text = re.sub(r"<[^>]+>", " ", html)
+    """Crude HTML tag stripper for description fields.
+
+    Unescapes FIRST: Greenhouse (and friends) entity-encode their HTML, so
+    stripping before unescaping left the markup visible as literal
+    ``<div class="content-intro">`` text. A second unescape catches
+    double-encoded entities revealed by the first pass.
+    """
+    text = unescape(html)
+    text = re.sub(r"<[^>]+>", " ", text)
     text = unescape(text)
     text = re.sub(r"\s+", " ", text)
     return text.strip()[:3000]

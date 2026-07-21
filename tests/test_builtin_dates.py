@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
+from job_finder.tools.scrapers._utils import _parse_posted_date
 from job_finder.tools.scrapers.builtin import _parse_html_jobs
 
 
@@ -22,7 +25,11 @@ def test_builtin_date_parser_does_not_treat_dragos_as_days_ago() -> None:
         ["Data Engineering Manager"],
         10,
     )
-    assert rows[0]["date_posted"] == "Reposted 4 Hours Ago"
+    # The stored value is a REAL date (today, since '4 Hours Ago'), not the
+    # prose phrase — so the pipeline freshness filter can parse it.
+    parsed = _parse_posted_date(rows[0]["date_posted"])
+    assert parsed is not None
+    assert parsed.date() == datetime.now(timezone.utc).date()
     assert rows[0]["date_confidence"] == "fuzzy"
 
 

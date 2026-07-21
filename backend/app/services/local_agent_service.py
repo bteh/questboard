@@ -23,8 +23,10 @@ from app.services import application_service, workspace_service
 from job_finder.job_trust import is_direct_source
 from job_finder.kinds import get_kinds, kind_for_vertical, vertical_values_for
 from job_finder.models.database import ScrapeRunRecord
+from job_finder.tools.scrapers._utils import _strip_html
 
 _WORK_KIND = "work"
+_EXCERPT_CHARS = 1200
 _MAX_RESULTS = 50
 _ALLOWED_STATUSES = frozenset(
     {
@@ -320,6 +322,20 @@ def _saved_search_defaults(
     )
 
 
+def _clean_excerpt(text: str | None, limit: int = _EXCERPT_CHARS) -> str:
+    """Serve a clean excerpt: strip residual HTML/entities (some stored
+    descriptions predate the scraper-side fix) and truncate on a word
+    boundary with an ellipsis instead of cutting mid-word."""
+    cleaned = _strip_html(text or "")
+    if len(cleaned) <= limit:
+        return cleaned
+    cut = cleaned[:limit]
+    space = cut.rfind(" ")
+    if space > 0:
+        cut = cut[:space]
+    return cut.rstrip() + "…"
+
+
 def _candidate_payload(record: ApplicationRecord, *, detail: bool = False) -> dict[str, Any]:
     kind = kind_for_vertical(record.vertical or "career")
     payload: dict[str, Any] = {
@@ -350,13 +366,15 @@ def _candidate_payload(record: ApplicationRecord, *, detail: bool = False) -> di
             "direct": is_direct_source(record.source or ""),
         },
         "retrieval": {
-            "bucket": record.match_bucket or "unclassified",
-            "method": record.rank_source or "unclassified",
+            # NULL columns mean the hybrid-ranking step never ran for this
+            # row — say so, instead of the ambiguous 'unclassified'.
+            "bucket": record.match_bucket or "not_ranked",
+            "method": record.rank_source or "not_ranked",
             "reasons": _json_list(record.match_reasons_json, limit=3),
             "is_fit_assessment": False,
         },
         "status": record.status or "found",
-        "description_excerpt": (record.description or "")[:1200],
+        "description_excerpt": _clean_excerpt(record.description),
     }
     if detail:
         payload.update(

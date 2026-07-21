@@ -24,6 +24,21 @@ logger = logging.getLogger(__name__)
 # for the Series A–C cohort. Watchlist entries are additive.
 _ASHBY_COMPANIES: list[str] = _load_seed_slugs("ashby_seed.txt")
 
+# Ashby comp-component intervals -> the shared salary_period vocabulary
+# (PAY_PERIOD_FACTORS keys). The API emits '1 HOUR', '1 YEAR', etc.
+_INTERVAL_PERIODS: dict[str, str] = {
+    "1 HOUR": "hourly",
+    "1 DAY": "daily",
+    "1 WEEK": "weekly",
+    "1 MONTH": "monthly",
+    "1 YEAR": "annual",
+}
+
+
+def _interval_to_period(interval: object) -> str:
+    """Map an Ashby compensation interval to a salary_period value ('' unknown)."""
+    return _INTERVAL_PERIODS.get(str(interval or "").strip().upper(), "")
+
 
 def _fetch_company_jobs(
     slug: str,
@@ -71,9 +86,14 @@ def _fetch_company_jobs(
         location = job.get("location", "")
         is_remote = job.get("isRemote", False) or job.get("workplaceType", "").lower() == "remote"
 
-        # Parse compensation
+        # Parse compensation: raw values + the currency and interval Ashby
+        # states alongside them. An hourly component stays a raw hourly rate
+        # with salary_period='hourly'; annualization happens downstream in
+        # finalize_scraper_jobs via the salary_*_annualized convention.
         salary_min = None
         salary_max = None
+        salary_currency = ""
+        salary_period = ""
         comp = job.get("compensation")
         if comp and isinstance(comp, dict):
             tiers = comp.get("compensationTiers", [])
@@ -83,6 +103,8 @@ def _fetch_company_jobs(
                     if c.get("compensationType") == "Salary":
                         salary_min = c.get("minValue")
                         salary_max = c.get("maxValue")
+                        salary_currency = c.get("currencyCode") or ""
+                        salary_period = _interval_to_period(c.get("interval"))
                         break
 
         published_at = job.get("publishedAt", "")
@@ -96,6 +118,14 @@ def _fetch_company_jobs(
             "description": description,
             "salary_min": salary_min,
             "salary_max": salary_max,
+            "salary_currency": salary_currency,
+            "salary_period": salary_period,
+            # Structured ATS pay is employer-stated — provenance 'reported'.
+            "salary_source": (
+                "reported"
+                if salary_min is not None or salary_max is not None
+                else None
+            ),
             "date_posted": published_at,
             "date_confidence": date_confidence_for(published_at),
             "is_remote": is_remote,

@@ -112,8 +112,11 @@ def test_finalize_never_mines_salary_from_quest_descriptions():
     finalize_scraper_jobs([career, study])
 
     # Control: the same sentence DOES parse on a career row, so the study
-    # assertion below proves the gate and not a regex miss.
-    assert career["salary_min"] == pytest.approx(50 * 2080)
+    # assertion below proves the gate and not a regex miss. Raw hourly value
+    # stays in salary_min; the annualized figure lives in its own field.
+    assert career["salary_min"] == pytest.approx(50)
+    assert career["salary_period"] == "hourly"
+    assert career["salary_min_annualized"] == pytest.approx(50 * 2080)
     assert career["salary_source"] == "parsed_from_description"
 
     assert study.get("salary_min") is None

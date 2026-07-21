@@ -911,21 +911,44 @@ def _resolve_salary_floor(config: dict | None) -> float:
     return annualize_amount(raw, pay_period) or 0
 
 
+def _annualize_raw_salary(value: float | None, period: str | None) -> float | None:
+    """Best-effort annualization when the salary_*_annualized fields are absent.
+
+    Uses the stamped ``salary_period`` when present. Without a period, a value
+    under 1000 cannot be an annual figure (no job pays $500/yr) — it's an
+    hourly rate that would otherwise be compared raw against an annual floor
+    and wrongly dropped, so treat it as hourly (x2080).
+    """
+    if value is None:
+        return None
+    period_key = (period or "").strip().lower()
+    if period_key:
+        annualized = annualize_amount(value, period_key)
+        if annualized is not None:
+            return annualized
+    if 0 < value < 1000:
+        return value * 2080.0
+    return value
+
+
 def _job_salary_passes(job: dict, hard_floor: float) -> bool:
     """Return True if the job's salary meets the hard floor, or is unknown.
 
     Uses the midpoint of the salary range when both min and max are known,
     otherwise uses salary_max. Jobs with no salary data always pass —
-    filtering them out would remove most listings.
+    filtering them out would remove most listings. Raw values are annualized
+    first (via salary_period, or the obviously-hourly heuristic) so an
+    hourly role is never compared raw against the annual floor.
     """
     # Use explicit None checks — 0 is a valid (if incorrect) salary value
     # and must not be treated as "no data"
+    period = job.get("salary_period")
     _sal_max = job.get("salary_max_annualized")
     if _sal_max is None:
-        _sal_max = job.get("salary_max")
+        _sal_max = _annualize_raw_salary(job.get("salary_max"), period)
     _sal_min = job.get("salary_min_annualized")
     if _sal_min is None:
-        _sal_min = job.get("salary_min")
+        _sal_min = _annualize_raw_salary(job.get("salary_min"), period)
 
     # No salary data → let it through
     if _sal_max is None and _sal_min is None:

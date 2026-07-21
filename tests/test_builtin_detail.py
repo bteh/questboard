@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from unittest.mock import patch
 
+from job_finder.tools.scrapers._utils import _parse_posted_date
 from job_finder.tools.scrapers.builtin import fetch_builtin_detail
 
 
@@ -24,7 +26,11 @@ def test_fetch_builtin_detail_recovers_requirements_date_and_direct_url() -> Non
         result = fetch_builtin_detail("https://builtin.com/job/example/123")
 
     assert "Lead a data engineering team." in result["description"]
-    assert result["date_posted"] == "Posted 4 Hours Ago"
+    # 'Posted 4 Hours Ago' becomes a real date (today) so the freshness
+    # filter can parse it; confidence stays fuzzy.
+    parsed = _parse_posted_date(result["date_posted"])
+    assert parsed is not None
+    assert parsed.date() == datetime.now(timezone.utc).date()
     assert result["date_confidence"] == "fuzzy"
     assert result["direct_application_url"] == (
         "https://job-boards.greenhouse.io/example/jobs/123"
