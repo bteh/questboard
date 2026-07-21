@@ -1,6 +1,7 @@
 import { createContext, useContext, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { sseUrl, streamSse } from '@/lib/api-client';
+import { getRunStatus } from '@/api/search';
 import { useWorkspace } from '@/contexts/workspace-context';
 import type { RunResult, SearchRequest, ProgressUpdate, SearchRunSnapshot } from '@/types/search';
 
@@ -212,11 +213,47 @@ export function SearchProvider({ children }: { children: ReactNode }) {
 
     es.onerror = () => {
       if (es.readyState === EventSource.CLOSED) {
-        // Connection closed permanently — mark failed only if we
-        // haven't already completed or received a server error.
-        setState((prev) => (prev === 'running' ? 'failed' : prev));
-        setError((prev) => prev || 'Connection lost');
         esRef.current = null;
+        // The stream dropped, but the run almost always finished server-side
+        // (a scrape completes even if the SSE didn't deliver 'complete', e.g.
+        // the backend restarted). Reconcile with the real run status before
+        // ever declaring failure, and keep polling briefly if it's still going.
+        let cancelled = false;
+        (async () => {
+          for (let i = 0; i < 30 && !cancelled; i++) {
+            try {
+              const s = await getRunStatus(runId);
+              if (s.status === 'completed') {
+                setResult({
+                  run_id: runId,
+                  status: 'completed',
+                  jobs_found: s.jobs_found ?? 0,
+                  new_jobs: s.new_jobs ?? 0,
+                  jobs_scored: s.jobs_scored ?? 0,
+                  strong_matches: 0,
+                  duration_seconds: 0,
+                  error: null,
+                });
+                setState('completed');
+                queryClient.invalidateQueries({ queryKey: ['applications'] });
+                queryClient.invalidateQueries({ queryKey: ['profile-work'] });
+                queryClient.invalidateQueries({ queryKey: ['board-summary'] });
+                return;
+              }
+              if (s.status === 'failed') {
+                setError(s.error || 'The run failed.');
+                setState('failed');
+                return;
+              }
+            } catch {
+              // status not readable yet — retry
+            }
+            await new Promise((r) => setTimeout(r, 3000));
+          }
+          // Gave up after ~90s with no terminal status.
+          setState((prev) => (prev === 'running' ? 'failed' : prev));
+          setError((prev) => prev || 'Lost contact with the run. Your board may still have updated.');
+        })();
       }
       // readyState === CONNECTING means EventSource is auto-reconnecting
       // — don't interfere, let it retry.

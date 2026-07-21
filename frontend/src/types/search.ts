@@ -75,6 +75,7 @@ export interface RunStatus {
   completed_at: string | null;
   progress_messages: string[];
   jobs_found: number;
+  new_jobs?: number;
   jobs_scored: number;
   error: string | null;
 }

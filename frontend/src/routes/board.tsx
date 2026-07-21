@@ -745,6 +745,16 @@ function BoardPage() {
           </div>
         )}
 
+        {total === 0 && careerLane && (
+          <div className="qb-board-empty" role="status">
+            <p className="qb-board-empty-lead">No jobs on your board for these roles yet.</p>
+            <p>
+              Click <b>“Get new jobs”</b> above to pull fresh postings from your sources onto the board.
+              It takes about a minute.
+            </p>
+          </div>
+        )}
+
         <p className="qb-board-legend">
           Pull <b>take it</b> to go straight to the source. <b>The colour of the pin tells you the kind of quest.</b>{' '}
           Every date on this board is the true post date; postings with no verifiable date say nothing.
