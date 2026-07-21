@@ -257,7 +257,8 @@ def _seed_preferences_from_default() -> WorkspacePreferencesSchema:
             companies=[],
             preferred_places=[],
             workplace_preference="remote_friendly",
-            max_days_old=14,
+            # Job posts stay open ~30-60 days; 14 hid still-live older ones.
+            max_days_old=45,
             include_linkedin_jobs=False,
             current_title="",
             current_level="mid",
