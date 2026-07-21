@@ -67,7 +67,8 @@ function StatusLine({
   }, [state]);
   useEffect(() => {
     if (prevState.current === 'running' && state === 'completed') {
-      toast.success(result?.jobs_found ? `Board updated · ${result.jobs_found} found` : 'Board updated');
+      const n = result?.new_jobs ?? 0;
+      toast.success(n > 0 ? `Board updated · ${n} new job${n === 1 ? '' : 's'}` : 'Board checked · nothing new this time');
     }
     prevState.current = state;
   }, [state, result]);
@@ -111,9 +112,11 @@ function StatusLine({
 
   if (state === 'completed' && result) {
     const timeouts = messages.filter((m) => TIMED_OUT_RE.test(m)).length;
+    const n = result.new_jobs ?? 0;
+    const lead = n > 0 ? `Board updated · ${n} new` : 'Board checked · nothing new';
     return (
       <p className="qb-workline" role="status">
-        Board updated · {result.jobs_found} found
+        {lead} ({result.jobs_found} scanned)
         {timeouts > 0 ? ` · ${timeouts} source${timeouts === 1 ? '' : 's'} timed out` : ''}.
         {cachedLine ? ` ${cachedLine}.` : ''}
       </p>

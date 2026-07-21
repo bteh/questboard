@@ -49,6 +49,7 @@ class RunStatus(BaseModel):
     completed_at: datetime | None = None
     progress_messages: list[str] = Field(default_factory=list)
     jobs_found: int = 0
+    new_jobs: int = 0
     jobs_scored: int = 0
     error: str | None = None
 
@@ -57,6 +58,7 @@ class RunResult(BaseModel):
     run_id: str
     status: str
     jobs_found: int = 0
+    new_jobs: int = 0
     jobs_scored: int = 0
     strong_matches: int = 0
     duration_seconds: float = 0.0
