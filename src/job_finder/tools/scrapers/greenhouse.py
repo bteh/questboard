@@ -15,6 +15,7 @@ from job_finder.tools.scrapers._utils import (
     _strip_html,
     date_confidence_for,
     is_crypto_company,
+    rank_by_relevance,
 )
 
 logger = logging.getLogger(__name__)
@@ -140,7 +141,9 @@ def search_greenhouse(
                 slug = futures[future]
                 logger.warning("Greenhouse/%s failed: %s", slug, e)
 
-    results = results[:max_results]
+    # Rank by title relevance before the cap so the strongest role matches
+    # survive, not whichever company boards happened to return first.
+    results = rank_by_relevance(results, roles)[:max_results]
     logger.info("Greenhouse: found %d matching jobs across %d companies",
                 len(results), len(company_list))
     return results

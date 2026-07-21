@@ -771,6 +771,36 @@ def _match_roles(
     return False
 
 
+def _relevance_score(title: str, roles: list[str] | None) -> int:
+    """A 3-tier title relevance score for ordering before a truncation cap.
+
+    3 = a full role appears verbatim (exact), 2 = all of a role's domain words
+    are present (all_significant), 1 = shares a domain word (any_word), 0 = no
+    match. Founding-title bypass is OFF here on purpose: those roles are still
+    kept by the scraper's inclusion filter, but for RANKING a generic "Member
+    of Technical Staff" must not outrank an exact target-role match.
+    """
+    if not roles or not title:
+        return 0
+    for mode, score in (("exact", 3), ("all_significant", 2), ("any_word", 1)):
+        if _match_roles(title, roles, include_founding=False, match_mode=mode):
+            return score
+    return 0
+
+
+def rank_by_relevance(jobs: list[dict], roles: list[str] | None) -> list[dict]:
+    """Stable-sort scraped jobs by title relevance to the target roles, best
+    first, so a downstream ``[:max_results]`` cap keeps the strongest matches
+    instead of arbitrary completion-order ones. A no-op without roles."""
+    if not roles or not jobs:
+        return jobs
+    return sorted(
+        jobs,
+        key=lambda job: _relevance_score(str(job.get("title") or job.get("job_title") or ""), roles),
+        reverse=True,
+    )
+
+
 # High-precision crypto/web3 signals — matched as substrings. These rarely
 # appear in non-crypto job titles, so substring matching is safe.
 _CRYPTO_SUBSTRING_TERMS: tuple[str, ...] = (

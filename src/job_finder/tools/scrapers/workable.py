@@ -23,6 +23,7 @@ from job_finder.tools.scrapers._utils import (
     _load_seed_slugs,
     _match_roles,
     _match_roles_crypto,
+    rank_by_relevance,
     _strip_html,
     date_confidence_for,
     is_crypto_company,
@@ -163,7 +164,7 @@ def search_workable(
                 slug = futures[future]
                 logger.warning("Workable/%s failed: %s", slug, e)
 
-    results = results[:max_results]
+    results = rank_by_relevance(results, roles)[:max_results]
     logger.info("Workable: found %d matching jobs across %d companies",
                 len(results), len(company_list))
     return results
