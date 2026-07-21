@@ -471,11 +471,15 @@ def list_profile_work(
         ]
 
     # Coherent order: in the roles view float the assistant's ranked picks to
-    # the top (stable, so unranked keep their recency order); then cap any one
-    # source to a short run so no board floods.
+    # the top, then cap any one source to a short run so no board floods.
+    # Declump ranked and unranked separately so an unranked recency row never
+    # leapfrogs a deeper ranked pick.
     if not source_category:
-        ordered.sort(key=_agent_rank)
-    ordered = _declump_by_source(ordered, max_run=3)
+        ranked = sorted((r for r in ordered if _agent_rank(r) < 10_000), key=_agent_rank)
+        unranked = [r for r in ordered if _agent_rank(r) >= 10_000]
+        ordered = _declump_by_source(ranked, max_run=3) + _declump_by_source(unranked, max_run=3)
+    else:
+        ordered = _declump_by_source(ordered, max_run=3)
 
     total = len(ordered)
     offset = (page - 1) * page_size

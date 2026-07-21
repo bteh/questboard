@@ -28,6 +28,8 @@ export function AssistantRunButton() {
   }, [run.isPending]);
 
   if (!isDesktopApp()) return null;
+  // Don't flash the "connect" link before we know the real state.
+  if (!run.isPending && (clients.isLoading || consent.isLoading)) return null;
 
   const claude = clients.data?.clients.find((c) => c.id === 'claude');
   const ready = (claude?.installed ?? false) && (consent.data?.granted ?? false);
