@@ -75,7 +75,7 @@
    The fields reuse the shared tray grammar from board.css. */
 .qb-worktool { margin-top: 12px; }
 .qb-worktool .qb-tray { margin-top: 0; }
-.qb-tray-label { font-family: var(--mono); font-size: 11px; color: var(--mute); white-space: nowrap; }
+.qb-tray-label { font-family: var(--mono); font-size: 12px; color: var(--soft); white-space: nowrap; }
 .qb-tray-minpay { flex: 0 0 auto; }
 .qb-tray-minpay input { width: 64px; }
 .qb-tray-run { display: flex; align-items: center; padding: 4px 4px 4px 12px; margin-left: auto; }
