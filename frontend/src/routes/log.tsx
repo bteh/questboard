@@ -23,6 +23,7 @@ import {
   personalLogFilters,
   readSignupState,
   reopenStatus,
+  rowActions,
   saveSignupEmail,
   splitLog,
   withPaidOut,
@@ -152,6 +153,7 @@ function LogCard({ app, labels }: { app: ApplicationResponse; labels: Record<str
   const personal = isPersonal(app);
   const applied = isApplied(app);
   const shelved = isShelved(app);
+  const actions = rowActions(app);
   const card = personal ? null : toBoardCard(app, resolveSourceLabel(app.source, labels));
   const vertical = personal ? 'personal' : card!.vertical;
   const date = logDate(app);
@@ -213,24 +215,36 @@ function LogCard({ app, labels }: { app: ApplicationResponse; labels: Record<str
               }}
             />
           ) : (
-            !applied && (
+            actions.length > 0 && (
               <span className="qb-acts">
-                <button type="button" onClick={() => setAsking(true)}>
-                  Done
-                </button>
-                {shelved ? (
+                {actions.includes('done') && (
+                  <button type="button" onClick={() => setAsking(true)}>
+                    Done
+                  </button>
+                )}
+                {actions.includes('shelve') && (
+                  <button
+                    type="button"
+                    onClick={() => edit.mutate({ id: app.id, data: { status: 'shelved' } })}
+                  >
+                    Shelve
+                  </button>
+                )}
+                {actions.includes('reopen') && (
                   <button
                     type="button"
                     onClick={() => edit.mutate({ id: app.id, data: { status: reopenStatus(app) } })}
                   >
                     Reopen
                   </button>
-                ) : (
+                )}
+                {/* back to 'found': out of the log, still on the board */}
+                {actions.includes('remove') && (
                   <button
                     type="button"
-                    onClick={() => edit.mutate({ id: app.id, data: { status: 'shelved' } })}
+                    onClick={() => edit.mutate({ id: app.id, data: { status: 'found' } })}
                   >
-                    Shelve
+                    Remove
                   </button>
                 )}
               </span>

@@ -69,6 +69,17 @@
   grid-template-columns: 40px 1fr auto;
   gap: 16px;
   align-items: start;
+  transition: background-color 120ms ease;
+}
+/* Hover or focus inside tints the card toward the page ground. Color only:
+   no shadow, no movement. The actions stay visible without it. */
+.qb-lcard:hover,
+.qb-lcard:focus-within {
+  background: var(--ground);
+}
+.qb-lcard:hover .qb-aff .qb-acts button,
+.qb-lcard:focus-within .qb-aff .qb-acts button {
+  color: var(--ink);
 }
 .qb-lcard .qb-stampcell { padding-top: 2px; }
 .qb-lcard .qb-stampcell .qb-stamp { width: 28px; height: 28px; }
@@ -108,8 +119,13 @@
   font-weight: 500;
   cursor: pointer;
   padding: 0;
+  transition: color 120ms ease;
 }
 .qb-lcard .qb-aff .qb-acts button:hover { color: var(--ink); }
+@media (prefers-reduced-motion: reduce) {
+  .qb-lcard,
+  .qb-lcard .qb-aff .qb-acts button { transition: none; }
+}
 .qb-affinput {
   border: 1px solid var(--hair);
   background: var(--ground);

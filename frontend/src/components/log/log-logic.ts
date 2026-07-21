@@ -138,6 +138,21 @@ export function reopenStatus(app: Pick<ApplicationResponse, 'vertical'>): string
   return isPersonal(app) ? 'found' : 'clipped';
 }
 
+export type LogAction = 'done' | 'shelve' | 'reopen' | 'remove';
+
+/**
+ * The small actions a live card offers, in render order. Applied rows carry
+ * the stamp instead of actions; done rows sit in the ledger below. Remove is
+ * only for clips: it sets the row back to 'found', so it leaves the log but
+ * stays on the board.
+ */
+export function rowActions(app: Pick<ApplicationResponse, 'status'>): LogAction[] {
+  if (isApplied(app) || isDone(app)) return [];
+  if (isShelved(app)) return ['done', 'reopen'];
+  if (app.status === 'clipped' || app.status === 'reviewed') return ['done', 'shelve', 'remove'];
+  return ['done', 'shelve'];
+}
+
 /**
  * "Applied Jun 30. A short follow-up is fair game after Jul 7. One note is
  * plenty." Only when a real applied date exists; nothing is guessed.

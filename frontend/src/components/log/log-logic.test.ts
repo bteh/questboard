@@ -11,6 +11,7 @@ import {
   personalLogFilters,
   readSignupState,
   reopenStatus,
+  rowActions,
   saveSignupEmail,
   splitLog,
   withPaidOut,
@@ -122,6 +123,46 @@ describe('paid figures', () => {
       paid_out: 45,
     });
     expect(JSON.parse(withPaidOut(app({}), 45))).toEqual({ paid_out: 45 });
+  });
+});
+
+describe('rowActions', () => {
+  it('offers Done, Shelve and Remove on a clipped or reviewed row', () => {
+    expect(rowActions(app({ vertical: 'study', status: 'clipped' }))).toEqual([
+      'done',
+      'shelve',
+      'remove',
+    ]);
+    expect(rowActions(app({ vertical: 'career', status: 'reviewed' }))).toEqual([
+      'done',
+      'shelve',
+      'remove',
+    ]);
+  });
+
+  it('never offers Remove on an applied row', () => {
+    for (const status of ['applied', 'interviewing', 'offer']) {
+      expect(rowActions(app({ vertical: 'career', status }))).toEqual([]);
+    }
+  });
+
+  it('offers Done and Reopen on a shelved row', () => {
+    expect(rowActions(app({ vertical: 'study', status: 'shelved' }))).toEqual(['done', 'reopen']);
+    expect(rowActions(app({ vertical: 'personal', status: 'shelved' }))).toEqual([
+      'done',
+      'reopen',
+    ]);
+  });
+
+  it('keeps Done and Shelve, without Remove, on everything else live', () => {
+    /* a personal quest was never clipped, so there is nothing to remove */
+    expect(rowActions(app({ vertical: 'personal', status: 'found' }))).toEqual(['done', 'shelve']);
+    expect(rowActions(app({ vertical: 'study', status: 'booked' }))).toEqual(['done', 'shelve']);
+  });
+
+  it('offers nothing on done rows; they live in the ledger', () => {
+    expect(rowActions(app({ vertical: 'study', status: 'attended' }))).toEqual([]);
+    expect(rowActions(app({ vertical: 'study', status: 'paid_out' }))).toEqual([]);
   });
 });
 
