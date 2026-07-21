@@ -42,6 +42,7 @@ import { PlacePicker } from '@/features/board/place-picker';
 import { JobsSetupStrip } from '@/features/board/jobs-callout';
 import { WorkToolbar } from '@/features/board/work-toolbar';
 import { SourceCategoryChips } from '@/features/board/source-category-chips';
+import { AssistantRunButton } from '@/features/board/assistant-run-button';
 import {
   advanceWorkCutoff,
   countNewSince,
@@ -601,6 +602,9 @@ function BoardPage() {
               payTo={payToRaw}
               onPayTo={setPayToRaw}
             />
+            <div className="mt-2">
+              <AssistantRunButton />
+            </div>
             <SourceCategoryChips
               counts={workMeta?.source_categories}
               selected={sourceCategory}

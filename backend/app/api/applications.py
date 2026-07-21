@@ -53,27 +53,41 @@ def _source_category_map() -> dict[str, str]:
     return {name.lower(): getattr(meta, "category", "") for name, meta in get_registry().items()}
 
 
-def _diversify_by_source(records: list) -> list:
-    """Round-robin records across their source so no single source floods the
-    top of the board. Order within each source (recency) is preserved."""
-    buckets: dict[str, list] = {}
-    order: list[str] = []
-    for record in records:
-        key = (record.source or "").lower()
-        if key not in buckets:
-            order.append(key)
-            buckets[key] = []
-        buckets[key].append(record)
+def _agent_rank(record) -> int:
+    """The assistant's rank for this row (1 = best) from its last run, or a big
+    number so unranked rows sort after ranked ones."""
+    raw = getattr(record, "agent_fit_json", "") or ""
+    if not raw:
+        return 10_000
+    try:
+        rank = json.loads(raw).get("rank")
+        return rank if isinstance(rank, int) else 10_000
+    except (json.JSONDecodeError, TypeError):
+        return 10_000
+
+
+def _declump_by_source(records: list, *, max_run: int = 3) -> list:
+    """Keep the given order (recency, or the agent's rank) but never show more
+    than `max_run` in a row from one source: an over-long run pulls the next
+    different-source row forward. Reads coherent, without one source flooding."""
+    remaining = list(records)
     out: list = []
-    depth = 0
-    remaining = True
     while remaining:
-        remaining = False
-        for key in order:
-            if depth < len(buckets[key]):
-                out.append(buckets[key][depth])
-                remaining = True
-        depth += 1
+        idx = 0
+        if len(out) >= max_run:
+            last = (out[-1].source or "").lower()
+            run = 0
+            for record in reversed(out):
+                if (record.source or "").lower() == last:
+                    run += 1
+                else:
+                    break
+            if run >= max_run:
+                for i, record in enumerate(remaining):
+                    if (record.source or "").lower() != last:
+                        idx = i
+                        break
+        out.append(remaining.pop(idx))
     return out
 
 
@@ -456,9 +470,12 @@ def list_profile_work(
             ).casefold()
         ]
 
-    # Round-robin across sources so no single source floods the top; recency
-    # is preserved within each source.
-    ordered = _diversify_by_source(ordered)
+    # Coherent order: in the roles view float the assistant's ranked picks to
+    # the top (stable, so unranked keep their recency order); then cap any one
+    # source to a short run so no board floods.
+    if not source_category:
+        ordered.sort(key=_agent_rank)
+    ordered = _declump_by_source(ordered, max_run=3)
 
     total = len(ordered)
     offset = (page - 1) * page_size
