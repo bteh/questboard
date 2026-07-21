@@ -87,6 +87,8 @@ export interface PosterProps {
   disclosure?: string;
   /** flavor tags: time and effort only, two at most */
   tags?: string[];
+  /** the connected assistant's fit verdict for this row, from its last run */
+  fitBadge?: { label: string; verdict: 'strong' | 'good' | 'reach' | 'skip' };
   pay?: string;
   payUnit?: string;
   /** e.g. "Applied, Jun 30"; wins over clippedDate */
@@ -117,6 +119,7 @@ export function Poster({
   catchLine,
   disclosure,
   tags = [],
+  fitBadge,
   pay,
   payUnit,
   applied,
@@ -151,6 +154,9 @@ export function Poster({
               {posted && newHere ? ' · ' : ''}
               {newHere && <span className="qb-p-new">new here</span>}
             </span>
+          )}
+          {fitBadge && (
+            <span className={cx('qb-p-fit', `qb-p-fit-${fitBadge.verdict}`)}>{fitBadge.label}</span>
           )}
         </div>
         {logoWell ? (

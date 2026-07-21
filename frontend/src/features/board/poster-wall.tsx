@@ -89,6 +89,7 @@ export function PosterWall({
         catchLine={poster.copy.catchLine}
         disclosure={link.disclosure}
         tags={poster.tags}
+        fitBadge={poster.fitBadge}
         pay={card.pay}
         payUnit={card.payUnit}
         applied={card.applied}

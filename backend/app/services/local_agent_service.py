@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import uuid
 from datetime import datetime, timezone
 from typing import Any
 
@@ -746,6 +747,98 @@ def set_opportunity_status(
         "opportunity_id": record.id,
         "status": record.status,
         "notes": record.notes or "",
+        "external_action_performed": False,
+    }
+
+
+_FIT_VERDICTS = {"strong", "good", "reach", "skip"}
+
+
+def set_work_fit(db: Session, rankings: list[dict[str, Any]]) -> dict[str, Any]:
+    """Record the connected assistant's own fit verdict for work rows, keyed by
+    opportunity_id, so the board and the results panel can show it.
+
+    This REPLACES any prior run's verdicts (clears them first), so the board
+    only ever reflects the latest run. It writes nothing but a local annotation
+    on rows the agent already retrieved; it performs no external action.
+    """
+    if not isinstance(rankings, list) or not rankings:
+        raise ValueError("Provide a non-empty list of {opportunity_id, verdict} rankings.")
+
+    cleaned: list[dict[str, Any]] = []
+    for item in rankings:
+        if not isinstance(item, dict):
+            continue
+        try:
+            oid = int(item.get("opportunity_id"))
+        except (TypeError, ValueError):
+            continue
+        verdict = str(item.get("verdict") or "").strip().lower()
+        if verdict not in _FIT_VERDICTS:
+            raise ValueError(f"verdict must be one of {sorted(_FIT_VERDICTS)}, got {verdict!r}")
+        rank_raw = item.get("rank")
+        try:
+            rank = int(rank_raw) if rank_raw is not None else None
+        except (TypeError, ValueError):
+            rank = None
+        cleaned.append({
+            "opportunity_id": oid,
+            "rank": rank,
+            "verdict": verdict,
+            "why": " ".join(str(item.get("why") or "").split())[:600],
+            "caveat": " ".join(str(item.get("caveat") or "").split())[:400],
+        })
+
+    if not cleaned:
+        raise ValueError("No valid rankings: each needs an integer opportunity_id and a verdict.")
+
+    # Resolve targets BEFORE clearing anything: a run that matches no row (stale
+    # or hallucinated ids) must not wipe a prior good run's verdicts. Fit only
+    # belongs on career/work rows, never on quest rows.
+    matched: list[tuple[ApplicationRecord, dict[str, Any]]] = []
+    missing: list[int] = []
+    for item in cleaned:
+        record = application_service.get_application(db, item["opportunity_id"])
+        if record is None or (record.vertical or "career") not in ("career", "work"):
+            missing.append(item["opportunity_id"])
+            continue
+        matched.append((record, item))
+
+    if not matched:
+        return {
+            "run_id": None,
+            "applied": 0,
+            "missing_opportunity_ids": missing,
+            "external_action_performed": False,
+        }
+
+    run_id = uuid.uuid4().hex[:12]
+    stamped_at = _iso(datetime.now(timezone.utc))
+
+    # Clear the previous run's verdicts (career/work only) so the board shows
+    # only the latest run, then write this run's.
+    db.query(ApplicationRecord).filter(
+        ApplicationRecord.vertical.in_(("career", "work")),
+        ApplicationRecord.agent_fit_json.isnot(None),
+        ApplicationRecord.agent_fit_json != "",
+    ).update({ApplicationRecord.agent_fit_json: ""}, synchronize_session=False)
+
+    for record, item in matched:
+        record.agent_fit_json = json.dumps({
+            "rank": item["rank"],
+            "verdict": item["verdict"],
+            "why": item["why"],
+            "caveat": item["caveat"],
+            "run_id": run_id,
+            "at": stamped_at,
+        })
+    applied = len(matched)
+
+    db.commit()
+    return {
+        "run_id": run_id,
+        "applied": applied,
+        "missing_opportunity_ids": missing,
         "external_action_performed": False,
     }
 

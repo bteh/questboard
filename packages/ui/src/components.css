@@ -218,6 +218,23 @@
 .qb-p-posted { margin-left: auto; font-family: var(--mono); font-size: 10.5px; color: var(--mute); }
 /* quiet last-visit marker: plain text, never a badge or a dot */
 .qb-p-new { color: var(--sage); font-weight: 500; }
+/* the connected assistant's fit verdict for this row (pinned to the right) */
+.qb-p-fit {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+.qb-p-posted + .qb-p-fit { margin-left: 0; }
+.qb-p-fit-strong { color: #2f6b3f; background: rgba(47, 107, 63, .09); }
+.qb-p-fit-good   { color: #5b7f4a; background: rgba(91, 127, 74, .09); }
+.qb-p-fit-reach  { color: #9a6a1f; background: rgba(154, 106, 31, .09); }
+.qb-p-fit-skip   { color: var(--mute); background: rgba(28, 27, 23, .05); }
 .qb-p-title { font-family: var(--serif); font-variation-settings: 'opsz' 40; font-weight: 560; font-size: 19px; line-height: 1.18; letter-spacing: -.01em; margin: 0 0 6px; }
 /* career logo well: a fixed square tile on light paper so logos survive the
    cream card; top-aligned to the title's first line, never shifting layout */
