@@ -3,7 +3,7 @@ import { createRoute, Link, useNavigate } from '@tanstack/react-router';
 import { Route as appRoute } from './app';
 
 import { AssistantTab } from '@/components/settings/AssistantTab';
-import { AutoApplyTab } from '@/components/settings/AutoApplyTab';
+import { CompaniesTab } from '@/components/settings/CompaniesTab';
 import { ResumeTab } from '@/components/settings/ResumeTab';
 import { SearchPrefsTab } from '@/components/settings/SearchPrefsTab';
 import {
@@ -32,7 +32,7 @@ const TAB_LABELS: Record<SettingsTab, string> = {
   resume: 'Resume',
   assistant: 'Assistant',
   restock: 'Restock',
-  'auto-apply': 'Auto-apply',
+  companies: 'Companies',
 };
 
 function SettingsPage() {
@@ -49,7 +49,7 @@ function SettingsPage() {
     resume: null,
     assistant: null,
     restock: null,
-    'auto-apply': null,
+    companies: null,
   });
   const handleTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, currentIndex: number) => {
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
@@ -108,7 +108,7 @@ function SettingsPage() {
           <SearchPrefsTab onboarding={onboarding} navigate={navigate} />
         )}
 
-        {activeTab === 'auto-apply' && <AutoApplyTab />}
+        {activeTab === 'companies' && <CompaniesTab />}
       </div>
 
       <div className="qb-settings-foot">

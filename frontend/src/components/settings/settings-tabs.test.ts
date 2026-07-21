@@ -17,4 +17,8 @@ describe('resolveSettingsTab', () => {
     expect(resolveSettingsTab(42)).toBeUndefined();
     expect(resolveSettingsTab(undefined)).toBeUndefined();
   });
+
+  it('drops the removed auto-apply tab to the default', () => {
+    expect(resolveSettingsTab('auto-apply')).toBeUndefined();
+  });
 });
