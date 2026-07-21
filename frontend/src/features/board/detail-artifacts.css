@@ -1,0 +1,59 @@
+/* The artifact folds under the job detail sheet's description. Same paper
+   box as the facts above, but each one opens and closes; the summary line
+   borrows the fact-label grammar so a fold reads as one more quiet row. */
+
+.qb-jda-stack { margin-top: 10px; }
+
+.qb-jda {
+  border: 1px solid var(--hair); border-bottom-color: var(--edge);
+  border-radius: 10px; background: var(--paper);
+  margin-top: 8px;
+}
+.qb-jda summary {
+  display: flex; align-items: baseline; gap: 8px;
+  padding: 9px 18px; cursor: pointer; list-style: none;
+  font-family: var(--mono); font-size: 11px; letter-spacing: .03em; color: var(--mute);
+}
+.qb-jda summary::-webkit-details-marker { display: none; }
+.qb-jda summary::before { content: '+'; color: var(--soft); }
+.qb-jda[open] summary::before { content: '\2212'; }
+.qb-jda summary:focus-visible { outline: 2px solid var(--sage); outline-offset: 2px; border-radius: 10px; }
+.qb-jda-count { margin-left: auto; font-variant-numeric: tabular-nums; }
+
+.qb-jda-body { padding: 0 18px 12px; }
+.qb-jda-caveat { font-size: 12.5px; color: var(--mute); line-height: 1.5; margin: 0 0 8px; }
+
+/* the letter itself: same dashed ground box as the stored description */
+.qb-jda-text {
+  border: 1px dashed var(--step4); border-radius: 4px; background: var(--ground);
+  padding: 12px 14px;
+  font-size: 14px; color: var(--soft); line-height: 1.55;
+  white-space: pre-wrap; overflow-wrap: break-word;
+  max-height: 38vh; overflow-y: auto;
+}
+
+/* kit fields and company note rows share the facts' hairline rhythm */
+.qb-jda-row { padding: 7px 0; border-bottom: 1px solid var(--hair); }
+.qb-jda-row:last-child { border-bottom: 0; }
+.qb-jda-rowhead { display: flex; align-items: baseline; gap: 10px; }
+.qb-jda-lonecopy { justify-content: flex-end; margin-bottom: 6px; }
+.qb-jda-label {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .03em; color: var(--mute);
+}
+.qb-jda-rowhead .qb-jda-copy { margin-left: auto; }
+.qb-jda-copy { font-size: 12.5px; }
+.qb-jda-value { font-size: 14px; color: var(--soft); line-height: 1.5; }
+.qb-jda-line { margin: 0 0 3px; }
+.qb-jda-line:last-child { margin-bottom: 0; }
+.qb-jda-sub { font-size: 12.5px; color: var(--mute); line-height: 1.5; margin: 3px 0 0; }
+.qb-jda-quote { font-size: 12.5px; font-style: italic; color: var(--mute); line-height: 1.5; margin: 3px 0 0; }
+
+/* requirement rows: the stored strength word sits where a fact label would */
+.qb-jda-reqs { list-style: none; margin: 0; padding: 0; }
+.qb-jda-req { display: flex; gap: 14px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--hair); }
+.qb-jda-req:last-child { border-bottom: 0; }
+.qb-jda-strength {
+  flex: none; width: 64px;
+  font-family: var(--mono); font-size: 11px; letter-spacing: .03em; color: var(--mute);
+}
+.qb-jda-reqbody { min-width: 0; }

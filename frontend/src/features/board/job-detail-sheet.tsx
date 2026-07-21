@@ -1,9 +1,14 @@
 /* The Jobs lane's detail sheet, at its own URL (?job={id}) so refresh and
    share reopen it. Shows the full stored description as plain text with its
    paragraphs kept, the stated facts with their provenance, and the door to
-   the original posting. Nothing here is summarized or guessed. */
+   the original posting. Nothing here is summarized or guessed. When the
+   pipeline drafted materials for a row (cover letter, application kit,
+   requirement check, company notes), they wait below the description in
+   collapsed folds, each labeled as generated work to check; see
+   detail-artifacts.tsx. A row without them looks exactly as before. */
 
 import { PlainButton, Sheet, TextLink } from '@questboard/ui';
+import { DetailArtifacts } from '@/features/board/detail-artifacts';
 import { useApplication } from '@/hooks/use-applications';
 import { resolveSourceLabel } from '@/hooks/use-scrapers';
 import { formatStatedPay, payUnitFor, toBoardCard } from '@/utils/board-card';
@@ -91,6 +96,7 @@ export function JobDetailSheet({
               No stored description for this one; the original posting has the full text.
             </p>
           )}
+          <DetailArtifacts app={app} />
           <div className="qb-srow">
             {app.job_url && <TextLink href={app.job_url}>View original posting</TextLink>}
             <PlainButton className="qb-closebtn" onClick={onClose}>
