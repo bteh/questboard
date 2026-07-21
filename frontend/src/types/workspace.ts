@@ -150,6 +150,8 @@ export interface WorkspaceResumeUploadResponse {
   analysis: Record<string, unknown> | null;
   parse_code: ResumeParseCode;
   analysis_status: ResumeAnalysisStatus;
+  derived_roles?: string[];
+  derived_keywords?: string[];
 }
 
 export interface WorkspaceSearchRunResponse {

@@ -67,6 +67,7 @@ The first local server exposes:
 | --- | --- | --- |
 | `server_info` | privacy, cost, and capability boundary | no |
 | `get_career_preferences` | saved roles and hard constraints, no resume text | no |
+| `set_career_preferences` | save target roles and keywords locally (the intent search_work retrieves on) | no |
 | `read_resume_for_matching` | private resume text after user authorization | no |
 | `refresh_work` | start a source-only local career refresh | no |
 | `get_refresh_status` | poll a local refresh | no |

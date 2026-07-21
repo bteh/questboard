@@ -4,17 +4,38 @@
 from __future__ import annotations
 
 import argparse
+import platform
 import shutil
 from datetime import datetime
 from pathlib import Path
+
+_BUNDLE_GLOB = "*/release/bundle/macos/Questboard.app"
+
+
+def discover_app(repo_root: Path) -> Path | None:
+    """Find the freshest built Questboard.app, preferring the host arch.
+
+    The Tauri build target follows the venv Python's arch (aarch64 or
+    x86_64), so the built bundle lives under the matching target triple.
+    Prefer that, fall back to any, newest by mtime, so this keeps working
+    whichever arch the last build produced.
+    """
+    base = repo_root / "frontend" / "src-tauri" / "target"
+    triple = "aarch64-apple-darwin" if platform.machine() == "arm64" else "x86_64-apple-darwin"
+    candidates = list(base.glob(f"{triple}/release/bundle/macos/Questboard.app"))
+    if not candidates:
+        candidates = list(base.glob(_BUNDLE_GLOB))
+    if not candidates:
+        return None
+    return max(candidates, key=lambda p: p.stat().st_mtime)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--source",
-        default="frontend/src-tauri/target/x86_64-apple-darwin/release/bundle/macos/Questboard.app",
-        help="Path to the built Questboard.app bundle.",
+        default=None,
+        help="Path to the built Questboard.app bundle. Auto-discovered by arch when omitted.",
     )
     parser.add_argument(
         "--destination",
@@ -32,7 +53,16 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     repo_root = Path(__file__).resolve().parent.parent
-    source = (repo_root / args.source).resolve()
+    if args.source:
+        source = (repo_root / args.source).resolve()
+    else:
+        discovered = discover_app(repo_root)
+        if discovered is None:
+            raise SystemExit(
+                "No built Questboard.app found under frontend/src-tauri/target. "
+                "Run 'make desktop-build' first."
+            )
+        source = discovered.resolve()
     destination = Path(args.destination).resolve()
     backup_dir = (repo_root / args.backup_dir).resolve()
 

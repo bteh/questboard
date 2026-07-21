@@ -124,6 +124,10 @@ class WorkspaceResumeUploadResponse(BaseModel):
     analysis: dict | None = None
     parse_code: str | None = None  # "SCANNED_PDF" | None
     analysis_status: str = "skipped_no_llm"  # "completed" | "skipped_no_llm" | "analysis_error" | "failed"
+    # Target roles/keywords the local (no-AI) extractor pulled from the resume
+    # and saved, when there was no AI analysis and no roles were set yet.
+    derived_roles: list[str] = []
+    derived_keywords: list[str] = []
 
 
 class LocationSuggestion(BaseModel):

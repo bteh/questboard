@@ -12,6 +12,22 @@ export interface AgentConsentStatus {
   expires_at: string | null;
 }
 
+export interface AgentClientStatus {
+  id: string;
+  name: string;
+  installed: boolean;
+  connected: boolean;
+  restart_required: boolean;
+}
+
+export interface AgentRunResult {
+  ok: boolean;
+  result: string;
+  error: string;
+  cost_usd: number | null;
+  num_turns: number | null;
+}
+
 export type ResumeAnalysisStatus = 'completed' | 'skipped_no_llm' | 'failed' | 'analysis_error' | 'quota_exhausted';
 
 export type ResumeParseCode = 'SCANNED_PDF' | null;

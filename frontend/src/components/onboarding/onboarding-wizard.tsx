@@ -271,7 +271,7 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
 
         <div className="px-6 pb-6 pt-4">
           {/* ──────────────────────────────────────────────────────────
-              Step 1 — Upload Your Resume
+              Step 1: Upload Your Resume
               Heading text "Upload Your Resume" is referenced by the
               Playwright smoke test, do not rename without updating
               frontend/scripts/run-desktop-smoke.mjs.
@@ -339,7 +339,7 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
                   onClick={() => setStep('search')}
                   className="flex-1"
                 >
-                  Skip — search by keywords
+                  Skip and search by keywords
                 </Button>
                 <Button
                   onClick={() => setStep('search')}
@@ -353,7 +353,7 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
           )}
 
           {/* ──────────────────────────────────────────────────────────
-              Step 2 — What are you looking for?
+              Step 2: What are you looking for?
               Heading text "What are you looking for?" is referenced by
               the Playwright smoke test, do not rename without updating
               frontend/scripts/run-desktop-smoke.mjs.
@@ -388,7 +388,7 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
                   <TagListInput
                     value={form.roles}
                     onChange={(roles) => setForm((prev) => ({ ...prev, roles }))}
-                    placeholder="e.g. Nurse Practitioner — press Enter to add"
+                    placeholder="e.g. Nurse Practitioner, then press Enter"
                     inputProps={{ 'data-testid': 'onboarding-roles-input' }}
                   />
                 </div>
@@ -409,14 +409,8 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
                 <div className="flex items-center gap-2 text-xs text-text-muted">
                   <Sparkles className="h-3.5 w-3.5 shrink-0" />
                   <span>
-                    {aiFailed ? 'AI offline — using keyword ranking. ' : 'Keyword ranking only. '}
-                    <button
-                      type="button"
-                      onClick={() => { handleDismiss(); navigate({ to: '/settings', search: { tab: 'ai' } }); }}
-                      className="font-medium text-brand hover:underline"
-                    >
-                      Connect AI
-                    </button>
+                    {aiFailed ? 'Your AI key is offline, ranking by keywords. ' : 'Ranking by keywords. '}
+                    Your connected assistant can rank by resume fit.
                   </span>
                 </div>
               ) : null}

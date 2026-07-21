@@ -305,3 +305,153 @@
   .qb-ghost { display: none; }
   .qb-sheet-bar { display: none; }
 }
+
+/* ============================================================
+   DOWNLOAD PAGE: the story sections below the hero window.
+   Trade-paper idiom: hairline borders, edge-colored bottom
+   borders on real cards, mono for data, the existing lift
+   budget only where something genuinely floats.
+   ============================================================ */
+
+/* ---- top bar nav + hero eyebrow / secondary cta ---- */
+.qb-land-nav { margin-left: auto; display: flex; gap: 22px; }
+.qb-land-nav a { font-size: 14px; color: var(--soft); text-decoration: none; }
+.qb-land-nav a:hover { color: var(--ink); }
+.qb-eyebrow {
+  font-family: var(--mono); font-size: 12.5px; letter-spacing: .01em;
+  color: var(--mute); margin: 30px 0 0;
+}
+.qb-land-hero h1 { margin-top: 12px; }
+.qb-lsub { max-width: 620px; }
+.qb-lsecondary { font-size: 14.5px; color: var(--sage); text-decoration: none; border-bottom: 1px solid rgba(63, 107, 84, .3); padding-bottom: 1px; }
+.qb-lsecondary:hover { border-bottom-color: var(--sage); }
+.qb-ltrust { font-size: 13px; color: var(--mute); margin: 20px 0 0; }
+
+/* ---- the download / notify cta component ---- */
+.qb-cta-stack { display: flex; flex-direction: column; align-items: center; gap: 9px; }
+.qb-cta-done { font-family: var(--serif); font-variation-settings: 'opsz' 30; font-weight: 560; font-size: 17px; margin: 0; }
+.qb-notify-form { display: flex; flex-direction: column; align-items: center; gap: 9px; }
+.qb-notify-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.qb-notify-input {
+  font-family: var(--sans); font-size: 15px; color: var(--ink);
+  background: var(--paper); border: 1px solid var(--hair); border-bottom-color: var(--edge);
+  border-radius: 8px; padding: 10px 14px; width: 240px; max-width: 72vw;
+}
+.qb-notify-input:focus { outline: 2px solid rgba(63, 107, 84, .4); outline-offset: 1px; border-color: var(--sage); }
+.qb-lnote-warn { color: var(--clay); }
+
+/* ---- mac window chrome dots on the hero board window ---- */
+.qb-win-dots { display: inline-flex; gap: 6px; margin-right: 4px; }
+.qb-win-dots i { width: 10px; height: 10px; border-radius: 50%; }
+.qb-win-dots i:nth-child(1) { background: var(--clay); }
+.qb-win-dots i:nth-child(2) { background: var(--ochre); }
+.qb-win-dots i:nth-child(3) { background: var(--sage); }
+.qb-win-title { margin-left: 2px; }
+
+/* ---- trust strip: four honest claims, hairline dividers, no boxes ---- */
+.qb-trust-strip {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 0;
+  margin: 8vh auto 0; max-width: 1000px;
+  border: 1px solid var(--hair); border-bottom-color: var(--edge);
+  border-radius: 12px; background: rgba(255, 255, 255, .72); overflow: hidden;
+}
+.qb-trust-item { padding: 20px 22px; }
+.qb-trust-item + .qb-trust-item { border-left: 1px solid var(--hair); }
+.qb-trust-item b { display: block; font-weight: 550; font-size: 15px; margin-bottom: 5px; }
+.qb-trust-item span { display: block; font-size: 13.5px; line-height: 1.5; color: var(--mute); }
+
+/* ---- content scenes: looser than the single-card scenes ---- */
+.qb-scene-lede, .qb-scene-flows, .qb-scene-how, .qb-scene-why, .qb-scene-price, .qb-scene-faq {
+  min-height: 0; padding: 9vh 20px; gap: 30px;
+}
+.qb-lede {
+  max-width: 720px; font-size: 18px; line-height: 1.62; color: var(--soft);
+  text-align: center; margin: 0; text-wrap: pretty;
+}
+
+/* ---- two workflows ---- */
+.qb-flows {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 26px;
+  max-width: 1000px; width: 100%; align-items: start;
+}
+.qb-flow-col {
+  display: flex; flex-direction: column; gap: 20px;
+  background: rgba(255, 255, 255, .72);
+  border: 1px solid var(--hair); border-bottom-color: var(--edge);
+  border-radius: 14px; padding: 26px 26px 30px;
+}
+.qb-flow-copy h3 { font-family: var(--serif); font-variation-settings: 'opsz' 40; font-weight: 580; font-size: 22px; margin: 0 0 8px; }
+.qb-flow-copy p { font-size: 15px; line-height: 1.58; color: var(--soft); margin: 0; }
+.qb-flow-poster { display: flex; justify-content: center; }
+.qb-flow-poster > * { width: 100%; max-width: 320px; }
+
+/* ---- how it works: numbered steps (a real sequence) ---- */
+.qb-steps {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px;
+  max-width: 940px; width: 100%;
+}
+.qb-step { display: flex; gap: 14px; align-items: flex-start; }
+.qb-step-n {
+  flex: none; width: 34px; height: 34px; border-radius: 50%;
+  display: grid; place-items: center;
+  font-family: var(--serif); font-variation-settings: 'opsz' 30; font-weight: 560; font-size: 17px;
+  color: var(--sage); border: 1.5px solid rgba(63, 107, 84, .4); background: rgba(63, 107, 84, .06);
+}
+.qb-step b { display: block; font-weight: 550; font-size: 15.5px; margin-bottom: 4px; }
+.qb-step p { font-size: 14px; line-height: 1.55; color: var(--mute); margin: 0; }
+.qb-fears { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 40px; max-width: 820px; width: 100%; }
+.qb-fear b { display: block; font-weight: 550; font-size: 15.5px; margin-bottom: 5px; }
+.qb-fear p { font-size: 14.5px; line-height: 1.55; color: var(--soft); margin: 0; }
+.qb-fine { font-family: var(--mono); font-size: 12.5px; color: var(--mute); margin: 0; text-align: center; }
+
+/* ---- why not a job board: four differentiators, then the ledger ---- */
+.qb-why-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px 44px; max-width: 860px; width: 100%; }
+.qb-why b { display: block; font-family: var(--serif); font-variation-settings: 'opsz' 24; font-weight: 560; font-size: 17px; margin-bottom: 6px; }
+.qb-why p { font-size: 14.5px; line-height: 1.56; color: var(--soft); margin: 0; }
+
+/* ---- the ledger's honest "example" marker ---- */
+.qb-done-eg { font-family: var(--mono); font-size: 11px; font-weight: 400; color: var(--mute); margin-left: 8px; }
+
+/* ---- snapshot counters caption ---- */
+.qb-odo-asof { font-size: 13.5px; color: var(--mute); margin: 0; text-align: center; max-width: 460px; }
+
+/* ---- pricing: two real cards (tiers earn the card) ---- */
+.qb-price-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; max-width: 760px; width: 100%; align-items: start; }
+.qb-price-card {
+  background: var(--paper); border: 1px solid var(--hair); border-bottom-color: var(--edge);
+  border-radius: 14px; box-shadow: var(--lift-2); padding: 26px 26px 28px;
+}
+.qb-price-pro { background: rgba(63, 107, 84, .045); border-color: rgba(63, 107, 84, .22); border-bottom-color: rgba(63, 107, 84, .3); }
+.qb-price-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+.qb-price-head h3 { font-family: var(--serif); font-variation-settings: 'opsz' 40; font-weight: 580; font-size: 24px; margin: 0; }
+.qb-price-tag { font-family: var(--mono); font-size: 12px; color: var(--mute); }
+.qb-price-sub { font-size: 14px; color: var(--soft); margin: 0 0 14px; }
+.qb-price-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+.qb-price-list li { font-size: 14.5px; line-height: 1.45; color: var(--soft); padding-left: 20px; position: relative; }
+.qb-price-list li::before { content: ''; position: absolute; left: 2px; top: .58em; width: 8px; height: 8px; border-radius: 2px; background: var(--sage); opacity: .55; }
+.qb-price-pro .qb-price-list li::before { background: var(--sage); opacity: .8; }
+.qb-price-oath { font-size: 14px; color: var(--soft); margin: 0; text-align: center; max-width: 600px; }
+
+/* ---- faq: hairline-divided q/a, no boxes ---- */
+.qb-faq { max-width: 700px; width: 100%; border-top: 1px solid var(--hair); }
+.qb-faq-q { padding: 18px 2px; border-bottom: 1px solid var(--hair); }
+.qb-faq-q b { display: block; font-weight: 550; font-size: 15.5px; margin-bottom: 5px; }
+.qb-faq-q p { font-size: 14.5px; line-height: 1.55; color: var(--mute); margin: 0; }
+
+/* ---- responsive ---- */
+@media (max-width: 880px) {
+  .qb-land-nav { display: none; }
+  .qb-eyebrow { margin-top: 22px; }
+  .qb-trust-strip { grid-template-columns: 1fr 1fr; margin-top: 60px; }
+  .qb-trust-item:nth-child(3) { border-left: 0; }
+  .qb-trust-item:nth-child(odd) { border-left: 0; }
+  .qb-trust-item:nth-child(even) { border-left: 1px solid var(--hair); }
+  .qb-trust-item:nth-child(n+3) { border-top: 1px solid var(--hair); }
+  .qb-scene-lede, .qb-scene-flows, .qb-scene-how, .qb-scene-why, .qb-scene-price, .qb-scene-faq { padding: 64px 16px; }
+  .qb-lede { font-size: 16px; }
+  .qb-flows { grid-template-columns: 1fr; }
+  .qb-steps { grid-template-columns: 1fr; gap: 18px; }
+  .qb-fears { grid-template-columns: 1fr; }
+  .qb-why-grid { grid-template-columns: 1fr; gap: 20px; }
+  .qb-price-cards { grid-template-columns: 1fr; }
+}

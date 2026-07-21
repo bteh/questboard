@@ -964,6 +964,100 @@ class HostedWorkspaceApiTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         self.assertEqual(captured["roles"], ["Manager (Lead), Data & Analytics Platform Engineering"])
 
+    def test_search_run_normalizes_rank_comma_domain_and_stops_at_department(self) -> None:
+        # Brian's real resume fragmented one word per line: the title is
+        # "Manager, Data Engineering" and "Data Platform" is the team below it.
+        # The role must read "Data Engineering Manager" (comma swap), and the
+        # repeated leading "Data" must stop the title before the department.
+        headers = self._auth_headers()
+        self.client.get("/api/v1/me", headers=headers)
+        pdf_bytes = b"%PDF-1.4\nmock pdf payload"
+        resume_text = "\n".join([
+            "BRIAN", "TEH", "WORK", "EXPERIENCE", "B", "ILL", "Remote",
+            "Manager ,", "Data", "Engineering", "Data", "Platform",
+            "December", "2025", "–", "June", "2026",
+        ])
+
+        with patch("job_finder.tools.resume_parser_tool.parse_resume", return_value=resume_text), patch(
+            "app.services.resume_analyzer.analyze_resume",
+            return_value={
+                "suggested_target_roles": [],
+                "suggested_keywords": [],
+                "current_title": "",
+                "seniority": "senior",
+            },
+        ):
+            upload = self.client.post(
+                "/api/v1/onboarding/resume",
+                headers=headers,
+                files={"file": ("resume.pdf", pdf_bytes, "application/pdf")},
+            )
+        self.assertEqual(upload.status_code, 200, upload.text)
+
+        captured: dict[str, object] = {}
+
+        def fake_start_run(**kwargs):
+            captured.update(kwargs)
+            return SimpleNamespace(
+                run_id="run-rank-comma-domain",
+                status="pending",
+                started_at=None,
+                completed_at=None,
+            )
+
+        with patch("app.services.pipeline_service.start_run", side_effect=fake_start_run):
+            response = self.client.post(
+                "/api/v1/search/run",
+                headers=headers,
+                json={
+                    "roles": [],
+                    "locations": [],
+                    "keywords": [],
+                    "companies": [],
+                    "include_remote": True,
+                    "workplace_preference": "remote_friendly",
+                    "max_days_old": 14,
+                    "use_ai": False,
+                    "profile": "default",
+                    "mode": "search_score",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(captured["roles"], ["Data Engineering Manager"])
+
+    def test_derive_does_not_fabricate_employer_into_role(self) -> None:
+        # "Manager, Netflix" is rank-then-employer, not rank-then-domain. The
+        # derived role must never become "Netflix Manager" (or carry "Netflix"
+        # at all); with no real title it should stay empty, not fabricate one.
+        headers = self._auth_headers()
+        me = self.client.get("/api/v1/me", headers=headers).json()
+        workspace_id = me["workspace"]["id"]
+        pdf_bytes = b"%PDF-1.4\nmock pdf payload"
+        resume_text = "\n".join([
+            "JANE", "DOE", "WORK", "EXPERIENCE",
+            "Manager,", "Netflix", "March", "2021", "Present",
+        ])
+
+        with patch("job_finder.tools.resume_parser_tool.parse_resume", return_value=resume_text), patch(
+            "app.services.resume_analyzer.analyze_resume",
+            return_value={"suggested_target_roles": [], "suggested_keywords": [], "current_title": "", "seniority": "senior"},
+        ):
+            upload = self.client.post(
+                "/api/v1/onboarding/resume",
+                headers=headers,
+                files={"file": ("resume.pdf", pdf_bytes, "application/pdf")},
+            )
+        self.assertEqual(upload.status_code, 200, upload.text)
+
+        db = self._get_db()
+        prefs = self.workspace_service.get_workspace_preferences(db, workspace_id).model_copy(
+            update={"current_title": "", "roles": [], "keywords": []},
+        )
+        roles, _keywords = self.workspace_service.derive_search_terms_from_resume(db, workspace_id, prefs)
+        joined = " ".join(roles).lower()
+        self.assertNotIn("netflix", joined, f"employer leaked into role: {roles}")
+
     def test_hosted_search_run_reports_queued_state_before_worker_claim(self) -> None:
         headers = self._auth_headers()
         self.client.get("/api/v1/me", headers=headers)

@@ -123,6 +123,29 @@ def get_career_preferences() -> dict[str, Any]:
         return local_agent_service.career_preferences(db)
 
 
+@mcp.tool(annotations=WRITE, structured_output=True)
+def set_career_preferences(
+    roles: list[str] | None = None,
+    keywords: list[str] | None = None,
+) -> dict[str, Any]:
+    """Save the user's target roles and keywords locally; this is the intent
+    that decides which career candidates search_work retrieves.
+
+    Read the resume (read_resume_for_matching) and agree the list with the
+    user before saving. Pass the full desired list for each field; omit a
+    field to leave it unchanged. Other saved preferences are untouched. Local
+    only; never contacts anything external.
+    """
+
+    with _database_session() as db:
+        return _tool_error(
+            local_agent_service.set_career_preferences,
+            db,
+            roles=roles,
+            keywords=keywords,
+        )
+
+
 @mcp.tool(annotations=RESUME_PII, structured_output=True)
 def read_resume_for_matching() -> dict[str, Any]:
     """Return the local resume (PII) only after a human granted consent.

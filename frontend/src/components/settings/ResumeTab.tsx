@@ -44,6 +44,12 @@ export function ResumeTab({ onboarding, navigate }: ResumeTabProps) {
           toast.success('Resume uploaded and analyzed');
         } else if (normalized.analysisStatus === 'analysis_error') {
           toast.warning('Resume saved. The AI step didn’t finish, so no skills yet. Try again in a moment.');
+        } else if (normalized.analysisStatus === 'skipped_no_llm') {
+          toast.success(
+            normalized.derivedRoles.length > 0
+              ? `Resume saved. Set ${normalized.derivedRoles.length} target roles from it.`
+              : 'Resume saved. Add your target roles to start finding work.',
+          );
         } else if (normalized.analysisStatus === 'failed') {
           toast.warning('Resume saved, but we couldn’t read any text from it');
         } else {
@@ -138,10 +144,10 @@ export function ResumeTab({ onboarding, navigate }: ResumeTabProps) {
               lastUpload.analysisStatus === 'skipped_no_llm' ? (
                 <button
                   type="button"
-                  onClick={() => navigate({ to: '/settings', search: { tab: 'ai' } })}
+                  onClick={() => navigate({ to: '/settings', search: { tab: 'restock' } })}
                   className="font-medium underline underline-offset-2"
                 >
-                  Connect an AI provider
+                  {lastUpload.derivedRoles.length > 0 ? 'Review your roles' : 'Add your target roles'}
                 </button>
               ) : lastUpload.analysisStatus === 'analysis_error' ? (
                 <button

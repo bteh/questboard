@@ -65,10 +65,11 @@ export function SearchPrefsTab({ onboarding, navigate }: SearchPrefsTabProps) {
       <CardContent className="space-y-5">
         <div className="space-y-1.5">
           <Label>Target roles</Label>
+          <p className="text-xs text-text-muted">The kind of work you want. This is what the board matches jobs against.</p>
           <TagListInput
             value={prefsForm.roles}
             onChange={(roles) => setPrefsForm((prev) => ({ ...prev, roles }))}
-            placeholder="e.g. Senior Engineer — press Enter to add"
+            placeholder="e.g. Data Engineering Manager, then press Enter"
           />
         </div>
 
@@ -77,7 +78,7 @@ export function SearchPrefsTab({ onboarding, navigate }: SearchPrefsTabProps) {
           <TagListInput
             value={prefsForm.keywords}
             onChange={(keywords) => setPrefsForm((prev) => ({ ...prev, keywords }))}
-            placeholder="e.g. Kubernetes — press Enter to add"
+            placeholder="e.g. Kubernetes, then press Enter"
           />
         </div>
 
@@ -90,7 +91,7 @@ export function SearchPrefsTab({ onboarding, navigate }: SearchPrefsTabProps) {
           <TagListInput
             value={prefsForm.companies}
             onChange={(companies) => setPrefsForm((prev) => ({ ...prev, companies }))}
-            placeholder="e.g. Stripe — press Enter to add"
+            placeholder="e.g. Stripe, then press Enter"
           />
         </div>
       </CardContent>
@@ -198,10 +199,10 @@ export function SearchPrefsTab({ onboarding, navigate }: SearchPrefsTabProps) {
             {(['loose', 'balanced', 'strict'] as const).map((value) => {
               const selected = prefsForm.match_strictness === value;
               const hint = value === 'loose'
-                ? 'Wider net — more results, looser matches'
+                ? 'Wider net, more results, looser matches'
                 : value === 'balanced'
-                  ? 'Default behavior — matches most users'
-                  : 'Tight matches only — fewer, more relevant results';
+                  ? 'Default behavior, matches most users'
+                  : 'Tight matches only, fewer and more relevant';
               return (
                 <button
                   key={value}
@@ -343,7 +344,7 @@ export function SearchPrefsTab({ onboarding, navigate }: SearchPrefsTabProps) {
                     }))}
                   />
                 </div>
-                <p className="text-xs text-text-muted">If set, jobs below this are completely hidden — stricter than minimum salary.</p>
+                <p className="text-xs text-text-muted">If set, jobs below this are completely hidden. Stricter than minimum salary.</p>
               </div>
 
               <div className="space-y-3">

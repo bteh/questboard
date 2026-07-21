@@ -1,25 +1,29 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { useNavigate } from '@tanstack/react-router';
-import { Chip, KindStamp, Poster, SageButton } from '@questboard/ui';
+import { Chip, KindStamp, Poster } from '@questboard/ui';
 import { KINDS } from '@questboard/kinds';
-import { useApplications, useUpdateStatus } from '@/hooks/use-applications';
-import { useBoardSummary } from '@/hooks/use-board-summary';
-import { useSourceLabels, resolveSourceLabel } from '@/hooks/use-scrapers';
-import { CLIP_STATUS, shortDate } from '@/utils/board-card';
-import { isCareerKind, kindParams, questTotal } from '@/features/board/kind-params';
+import { resolveSourceLabel } from '@/hooks/use-scrapers';
+import { shortDate } from '@/utils/board-card';
 import { toPoster } from '@/features/board/poster-model';
-import { hasEntered } from '@/lib/entry';
 import { World } from './world';
-import { handleEnter, pickLandingCards, plainWords } from './landing-logic';
-import type { ApplicationFilters, ApplicationResponse } from '@/types/application';
+import { plainWords } from './landing-logic';
+import { DownloadOrNotify } from './download-cta';
+import {
+  SNAPSHOT_AS_OF,
+  SNAPSHOT_CAREER,
+  SNAPSHOT_HERO,
+  SNAPSHOT_SOURCE_LABELS,
+  SNAPSHOT_TOTALS,
+} from './snapshot';
+import type { ApplicationResponse } from '@/types/application';
 import './landing.css';
 
-/* The front page: the felt board floats as a window over a coded dawn
-   field, and the product performs itself (a poster clips, the explain
-   sheet answers) on a gentle loop. The posters inside the window are the
-   real @questboard/ui Poster fed real board rows through the same
-   poster-model the board route uses, and the demo text is built from
-   those rows, so nothing here is a hardcoded fake that can drift. */
+/* The public front door for Questboard for Mac. It tells the story and
+   points at the download; the app does the work. Path A runs locally, so
+   this page ships with no backend: the felt-board window and the counters
+   are fed by a FROZEN snapshot of real board rows (see snapshot.ts), never
+   live hooks that a stranger's browser can't reach. The posters are the
+   real @questboard/ui Poster through the same poster-model the board route
+   uses, so design changes reflect here and nothing is a hardcoded fake. */
 
 function BrandMark() {
   return (
@@ -34,20 +38,30 @@ function BrandMark() {
         </svg>
       </span>
       <b>Questboard</b>
+      <nav className="qb-land-nav">
+        <a href="#how">How it works</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#get">Get it</a>
+      </nav>
     </div>
   );
 }
 
-/* One real poster through the board's own model; Clip writes through the
-   real status mutation. The fit line renders as plain text here: the
-   requirement sheet it opens lives in the app, not on the front page. */
-function LandingPoster({ app, labels }: { app: ApplicationResponse; labels: Record<string, string> }) {
-  const updateStatus = useUpdateStatus();
+/* One real snapshot poster through the board's own model. On this page the
+   Clip control has no local board to write to, so it nudges toward the
+   download instead of a dead mutation. The fit line never shows here: no
+   resume has been compared, so a "covers N of M" claim would be invented. */
+function SnapshotPoster({
+  app,
+  labels,
+  onClip,
+}: {
+  app: ApplicationResponse;
+  labels: Record<string, string>;
+  onClip?: () => void;
+}) {
   const poster = toPoster(app, resolveSourceLabel(app.source, labels));
   const { card } = poster;
-  const bring = poster.hasFit
-    ? `a resume. this one covers ${card.fit!.strong} of the ${card.fit!.total} things they ask for`
-    : poster.copy.bring;
   return (
     <Poster
       kind={poster.kind}
@@ -55,8 +69,8 @@ function LandingPoster({ app, labels }: { app: ApplicationResponse; labels: Reco
       href={card.href}
       giver={card.meta}
       desc={poster.desc}
-      bring={bring}
-      bringFree={poster.copy.bringFree && !poster.hasFit}
+      bring={poster.copy.bring}
+      bringFree={poster.copy.bringFree}
       catchLine={poster.copy.catchLine}
       tags={poster.tags}
       pay={card.pay}
@@ -64,31 +78,10 @@ function LandingPoster({ app, labels }: { app: ApplicationResponse; labels: Reco
       applied={card.applied}
       clippedDate={card.clippedDate}
       rotateDeg={poster.rotateDeg}
-      onClip={() => updateStatus.mutate({ id: app.id, data: { status: CLIP_STATUS } })}
+      giverLogoUrl={poster.logoUrl}
+      logoWell={poster.logoWell}
+      onClip={onClip}
     />
-  );
-}
-
-/* A window-chrome chip whose count is the query's true total. */
-function ChromeChip({ label, filters }: { label: string; filters: Partial<ApplicationFilters> }) {
-  const { data } = useApplications({ ...filters, page: 1, page_size: 1, scope: 'board' });
-  return <Chip label={label} count={data?.total} dim={data !== undefined && data.total < 3} />;
-}
-
-/* The busiest kinds, counted by the same summary the board rail reads. The
-   front page sells side-questing, so the Jobs lane stays out of the chips. */
-function ChromeKindChips() {
-  const { data } = useBoardSummary();
-  const top = [...(data?.kinds ?? [])]
-    .filter((k) => !isCareerKind(k.id))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 3);
-  return (
-    <>
-      {top.map((k) => (
-        <Chip key={k.id} label={k.label.toLowerCase()} count={k.count} dim={k.count < 3} />
-      ))}
-    </>
   );
 }
 
@@ -109,40 +102,19 @@ function OdoGroup({ value, label }: { value: number; label: string }) {
   );
 }
 
+const scrollToGet = () =>
+  document.getElementById('get')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
 export function LandingPage() {
-  const navigate = useNavigate();
-  const labels = useSourceLabels();
-  const entered = hasEntered();
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    document.title = 'Questboard, one board for every side quest';
+    document.title = 'Questboard for Mac, one board for real work and paid side quests';
   }, []);
 
-  /* the same summary the board rail reads, so both surfaces say one number.
-     side-quests only, matching the default board: the front page sells
-     quests, so job postings never pad the count */
-  const summary = useBoardSummary().data;
-  const boardTotal = summary ? questTotal(summary.kinds) : undefined;
-  const pay500Total = useApplications({
-    ...kindParams('all'),
-    salary_min: 500,
-    page: 1,
-    page_size: 1,
-    scope: 'board',
-  }).data?.total;
-
-  /* one board page of the newest rows: enough spread for mixed kinds */
-  const newest = useApplications({
-    ...kindParams('all'),
-    sort_by: 'date_found',
-    sort_order: 'desc',
-    page: 1,
-    page_size: 24,
-    scope: 'board',
-  });
-  const items = newest.data?.items ?? [];
-  const pinned = pickLandingCards(items);
+  const labels = SNAPSHOT_SOURCE_LABELS;
+  /* exactly three real side-quest rows, in a fixed order (no live query) */
+  const pinned = SNAPSHOT_HERO;
 
   /* the explain-sheet script, built from the real pinned rows so it can
      never say something the cards do not. one entry per card, in order. */
@@ -155,15 +127,12 @@ export function LandingPage() {
     [pinned, labels],
   );
 
-  const enter = () => handleEnter(navigate);
-  const ctaLabel = entered ? 'Back to the board' : 'Open the board';
-
-  /* ---- motion + demo choreography, once the pinned cards exist ---- */
+  /* ---- motion + demo choreography (unchanged from the live board hero) ---- */
   const explainsRef = useRef(explains);
   useEffect(() => {
     explainsRef.current = explains;
   }, [explains]);
-  const ready = pinned.length > 0 && boardTotal !== undefined;
+  const ready = pinned.length > 0;
 
   useEffect(() => {
     if (!ready) return;
@@ -385,8 +354,6 @@ export function LandingPage() {
       ghost.style.transform = `translate(${Math.round(x)}px,${Math.round(y)}px)`;
       void ghost.offsetWidth;
     };
-    /* the poster's real Clip control, in board-body coordinates; the demo
-       presses exactly where a user would */
     const clipRect = (idx: number) => {
       const slot = slots[idx];
       if (!body || !slot) return null;
@@ -458,7 +425,6 @@ export function LandingPage() {
       const ex = list[exIdx % list.length];
       let t = 0;
 
-      /* phase 1: the ghost clips the first poster, the postmark presses */
       after((t += 150), () => {
         if (!body) return;
         ghostJump(body.offsetWidth - 30, -16);
@@ -475,7 +441,6 @@ export function LandingPage() {
         ring?.classList.add('stamped');
       });
 
-      /* phase 2: the explain sheet slides up over a card and types */
       after((t += 1450), () => {
         if (!body || !slots[ex.card]) return;
         const p = offsetIn(slots[ex.card], body);
@@ -491,7 +456,6 @@ export function LandingPage() {
       after((t += 420), () => typeText(ex.text));
       const typeMs = Math.ceil(ex.text.length / 2) * 28 + 200;
 
-      /* phase 3: the sheet holds, then closes and the loop advances */
       after((t += typeMs + 250), () => {
         sheet?.style.setProperty('--holdms', '3000ms');
         sheet?.classList.add('hold');
@@ -586,35 +550,45 @@ export function LandingPage() {
       <World />
 
       <div className="qb-land-page">
+        {/* ============================ HERO ============================ */}
         <div className="qb-land-hero" data-hero>
           <div className="qb-lwrap">
             <BrandMark />
-            <h1>start side questing.</h1>
-            <p className="qb-lsub">Real quests that actually pay, pulled live from real sources.</p>
+            <p className="qb-eyebrow">A desktop app for Mac</p>
+            <h1>Find real work and paid side quests.</h1>
+            <p className="qb-lsub">
+              A radar that runs on your Mac. It finds fresh opportunities, filters them hard, and
+              keeps a link straight to the source. When you want a read on one, the AI you already
+              use does the thinking. No account, and no AI bill from us.
+            </p>
             <div className="qb-land-cta">
-              <SageButton big onClick={enter}>
-                {ctaLabel}
-              </SageButton>
-              <span className="qb-lnote">Free. Your log lives in your browser.</span>
+              <DownloadOrNotify big />
+              <a className="qb-lsecondary" href="#how">
+                See how it works
+              </a>
             </div>
+            <p className="qb-ltrust">No account. Nothing leaves your Mac unless you say so.</p>
           </div>
 
           <div className="qb-winpersp">
             <div className="qb-board-window" data-board-window>
               <div className="qb-win-chrome">
-                <span className="qb-win-title">The board</span>
+                <span className="qb-win-dots" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                </span>
+                <span className="qb-win-title">Questboard</span>
                 <div className="qb-win-chips">
-                  <ChromeKindChips />
-                  <ChromeChip
-                    label="$500 or more"
-                    filters={{ ...kindParams('all'), salary_min: 500 }}
-                  />
+                  <Chip label="tell them what you think" />
+                  <Chip label="join a study" />
+                  <Chip label="look after" />
                 </div>
               </div>
               <div className="qb-board-body" data-board-body>
                 {pinned.map((app) => (
                   <div key={app.id} className="qb-land-slot">
-                    <LandingPoster app={app} labels={labels} />
+                    <SnapshotPoster app={app} labels={labels} onClip={scrollToGet} />
                   </div>
                 ))}
                 <span className="qb-demo-ring" data-ring aria-hidden="true" />
@@ -643,10 +617,153 @@ export function LandingPage() {
           </div>
         </div>
 
-        <div className="qb-scene qb-scene-ledger" data-reveal>
-          <p className="qb-scap">The log counts only what paid.</p>
+        {/* ========================= TRUST STRIP ========================= */}
+        <div className="qb-lwrap">
+          <div className="qb-trust-strip" data-reveal>
+            <div className="qb-trust-item qb-scene-obj">
+              <b>Runs on your Mac</b>
+              <span>A desktop app, not a website. Your board and your log live locally.</span>
+            </div>
+            <div className="qb-trust-item qb-scene-obj">
+              <b>Bring your own AI</b>
+              <span>Connect Claude or Codex for the reading help. Or use none and still find work.</span>
+            </div>
+            <div className="qb-trust-item qb-scene-obj">
+              <b>We never charge for AI</b>
+              <span>The reading runs on your own plan. We never see your key or your resume.</span>
+            </div>
+            <div className="qb-trust-item qb-scene-obj">
+              <b>Real, or it isn’t here</b>
+              <span>Stated pay, true source, honest freshness. Unknowns stay unknown.</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ========================= WHAT IT IS ========================= */}
+        <div className="qb-scene qb-scene-lede" data-reveal>
+          <p className="qb-scap">One board for every way to earn on the side.</p>
+          <p className="qb-lede qb-scene-obj">
+            Questboard watches the places real opportunities show up. Job boards, focus-group panels,
+            casting calls, study registries, sitting marketplaces, grant calls. It pulls the fresh
+            ones onto one board, checks the hard facts (still live, where it applies, what it pays),
+            and keeps a link straight back to the source. It runs on your machine, and your data
+            stays there.
+          </p>
+        </div>
+
+        {/* ======================= TWO WORKFLOWS ======================= */}
+        <div className="qb-scene qb-scene-flows qb-scene-stamps" data-reveal>
+          <p className="qb-scap">Two ways in. One board.</p>
+          <div className="qb-flows">
+            <div className="qb-flow-col qb-scene-obj">
+              <div className="qb-flow-copy">
+                <h3>Find Work</h3>
+                <p>
+                  Career openings, pulled fresh and filtered by what actually rules you in or out:
+                  location, remote scope, work authorization, pay, seniority. For a fit read, your
+                  own AI compares the posting to your resume, point by point. We never upload the
+                  resume, and we never charge for the AI.
+                </p>
+              </div>
+              <div className="qb-flow-poster">
+                <SnapshotPoster app={SNAPSHOT_CAREER} labels={labels} onClip={scrollToGet} />
+              </div>
+            </div>
+            <div className="qb-flow-col qb-scene-obj">
+              <div className="qb-flow-copy">
+                <h3>Side Quests</h3>
+                <p>
+                  Paid studies, focus groups, casting calls, sitting gigs, grants, bank bonuses, and
+                  more. No resume needed. Each one shows the pay it stated and links straight to
+                  where you take it.
+                </p>
+              </div>
+              <div className="qb-flow-poster">
+                <SnapshotPoster app={pinned[0]} labels={labels} onClip={scrollToGet} />
+              </div>
+            </div>
+          </div>
+          <div className="qb-stamp-card qb-on-field qb-scene-obj">
+            {KINDS.map((k, i) => (
+              <div key={k.id} className="qb-st" style={{ ['--sd' as string]: `${0.15 + i * 0.05}s` }}>
+                <KindStamp kind={k.id} size={44} />
+                <span className="qb-lab">{k.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ==================== CONNECT YOUR AGENT ==================== */}
+        <div className="qb-scene qb-scene-how" id="how" data-reveal>
+          <p className="qb-scap">The board does the finding. The AI is optional.</p>
+          <div className="qb-steps qb-scene-obj">
+            <div className="qb-step">
+              <span className="qb-step-n">1</span>
+              <div>
+                <b>Download and open it.</b>
+                <p>It’s a Mac app. No account, no setup wizard to fight through.</p>
+              </div>
+            </div>
+            <div className="qb-step">
+              <span className="qb-step-n">2</span>
+              <div>
+                <b>Restock the board.</b>
+                <p>Questboard pulls fresh opportunities from real sources and filters them for you.</p>
+              </div>
+            </div>
+            <div className="qb-step">
+              <span className="qb-step-n">3</span>
+              <div>
+                <b>Connect an assistant, if you want the reading help.</b>
+                <p>
+                  Link an app you may already use (Claude, Codex, or Cursor). It reads postings with
+                  you, checks them against your resume when you ask, and drafts notes. We never charge
+                  for it and never see your key.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="qb-fears qb-scene-obj">
+            <div className="qb-fear">
+              <b>Do I need to be a programmer?</b>
+              <p>No. It’s a Mac app you download. Connecting an assistant is a one-time step with a guided setup.</p>
+            </div>
+            <div className="qb-fear">
+              <b>Do I need to pay for AI?</b>
+              <p>Not to us. The core board needs no AI at all. The optional reading help runs on whatever AI plan you already have.</p>
+            </div>
+          </div>
+          <p className="qb-fine qb-scene-obj">
+            It connects over MCP, the standard way those apps plug into local tools.
+          </p>
+        </div>
+
+        {/* =============== WHY NOT JUST A JOB BOARD =============== */}
+        <div className="qb-scene qb-scene-why qb-scene-ledger" data-reveal>
+          <p className="qb-scap">Not another job board.</p>
+          <div className="qb-why-grid qb-scene-obj">
+            <div className="qb-why">
+              <b>Fresh, and it says so</b>
+              <p>Every listing carries when it was first seen and where it came from. Stale and dead links get caught, not buried.</p>
+            </div>
+            <div className="qb-why">
+              <b>Eligibility is a fact, not a guess</b>
+              <p>Remote country scope, local rules, dates, and stated pay are real fields. Unknowns stay unknown.</p>
+            </div>
+            <div className="qb-why">
+              <b>Receipts, not aggregation</b>
+              <p>Every result links straight to the source. Direct application links win when we can resolve them.</p>
+            </div>
+            <div className="qb-why">
+              <b>It remembers what paid</b>
+              <p>Clip, apply, complete, get paid. Your log counts the money that actually landed.</p>
+            </div>
+          </div>
+
           <div className="qb-ledger-card qb-on-field qb-scene-obj">
-            <div className="qb-done-label">Done</div>
+            <div className="qb-done-label">
+              Done <span className="qb-done-eg">an example log</span>
+            </div>
             <div className="qb-dline">
               <span className="qb-dd">Jul 3</span>
               <span className="qb-dt">Prolific study batch paid out.</span>
@@ -660,7 +777,7 @@ export function LandingPage() {
             <div className="qb-dline">
               <span className="qb-dd">Mar 4</span>
               <span className="qb-dt">Ran the 10k.</span>
-              <span className="qb-dn">Helped by your sister.</span>
+              <span className="qb-dn">Just for the medal.</span>
             </div>
             <div className="qb-ledger-total">
               <span className="qb-total-text">
@@ -669,35 +786,99 @@ export function LandingPage() {
               </span>
             </div>
           </div>
+          <p className="qb-odo-asof qb-scene-obj">
+            An example. Your log fills in on your Mac as you get paid.
+          </p>
         </div>
 
-        {boardTotal !== undefined && pay500Total !== undefined && (
-          <div className="qb-scene" data-reveal data-odo>
-            <p className="qb-scap">Real quests, counted live.</p>
-            <div className="qb-odo-card qb-on-field qb-scene-obj">
-              <OdoGroup value={boardTotal} label="on the board right now" />
-              <OdoGroup value={pay500Total} label="pay $500 or more" />
+        {/* ==================== COUNTS (snapshot) ==================== */}
+        <div className="qb-scene" data-reveal data-odo>
+          <p className="qb-scap">What the radar had found by then.</p>
+          <div className="qb-odo-card qb-on-field qb-scene-obj">
+            <OdoGroup value={SNAPSHOT_TOTALS.quests} label="quests on the board" />
+            <OdoGroup value={SNAPSHOT_TOTALS.addedToday} label="added that day" />
+          </div>
+          <p className="qb-odo-asof qb-scene-obj">
+            A snapshot from {SNAPSHOT_AS_OF}. The app refreshes this on your machine.
+          </p>
+        </div>
+
+        {/* ========================= PRICING ========================= */}
+        <div className="qb-scene qb-scene-price" id="pricing" data-reveal>
+          <p className="qb-scap">Free to do the work. A one-time pass for the extras.</p>
+          <div className="qb-price-cards qb-scene-obj">
+            <div className="qb-price-card">
+              <div className="qb-price-head">
+                <h3>Free</h3>
+                <span className="qb-price-tag">forever</span>
+              </div>
+              <p className="qb-price-sub">Everything that finds and tracks the work.</p>
+              <ul className="qb-price-list">
+                <li>Source discovery, hard filters, and dedup</li>
+                <li>Freshness receipts and direct source links</li>
+                <li>Your local board, log, and workflow history</li>
+                <li>Connect your own AI assistant</li>
+                <li>A signed Mac app that installs clean</li>
+              </ul>
+            </div>
+            <div className="qb-price-card qb-price-pro">
+              <div className="qb-price-head">
+                <h3>Pro</h3>
+                <span className="qb-price-tag">one-time pass</span>
+              </div>
+              <p className="qb-price-sub">Pays for convenience, never for access.</p>
+              <ul className="qb-price-list">
+                <li>Automatic updates</li>
+                <li>Premium source packs</li>
+                <li>Standing watches with digests</li>
+                <li>A one-time pass, never a subscription</li>
+              </ul>
             </div>
           </div>
-        )}
-
-        <div className="qb-scene qb-scene-stamps" data-reveal>
-          <p className="qb-scap">One board, every kind of quest.</p>
-          <div className="qb-stamp-card qb-on-field qb-scene-obj">
-            {KINDS.map((k, i) => (
-              <div key={k.id} className="qb-st" style={{ ['--sd' as string]: `${0.15 + i * 0.07}s` }}>
-                <KindStamp kind={k.id} size={48} />
-                <span className="qb-lab">{k.label}</span>
-              </div>
-            ))}
-          </div>
+          <p className="qb-price-oath qb-scene-obj">
+            No ads. No employer money. No AI credits. And never a paywall before your first useful search.
+          </p>
         </div>
 
-        <div className="qb-land-foot">
-          <p className="qb-fnote">New quests land every day. Every listing links straight to the source.</p>
-          <SageButton big onClick={enter}>
-            {ctaLabel}
-          </SageButton>
+        {/* ========================= GET IT ========================= */}
+        <div className="qb-land-foot" id="get">
+          <p className="qb-scap">Get the radar on your Mac.</p>
+          <DownloadOrNotify big />
+        </div>
+
+        {/* ========================= FAQ ========================= */}
+        <div className="qb-scene qb-scene-faq" data-reveal>
+          <div className="qb-faq qb-scene-obj">
+            <div className="qb-faq-q">
+              <b>Which Macs?</b>
+              <p>Apple Silicon and Intel, on recent macOS. The build is universal.</p>
+            </div>
+            <div className="qb-faq-q">
+              <b>Which AI assistants?</b>
+              <p>Any MCP client. Claude and Codex are the ones I test first. The board also works with none.</p>
+            </div>
+            <div className="qb-faq-q">
+              <b>Do I pay for AI?</b>
+              <p>Not to us. The board needs no AI. The optional reading help runs on your own AI plan.</p>
+            </div>
+            <div className="qb-faq-q">
+              <b>Does my resume leave my Mac?</b>
+              <p>
+                Questboard never uploads it and never sees it. It stays in a local file and is read
+                only when you ask. If your assistant is a cloud app like Claude or Codex, it reads
+                the resume under your own account there, the same as anything you paste in yourself.
+              </p>
+            </div>
+            <div className="qb-faq-q">
+              <b>Where does my data live?</b>
+              <p>On your Mac, in a local file. There’s no cloud account.</p>
+            </div>
+            <div className="qb-faq-q">
+              <b>Windows or Linux?</b>
+              <p>Mac first, others later. Leave your email and I’ll tell you when.</p>
+            </div>
+          </div>
+          <p className="qb-fnote">Every listing links straight to the source. New ones land every day.</p>
         </div>
       </div>
     </div>

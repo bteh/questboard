@@ -31,6 +31,7 @@ Questboard does not sign into ChatGPT or Claude on the user's behalf. It also do
 Saved career preferences and resume access are separate MCP tools:
 
 - `get_career_preferences` returns roles, locations, workplace choices, compensation constraints, and resume metadata without resume text.
+- `set_career_preferences` saves target roles and keywords to the local workspace so the agent can turn a resume it just read into the intent `search_work` retrieves on, without Questboard calling a model. Local write only.
 - `read_resume_for_matching` returns the parsed local resume only after the user authorizes resume matching.
 
 The resume stays in the local Questboard database at rest. When an agent calls the resume tool, the connected model provider may receive that text as tool context. This is a direct user-to-provider disclosure, not a Questboard upload. The agent workflow must ask first and the UI must explain this boundary.

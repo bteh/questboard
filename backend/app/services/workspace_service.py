@@ -90,6 +90,10 @@ _DATE_TOKENS = {
     "may", "june", "jun", "july", "jul", "august", "aug", "september", "sep",
     "october", "oct", "november", "nov", "december", "dec", "present",
 }
+# Month tokens that are also ordinary English words. Excluded from the
+# last-resort title anchor so prose like "...who may lead marketing teams"
+# doesn't read as a date that a job title must precede.
+_AMBIGUOUS_MONTH_WORDS = {"may", "march", "mar"}
 _RESUME_STOP_TOKENS = {
     "work", "experience", "summary", "skills", "projects", "education",
     "linkedin", "phone", "email", "remote", "hybrid", "onsite", "on-site",
@@ -1128,12 +1132,37 @@ def save_workspace_resume(
     # No text read from the file → "failed" (scanned PDFs still surface
     # parse_code="SCANNED_PDF" below via the `scanned` check).
     analysis_status = "failed"
+    derived_roles: list[str] = []
+    derived_keywords: list[str] = []
     if extracted_text:
         # Flush the new hash/text first so the cache key is the uploaded file.
         # Suggestions are returned for editing and are not preferences until
         # the user explicitly saves the onboarding form.
         db.flush()
         analysis, analysis_status, _cached = get_or_create_resume_analysis(db, workspace_id)
+        # No usable AI analysis (the MCP-only case, or an AI error) would leave
+        # the board with no target roles. Fall back to the LOCAL, no-AI
+        # extractor so Find Work has intent right after upload, without the
+        # person typing roles or connecting an assistant. Only fill in when
+        # they have not set roles themselves, so a re-upload never clobbers a
+        # real choice; a connected assistant can still refine these later.
+        if analysis_status != "completed":
+            current_prefs = get_workspace_preferences(db, workspace_id)
+            if not current_prefs.roles:
+                derived_roles, derived_keywords = derive_search_terms_from_resume(
+                    db, workspace_id, current_prefs
+                )
+                if derived_roles or derived_keywords:
+                    save_workspace_preferences(
+                        db,
+                        workspace_id,
+                        current_prefs.model_copy(
+                            update={
+                                "roles": derived_roles or current_prefs.roles,
+                                "keywords": derived_keywords or current_prefs.keywords,
+                            }
+                        ),
+                    )
 
     db.commit()
     try:
@@ -1146,6 +1175,8 @@ def save_workspace_resume(
         analysis=analysis,
         parse_code="SCANNED_PDF" if scanned else None,
         analysis_status=analysis_status,
+        derived_roles=derived_roles,
+        derived_keywords=derived_keywords,
     )
 
 
@@ -1214,7 +1245,83 @@ def derive_search_terms_from_resume(
             return False
         if any(token in lowered for token in ("work experience", "professional summary", "curriculum vitae")):
             return False
+        # Reject a bare rank fragment like "Manager ," — a real title carries a
+        # domain word too, so let the fragment reconstruction rebuild it.
+        words = re.findall(r"[A-Za-z][A-Za-z&/+-]*", value)
+        if words and all(word.lower() in _SENIORITY_HEADS for word in words):
+            return False
         return True
+
+    _SENIORITY_HEADS = (
+        "manager", "director", "lead", "head", "principal", "architect",
+        "engineer", "analyst", "scientist", "designer", "developer",
+        "specialist", "consultant", "officer", "administrator",
+    )
+
+    def _normalize_role(title: str) -> str:
+        """Turn "Manager, Data Engineering" into "Data Engineering Manager" and
+        trim anything after a divider, so the role reads like a job title.
+
+        Only swap when the comma-tail is a domain (carries a title keyword like
+        "engineering"). "Senior Engineer, Google" has an employer after the
+        comma, not a domain, so drop the tail and keep the rank rather than
+        producing "Google Senior Engineer". (A tail that keeps a trailing
+        employer token, e.g. "Data Engineering Google", is a rarer fragmented-
+        PDF case we don't try to strip — no reliable company signal without a
+        dictionary, and the connected agent or a manual edit corrects it.)"""
+        title = re.sub(r"\s+", " ", title).strip(" ,-–—|")
+        head, sep, tail = title.partition(",")
+        head, tail = head.strip(), tail.strip()
+        if sep and tail and head.split() and head.split()[-1].lower() in _SENIORITY_HEADS:
+            if any(keyword in tail.lower() for keyword in _TITLE_KEYWORDS):
+                tail = re.split(r"\s[-–—|]\s|\s{2,}", tail)[0].strip()
+                title = f"{tail} {head}"
+            else:
+                title = head
+        else:
+            title = re.split(r"\s[-–—|]\s", title)[0].strip()
+        return title[:120]
+
+    def _reconstruct_fragmented_title(compact: list[str]) -> str:
+        """Some PDFs break a title across per-token lines ("Manager ," / "Data"
+        / "Engineering"). Rejoin the seniority line with the short domain
+        fragments that follow it."""
+        start = 0
+        for idx, line in enumerate(compact):
+            if re.sub(r"[^a-z]", "", line.lower()) in (
+                "experience", "workexperience", "professionalexperience", "employment", "employmenthistory",
+            ):
+                start = idx + 1
+                break
+        for idx in range(start, min(start + 25, len(compact))):
+            line = compact[idx]
+            if len(line) > 45 or not any(h in line.lower() for h in _SENIORITY_HEADS):
+                continue
+            parts = [line]
+            seen_domain: set[str] = set()
+            for nxt in compact[idx + 1 : idx + 7]:
+                low = nxt.lower()
+                if not nxt or len(nxt) > 45 or nxt in ("-", "–", "—", "•", "·", "|"):
+                    break
+                first = re.split(r"[\s,]+", low)[0].strip(".,")
+                # A year, a month, or a section word ends the title.
+                if re.search(r"(19|20)\d{2}|present", low) or first in _DATE_TOKENS:
+                    break
+                if first in _RESUME_STOP_TOKENS:
+                    break
+                # A repeated leading word starts the next phrase (the team or
+                # department), e.g. "Manager, Data Engineering" then "Data
+                # Platform" — stop before the title runs into the department.
+                if first in seen_domain:
+                    break
+                seen_domain.add(first)
+                parts.append(nxt)
+                if any(divider in nxt for divider in ("-", "–", "—")):
+                    break
+            candidate = _normalize_role(" ".join(parts))
+            if len(candidate.split()) >= 2 and _looks_like_title(candidate):
+                return candidate
+        return ""
 
     def _extract_title_from_text(text: str) -> str:
         lines = [
@@ -1227,13 +1334,21 @@ def derive_search_terms_from_resume(
             if _looks_like_title(line):
                 return _clean_candidate(line)
 
+        reconstructed = _reconstruct_fragmented_title(compact_lines)
+        if reconstructed:
+            return reconstructed
+
         tokens = re.findall(r"\([A-Za-z][A-Za-z0-9&/().,+-]*|&|[A-Za-z][A-Za-z0-9&/().,+-]*", text)
         search_window = tokens[:180]
         date_idx = next(
             (
                 idx
                 for idx, token in enumerate(search_window)
-                if token.lower().strip(".,") in _DATE_TOKENS or re.fullmatch(r"(19|20)\d{2}", token)
+                if (
+                    token.lower().strip(".,") in _DATE_TOKENS
+                    and token.lower().strip(".,") not in _AMBIGUOUS_MONTH_WORDS
+                )
+                or re.fullmatch(r"(19|20)\d{2}", token)
             ),
             None,
         )
@@ -1255,7 +1370,9 @@ def derive_search_terms_from_resume(
             if len(collected) >= 10:
                 break
 
-        candidate = _clean_candidate(" ".join(reversed(collected)))
+        # Normalize so an employer that trails a comma ("Manager, Netflix") is
+        # dropped here too, not just in the reconstruction path.
+        candidate = _normalize_role(_clean_candidate(" ".join(reversed(collected))))
         return candidate if _looks_like_title(candidate) else ""
 
     # 1) Use roles and keywords already saved in preferences (from prior
@@ -1312,7 +1429,9 @@ def _extract_keywords_from_text(text: str) -> list[str]:
     matching multi-word and single-word patterns against a curated set.
     Returns up to 15 keywords ordered by appearance (earlier = more prominent).
     """
-    lowered = text.lower()
+    # Collapse whitespace so multi-word terms match even when a PDF split them
+    # across lines ("Data\nEngineering" -> "data engineering").
+    lowered = re.sub(r"\s+", " ", text).lower()
     found: list[str] = []
     seen: set[str] = set()
 

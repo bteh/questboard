@@ -19,6 +19,9 @@ export interface NormalizedResumeUpload {
   analysis: ResumeAnalysisSummary | null;
   parseWarning: string;
   message: string;
+  /** Target roles the local (no-AI) extractor pulled from the resume and
+   *  saved, when there was no AI analysis and no roles were set yet. */
+  derivedRoles: string[];
 }
 
 function stringList(value: unknown): string[] {
@@ -75,6 +78,7 @@ export function normalizeLegacyUpload(response: ResumeUploadResponse): Normalize
     analysis: normalizeAnalysisSummary(response.analysis),
     parseWarning: response.parse_status === 'error' ? response.message : '',
     message: response.message,
+    derivedRoles: [],
   };
 }
 
@@ -86,6 +90,7 @@ export function normalizeWorkspaceUpload(response: WorkspaceResumeUploadResponse
     analysis: normalizeAnalysisSummary(response.analysis),
     parseWarning: response.resume.parse_warning || '',
     message: response.message,
+    derivedRoles: stringList(response.derived_roles),
   };
 }
 
