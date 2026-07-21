@@ -3,6 +3,7 @@
    owns the page queries and hands the loaded rows in. */
 
 import type { ReactNode } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import { Poster } from '@questboard/ui';
 import { resolveSourceLabel } from '@/hooks/use-scrapers';
 import { useUpdateStatus } from '@/hooks/use-applications';
@@ -45,6 +46,7 @@ export function PosterWall({
   onOpenDetail,
 }: PosterWallProps) {
   const updateStatus = useUpdateStatus();
+  const navigate = useNavigate();
 
   function renderPoster(app: ApplicationResponse) {
     const poster = toPoster(app, resolveSourceLabel(app.source, labels));
@@ -95,6 +97,7 @@ export function PosterWall({
         payUnit={card.payUnit}
         applied={card.applied}
         clippedDate={card.clippedDate}
+        onOpenLog={() => navigate({ to: '/log' })}
         rotateDeg={poster.rotateDeg}
         showExplain
         onExplain={() => onExplain(app)}

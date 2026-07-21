@@ -11,6 +11,7 @@ import { PlainButton, Sheet, TextLink } from '@questboard/ui';
 import { DetailArtifacts } from '@/features/board/detail-artifacts';
 import { useApplication } from '@/hooks/use-applications';
 import { resolveSourceLabel } from '@/hooks/use-scrapers';
+import { cleanDescription } from '@/utils/format';
 import { formatStatedPay, payUnitFor, toBoardCard } from '@/utils/board-card';
 import { postedAgoLabel } from '@/utils/job-trust';
 import type { ApplicationResponse } from '@/types/application';
@@ -74,6 +75,9 @@ export function JobDetailSheet({
   const { data: app, isError } = useApplication(jobId ?? 0);
   const open = jobId !== null;
   const card = open && app ? toBoardCard(app, resolveSourceLabel(app.source, labels)) : null;
+  /* rows scraped before the pipeline cleaned text can carry markup junk;
+     cleanDescription keeps the newlines, so pre-wrap still shows paragraphs */
+  const desc = app ? cleanDescription(app.description) : '';
 
   return (
     <Sheet
@@ -89,8 +93,8 @@ export function JobDetailSheet({
       {open && app && card && (
         <>
           <Facts app={app} sourceLabel={resolveSourceLabel(app.source, labels)} />
-          {app.description.trim() ? (
-            <div className="qb-jd-desc">{app.description.trim()}</div>
+          {desc ? (
+            <div className="qb-jd-desc">{desc}</div>
           ) : (
             <p className="qb-hint">
               No stored description for this one; the original posting has the full text.

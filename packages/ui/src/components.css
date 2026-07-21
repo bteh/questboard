@@ -211,6 +211,9 @@
   padding: 3px 8px; cursor: pointer; font-family: inherit;
 }
 .qb-poster-clipped { color: var(--sage); border-color: transparent; cursor: default; }
+/* the clipped stamp as a door to the log; same quiet look, just clickable */
+.qb-poster-clip-log { cursor: pointer; }
+.qb-poster-clip-log:hover { text-decoration: underline; }
 
 .qb-p-head { display: flex; align-items: center; gap: 8px; margin-bottom: 11px; padding-right: 52px; }
 .qb-p-head svg { flex: none; }

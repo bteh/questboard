@@ -109,6 +109,23 @@ describe('JobDetailSheet artifacts', () => {
     expect(screen.getByText('View original posting')).toBeTruthy();
   });
 
+  it('cleans stored markup out of the description and keeps the paragraphs', () => {
+    mockApp = makeApp({
+      description:
+        '**Own** the pipeline.\n\n### Requirements\n<div class="content-intro">5 years with Python.</div>',
+    });
+    const { container } = render(
+      <JobDetailSheet jobId={7} labels={{}} onClose={() => {}} />,
+    );
+    const desc = container.querySelector('.qb-jd-desc')!;
+    expect(desc).toBeTruthy();
+    expect(desc.textContent).not.toMatch(/\*\*|###|<div|content-intro/);
+    expect(desc.textContent).toContain('Own the pipeline.');
+    expect(desc.textContent).toContain('5 years with Python.');
+    /* the sheet keeps line structure; pre-wrap CSS renders these as breaks */
+    expect(desc.textContent).toContain('\n');
+  });
+
   it('renders nothing extra while the detail fetch is still on its way', () => {
     mockApp = undefined;
     const { container } = render(

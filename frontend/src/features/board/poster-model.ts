@@ -4,6 +4,7 @@
    The route composes the bring line's inline fit action itself. */
 
 import { kindForVertical } from '@questboard/kinds';
+import { cleanDescription } from '@/utils/format';
 import { cleanCompany, toBoardCard, type BoardCardModel } from '@/utils/board-card';
 import { kindCopy, type KindCopy } from '@/features/board/kind-copy';
 import { getCompanyLogoUrl } from '@/utils/company-domains';
@@ -65,7 +66,9 @@ export function fitBadgeFor(app: ApplicationResponse): PosterModel['fitBadge'] {
 /** First sentence of the posting's own description, capped for scanning.
     No text, no line: never summarized by a model, never invented. */
 export function scannableDesc(description: string | null | undefined): string | undefined {
-  const text = (description ?? '').replace(/\s+/g, ' ').trim();
+  /* rows scraped before the pipeline cleaned text can carry markup junk;
+     strip it here so the excerpt never shows it */
+  const text = cleanDescription(description ?? '').replace(/\s+/g, ' ').trim();
   if (!text) return undefined;
   // Return a clean word-boundary lead and let the card's 2-line CSS clamp do
   // the visual cut (it adds its own ellipsis). A JS character cut here fought

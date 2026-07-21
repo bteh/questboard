@@ -103,6 +103,14 @@ describe('the poster model', () => {
     expect(out.endsWith('word')).toBe(true);
   });
 
+  it('strips stored markup junk before cutting the scannable line', () => {
+    const dirty =
+      '**Own** the pipeline.\n\n### Requirements\n<div class="content-intro">5 years with Python.</div>';
+    const out = scannableDesc(dirty)!;
+    expect(out).toBe('Own the pipeline. Requirements 5 years with Python.');
+    expect(out).not.toMatch(/\*\*|###|<|content-intro/);
+  });
+
   it('gives career posters the logo well, quests the small giver logo', () => {
     const career = toPoster(app({ vertical: 'career', company: 'Stripe' }), 'BuiltIn');
     expect(career.logoWell).toBeDefined();

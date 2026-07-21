@@ -96,6 +96,9 @@ export interface PosterProps {
   /** e.g. "Applied, Jun 30"; wins over clippedDate */
   applied?: string;
   clippedDate?: string;
+  /** opens Your log; when set, the clipped stamp names where the row went
+      and becomes the door there. Absent, the stamp stays a plain label. */
+  onOpenLog?: () => void;
   /** stable per-posting tilt, degrees; keep within about ±1.5 */
   rotateDeg?: number;
   showExplain?: boolean;
@@ -127,6 +130,7 @@ export function Poster({
   payUnit,
   applied,
   clippedDate,
+  onOpenLog,
   rotateDeg = 0,
   showExplain,
   onClip,
@@ -139,8 +143,20 @@ export function Poster({
     <div className="qb-slot" style={{ ['--qb-hue' as string]: hue }}>
       <span className="qb-pin" aria-hidden="true" />
       <article className="qb-poster" style={{ ['--qb-rot' as string]: `${rotateDeg}deg` }}>
-        {clippedDate || applied ? (
-          <span className="qb-poster-clip qb-poster-clipped">{applied ?? `Clipped, ${clippedDate}`}</span>
+        {applied ? (
+          <span className="qb-poster-clip qb-poster-clipped">{applied}</span>
+        ) : clippedDate ? (
+          onOpenLog ? (
+            <button
+              type="button"
+              className="qb-poster-clip qb-poster-clipped qb-poster-clip-log"
+              onClick={onOpenLog}
+            >
+              {`Clipped, ${clippedDate} · in your log`}
+            </button>
+          ) : (
+            <span className="qb-poster-clip qb-poster-clipped">{`Clipped, ${clippedDate}`}</span>
+          )
         ) : (
           onClip && (
             <button type="button" className="qb-poster-clip" onClick={onClip}>
