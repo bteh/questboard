@@ -1,7 +1,7 @@
-import { Fragment, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { ExternalLink, Loader2, Sparkles, Wand2 } from 'lucide-react';
+import { Check, ExternalLink, Loader2, Sparkles, Wand2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { useAgentClients, useRunAgent } from '@/hooks/use-agent-clients';
@@ -154,6 +154,72 @@ function renderInline(text: string): React.ReactNode {
   });
 }
 
+// The real phases of a run, with a rough time each one starts. The last phase
+// (ranking) is the long one and stays active until the result lands, so the
+// card never shows a fake "done".
+const RUN_STEPS = [
+  { at: 0, label: 'Reading your resume' },
+  { at: 7, label: 'Searching the board' },
+  { at: 20, label: 'Ranking against your experience' },
+];
+
+/** A live progress card during the ~1-2 min run: a running clock and the
+ *  current phase, so the wait shows activity instead of a still spinner. */
+function RunProgress() {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setElapsed((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const currentIdx = RUN_STEPS.reduce((acc, step, i) => (elapsed >= step.at ? i : acc), 0);
+  const mm = Math.floor(elapsed / 60);
+  const ss = String(elapsed % 60).padStart(2, '0');
+  return (
+    <div className="mt-4 rounded-xl border border-brand/25 bg-brand/5 p-4">
+      <div className="flex items-center justify-between">
+        <span className="flex items-center gap-2 text-sm font-medium text-text-primary">
+          <Loader2 className="h-4 w-4 animate-spin text-brand" />
+          Your assistant is working
+        </span>
+        <span className="font-mono text-xs tabular-nums text-text-muted">
+          {mm}:{ss}
+        </span>
+      </div>
+      <ul className="mt-3 space-y-2">
+        {RUN_STEPS.map((step, i) => {
+          const done = i < currentIdx;
+          const active = i === currentIdx;
+          return (
+            <li
+              key={step.label}
+              className={`flex items-center gap-2.5 text-sm ${active ? 'text-text-primary' : done ? 'text-text-secondary' : 'text-text-muted'}`}
+            >
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                {done ? (
+                  <Check className="h-3.5 w-3.5 text-emerald-600" />
+                ) : active ? (
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-brand" />
+                ) : (
+                  <span className="h-1.5 w-1.5 rounded-full bg-text-muted/40" />
+                )}
+              </span>
+              <span>
+                {step.label}
+                {active && i === RUN_STEPS.length - 1 && (
+                  <span className="text-text-muted"> (the long part)</span>
+                )}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="mt-3 text-xs text-text-muted">
+        Runs in your own Claude, about a minute or two. You can keep using the app.
+      </p>
+    </div>
+  );
+}
+
 /**
  * One-click AI: the user clicks a button and the app runs their own connected
  * assistant (Claude) headlessly over the local MCP. The ranked, explained
@@ -236,11 +302,7 @@ export function AssistantRunPanel() {
             </Button>
           </div>
 
-          {run.isPending && (
-            <p className="mt-3 text-sm text-text-muted">
-              Reading your resume and ranking jobs. This takes a minute or two; you can keep using the app.
-            </p>
-          )}
+          {run.isPending && <RunProgress />}
 
           {httpError && !run.isPending && (
             <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">

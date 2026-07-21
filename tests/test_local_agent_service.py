@@ -235,20 +235,30 @@ def test_work_search_rejects_description_only_role_matches(local_agent_db) -> No
 
 
 def test_role_family_match_rejects_conflicting_occupations() -> None:
-    from app.services import local_agent_service
+    from app.services.local_agent_service import _title_is_in_lane
 
-    assert local_agent_service._title_matches_queries(
-        "Senior Engineering Manager, Data Engineering",
-        ["Data Engineering Manager"],
+    # Primary role-family match.
+    assert _title_is_in_lane(
+        "Senior Engineering Manager, Data Engineering", ["Data Engineering Manager"]
     )
-    assert not local_agent_service._title_matches_queries(
-        "Lead Product Manager, Data Platform",
-        ["Data Platform Lead"],
+    # An occupation conflict the query doesn't share disqualifies the title.
+    assert not _title_is_in_lane("Lead Product Manager, Data Platform", ["Data Platform Lead"])
+    assert not _title_is_in_lane(
+        "Senior Manager, Clinical Engineering & Data Analytics", ["Analytics Engineering Manager"]
     )
-    assert not local_agent_service._title_matches_queries(
-        "Senior Manager, Clinical Engineering & Data Analytics",
-        ["Analytics Engineering Manager"],
-    )
+
+
+def test_title_filter_keeps_adjacent_roles_for_the_agent_to_judge() -> None:
+    # Retrieval is recall-first: adjacent in-lane roles survive so the agent
+    # can rank or skip them; only bare-seniority overlaps and off-lane roles drop.
+    from app.services.local_agent_service import _title_is_in_lane
+
+    q = ["Data Engineering Manager"]
+    assert _title_is_in_lane("Analytics Engineering Manager", q)  # shares "engineer"
+    assert _title_is_in_lane("Head of Data Platform", q)  # shares "data"
+    assert _title_is_in_lane("Staff Data Engineer", q)  # shares "data"/"engineer"
+    assert not _title_is_in_lane("Office Manager", q)  # only shares the seniority word
+    assert not _title_is_in_lane("Registered Nurse", q)  # off lane
 
 
 def test_remote_only_profile_recovers_jurisdiction_from_the_same_resume(
