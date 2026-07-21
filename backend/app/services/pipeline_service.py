@@ -68,6 +68,7 @@ class PipelineRun:
     completed_at: datetime | None = None
     progress_messages: list[str] = field(default_factory=list)
     jobs_found: int = 0
+    new_jobs: int = 0
     jobs_scored: int = 0
     strong_matches: int = 0
     jobs_before_filters: int = 0
@@ -620,7 +621,7 @@ def _execute_pipeline(
             run.jobs_before_filters = getattr(pipeline, '_last_pre_filter_count', run.jobs_found)
             # Save to DB
             if jobs:
-                _save_search_results(
+                run.new_jobs = _save_search_results(
                     pipeline,
                     jobs,
                     progress_cb,
@@ -688,6 +689,7 @@ def _execute_pipeline(
             "complete",
             json.dumps({
                 "jobs_found": run.jobs_found,
+                "new_jobs": run.new_jobs,
                 "jobs_before_filters": run.jobs_before_filters,
                 "jobs_scored": run.jobs_scored,
                 "strong_matches": run.strong_matches,
@@ -865,14 +867,19 @@ def _save_search_results(
     progress_cb,
     search_run_id: str | None = None,
     workspace_id: str | None = None,
-) -> None:
-    """Save search-only results to DB (mirrors app.py search_only logic)."""
+) -> int:
+    """Save search-only results to DB (mirrors app.py search_only logic).
+
+    Returns the number of rows that were NEW to the board (save_application
+    only ever inserts a new URL or updates an existing one, never deletes, so
+    the row-count delta across the save is the new-job count)."""
     import json as _json
-    from job_finder.models.database import init_db, save_application
+    from job_finder.models.database import ApplicationRecord, get_session, init_db, save_application
     from job_finder.company_classifier import classify_company, classify_work_type
 
     init_db()
     progress_cb("Saving results to database...")
+    before_count = get_session().query(ApplicationRecord).count()
     for job in jobs:
         ct = classify_company(
             job.get("company", ""),
@@ -905,7 +912,9 @@ def _save_search_results(
             date_posted=job.get("date_posted"),
             date_confidence=job.get("date_confidence"),
         )
-    progress_cb(f"Saved {len(jobs)} jobs to database")
+    new_jobs = max(0, get_session().query(ApplicationRecord).count() - before_count)
+    progress_cb(f"Saved {len(jobs)} jobs to database ({new_jobs} new)")
+    return new_jobs
 
 
 def _send_event(run: PipelineRun, event_type: str, data: str) -> None:

@@ -83,6 +83,8 @@ export interface RunResult {
   run_id: string;
   status: string;
   jobs_found: number;
+  /** rows that were NEW to the board this run (not already present) */
+  new_jobs?: number;
   jobs_scored: number;
   strong_matches: number;
   duration_seconds: number;
