@@ -42,11 +42,11 @@ _AGENT_TASKS: dict[str, dict[str, object]] = {
             "verdict, so my whole board is scored, not just the top few. Verdict scale: "
             "strong / good / reach for ones worth my time, skip for ones that don't fit "
             "(wrong role, staffing agency, junk). Rank the non-skips 1..N best-first; skips "
-            "need no rank. Each needs its opportunity_id, a one-or-two-sentence 'why', and a "
-            "'caveat' for any real risk (wrong level, comp floor, remote unclear). set_work_fit "
-            "is what puts your verdicts on my board. After that, reply with just a one-line "
-            "summary (e.g. 'Scored 28: 6 strong/good, rest reach or skip; GitLab EM is #1.'). "
-            "Be honest; do not invent postings."
+            "need no rank. Keep it FAST: each 'why' is a short phrase (a few words, <=12), and "
+            "add a 'caveat' only when there's a real risk (wrong level, comp floor, remote "
+            "unclear). Each needs its opportunity_id. set_work_fit is what puts your verdicts "
+            "on my board. After that, reply with just a one-line summary (e.g. 'Scored 28: 6 "
+            "strong/good, rest reach or skip; GitLab EM is #1.'). Be honest; don't invent postings."
         ),
     },
 }

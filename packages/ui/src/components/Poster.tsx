@@ -155,10 +155,12 @@ export function Poster({
               {newHere && <span className="qb-p-new">new here</span>}
             </span>
           )}
-          {fitBadge && (
-            <span className={cx('qb-p-fit', `qb-p-fit-${fitBadge.verdict}`)}>{fitBadge.label}</span>
-          )}
         </div>
+        {fitBadge && (
+          <div className="qb-p-fitrow">
+            <span className={cx('qb-p-fit', `qb-p-fit-${fitBadge.verdict}`)}>{fitBadge.label}</span>
+          </div>
+        )}
         {logoWell ? (
           <div className="qb-p-titlerow">
             <LogoWell {...logoWell} />

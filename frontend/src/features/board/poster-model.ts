@@ -36,16 +36,19 @@ export interface PosterModel {
   fitBadge?: { label: string; verdict: 'strong' | 'good' | 'reach' | 'skip' };
 }
 
-/** The assistant's verdict as a short poster badge, or undefined. */
+const FIT_WORD: Record<'strong' | 'good' | 'reach' | 'skip', string> = {
+  strong: 'strong fit',
+  good: 'good fit',
+  reach: 'a reach',
+  skip: 'skip',
+};
+
+/** The assistant's verdict as a clear poster badge, or undefined. */
 export function fitBadgeFor(app: ApplicationResponse): PosterModel['fitBadge'] {
   const fit = app.agent_fit;
   if (!fit) return undefined;
-  const label =
-    fit.verdict === 'skip'
-      ? 'skip'
-      : fit.rank
-        ? `#${fit.rank} ${fit.verdict}`
-        : fit.verdict;
+  const word = FIT_WORD[fit.verdict];
+  const label = fit.verdict !== 'skip' && fit.rank ? `#${fit.rank} · ${word}` : word;
   return { label, verdict: fit.verdict };
 }
 

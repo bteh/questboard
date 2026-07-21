@@ -226,6 +226,9 @@ def _run_command(client: str, binary: str, prompt: str, config_path: str, allowe
             binary, "-p", prompt,
             "--mcp-config", config_path,
             "--allowedTools", ",".join(qualified),
+            # Sonnet is much faster than Opus and plenty for mapping postings to
+            # a resume; the run is a ranking task, not open-ended reasoning.
+            "--model", "sonnet",
             "--output-format", "json",
         ]
     # codex exec: non-interactive, reads its own ~/.codex MCP registration.
