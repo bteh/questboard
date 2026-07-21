@@ -608,3 +608,69 @@ def test_set_career_preferences_refuses_to_clear_all_intent(local_agent_db) -> N
     prefs = local_agent_service.career_preferences(local_agent_db)["preferences"]
     assert prefs["roles"] == ["Data Engineering Manager"]
     assert prefs["keywords"] == ["data platform", "Snowflake"]
+
+
+def test_set_work_fit_writes_verdicts_and_replaces_prior(local_agent_db) -> None:
+    from app.services import local_agent_service
+    from job_finder.models.database import ApplicationRecord
+
+    db = local_agent_db
+    ids = [
+        r.id
+        for r in db.query(ApplicationRecord)
+        .filter(ApplicationRecord.vertical == "career")
+        .order_by(ApplicationRecord.id)
+        .all()
+    ]
+
+    out = local_agent_service.set_work_fit(
+        db,
+        [
+            {"opportunity_id": ids[0], "rank": 1, "verdict": "strong", "why": "Exact stack.", "caveat": "Confirm remote."},
+            {"opportunity_id": ids[1], "verdict": "skip", "why": "EU only."},
+        ],
+    )
+    assert out["applied"] == 2
+    assert out["external_action_performed"] is False
+
+    fit0 = json.loads(db.query(ApplicationRecord).get(ids[0]).agent_fit_json)
+    assert fit0["verdict"] == "strong" and fit0["rank"] == 1 and "Exact" in fit0["why"]
+
+    # A second run replaces the prior verdicts (latest-run-only on the board).
+    out2 = local_agent_service.set_work_fit(
+        db, [{"opportunity_id": ids[2], "rank": 1, "verdict": "good", "why": "Now this one."}]
+    )
+    assert out2["applied"] == 1
+    assert not db.query(ApplicationRecord).get(ids[0]).agent_fit_json  # cleared
+    assert json.loads(db.query(ApplicationRecord).get(ids[2]).agent_fit_json)["verdict"] == "good"
+
+
+def test_set_work_fit_rejects_bad_verdict(local_agent_db) -> None:
+    from app.services import local_agent_service
+    from job_finder.models.database import ApplicationRecord
+
+    db = local_agent_db
+    rid = db.query(ApplicationRecord).filter(ApplicationRecord.vertical == "career").first().id
+    with pytest.raises(ValueError):
+        local_agent_service.set_work_fit(db, [{"opportunity_id": rid, "verdict": "amazing"}])
+
+
+def test_set_work_fit_does_not_wipe_prior_when_no_ids_match(local_agent_db) -> None:
+    from app.services import local_agent_service
+    from job_finder.models.database import ApplicationRecord
+
+    db = local_agent_db
+    ids = [
+        r.id
+        for r in db.query(ApplicationRecord)
+        .filter(ApplicationRecord.vertical == "career")
+        .order_by(ApplicationRecord.id)
+        .all()
+    ]
+    local_agent_service.set_work_fit(db, [{"opportunity_id": ids[0], "rank": 1, "verdict": "strong", "why": "Keep me."}])
+
+    # A run whose ids match no row must NOT clear the prior good run's verdicts.
+    out = local_agent_service.set_work_fit(db, [{"opportunity_id": 999999, "verdict": "good", "why": "ghost"}])
+    assert out["applied"] == 0
+    assert 999999 in out["missing_opportunity_ids"]
+    assert json.loads(db.query(ApplicationRecord).get(ids[0]).agent_fit_json)["verdict"] == "strong"

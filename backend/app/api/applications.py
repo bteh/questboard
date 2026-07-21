@@ -81,8 +81,24 @@ def _to_response(record) -> ApplicationResponse:
     except (json.JSONDecodeError, TypeError):
         pass
 
+    agent_fit = None
+    try:
+        raw_fit = getattr(record, "agent_fit_json", "") or ""
+        if raw_fit:
+            parsed_fit = json.loads(raw_fit)
+            if isinstance(parsed_fit, dict) and parsed_fit.get("verdict"):
+                agent_fit = {
+                    "rank": parsed_fit.get("rank"),
+                    "verdict": str(parsed_fit.get("verdict")),
+                    "why": str(parsed_fit.get("why") or ""),
+                    "caveat": str(parsed_fit.get("caveat") or ""),
+                }
+    except (json.JSONDecodeError, TypeError):
+        pass
+
     return ApplicationResponse(
         id=record.id,
+        agent_fit=agent_fit,
         vertical=getattr(record, "vertical", "career") or "career",
         event_start=getattr(record, "event_start", None),
         event_end=getattr(record, "event_end", None),

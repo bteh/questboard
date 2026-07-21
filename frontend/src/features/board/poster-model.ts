@@ -32,6 +32,21 @@ export interface PosterModel {
   logoUrl?: string;
   /** career rows only: the 40px logo well beside the title */
   logoWell?: PosterLogoWell;
+  /** the connected assistant's fit verdict for this row, from its last run */
+  fitBadge?: { label: string; verdict: 'strong' | 'good' | 'reach' | 'skip' };
+}
+
+/** The assistant's verdict as a short poster badge, or undefined. */
+export function fitBadgeFor(app: ApplicationResponse): PosterModel['fitBadge'] {
+  const fit = app.agent_fit;
+  if (!fit) return undefined;
+  const label =
+    fit.verdict === 'skip'
+      ? 'skip'
+      : fit.rank
+        ? `#${fit.rank} ${fit.verdict}`
+        : fit.verdict;
+  return { label, verdict: fit.verdict };
 }
 
 /** First sentence of the posting's own description, capped for scanning.
@@ -106,5 +121,6 @@ export function toPoster(app: ApplicationResponse, sourceLabel: string): PosterM
     rotateDeg: rotationFor(app.id),
     logoUrl: logoWell ? undefined : logoUrl,
     logoWell,
+    fitBadge: fitBadgeFor(app),
   };
 }

@@ -38,6 +38,7 @@ RUN_ALLOWED_TOOLS: tuple[str, ...] = (
     "search_work",
     "search_side_quests",
     "get_opportunity",
+    "set_work_fit",
 )
 
 # id -> display name, in the order we show them.

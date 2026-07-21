@@ -10,7 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { ConsentCard, ExplainNote, PlainButton, SageButton, Sheet, TextLink } from '@questboard/ui';
-import type { ApplicationResponse } from '@/types/application';
+import type { AgentFitVerdict, ApplicationResponse } from '@/types/application';
 import { resolveSourceLabel } from '@/hooks/use-scrapers';
 import { toBoardCard } from '@/utils/board-card';
 import {
@@ -88,6 +88,13 @@ function ConsentArea({
   return null;
 }
 
+const FIT_WORD: Record<AgentFitVerdict, string> = {
+  strong: 'strong fit',
+  good: 'good fit',
+  reach: 'a reach',
+  skip: 'skip',
+};
+
 export function ExplainSheet({
   app,
   labels,
@@ -133,6 +140,24 @@ export function ExplainSheet({
       title={card?.title}
       meta={card?.meta}
     >
+      {app?.agent_fit && (
+        <div className="qb-jd-facts" aria-label="Your assistant's read on this job">
+          <div className="qb-jd-fact">
+            <span className="qb-jd-fact-label">your assistant&rsquo;s read</span>
+            <span className="qb-jd-fact-value">
+              {app.agent_fit.rank ? `#${app.agent_fit.rank}, ` : ''}
+              {FIT_WORD[app.agent_fit.verdict]}
+              {app.agent_fit.why ? `. ${app.agent_fit.why}` : ''}
+            </span>
+          </div>
+          {app.agent_fit.caveat && (
+            <div className="qb-jd-fact">
+              <span className="qb-jd-fact-label">watch for</span>
+              <span className="qb-jd-fact-value">{app.agent_fit.caveat}</span>
+            </div>
+          )}
+        </div>
+      )}
       {controller && (
         <>
           {app?.match_reasons && app.match_reasons.length > 0 && (

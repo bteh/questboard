@@ -111,6 +111,10 @@ class ApplicationRecord(Base):
     rank_source = Column(String(20), nullable=True)  # hybrid | lexical
     match_bucket = Column(String(20), nullable=True)  # primary | adjacent
     match_reasons_json = Column(Text, default="")
+    # The connected assistant's own fit verdict from the last headless run,
+    # keyed to this row. JSON: {rank:int, verdict:"strong|good|reach|skip",
+    # why:str, caveat:str, run_id:str, at:iso}. Empty until a run writes it.
+    agent_fit_json = Column(Text, default="")
     score_reasoning = Column(Text, default="")
     key_strengths = Column(Text, default="")  # JSON array
     key_gaps = Column(Text, default="")  # JSON array
@@ -602,6 +606,8 @@ def _migrate_db(engine) -> None:
             conn.execute(text("ALTER TABLE applications ADD COLUMN match_bucket VARCHAR(20)"))
         if "match_reasons_json" not in existing_cols:
             conn.execute(text("ALTER TABLE applications ADD COLUMN match_reasons_json TEXT DEFAULT ''"))
+        if "agent_fit_json" not in existing_cols:
+            conn.execute(text("ALTER TABLE applications ADD COLUMN agent_fit_json TEXT DEFAULT ''"))
         # Backfill score provenance, idempotent: only scored rows with no
         # source are touched. The stored reasoning format tells the scales
         # apart: the keyword/baseline scorer writes "Scoring (...)" reasoning,

@@ -41,6 +41,15 @@ class MatchReason(BaseModel):
     label: str
 
 
+class AgentFit(BaseModel):
+    """The connected assistant's fit verdict for one work row."""
+
+    rank: int | None = None
+    verdict: Literal["strong", "good", "reach", "skip"]
+    why: str = ""
+    caveat: str = ""
+
+
 class ApplicationResponse(ApplicationBase):
     id: int
     # Quest verticals. vertical matches packages/ui/src/tokens.ts
@@ -68,6 +77,9 @@ class ApplicationResponse(ApplicationBase):
     score_source: str | None = None
     rank_source: Literal["hybrid", "lexical"] | None = None
     match_bucket: Literal["primary", "adjacent"] | None = None
+    # The connected assistant's own fit verdict for this row from the last
+    # headless run (set_work_fit). None until a run judges it.
+    agent_fit: AgentFit | None = None
     match_reasons: list[MatchReason] = Field(default_factory=list)
     score_reasoning: str = ""
     key_strengths: list[str] = []

@@ -55,6 +55,16 @@ export interface MatchReason {
   label: string;
 }
 
+export type AgentFitVerdict = 'strong' | 'good' | 'reach' | 'skip';
+
+/** The connected assistant's fit verdict for one work row (set_work_fit). */
+export interface AgentFit {
+  rank: number | null;
+  verdict: AgentFitVerdict;
+  why: string;
+  caveat: string;
+}
+
 export interface ApplicationBase {
   job_title: string;
   company: string;
@@ -113,6 +123,8 @@ export interface ApplicationResponse extends ApplicationBase {
   /** Retrieval provenance; raw fusion scores are intentionally not exposed. */
   rank_source?: 'hybrid' | 'lexical' | null;
   match_bucket?: 'primary' | 'adjacent' | null;
+  /** The connected assistant's own fit verdict from the last run, or null. */
+  agent_fit?: AgentFit | null;
   match_reasons?: MatchReason[];
   score_reasoning: string;
   key_strengths: string[];

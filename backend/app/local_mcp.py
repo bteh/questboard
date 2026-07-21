@@ -358,6 +358,27 @@ def set_opportunity_status(
         )
 
 
+@mcp.tool(annotations=WRITE, structured_output=True)
+def set_work_fit(rankings: list[dict[str, Any]]) -> dict[str, Any]:
+    """Record your own fit verdict for the work rows you just judged, so the
+    user's board and results panel show your ranking and reasons.
+
+    Call this after search_work, once, with all the finalists AND the ones to
+    skip. Pass a list of objects, each:
+      - opportunity_id (int, required): the row's id from search_work
+      - verdict (required): "strong" | "good" | "reach" | "skip"
+      - rank (int, optional): 1 = best fit; omit for skips
+      - why (str): one or two sentences on why it fits (or, for a skip, why not)
+      - caveat (str, optional): a real risk to check (level, comp floor, remote)
+
+    This REPLACES the previous run's verdicts. Local annotation only; it never
+    contacts anything external and does not apply to the job.
+    """
+
+    with _database_session() as db:
+        return _tool_error(local_agent_service.set_work_fit, db, rankings)
+
+
 def configure_environment(data_dir: Path, database_url: str = "") -> None:
     data_dir = data_dir.expanduser().resolve()
     data_dir.mkdir(parents=True, exist_ok=True)

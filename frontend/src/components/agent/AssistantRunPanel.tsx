@@ -1,12 +1,89 @@
 import { Fragment, useState } from 'react';
 import { Link } from '@tanstack/react-router';
-import { Loader2, Sparkles, Wand2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { ExternalLink, Loader2, Sparkles, Wand2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { useAgentClients, useRunAgent } from '@/hooks/use-agent-clients';
 import { useAgentConsent } from '@/hooks/use-agent-consent';
+import { useApplications } from '@/hooks/use-applications';
 import { isDesktopApp } from '@/lib/platform';
+import type { AgentFitVerdict, ApplicationResponse } from '@/types/application';
 import type { AgentRunResult } from '@/types/resume';
+
+// Terse words that match the poster badge's vocabulary (one verdict, one word
+// everywhere). The rank shows separately as the card's leading number.
+const FIT_LABEL: Record<AgentFitVerdict, string> = {
+  strong: 'strong',
+  good: 'good',
+  reach: 'reach',
+  skip: 'skip',
+};
+const FIT_ORDER: Record<AgentFitVerdict, number> = { strong: 0, good: 1, reach: 2, skip: 3 };
+const FIT_BADGE_CLS: Record<AgentFitVerdict, string> = {
+  strong: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+  good: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+  reach: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+  skip: 'bg-black/5 text-text-muted dark:bg-white/10',
+};
+
+/** Sort the agent's judged rows: by rank when present, else by verdict, skips last. */
+function byFit(a: ApplicationResponse, b: ApplicationResponse): number {
+  const fa = a.agent_fit!;
+  const fb = b.agent_fit!;
+  const ra = fa.rank ?? 999;
+  const rb = fb.rank ?? 999;
+  if (ra !== rb) return ra - rb;
+  return FIT_ORDER[fa.verdict] - FIT_ORDER[fb.verdict];
+}
+
+function payLine(a: ApplicationResponse): string {
+  // Prefer the annualized values; the raw salary_min/max can be an hourly or
+  // monthly rate, which the $k formatter (÷1000) would render as "$0k".
+  const min = a.salary_min_annualized ?? a.salary_min ?? null;
+  const max = a.salary_max_annualized ?? a.salary_max ?? null;
+  const k = (n: number) => `$${Math.round(n / 1000)}k`;
+  if (min && max) return `${k(min)}–${k(max)}`;
+  if (min) return `${k(min)}+`;
+  if (max) return `up to ${k(max)}`;
+  return 'pay not listed';
+}
+
+/** One ranked opportunity, the assistant's verdict + why, linking to the posting. */
+function RankedCard({ app }: { app: ApplicationResponse }) {
+  const fit = app.agent_fit!;
+  return (
+    <div className="rounded-xl border border-border-default bg-bg-card p-3.5">
+      <div className="flex items-baseline justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-text-primary">
+            {fit.rank ? <span className="text-text-muted">{fit.rank}. </span> : null}
+            {app.job_title}
+          </p>
+          <p className="truncate text-xs text-text-muted">
+            {app.company}
+            {app.location ? ` · ${app.location}` : ''} · {payLine(app)}
+          </p>
+        </div>
+        <span className={`shrink-0 rounded-full px-2 py-0.5 font-mono text-[10.5px] font-semibold ${FIT_BADGE_CLS[fit.verdict]}`}>
+          {FIT_LABEL[fit.verdict]}
+        </span>
+      </div>
+      {fit.why && <p className="mt-2 text-sm leading-relaxed text-text-secondary">{fit.why}</p>}
+      {fit.caveat && <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">Watch for: {fit.caveat}</p>}
+      {app.job_url && (
+        <a
+          href={app.job_url}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-brand underline underline-offset-2"
+        >
+          Open posting <ExternalLink className="h-3 w-3" />
+        </a>
+      )}
+    </div>
+  );
+}
 
 /** Render a small subset of Markdown as React nodes (headings, bold, links).
  *  No dangerouslySetInnerHTML: every node is constructed, so there's no XSS
@@ -55,11 +132,16 @@ function renderInline(text: string): React.ReactNode {
     }
     const linked = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
     if (linked) {
-      return (
-        <a key={i} href={linked[2]} target="_blank" rel="noreferrer" className="text-brand underline underline-offset-2">
-          {linked[1]}
-        </a>
-      );
+      // Only link safe schemes; a model-supplied javascript:/data: URL renders
+      // as plain text, never a clickable link.
+      if (/^(https?:|mailto:)/i.test(linked[2])) {
+        return (
+          <a key={i} href={linked[2]} target="_blank" rel="noreferrer" className="text-brand underline underline-offset-2">
+            {linked[1]}
+          </a>
+        );
+      }
+      return <Fragment key={i}>{linked[1]}</Fragment>;
     }
     if (/^https?:\/\//.test(part)) {
       return (
@@ -82,10 +164,16 @@ export function AssistantRunPanel() {
   const run = useRunAgent();
   const clients = useAgentClients();
   const consent = useAgentConsent();
+  const queryClient = useQueryClient();
+  // The assistant writes its verdict onto the board rows (set_work_fit); read
+  // them back to show the ranked cards and to reflect the badges on posters.
+  const board = useApplications({ vertical: 'career', page_size: 100 });
   const [outcome, setOutcome] = useState<AgentRunResult | null>(null);
   const [httpError, setHttpError] = useState<string | null>(null);
 
   if (!isDesktopApp()) return null;
+
+  const ranked = (board.data?.items ?? []).filter((a) => a.agent_fit).sort(byFit);
 
   const claude = clients.data?.clients.find((c) => c.id === 'claude');
   const claudeInstalled = claude?.installed ?? false;
@@ -97,7 +185,12 @@ export function AssistantRunPanel() {
     run.mutate(
       { task: 'find_and_rank', client: 'claude' },
       {
-        onSuccess: (data) => setOutcome(data),
+        onSuccess: (data) => {
+          setOutcome(data);
+          // Pull the fresh verdicts onto the board (poster badges) and into the
+          // ranked cards below.
+          void queryClient.invalidateQueries({ queryKey: ['applications'] });
+        },
         onError: (error) => setHttpError(error instanceof Error ? error.message : 'Something went wrong.'),
       },
     );
@@ -162,11 +255,29 @@ export function AssistantRunPanel() {
           )}
 
           {outcome && outcome.ok && !run.isPending && (
-            <div className="mt-4 space-y-3 rounded-xl border border-border-default bg-bg-subtle/40 p-4">
-              {renderMarkdown(outcome.result)}
-              <p className="pt-1 text-xs text-text-muted">
-                Ranked by your own Claude{typeof outcome.num_turns === 'number' ? ` in ${outcome.num_turns} steps` : ''}. Always confirm details on the source posting.
-              </p>
+            <div className="mt-4 space-y-3">
+              {ranked.length > 0 && outcome.result && (
+                <p className="text-sm font-medium text-text-primary">{outcome.result}</p>
+              )}
+              {ranked.length > 0 ? (
+                <>
+                  <div className="space-y-2.5">
+                    {ranked.map((app) => (
+                      <RankedCard key={app.id} app={app} />
+                    ))}
+                  </div>
+                  <p className="text-xs text-text-muted">
+                    Ranked by your own Claude{typeof outcome.num_turns === 'number' ? ` in ${outcome.num_turns} steps` : ''}.
+                    These verdicts also show on the board posters below. Always confirm details on the source posting.
+                  </p>
+                </>
+              ) : (
+                // Ran fine, but no per-job verdicts came back (older agent, or it
+                // answered in prose). Show its reply so nothing is lost.
+                <div className="rounded-xl border border-border-default bg-bg-subtle/40 p-4">
+                  {renderMarkdown(outcome.result)}
+                </div>
+              )}
             </div>
           )}
         </div>

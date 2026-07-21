@@ -37,10 +37,14 @@ _AGENT_TASKS: dict[str, dict[str, object]] = {
             "resume, then get_career_preferences for my saved target roles. If my target "
             "roles are empty or clearly off, call set_career_preferences to set sharper ones "
             "from my resume. Then call search_work to find matching jobs. Retrieval order is "
-            "not a fit verdict, so map each finalist against my actual background and tell me "
-            "the top 5 postings that fit my experience best and why, each with its title, "
-            "company, pay if known, and link. Call out anything I should skip (wrong level, "
-            "staffing agency). Be concise and honest, and use plain Markdown."
+            "not a fit verdict, so map each candidate against my actual background. "
+            "Then call set_work_fit ONCE with your verdicts: the finalists ranked 1..N "
+            "(verdict strong/good/reach) plus any you'd skip (verdict skip), each with its "
+            "opportunity_id, a one-or-two-sentence 'why', and a 'caveat' for any real risk "
+            "(wrong level, comp floor, staffing agency, remote unclear). set_work_fit is what "
+            "puts your ranking on my board. After that, reply with just a one-line summary "
+            "(e.g. 'Ranked 5 fits and flagged 2 to skip; GitLab EM is the top match.'). "
+            "Be honest; do not invent postings."
         ),
     },
 }
