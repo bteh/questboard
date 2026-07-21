@@ -5,7 +5,6 @@
    The status line under it states only what the data backs. */
 
 import { useEffect, useRef, useState } from 'react';
-import { Link } from '@tanstack/react-router';
 import { toast } from 'sonner';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { CoinsDollarIcon, Search01Icon } from '@hugeicons/core-free-icons';
@@ -102,10 +101,8 @@ function StatusLine({
   if (state === 'failed') {
     return (
       <p className="qb-workline" role="status">
-        The run failed{error ? `: ${error}` : ''}.{' '}
-        <Link to="/restock" className="qb-textlink" style={{ fontSize: 'inherit' }}>
-          see the log
-        </Link>
+        That didn’t finish{error ? `: ${error}` : ''}. Click <b>“Get new jobs”</b> to try again
+        {cachedLine ? `. ${cachedLine}` : ''}.
       </p>
     );
   }
