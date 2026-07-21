@@ -426,6 +426,14 @@ _ROLE_GENERIC_TOKENS = frozenset({
     "senior", "staff", "principal", "lead", "manager", "director", "head",
     "vp", "chief", "officer", "junior", "associate", "i", "ii", "iii", "iv",
 })
+# Pure seniority-LEVEL words (not role-type). Dropped from a role's retrieval
+# tokens so the DOMAIN drives the match: "Staff Data Engineer" also finds
+# "Senior Data Engineer" and "Data Engineer". Role-type words (manager,
+# director, lead, head, engineer, analyst...) are intentionally NOT here.
+_LEVEL_TOKENS = frozenset({
+    "senior", "staff", "principal", "junior", "associate", "entry",
+    "i", "ii", "iii", "iv", "v",
+})
 
 
 def _title_is_in_lane(title: str | None, queries: list[str]) -> bool:
@@ -574,9 +582,17 @@ def search_work(
     # Saved role families are token groups, not exact phrases. This retrieves
     # "Manager, Data Engineering" for "Data Engineering Manager" while the
     # Python check below prevents description-only and substring false hits.
+    # Retrieval is recall-first: match a role on its DOMAIN words and drop the
+    # pure seniority level, so "Staff Data Engineer" also surfaces "Senior Data
+    # Engineer" and plain "Data Engineer" (the agent ranks; we don't pre-drop).
+    role_groups = [
+        [tok for tok in sorted(_role_tokens(term)) if tok not in _LEVEL_TOKENS]
+        for term in terms
+    ]
+    role_groups = [group for group in role_groups if group]
     rows, _ = application_service.get_applications(
         db,
-        title_token_groups=[sorted(_role_tokens(term)) for term in terms] or None,
+        title_token_groups=role_groups or None,
         is_remote=True if effective_workplace == "remote_only" else None,
         location=effective_location or None,
         location_strict=bool(
