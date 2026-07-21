@@ -168,6 +168,50 @@ def career_preferences(
     }
 
 
+def set_career_preferences(
+    db: Session,
+    *,
+    roles: list[str] | None = None,
+    keywords: list[str] | None = None,
+    workspace_id: str | None = None,
+) -> dict[str, Any]:
+    """Save the user's target roles and keywords to the local workspace.
+
+    This is the intent that decides which career candidates search_work
+    retrieves, so a fresh resume with no roles set leaves the Find Work board
+    starved. A connected agent can read the resume and propose these, or the
+    person types them in Settings; either way this persists them locally.
+    Only the two intent fields change; every other saved preference the person
+    set (location, pay, filters) is preserved. Never performs an external
+    action.
+    """
+    workspace = resolve_local_workspace(db, workspace_id)
+    if workspace is None:
+        raise ValueError("No local workspace found to save preferences to.")
+    if roles is None and keywords is None:
+        raise ValueError("Provide roles and/or keywords to save.")
+
+    current = workspace_service.get_workspace_preferences(db, workspace.id)
+    new_roles = clean_terms(roles, limit=15) if roles is not None else current.roles
+    new_keywords = clean_terms(keywords, limit=20) if keywords is not None else current.keywords
+    # Never let this tool blank out all retrieval intent. Empty or
+    # whitespace-only lists clean to [], and saving both would starve Find
+    # Work, the exact state this tool exists to prevent. A caller that means
+    # to clear one field can still do so as long as the other stays set.
+    if not new_roles and not new_keywords:
+        raise ValueError(
+            "Refusing to clear both roles and keywords: that leaves Find Work with "
+            "no target. Provide at least one real role or keyword."
+        )
+    updated = current.model_copy(update={"roles": new_roles, "keywords": new_keywords})
+    workspace_service.save_workspace_preferences(db, workspace.id, updated)
+
+    result = career_preferences(db, workspace.id)
+    result["saved"] = True
+    result["external_action_performed"] = False
+    return result
+
+
 def resume_for_matching(
     db: Session, workspace_id: str | None = None
 ) -> dict[str, Any]:

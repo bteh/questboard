@@ -1,4 +1,4 @@
-import { AlertTriangle, RefreshCw, ScanLine, Sparkles } from 'lucide-react';
+import { AlertTriangle, ListChecks, RefreshCw, ScanLine } from 'lucide-react';
 
 import type { NormalizedResumeUpload } from '@/lib/resume-analysis';
 import { cn } from '@/lib/utils';
@@ -12,7 +12,7 @@ interface ResumeAnalysisBannerProps {
 
 /**
  * Status banner for a resume upload outcome. Renders nothing when the
- * analysis completed — the extracted-data panel is the success state.
+ * analysis completed. The extracted-data panel is the success state.
  *
  * Shared between the Settings resume tab and the onboarding wizard so the
  * user sees the same explanation in both places.
@@ -35,7 +35,7 @@ export function ResumeAnalysisBanner({ upload, action, className }: ResumeAnalys
             This PDF looks scanned (no selectable text). Export a text-based PDF or upload a DOCX.
           </p>
           <p className="text-red-800/90 dark:text-red-300/90">
-            Your file was saved, but nothing can be read from it — scoring and skill extraction
+            Your file was saved, but nothing can be read from it. Scoring and skill extraction
             need selectable text.
           </p>
           {action}
@@ -53,12 +53,26 @@ export function ResumeAnalysisBanner({ upload, action, className }: ResumeAnalys
           className,
         )}
       >
-        <Sparkles className="mt-0.5 h-4 w-4 shrink-0" />
+        <ListChecks className="mt-0.5 h-4 w-4 shrink-0" />
         <div className="min-w-0 flex-1 space-y-1">
-          <p className="font-medium">
-            Resume uploaded but skills were not extracted — connect an AI provider in Settings to
-            use your full resume.
-          </p>
+          {upload.derivedRoles.length > 0 ? (
+            <>
+              <p className="font-medium">Resume saved. We set your target roles from it.</p>
+              <p className="text-amber-800/90 dark:text-amber-300/90">
+                {upload.derivedRoles.slice(0, 5).join(', ')}
+                {upload.derivedRoles.length > 5 ? ', and more' : ''}. The board can find matching work
+                now. Edit these anytime, or a connected assistant can refine them.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="font-medium">Resume saved. Now tell Questboard the roles you want.</p>
+              <p className="text-amber-800/90 dark:text-amber-300/90">
+                Add your target roles and the board finds matching work. No AI needed. If you&apos;ve
+                connected an assistant like Claude or Codex, it can read your resume and fill them in.
+              </p>
+            </>
+          )}
           {action}
         </div>
       </div>

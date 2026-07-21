@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import { createRoute, Link, useNavigate } from '@tanstack/react-router';
 import { Route as appRoute } from './app';
 
-import { AiProviderTab } from '@/components/settings/AiProviderTab';
+import { AssistantTab } from '@/components/settings/AssistantTab';
 import { AutoApplyTab } from '@/components/settings/AutoApplyTab';
 import { ResumeTab } from '@/components/settings/ResumeTab';
 import { SearchPrefsTab } from '@/components/settings/SearchPrefsTab';
@@ -30,8 +30,8 @@ export const Route = createRoute({
 
 const TAB_LABELS: Record<SettingsTab, string> = {
   resume: 'Resume',
+  assistant: 'Assistant',
   restock: 'Restock',
-  ai: 'AI',
   'auto-apply': 'Auto-apply',
 };
 
@@ -47,8 +47,8 @@ function SettingsPage() {
   // Roving tabindex for ArrowLeft/ArrowRight keyboard navigation between tabs.
   const tabButtonRefs = useRef<Record<SettingsTab, HTMLButtonElement | null>>({
     resume: null,
+    assistant: null,
     restock: null,
-    ai: null,
     'auto-apply': null,
   });
   const handleTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, currentIndex: number) => {
@@ -102,11 +102,11 @@ function SettingsPage() {
       >
         {activeTab === 'resume' && <ResumeTab onboarding={onboarding} navigate={navigate} />}
 
+        {activeTab === 'assistant' && <AssistantTab />}
+
         {activeTab === 'restock' && (
           <SearchPrefsTab onboarding={onboarding} navigate={navigate} />
         )}
-
-        {activeTab === 'ai' && <AiProviderTab />}
 
         {activeTab === 'auto-apply' && <AutoApplyTab />}
       </div>

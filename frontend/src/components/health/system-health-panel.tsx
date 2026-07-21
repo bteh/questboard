@@ -72,7 +72,7 @@ export function SystemHealthPanel({ open, onOpenChange, onOpenDiagnostic }: Syst
         onOpenDiagnostic?.();
         break;
       case 'open_settings':
-        navigate({ to: '/settings', search: { tab: 'ai' } });
+        navigate({ to: '/settings', search: { tab: undefined } });
         break;
       case 'open_search':
         navigate({ to: '/restock' });

@@ -31,8 +31,12 @@ import {
   resolveSavedSearchAreaDefaults,
   resolveSearchSnapshotMetadata,
 } from '@/lib/search-preferences';
+import { AssistantRunPanel } from '@/components/agent/AssistantRunPanel';
 import { SearchConfigForm } from '@/components/search/SearchConfigForm';
 import { SearchRunView } from '@/components/search/SearchRunView';
+import { useAgentClients } from '@/hooks/use-agent-clients';
+import { useAgentConsent } from '@/hooks/use-agent-consent';
+import { isDesktopApp } from '@/lib/platform';
 import { getStagesForMode } from '@/components/search/search-leaf-helpers';
 
 /* Restock: the old Search page whole, at its verb address. The form, the
@@ -62,6 +66,16 @@ function RestockPage() {
   const { state, runId, messages, result, error, mode, progress, snapshot, activate, reset: resetSearch } = useSearchContext();
   const { data: scraperSources } = useScraperSources();
   const sourceLabels = useMemo(() => buildSourceLabels(scraperSources), [scraperSources]);
+
+  // When a desktop user has Claude connected and resume access on, the
+  // assistant run is the primary path, so the manual form drops to a
+  // "prefer to do it yourself?" fallback below it.
+  const agentClients = useAgentClients();
+  const agentConsent = useAgentConsent();
+  const assistantReady =
+    isDesktopApp() &&
+    (agentClients.data?.clients.find((c) => c.id === 'claude')?.installed ?? false) &&
+    (agentConsent.data?.granted ?? false);
 
   const [roles, setRoles] = useState('');
   const [keywords, setKeywords] = useState('');
@@ -275,7 +289,7 @@ function RestockPage() {
 
   const handleSuggest = () => {
     if (!llmAvailable) {
-      toast.error('Connect an AI provider in Settings to use this feature.');
+      toast.error('Auto-fill needs an AI. You can type your target roles by hand instead, no AI needed.');
       return;
     }
     suggest.mutate(profile, {
@@ -316,7 +330,7 @@ function RestockPage() {
         const message = error instanceof Error ? error.message : '';
         const msg = error instanceof Error ? error.message : '';
         if (msg.includes('No LLM') || msg.includes('provider')) {
-          toast.error('Connect an AI provider in Settings to analyze your resume.', { id: SUGGEST_TOAST_ID });
+          toast.error('Reading your resume automatically needs an AI. Type your target roles by hand instead.', { id: SUGGEST_TOAST_ID });
         } else if (msg.includes('No resume') || msg.includes('Upload')) {
           toast.error('Upload your resume in Settings first.', { id: SUGGEST_TOAST_ID });
         } else if (message.includes('too long')) {
@@ -383,17 +397,17 @@ function RestockPage() {
     },
     search_score: {
       label: 'Find and rank',
-      desc: llmAvailable ? 'Restock, then rank by resume fit' : 'Restock with basic ranking for now',
+      desc: llmAvailable ? 'Restock, then rank by resume fit' : 'Restock, then rank by keywords and filters',
       detail: llmAvailable
         ? `Restocks from ${boardsLabel}, then ranks each job by how well your skills and experience match the requirements.`
-        : `Restocks from ${boardsLabel}, then ranks results using keywords, filters, and resume context. Connect AI to upgrade this into deeper resume-fit ranking.`,
+        : `Restocks from ${boardsLabel}, then ranks results using keywords, filters, and resume context. Your connected assistant can take these and rank them by resume fit.`,
     },
+    // Legacy in-app-AI mode, no longer shown in the selector (the connected
+    // assistant drafts materials over MCP). Kept for the mode-type Record.
     full_pipeline: {
       label: 'Find, rank, and prepare',
-      desc: llmAvailable ? 'Rank, draft cover letters, company notes' : 'Needs AI connected',
-      detail: llmAvailable
-        ? `Restocks from ${boardsLabel}, ranks by resume fit, drafts tailored cover letters, and prepares company background notes. You always review before applying.`
-        : 'Connect AI to unlock tailored cover letters and company notes. Basic restock and ranking work without it.',
+      desc: 'Rank, draft cover letters, company notes',
+      detail: `Restocks from ${boardsLabel}, ranks by resume fit, drafts tailored cover letters, and prepares company background notes. You always review before applying.`,
     },
   };
 
@@ -408,7 +422,7 @@ function RestockPage() {
 
   // ── Idle view: the restock form ─────────────────────────────────────
   if (state === 'idle') {
-    return (
+    const manualForm = (
       <SearchConfigForm
         sourceCount={sourceCount}
         llmAvailable={llmAvailable}
@@ -456,6 +470,23 @@ function RestockPage() {
         usesRemoteFallback={usesRemoteFallback}
         startLabel={startLabel}
       />
+    );
+
+    return (
+      <div className="space-y-4">
+        <AssistantRunPanel />
+        {assistantReady ? (
+          <details className="group rounded-2xl border border-border-default bg-bg-card">
+            <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-4 text-sm font-medium text-text-secondary transition-colors hover:text-text-primary">
+              <span>Prefer to set your roles and restock by hand?</span>
+              <span className="text-text-muted transition-transform group-open:rotate-90">›</span>
+            </summary>
+            <div className="border-t border-border-default p-4">{manualForm}</div>
+          </details>
+        ) : (
+          manualForm
+        )}
+      </div>
     );
   }
 

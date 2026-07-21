@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 .venv/
+.venv-x86/
 venv/
 
 # Runtime caches (auto-created)

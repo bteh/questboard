@@ -3,7 +3,6 @@ import { useNavigate } from '@tanstack/react-router';
 import { getWorkplacePreferenceLabel } from '@/lib/profile-preferences';
 import { resolveSourceLabel } from '@/hooks/use-scrapers';
 import { FunnelSummary } from '@/components/jobs/funnel-summary';
-import { ConnectAiPopover } from '@/components/onboarding/connect-ai-popover';
 import type {
   FunnelSummary as FunnelSummaryData,
   ProgressUpdate,
@@ -145,13 +144,8 @@ export function SearchRunView({
           )}
           {snapshot && !snapshot.use_ai && (
             <div className="qb-restock-note" style={{ marginTop: 14 }}>
-              <b>This run used basic ranking only.</b> Connect AI to rerank by resume fit and
-              draft cover letters and company notes.{' '}
-              <ConnectAiPopover side="bottom" align="start">
-                <button type="button" className="qb-textlink" style={{ fontSize: 14 }}>
-                  Connect AI
-                </button>
-              </ConnectAiPopover>
+              <b>This run ranked by keywords and filters.</b> For resume-fit ranking and drafted
+              notes, your connected assistant (Claude or Codex) reads these results and does that part.
             </div>
           )}
         </div>

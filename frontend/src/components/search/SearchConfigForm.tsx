@@ -6,7 +6,6 @@ import { FilterChips } from '@/components/shared/FilterChips';
 import { Textarea } from '@/components/ui/textarea';
 import { Slider } from '@/components/ui/slider';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ConnectAiPopover } from '@/components/onboarding/connect-ai-popover';
 import { cx } from '@questboard/ui';
 import type { MatchStrictness, SearchRequest } from '@/types/search';
 import type { OnboardingState, PlaceSelection } from '@/types/workspace';
@@ -133,13 +132,9 @@ export function SearchConfigForm({
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {!llmAvailable && (
           <div className="qb-restock-note">
-            <b>The board restocks fine without AI.</b> Connect it in Settings when you want
-            resume-fit ranking and drafted materials on top.{' '}
-            <ConnectAiPopover side="bottom" align="start">
-              <button type="button" className="qb-textlink" style={{ fontSize: 14 }}>
-                Connect AI
-              </button>
-            </ConnectAiPopover>
+            <b>The board restocks and ranks on its own, no AI needed.</b> For resume-fit ranking
+            and drafted notes, your connected assistant (Claude or Codex) reads the board over the
+            local link and does that part.
           </div>
         )}
 
@@ -422,7 +417,7 @@ export function SearchConfigForm({
               <div>
                 <span className="qb-flabel">What should the restock do?</span>
                 <div className="qb-modes" role="radiogroup" aria-label="Restock mode">
-                  {(['search_only', 'search_score', 'full_pipeline'] as const).map((m) => {
+                  {(['search_only', 'search_score'] as const).map((m) => {
                     const info = modeLabels[m];
                     const isSelected = selectedMode === m;
                     return (
@@ -432,7 +427,6 @@ export function SearchConfigForm({
                         role="radio"
                         aria-checked={isSelected}
                         onClick={() => setSelectedMode(m)}
-                        disabled={m === 'full_pipeline' && !llmAvailable}
                         className={cx('qb-mode', isSelected && 'qb-active')}
                       >
                         <div className="qb-mlabel">{info.label}</div>
@@ -446,11 +440,8 @@ export function SearchConfigForm({
                 </p>
                 {!llmAvailable && selectedMode === 'search_score' && (
                   <p className="qb-fhelp">
-                    This run still ranks jobs, with keyword and filter matching, until AI is connected in Settings.
+                    This run ranks with keyword and filter matching. Your connected assistant can rank by resume fit.
                   </p>
-                )}
-                {!llmAvailable && selectedMode === 'full_pipeline' && (
-                  <p className="qb-fhelp">Prepare mode stays off until AI is connected.</p>
                 )}
               </div>
 

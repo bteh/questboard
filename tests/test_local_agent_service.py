@@ -546,7 +546,65 @@ def test_local_mcp_exposes_the_two_product_workflows() -> None:
         "search_work",
         "search_side_quests",
         "read_resume_for_matching",
+        "get_career_preferences",
+        "set_career_preferences",
         "refresh_work",
         "get_source_status",
         "set_opportunity_status",
     }.issubset(names)
+
+
+def test_set_career_preferences_saves_and_preserves_other_prefs(local_agent_db) -> None:
+    from app.services import local_agent_service
+
+    result = local_agent_service.set_career_preferences(
+        local_agent_db,
+        roles=["Head of Data Platform", "AI Platform Lead"],
+        keywords=["dbt", "lakehouse"],
+    )
+    assert result["saved"] is True
+    assert result["external_action_performed"] is False
+
+    prefs = local_agent_service.career_preferences(local_agent_db)["preferences"]
+    assert prefs["roles"] == ["Head of Data Platform", "AI Platform Lead"]
+    assert prefs["keywords"] == ["dbt", "lakehouse"]
+    # The location and workplace the person set stay untouched.
+    assert prefs["workplace_preference"] == "remote_friendly"
+    assert prefs["preferred_places"], "saved location must survive a roles update"
+
+
+def test_set_career_preferences_leaves_omitted_field_unchanged(local_agent_db) -> None:
+    from app.services import local_agent_service
+
+    local_agent_service.set_career_preferences(local_agent_db, roles=["Data Ops Manager"])
+
+    prefs = local_agent_service.career_preferences(local_agent_db)["preferences"]
+    assert prefs["roles"] == ["Data Ops Manager"]
+    # keywords were not passed, so the seeded ones remain.
+    assert prefs["keywords"] == ["data platform", "Snowflake"]
+
+
+def test_set_career_preferences_requires_at_least_one_field(local_agent_db) -> None:
+    import pytest as _pytest
+
+    from app.services import local_agent_service
+
+    with _pytest.raises(ValueError):
+        local_agent_service.set_career_preferences(local_agent_db)
+
+
+def test_set_career_preferences_refuses_to_clear_all_intent(local_agent_db) -> None:
+    import pytest as _pytest
+
+    from app.services import local_agent_service
+
+    # Empty lists (or whitespace-only) would wipe the saved intent and starve
+    # Find Work; the tool must refuse and leave the saved roles untouched.
+    with _pytest.raises(ValueError):
+        local_agent_service.set_career_preferences(local_agent_db, roles=[], keywords=[])
+    with _pytest.raises(ValueError):
+        local_agent_service.set_career_preferences(local_agent_db, roles=["  "], keywords=[])
+
+    prefs = local_agent_service.career_preferences(local_agent_db)["preferences"]
+    assert prefs["roles"] == ["Data Engineering Manager"]
+    assert prefs["keywords"] == ["data platform", "Snowflake"]

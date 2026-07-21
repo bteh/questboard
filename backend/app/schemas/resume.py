@@ -24,6 +24,42 @@ class AgentConsentRequest(BaseModel):
     ttl_hours: int | None = None
 
 
+class AgentClientStatus(BaseModel):
+    """One MCP assistant (Claude Code, Codex): installed on this machine, and
+    whether Questboard's local MCP server is registered with it."""
+
+    id: str
+    name: str
+    installed: bool = False
+    connected: bool = False
+    restart_required: bool = False
+
+
+class AgentClientsResponse(BaseModel):
+    clients: list[AgentClientStatus] = Field(default_factory=list)
+
+
+class AgentConnectRequest(BaseModel):
+    client: str
+
+
+class AgentRunRequest(BaseModel):
+    """Ask the connected assistant to run a named task headlessly. The task id
+    (not a free-form prompt) is what the client sends; the server owns the
+    actual prompt and the tool allow-list."""
+
+    client: str = "claude"
+    task: str = "find_and_rank"
+
+
+class AgentRunResponse(BaseModel):
+    ok: bool = False
+    result: str = ""
+    error: str = ""
+    cost_usd: float | None = None
+    num_turns: int | None = None
+
+
 class ResumeAnalysisSummary(BaseModel):
     """Summary of what resume analysis extracted, echoed in the upload response."""
 

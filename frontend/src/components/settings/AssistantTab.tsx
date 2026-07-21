@@ -1,0 +1,215 @@
+import { useState } from 'react';
+import { Bot, Check, Copy, Loader2, Plug } from 'lucide-react';
+import { toast } from 'sonner';
+
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAgentClients, useConnectAgent, useDisconnectAgent } from '@/hooks/use-agent-clients';
+import { useAgentConsent, useSetAgentConsent } from '@/hooks/use-agent-consent';
+import { isDesktopApp } from '@/lib/platform';
+import { openExternal } from '@/lib/open-external';
+import type { AgentClientStatus } from '@/types/resume';
+
+/* The one message that drives the whole career flow through the agent: it
+   Roles are already auto-derived from the resume on upload, so this asks the
+   agent to sharpen them if they're off (via set_career_preferences), then do
+   the part the board can't: judge which postings fit the resume and why.
+   Consent-gated. The user pastes it into Claude or Codex once connected. */
+const SETUP_PROMPT =
+  'Use my local Questboard MCP tools: read my resume, sharpen my target roles and keywords if they need it, then find me matching work and tell me which postings fit my experience best and why.';
+
+export function AssistantTab() {
+  const clientsQuery = useAgentClients();
+  const connect = useConnectAgent();
+  const disconnect = useDisconnectAgent();
+  const consent = useAgentConsent();
+  const setConsent = useSetAgentConsent();
+  const [copied, setCopied] = useState(false);
+
+  const clients = clientsQuery.data?.clients ?? [];
+  const noneInstalled = !clientsQuery.isLoading && clients.length > 0 && clients.every((client) => !client.installed);
+
+  const handleConnect = (client: AgentClientStatus) => {
+    connect.mutate(client.id, {
+      onSuccess: (data) => toast.success(`${data.name} connected. Restart ${data.name} to use Questboard.`),
+      onError: (error) => toast.error(error instanceof Error ? error.message : 'Could not connect'),
+    });
+  };
+  const handleDisconnect = (client: AgentClientStatus) => {
+    disconnect.mutate(client.id, {
+      onSuccess: (data) => toast.success(`${data.name} turned off`),
+      onError: (error) => toast.error(error instanceof Error ? error.message : 'Could not turn off'),
+    });
+  };
+  const copyPrompt = async () => {
+    try {
+      await navigator.clipboard.writeText(SETUP_PROMPT);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      toast.error('Copy failed. Select the text and copy it by hand.');
+    }
+  };
+
+  if (!isDesktopApp()) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Bot className="h-4 w-4" /> Your assistant
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-text-secondary">
+            Connecting Claude or Codex happens in the desktop app, which runs the link on your own
+            machine. Open Questboard on your Mac to set it up.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Bot className="h-4 w-4" /> Your assistant
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-text-secondary">
+            Questboard finds and filters the work. Your own assistant (Claude or Codex) does the
+            resume-fit ranking and drafts notes, over a link that stays on your machine. No AI key,
+            and no cost from us.
+          </p>
+
+          <div className="space-y-2">
+            {clientsQuery.isLoading ? (
+              <p className="text-sm text-text-muted">Checking for assistants…</p>
+            ) : (
+              clients.map((client) => (
+                <div
+                  key={client.id}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-border-default bg-bg-subtle/40 p-3"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-text-primary">{client.name}</p>
+                    <p className="text-xs text-text-muted">
+                      {!client.installed
+                        ? 'Not found on this Mac'
+                        : client.connected
+                          ? 'Connected. Restart it to pick up changes.'
+                          : 'Installed, not connected yet'}
+                    </p>
+                  </div>
+                  {!client.installed ? (
+                    <span className="text-xs text-text-tertiary">Install it first</span>
+                  ) : client.connected ? (
+                    <div className="flex items-center gap-2">
+                      <span className="flex items-center gap-1 text-xs font-medium text-brand">
+                        <Check className="h-3.5 w-3.5" /> Connected
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={connect.isPending}
+                        onClick={() => handleConnect(client)}
+                      >
+                        Reconnect
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={disconnect.isPending}
+                        onClick={() => handleDisconnect(client)}
+                      >
+                        Turn off
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      size="sm"
+                      disabled={connect.isPending}
+                      onClick={() => handleConnect(client)}
+                    >
+                      {connect.isPending && connect.variables === client.id ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Plug className="mr-2 h-4 w-4" />
+                      )}
+                      Connect
+                    </Button>
+                  )}
+                </div>
+              ))
+            )}
+            {noneInstalled && (
+              <p className="text-xs text-text-muted">
+                No assistant found on this Mac. Questboard works with{' '}
+                <button
+                  type="button"
+                  className="font-medium text-brand underline underline-offset-2"
+                  onClick={() => void openExternal('https://claude.ai/code')}
+                >
+                  Claude Code
+                </button>{' '}
+                or Codex. Install one, then come back.
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Plug className="h-4 w-4" /> Set up your job search in one message
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-border-default bg-bg-subtle/40 p-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-text-primary">Step 1: let your assistant read your resume</p>
+              <p className="text-xs text-text-muted">
+                {consent.data?.granted
+                  ? 'Allowed. It reads your resume to match roles. Questboard never sends it anywhere.'
+                  : 'Off. Your assistant can browse jobs, but cannot read your resume until you allow it.'}
+              </p>
+            </div>
+            <Button
+              variant={consent.data?.granted ? 'outline' : 'default'}
+              size="sm"
+              disabled={setConsent.isPending || consent.isLoading}
+              onClick={() =>
+                setConsent.mutate(!consent.data?.granted, {
+                  onSuccess: (data) =>
+                    toast.success(data.granted ? 'Resume access allowed' : 'Resume access turned off'),
+                  onError: (error) =>
+                    toast.error(error instanceof Error ? error.message : 'Could not update access'),
+                })
+              }
+            >
+              {consent.data?.granted ? 'Turn off' : 'Allow'}
+            </Button>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-text-primary">Step 2 (optional): go deeper with your assistant</p>
+            <p className="text-sm text-text-secondary">
+              Your target roles are already set from your resume. Paste this to have your assistant
+              sharpen them and judge which postings actually fit your experience, and why.
+            </p>
+            <div className="rounded-xl border border-border-default bg-bg-card p-3 text-sm leading-relaxed text-text-primary">
+              {SETUP_PROMPT}
+            </div>
+            <Button variant="outline" size="sm" onClick={copyPrompt} disabled={!consent.data?.granted}>
+              {copied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
+              {consent.data?.granted ? (copied ? 'Copied' : 'Copy prompt') : 'Allow resume access first'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
