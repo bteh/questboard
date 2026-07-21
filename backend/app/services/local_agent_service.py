@@ -420,24 +420,43 @@ def _role_tokens(value: str | None) -> set[str]:
     return tokens
 
 
-def _title_matches_queries(title: str | None, queries: list[str]) -> bool:
-    """Require a candidate title to contain one configured role family.
+# Seniority / scaffolding words that carry no domain signal on their own. A
+# title that only shares one of these with a target role is not "in lane".
+_ROLE_GENERIC_TOKENS = frozenset({
+    "senior", "staff", "principal", "lead", "manager", "director", "head",
+    "vp", "chief", "officer", "junior", "associate", "i", "ii", "iii", "iv",
+})
 
-    The generic application search also scans descriptions and companies.
-    That is useful for free-text browsing but made the profile board admit
-    unrelated jobs merely because their description mentioned a target role.
+
+def _title_is_in_lane(title: str | None, queries: list[str]) -> bool:
+    """Keep a candidate title that is a full role match (primary) OR shares a
+    real domain word with a target role (adjacent).
+
+    Retrieval is recall-first: the connected agent owns the fit verdict, so we
+    hand it in-lane roles it can rank or skip rather than dropping them here.
+    We still exclude titles with an occupation conflict the query doesn't share
+    (a nurse/clinical/product role for an engineer), and titles that overlap
+    only on a bare seniority word ("Manager" alone is not a data match).
     """
 
     title_tokens = _role_tokens(title)
+    if not title_tokens:
+        return False
     title_conflicts = title_tokens & _OCCUPATION_CONFLICT_TOKENS
     for query in queries:
         query_tokens = _role_tokens(query)
-        if not query_tokens or not query_tokens.issubset(title_tokens):
+        if not query_tokens:
             continue
         query_conflicts = query_tokens & _OCCUPATION_CONFLICT_TOKENS
         if title_conflicts - query_conflicts:
             continue
-        return True
+        # primary: the whole role family is present
+        if query_tokens.issubset(title_tokens):
+            return True
+        # adjacent: shares a domain (non-seniority) word with the target role
+        domain = query_tokens - _ROLE_GENERIC_TOKENS
+        if domain & title_tokens:
+            return True
     return False
 
 
@@ -581,7 +600,7 @@ def search_work(
     # still-live unknown-date duplicate that shared the key.
     survivors: list[ApplicationRecord] = []
     for row in rows:
-        if terms and not _title_matches_queries(row.job_title, terms):
+        if terms and not _title_is_in_lane(row.job_title, terms):
             title_mismatch_excluded += 1
             continue
         age_days = _source_age_days(row.date_posted)

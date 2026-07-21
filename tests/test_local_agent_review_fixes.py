@@ -266,15 +266,15 @@ def test_refresh_is_not_advertised_idempotent():
 
 
 def test_conflict_rejection_covers_the_domain_tokens():
-    from app.services.local_agent_service import _title_matches_queries
+    from app.services.local_agent_service import _title_is_in_lane
 
-    # query is a token-subset of the title but a conflict token differs -> reject
-    assert not _title_matches_queries("Data Science Manager", ["Data Manager"])
-    assert not _title_matches_queries("Program Manager, Data", ["Data Manager"])
-    assert not _title_matches_queries("Data Center Engineer", ["Data Engineer"])
-    assert not _title_matches_queries("Project Manager, Data", ["Data Manager"])
+    # A conflict token the query doesn't share rejects even a domain overlap.
+    assert not _title_is_in_lane("Data Science Manager", ["Data Manager"])
+    assert not _title_is_in_lane("Program Manager, Data", ["Data Manager"])
+    assert not _title_is_in_lane("Data Center Engineer", ["Data Engineer"])
+    assert not _title_is_in_lane("Project Manager, Data", ["Data Manager"])
     # no conflict token -> keep
-    assert _title_matches_queries("Senior Data Engineer", ["Data Engineer"])
+    assert _title_is_in_lane("Senior Data Engineer", ["Data Engineer"])
 
 
 def test_source_age_days_parses_relative_and_unix():
