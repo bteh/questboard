@@ -420,6 +420,10 @@ function BoardPage() {
   const visibleItems = pageQueries
     .flatMap((q) => q.data?.items ?? [])
     .filter((app) => withinPayCeiling(app, payCeiling));
+  /* Once the assistant has ranked, its fit order (from the API) wins: don't
+     re-split by recency or claim an exact "new since" count, both of which
+     assume newest-first. */
+  const hasAgentVerdicts = careerLane && visibleItems.some((app) => app.agent_fit);
 
   /* careerOnly presets lean on fields only career rows carry (score,
      company type), and career rows only live in the Jobs lane now, so the
@@ -441,7 +445,7 @@ function BoardPage() {
 
   const newSince = careerLane
     ? countNewSince(visibleItems, workCutoff, {
-        newestFirst: sortNewest,
+        newestFirst: sortNewest && !hasAgentVerdicts,
         hasMore: total === undefined || pages * PAGE_SIZE < total,
       })
     : null;
@@ -720,7 +724,7 @@ function BoardPage() {
                 items={visibleItems}
                 labels={labels}
                 cutoff={careerLane ? workCutoff : undefined}
-                grouped={careerLane && sortNewest}
+                grouped={careerLane && sortNewest && !hasAgentVerdicts}
                 onOpenSheet={setSheetApp}
                 onExplain={setExplainApp}
                 onOpenDetail={careerLane ? openDetail : undefined}
