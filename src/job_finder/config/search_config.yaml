@@ -126,7 +126,7 @@ compensation:
 # Search frequency
 search_settings:
   results_per_board: 50
-  results_per_additional_source: 100
+  results_per_additional_source: 500
   max_days_old: 30
   exclude_staffing_agencies: true
   country: "USA"

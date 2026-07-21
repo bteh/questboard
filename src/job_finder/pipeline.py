@@ -1322,7 +1322,10 @@ class JobFinderPipeline:
         # equally-relevant remote roles that the location filter later drops, and
         # the cap runs before that filter. The scraper already fetched every
         # board, so a higher cap costs almost nothing (it only keeps more rows).
-        results_per_additional = max(1, settings.get("results_per_additional_source", 500))
+        # Floor at 500 regardless of the loaded profile: a lower per-source cap
+        # silently drops relevant company jobs (e.g. ALO's Manager of Data
+        # Engineering sat behind 100 exact matches), which we never want.
+        results_per_additional = max(500, int(settings.get("results_per_additional_source", 500) or 500))
         max_days_old = max(1, settings.get("max_days_old", 30))
         search_distance = settings.get("search_radius_miles")  # None = JobSpy default (50 miles)
         jobspy_boards = self.config.get("job_boards") or None  # None → default boards

@@ -10,6 +10,45 @@ from sqlalchemy.orm import Session
 from job_finder.models.database import APPLICATION_VERTICALS, scoped_applications
 from app.models.application import ApplicationRecord
 
+# A place filter keyed to a city name alone drops every metro-sibling city:
+# "Los Angeles" would hide Beverly Hills, Santa Monica, Culver City, etc.,
+# which is not what a job seeker means by their city. Expand a known metro to
+# its cities so on-site work anywhere in the metro still surfaces.
+_METRO_CITIES: dict[str, tuple[str, ...]] = {
+    "los angeles": (
+        "los angeles", "beverly hills", "santa monica", "culver city", "pasadena",
+        "burbank", "glendale", "long beach", "torrance", "el segundo", "marina del rey",
+        "west hollywood", "hollywood", "inglewood", "hawthorne", "manhattan beach",
+        "playa vista", "venice", "westwood", "century city", "sherman oaks",
+        "studio city", "north hollywood", "van nuys", "woodland hills", "el monte",
+        "alhambra", "monterey park", "redondo beach", "santa clarita", "universal city",
+    ),
+    "san francisco": (
+        "san francisco", "oakland", "berkeley", "san mateo", "palo alto", "mountain view",
+        "menlo park", "redwood city", "sunnyvale", "santa clara", "san jose", "cupertino",
+        "emeryville", "south san francisco", "foster city", "burlingame",
+    ),
+    "new york": (
+        "new york", "brooklyn", "manhattan", "queens", "jersey city", "hoboken",
+        "long island city", "newark",
+    ),
+    "seattle": ("seattle", "bellevue", "redmond", "kirkland", "tacoma"),
+    "boston": ("boston", "cambridge", "somerville", "waltham", "burlington"),
+    "austin": ("austin", "round rock"),
+    "chicago": ("chicago", "evanston"),
+    "denver": ("denver", "boulder"),
+    "san diego": ("san diego", "la jolla", "carlsbad"),
+}
+
+
+def _metro_cities_for(location: str) -> tuple[str, ...] | None:
+    """The metro's city list if `location` names a known metro, else None."""
+    low = " ".join((location or "").lower().split())
+    for metro, cities in _METRO_CITIES.items():
+        if metro in low:
+            return cities
+    return None
+
 _ALLOWED_SORT_BY = frozenset({
     "overall_score", "date_found", "company", "job_title", "salary_min", "salary_max",
     "event_start", "updated_at",
@@ -155,8 +194,13 @@ def get_applications(
         # text keeps a plain location substring match.
         from job_finder.us_states import state_aliases
 
+        metro = _metro_cities_for(location)
         aliases = state_aliases(location)
-        if aliases:
+        if metro:
+            # "Los Angeles" also finds Beverly Hills / Santa Monica / etc. — the
+            # seeker means the metro, not only rows that name the core city.
+            place_match = or_(*[ApplicationRecord.location.ilike(f"%{c}%") for c in metro])
+        elif aliases:
             _full_name, abbr = aliases
             place_match = ApplicationRecord.state_codes.like(f"%,{abbr},%")
         else:
