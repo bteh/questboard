@@ -47,6 +47,7 @@ describe('the money page', () => {
         onClose={() => {}}
         onHome={false}
         onBoard={false}
+        onWork={false}
         onLog={false}
         onSettings={false}
         onHealth={false}
