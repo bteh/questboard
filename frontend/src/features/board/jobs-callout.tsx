@@ -33,7 +33,8 @@ export function JobsSetupStrip({
       )}
       {profileConfigured !== false && (
         <span>
-          <b>Profile radar on.</b> These titles match your target roles; use Codex or Claude for resume evidence.
+          <b>These match your target roles.</b> “Get new jobs” pulls fresh postings from your sources;
+          “Rank these with your assistant” has your AI score what’s already here.
         </span>
       )}
       {jurisdictionConfigured === false && (
