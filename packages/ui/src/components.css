@@ -109,7 +109,7 @@
 .qb-chip.qb-active.qb-c-wine { background: rgba(125, 59, 76, .08); color: var(--wine); border-color: rgba(125, 59, 76, .3); }
 .qb-chip:focus-visible { outline: 2px solid var(--sage); outline-offset: 2px; }
 .qb-pchip { display: flex; align-items: center; gap: 7px; border: 1px solid var(--hair); background: var(--paper); border-radius: 4px; padding: 5px 12px; font-family: inherit; font-size: 13.5px; color: var(--soft); cursor: pointer; }
-.qb-pchip .qb-n { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 12px; color: var(--mute); }
+.qb-pchip .qb-n { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 12px; color: var(--soft); }
 .qb-pchip.qb-active { background: var(--step2); border-color: var(--step4); color: var(--ink); font-weight: 500; }
 .qb-pchip.qb-dim { opacity: .45; }
 

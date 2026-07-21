@@ -54,7 +54,7 @@ export function SourceCategoryChips({ counts, selected, onSelect }: SourceCatego
           }`}
         >
           {CATEGORY_LABELS[c] ?? c}{' '}
-          <span className="font-mono text-text-muted tabular-nums">{counts?.[c]}</span>
+          <span className="font-mono text-text-secondary tabular-nums">{counts?.[c]}</span>
         </button>
       ))}
     </div>
