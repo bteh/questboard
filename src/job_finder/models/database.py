@@ -694,6 +694,16 @@ def _migrate_db(engine) -> None:
                     text("ALTER TABLE scrape_runs ADD COLUMN rows_invalid INTEGER DEFAULT 0")
                 )
 
+    # One-time, versioned DATA repairs (vs the schema migrations above).
+    # Runs here so every startup path that migrates a local SQLite DB, the
+    # src pipeline, the dev backend, and the desktop sidecar (both delegate
+    # to this function), repairs old rows automatically. Each repair is
+    # marker-gated in the data_repairs table, so this costs one SELECT per
+    # launch once applied. Never raises.
+    from job_finder.models.maintenance import run_startup_repairs
+
+    run_startup_repairs(engine)
+
 
 def init_db(db_path: str | None = None) -> None:
     """Initialize the database and create tables."""
