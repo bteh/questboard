@@ -87,14 +87,20 @@ describe('the poster model', () => {
     expect(stated.copy.bring).toContain('nothing');
   });
 
-  it('cuts the scannable line from real text or renders nothing', () => {
+  it('returns a clean word-boundary lead, letting the card CSS clamp the rest', () => {
     expect(scannableDesc('')).toBeUndefined();
     expect(scannableDesc('   ')).toBeUndefined();
+    // Short text is returned whole; the poster's 2-line CSS clamp does the
+    // visual cut, so no mid-sentence JS truncation here.
     expect(scannableDesc('React to a new snack. Then more detail here.')).toBe(
-      'React to a new snack.',
+      'React to a new snack. Then more detail here.',
     );
-    const long = 'a'.repeat(200);
-    expect(scannableDesc(long)!.length).toBeLessThanOrEqual(140);
+    // Long text: word-boundary truncation, no mid-word fragment, <= 200 chars.
+    const long = 'word '.repeat(60).trim();
+    const out = scannableDesc(long)!;
+    expect(out.length).toBeLessThanOrEqual(200);
+    expect(out.endsWith(' ')).toBe(false);
+    expect(out.endsWith('word')).toBe(true);
   });
 
   it('gives career posters the logo well, quests the small giver logo', () => {

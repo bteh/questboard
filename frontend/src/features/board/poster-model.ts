@@ -67,9 +67,13 @@ export function fitBadgeFor(app: ApplicationResponse): PosterModel['fitBadge'] {
 export function scannableDesc(description: string | null | undefined): string | undefined {
   const text = (description ?? '').replace(/\s+/g, ' ').trim();
   if (!text) return undefined;
-  const sentence = text.split(/(?<=[.!?])\s/)[0] ?? text;
-  const cut = sentence.length > 140 ? `${sentence.slice(0, 137).trimEnd()}…` : sentence;
-  return cut;
+  // Return a clean word-boundary lead and let the card's 2-line CSS clamp do
+  // the visual cut (it adds its own ellipsis). A JS character cut here fought
+  // the clamp and left mid-word fragments like "...Okta Data Engineer to".
+  if (text.length <= 200) return text;
+  const slice = text.slice(0, 200);
+  const lastSpace = slice.lastIndexOf(' ');
+  return (lastSpace > 60 ? slice.slice(0, lastSpace) : slice).replace(/[,;:.]$/, '');
 }
 
 function statedStr(quest: ApplicationResponse['quest'], key: string): string {
