@@ -34,6 +34,16 @@ export interface PosterModel {
   logoWell?: PosterLogoWell;
   /** the connected assistant's fit verdict for this row, from its last run */
   fitBadge?: { label: string; verdict: 'strong' | 'good' | 'reach' | 'skip' };
+  /** fast offline skill-coverage hint, shown until the agent's verdict lands */
+  skillBadge?: { label: string; band: 'close' | 'partial' | 'weak' };
+}
+
+/** The fast skill-coverage hint as a light poster badge, or undefined. */
+export function skillBadgeFor(app: ApplicationResponse): PosterModel['skillBadge'] {
+  const lf = app.local_fit;
+  if (!lf || lf.skill_count < 1) return undefined;
+  const n = lf.skill_count;
+  return { label: `${n} skill${n === 1 ? '' : 's'} match`, band: lf.band };
 }
 
 const FIT_WORD: Record<'strong' | 'good' | 'reach' | 'skip', string> = {
@@ -125,5 +135,6 @@ export function toPoster(app: ApplicationResponse, sourceLabel: string): PosterM
     logoUrl: logoWell ? undefined : logoUrl,
     logoWell,
     fitBadge: fitBadgeFor(app),
+    skillBadge: skillBadgeFor(app),
   };
 }

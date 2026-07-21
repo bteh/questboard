@@ -236,6 +236,19 @@
 .qb-p-fit-good   { color: #5b7f4a; background: rgba(91, 127, 74, .09); }
 .qb-p-fit-reach  { color: #9a6a1f; background: rgba(154, 106, 31, .09); }
 .qb-p-fit-skip   { color: var(--mute); background: rgba(28, 27, 23, .05); }
+/* the fast skill-coverage hint: lighter than the agent's verdict, no border,
+   so it reads as a quick signal, not a judgment */
+.qb-p-skill {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  color: var(--soft);
+  background: rgba(28, 27, 23, .05);
+  white-space: nowrap;
+}
+.qb-p-skill-close { color: #2f6b3f; background: rgba(47, 107, 63, .08); }
 .qb-p-title { font-family: var(--serif); font-variation-settings: 'opsz' 40; font-weight: 560; font-size: 19px; line-height: 1.18; letter-spacing: -.01em; margin: 0 0 6px; }
 /* career logo well: a fixed square tile on light paper so logos survive the
    cream card; top-aligned to the title's first line, never shifting layout */
