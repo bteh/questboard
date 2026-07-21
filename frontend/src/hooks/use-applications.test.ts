@@ -73,4 +73,34 @@ describe('patchApplicationLists', () => {
     patchApplicationLists(qc, 7, { status: 'paid_out' });
     expect(qc.getQueryData<ApplicationResponse>(['applications', 7])?.status).toBe('clipped');
   });
+
+  /* The Find Work board caches its rows under ['profile-work', filters]
+     (board.tsx careerLane), not ['applications', filters]. A Clip made on
+     that board must land in those caches too, or the poster never flips
+     to its clipped stamp. */
+  it('writes the edit into cached profile-work lists too', () => {
+    const qc = new QueryClient();
+    const WORK_KEY = ['profile-work', { sort_by: 'rank', page: 1 }];
+    qc.setQueryData(WORK_KEY, list([row(7, 'found'), row(8, 'found')]));
+    qc.setQueryData(LEDGER_KEY, list([row(7, 'found')]));
+
+    patchApplicationLists(qc, 7, { status: 'clipped' });
+
+    const work = qc.getQueryData<ApplicationListResponse>(WORK_KEY)!;
+    expect(work.items.find((i) => i.id === 7)?.status).toBe('clipped');
+    expect(work.items.find((i) => i.id === 8)?.status).toBe('found');
+    expect(qc.getQueryData<ApplicationListResponse>(LEDGER_KEY)!.items[0].status).toBe('clipped');
+  });
+
+  it('returns profile-work entries so a failed mutation rolls those back too', () => {
+    const qc = new QueryClient();
+    const WORK_KEY = ['profile-work', { sort_by: 'rank', page: 1 }];
+    qc.setQueryData(WORK_KEY, list([row(7, 'found')]));
+
+    const previous = patchApplicationLists(qc, 7, { status: 'clipped' });
+    expect(qc.getQueryData<ApplicationListResponse>(WORK_KEY)!.items[0].status).toBe('clipped');
+
+    previous.forEach(([key, data]) => qc.setQueryData(key, data));
+    expect(qc.getQueryData<ApplicationListResponse>(WORK_KEY)!.items[0].status).toBe('found');
+  });
 });

@@ -112,3 +112,50 @@ describe('score provenance on the job card', () => {
     expect(screen.queryByText('rough keyword match')).toBeNull();
   });
 });
+
+describe('salary honesty on the job card', () => {
+  it('renders hourly pay with /hr, never compacted like annual pay', () => {
+    render(
+      <JobCard
+        app={makeApp({
+          salary_min: 50,
+          salary_max: 90,
+          salary_currency: 'USD',
+          salary_period: 'hourly',
+          salary_source: 'reported',
+        })}
+      />,
+    );
+    expect(screen.getByText('$50 - $90/hr')).toBeTruthy();
+    /* reported pay gets no estimate suffix */
+    expect(screen.queryByText('estimated from description')).toBeNull();
+  });
+
+  it('renders the stated currency, not a dollar sign', () => {
+    render(
+      <JobCard
+        app={makeApp({
+          salary_min: 90000,
+          salary_max: 110000,
+          salary_currency: 'EUR',
+          salary_period: 'annual',
+        })}
+      />,
+    );
+    expect(screen.getByText('€90K - €110K')).toBeTruthy();
+  });
+
+  it('keeps the estimate note for pay parsed from the description', () => {
+    render(
+      <JobCard
+        app={makeApp({
+          salary_min: 90000,
+          salary_max: 110000,
+          salary_source: 'parsed_from_description',
+        })}
+      />,
+    );
+    expect(screen.getByText('$90K - $110K')).toBeTruthy();
+    expect(screen.getByText('estimated from description')).toBeTruthy();
+  });
+});

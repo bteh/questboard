@@ -30,15 +30,52 @@ export function formatDate(dateStr: string | null, style: 'short' | 'relative' |
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-export function formatSalary(min: number | null, max: number | null): string {
+/** ISO codes the UI renders as a bare symbol. Anything else keeps its code
+    as a prefix ("CHF 90K") so we never guess at a symbol. */
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  USD: '$',
+  EUR: '€',
+  GBP: '£',
+  CAD: 'C$',
+  AUD: 'A$',
+};
+
+/** '$' when no currency is stated (legacy rows), the symbol for known
+    codes, "CHF " (code plus space) for the rest. */
+export function salaryCurrencyPrefix(currency?: string | null): string {
+  const code = (currency || '').trim().toUpperCase();
+  if (!code) return '$';
+  return CURRENCY_SYMBOLS[code] ?? `${code} `;
+}
+
+export type SalaryPeriod = 'hourly' | 'annual';
+
+/** The API's salary_period narrowed to what the formatter distinguishes.
+    'yearly' appears on rows saved before the values settled. */
+export function toSalaryPeriod(raw?: string | null): SalaryPeriod | null {
+  if (raw === 'hourly') return 'hourly';
+  if (raw === 'annual' || raw === 'yearly') return 'annual';
+  return null;
+}
+
+export function formatSalary(
+  min: number | null,
+  max: number | null,
+  currency?: string | null,
+  period?: SalaryPeriod | null,
+): string {
   if (!min && !max) return '';
+  const prefix = salaryCurrencyPrefix(currency);
+  const hourly = period === 'hourly';
   const fmt = (n: number) => {
-    if (n >= 1000) return `$${Math.round(n / 1000)}K`;
-    return `$${n}`;
+    // Hourly rates stay exact; only annual-scale figures compact to K.
+    if (!hourly && n >= 1000) return `${prefix}${Math.round(n / 1000)}K`;
+    return `${prefix}${n}`;
   };
-  if (min && max) return `${fmt(min)} - ${fmt(max)}`;
-  if (min) return `${fmt(min)}+`;
-  return `Up to ${fmt(max!)}`;
+  const suffix = hourly ? '/hr' : '';
+  if (min && max) return `${fmt(min)} - ${fmt(max)}${suffix}`;
+  if (min) return `${fmt(min)}+${suffix}`;
+  return `Up to ${fmt(max!)}${suffix}`;
 }
 
 /**

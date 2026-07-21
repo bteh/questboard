@@ -20,34 +20,43 @@ export function useApplications(filters: ApplicationFilters = {}) {
 }
 
 /**
- * Write one row's fields into EVERY cached ['applications', *] list at once.
+ * Every query-key family that caches application lists. The log trio shares
+ * ['applications', filters]; the Find Work board's career lane caches under
+ * ['profile-work', filters] (board.tsx). A status edit must land in both.
+ */
+export const APPLICATION_LIST_KEYS = [['applications'], ['profile-work']] as const;
+
+/**
+ * Write one row's fields into EVERY cached application list at once.
  *
- * This is the shared-cache contract the log trio rides on: the log page, the
- * ledger, and the board all read ['applications', filters] keys from the one
- * QueryClient, so an optimistic status edit made anywhere shows everywhere
- * instantly, before the server round-trip settles. Returns the touched
- * entries so a mutation's onError can roll them back.
+ * This is the shared-cache contract the log trio and the Find Work board
+ * ride on: they all read list keys from the one QueryClient, so an
+ * optimistic status edit made anywhere shows everywhere instantly, before
+ * the server round-trip settles. Returns the touched entries so a
+ * mutation's onError can roll them back.
  */
 export function patchApplicationLists(
   queryClient: ReturnType<typeof useQueryClient>,
   id: number,
   patch: Partial<ApplicationResponse>,
 ): [readonly unknown[], ApplicationListResponse | undefined][] {
-  const previousLists = queryClient.getQueriesData<ApplicationListResponse>({
-    queryKey: ['applications'],
-  });
-  queryClient.setQueriesData<ApplicationListResponse>(
-    { queryKey: ['applications'] },
-    (old) => {
-      if (!old || !Array.isArray(old.items)) return old;
-      return {
-        ...old,
-        items: old.items.map((item: ApplicationResponse) =>
-          item.id === id ? { ...item, ...patch } : item,
-        ),
-      };
-    },
+  const previousLists = APPLICATION_LIST_KEYS.flatMap((queryKey) =>
+    queryClient.getQueriesData<ApplicationListResponse>({ queryKey }),
   );
+  for (const queryKey of APPLICATION_LIST_KEYS) {
+    queryClient.setQueriesData<ApplicationListResponse>(
+      { queryKey },
+      (old) => {
+        if (!old || !Array.isArray(old.items)) return old;
+        return {
+          ...old,
+          items: old.items.map((item: ApplicationResponse) =>
+            item.id === id ? { ...item, ...patch } : item,
+          ),
+        };
+      },
+    );
+  }
   return previousLists;
 }
 
@@ -88,6 +97,7 @@ export function useUpdateStatus() {
     mutationFn: ({ id, data }: { id: number; data: StatusUpdate }) => updateApplicationStatus(id, data),
     onMutate: async ({ id, data }) => {
       await queryClient.cancelQueries({ queryKey: ['applications'] });
+      await queryClient.cancelQueries({ queryKey: ['profile-work'] });
       const previousLists = patchApplicationLists(queryClient, id, { status: data.status });
       return { previousLists };
     },
@@ -100,6 +110,7 @@ export function useUpdateStatus() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['profile-work'] });
       queryClient.invalidateQueries({ queryKey: ['analytics'] });
     },
   });
@@ -118,6 +129,7 @@ export function useLogEdit() {
     mutationFn: ({ id, data }: { id: number; data: ApplicationUpdate }) => updateApplication(id, data),
     onMutate: async ({ id, data }) => {
       await queryClient.cancelQueries({ queryKey: ['applications'] });
+      await queryClient.cancelQueries({ queryKey: ['profile-work'] });
       const patch: Partial<ApplicationResponse> = {
         // The list sorts on updated_at; mirror the server's touch so the
         // optimistic row keeps its place honestly.
@@ -144,6 +156,7 @@ export function useLogEdit() {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['applications'] });
+      queryClient.invalidateQueries({ queryKey: ['profile-work'] });
       queryClient.invalidateQueries({ queryKey: ['analytics'] });
     },
   });

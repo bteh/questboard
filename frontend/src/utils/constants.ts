@@ -1,7 +1,10 @@
+// Mirrors the backend StatusUpdate enum (backend/app/schemas/application.py).
+// 'booked' and 'expired' are usually pipeline-set but stay selectable and
+// filterable so those rows never become invisible.
 export const STATUS_OPTIONS = [
   'found', 'reviewed', 'clipped', 'applying', 'applied',
   'interviewing', 'offer', 'rejected', 'withdrawn',
-  'shelved', 'attended', 'paid_out',
+  'shelved', 'booked', 'attended', 'paid_out', 'expired',
 ] as const;
 
 export type StatusOption = typeof STATUS_OPTIONS[number];
@@ -59,8 +62,10 @@ export const STATUS_COLORS: Record<string, BadgeColors> = {
   rejected:     DANGER_BADGE,
   withdrawn:    { bg: '#F1F5F9', text: '#64748B', darkBg: '#334155', darkText: '#94A3B8' },
   shelved:      { bg: '#F1F5F9', text: '#64748B', darkBg: '#334155', darkText: '#94A3B8' },
+  booked:       SAGE_BADGE,
   attended:     SAGE_BADGE,
   paid_out:     SAGE_BADGE,
+  expired:      { bg: '#F1F5F9', text: '#64748B', darkBg: '#334155', darkText: '#94A3B8' },
 };
 
 export const STATUS_DOT_COLORS: Record<string, string> = {

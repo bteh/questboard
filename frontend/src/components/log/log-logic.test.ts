@@ -15,8 +15,20 @@ import {
   splitLog,
   withPaidOut,
 } from './log-logic';
+import { LOG_BOARD_STATUSES } from './log-logic';
 import { ALL_VERTICALS, VERTICAL_KEYS, verticalParams } from '@/utils/board-verticals';
 import type { ApplicationResponse } from '@/types/application';
+
+/* Pipeline-set statuses stay visible: 'booked' (booking flow) and 'expired'
+   (expiry pipeline) are written without the user picking them, so the log's
+   board filter must include them or those rows silently vanish. */
+describe('log board status filter', () => {
+  it('includes the pipeline-set statuses booked and expired', () => {
+    const statuses = LOG_BOARD_STATUSES.split(',');
+    expect(statuses).toContain('booked');
+    expect(statuses).toContain('expired');
+  });
+});
 
 function app(over: Partial<ApplicationResponse>): ApplicationResponse {
   return {

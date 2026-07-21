@@ -16,9 +16,10 @@ import type { ApplicationFilters, ApplicationResponse } from '@/types/applicatio
 import { parseAmount, shortDate } from '@/utils/board-card';
 import { ALL_VERTICALS } from '@/utils/board-verticals';
 
-/** Board rows join the log only through one of these statuses. */
+/** Board rows join the log only through one of these statuses. 'booked' and
+    'expired' are pipeline-set, so they must stay visible here. */
 export const LOG_BOARD_STATUSES =
-  'clipped,reviewed,applying,applied,interviewing,offer,shelved,attended,paid_out';
+  'clipped,reviewed,applying,applied,interviewing,offer,shelved,booked,attended,paid_out,expired';
 
 /* The two log queries. Object identity does not matter for the cache key
    (TanStack hashes structurally), but sharing the definitions keeps every

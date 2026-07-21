@@ -15,6 +15,7 @@
 
 import { kindForVertical } from '@questboard/kinds';
 import type { ApplicationResponse, EvaluationReport } from '@/types/application';
+import { salaryCurrencyPrefix } from '@/utils/format';
 import { computeRequirementFit, type RequirementFit } from '@/utils/job-fit';
 import { postedAgoLabel } from '@/utils/job-trust';
 
@@ -109,17 +110,23 @@ function fmtBound(n: number): string {
   return n >= 1000 ? `${Math.round(n / 1000)}` : `${n}`;
 }
 
-/** "$160–190k", "$58–72", "$170k+", "up to $95k". Empty when no pay stated. */
-export function formatStatedPay(min: number | null, max: number | null): string {
+/** "$160–190k", "$58–72", "$170k+", "up to $95k". Empty when no pay stated.
+    The stated currency leads ("€160–190k", "CHF 95k"); no currency keeps "$". */
+export function formatStatedPay(
+  min: number | null,
+  max: number | null,
+  currency?: string | null,
+): string {
+  const c = salaryCurrencyPrefix(currency);
   const k = (n: number) => n >= 1000;
   if (min != null && max != null) {
     // Equal bounds are a single figure, never a "$60–60" range.
-    if (min === max) return k(min) ? `$${fmtBound(min)}k` : `$${min}`;
-    if (k(min) && k(max)) return `$${fmtBound(min)}–${fmtBound(max)}k`;
-    return `$${min}–${max}`;
+    if (min === max) return k(min) ? `${c}${fmtBound(min)}k` : `${c}${min}`;
+    if (k(min) && k(max)) return `${c}${fmtBound(min)}–${fmtBound(max)}k`;
+    return `${c}${min}–${max}`;
   }
-  if (min != null) return k(min) ? `$${fmtBound(min)}k+` : `$${min}+`;
-  if (max != null) return k(max) ? `up to $${fmtBound(max)}k` : `up to $${max}`;
+  if (min != null) return k(min) ? `${c}${fmtBound(min)}k+` : `${c}${min}+`;
+  if (max != null) return k(max) ? `up to ${c}${fmtBound(max)}k` : `up to ${c}${max}`;
   return '';
 }
 
@@ -251,6 +258,7 @@ export function questPay(app: ApplicationResponse): { pay: string; payUnit: stri
   const min = app.salary_min;
   const max = app.salary_max;
   if (min == null && max == null) return null;
+  const c = salaryCurrencyPrefix(app.salary_currency);
   const period = (app.salary_period || '').toLowerCase();
   let unit = QUEST_PERIOD_UNITS[period] || '';
   const hours = questNum(app.quest, 'session_hours');
@@ -258,12 +266,12 @@ export function questPay(app: ApplicationResponse): { pay: string; payUnit: stri
 
   let pay: string;
   if (min != null && max != null && min !== max) {
-    pay = `$${fmtQuestAmount(min)}–${fmtQuestAmount(max)}`;
+    pay = `${c}${fmtQuestAmount(min)}–${fmtQuestAmount(max)}`;
   } else if (min != null) {
-    pay = max == null ? `$${fmtQuestAmount(min)}+` : `$${fmtQuestAmount(min)}`;
+    pay = max == null ? `${c}${fmtQuestAmount(min)}+` : `${c}${fmtQuestAmount(min)}`;
   } else {
     /* max only: an "up to" figure; "max" says so without inventing a floor */
-    pay = `$${fmtQuestAmount(max as number)}`;
+    pay = `${c}${fmtQuestAmount(max as number)}`;
     unit = 'max';
   }
   if (app.salary_source === 'parsed_from_description') {
@@ -385,7 +393,7 @@ export function toBoardCard(app: ApplicationResponse, sourceLabel?: string): Boa
     scoreSource: app.score_source ?? null,
   };
 
-  const pay = formatStatedPay(app.salary_min, app.salary_max);
+  const pay = formatStatedPay(app.salary_min, app.salary_max, app.salary_currency);
   if (pay) {
     card.pay = pay;
     card.payUnit = payUnitFor(app);

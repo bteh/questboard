@@ -1,16 +1,20 @@
 import { DollarSign } from 'lucide-react';
 import { ColorBadge } from './color-badge';
-import { formatSalary } from '@/utils/format';
+import { formatSalary, toSalaryPeriod } from '@/utils/format';
 
 interface SalaryBadgeProps {
   min: number | null;
   max: number | null;
   /** 'reported' | 'parsed_from_description' — parsed values are marked as estimates. */
   source?: string | null;
+  /** ISO code from salary_currency ('USD', 'EUR', ...); absent keeps "$". */
+  currency?: string | null;
+  /** salary_period from the record; 'hourly' renders with /hr, uncompacted. */
+  period?: string | null;
 }
 
-export function SalaryBadge({ min, max, source }: SalaryBadgeProps) {
-  const text = formatSalary(min, max);
+export function SalaryBadge({ min, max, source, currency, period }: SalaryBadgeProps) {
+  const text = formatSalary(min, max, currency, toSalaryPeriod(period));
   if (!text) return null;
   const estimated = source === 'parsed_from_description';
   return (

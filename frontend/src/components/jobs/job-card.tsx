@@ -11,7 +11,7 @@ import { FundingBadge } from '@/components/badges/funding-badge';
 import { JobDetail } from './job-detail';
 import { ApplyDrawer } from './apply-drawer';
 import { useDeleteApplication, useUpdateFeedback } from '@/hooks/use-applications';
-import { truncateDescription, formatDate, formatSalary } from '@/utils/format';
+import { truncateDescription, formatDate, formatSalary, toSalaryPeriod } from '@/utils/format';
 import { classifyFreshness, postedAgoLabel, staleWarning, type Freshness } from '@/utils/job-trust';
 import { computeRequirementFit } from '@/utils/job-fit';
 import { cn } from '@/lib/utils';
@@ -176,7 +176,12 @@ export function JobCard({ app, sourceLabels, latestRunId }: JobCardProps) {
     ? REC_BORDER_COLORS.SKIP
     : REC_BORDER_COLORS[app.recommendation] || REC_BORDER_COLORS.SKIP;
   const recency = getRecencyLabel(app.date_found);
-  const salaryText = formatSalary(app.salary_min, app.salary_max);
+  const salaryText = formatSalary(
+    app.salary_min,
+    app.salary_max,
+    app.salary_currency,
+    toSalaryPeriod(app.salary_period),
+  );
 
   // Trust & freshness: the TRUE original post date (not when we found it) so a
   // months-old repost can't look fresh. Falls back to date_found recency.

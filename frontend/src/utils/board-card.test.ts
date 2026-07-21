@@ -210,6 +210,36 @@ describe('pay honesty', () => {
     expect(formatStatedPay(60, 60)).toBe('$60');
     expect(formatStatedPay(200000, 200000)).toBe('$200k');
   });
+
+  it('shows the stated currency, never a dollar-sign lie', () => {
+    expect(formatStatedPay(160000, 190000, 'EUR')).toBe('€160–190k');
+    expect(formatStatedPay(170000, null, 'GBP')).toBe('£170k+');
+    expect(formatStatedPay(null, 95000, 'CHF')).toBe('up to CHF 95k');
+    /* no currency stated keeps today's dollar rendering */
+    expect(formatStatedPay(160000, 190000, null)).toBe('$160–190k');
+  });
+
+  it('carries salary_currency onto the career card pay', () => {
+    const card = toBoardCard(
+      makeApp({ salary_min: 160000, salary_max: 190000, salary_currency: 'EUR' }),
+    );
+    expect(card.pay).toBe('€160–190k');
+  });
+
+  it('carries salary_currency onto quest pay', () => {
+    const card = toBoardCard(
+      makeApp({
+        vertical: 'study',
+        salary_min: 100,
+        salary_max: 125,
+        salary_currency: 'GBP',
+        salary_period: 'session',
+        quest: {},
+      }),
+    );
+    expect(card.pay).toBe('£100–125');
+    expect(card.payUnit).toBe('a session');
+  });
 });
 
 describe('posted label honesty', () => {
