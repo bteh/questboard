@@ -30,7 +30,7 @@ export function titleCase(value: string): string {
     .join(' ');
 }
 
-// Category color mapping — applied dynamically from whatever categories the API
+// Category color mapping, applied dynamically from whatever categories the API
 // returns. Warm-varied hues (sage, teal, clay, olive) keep the source categories
 // distinguishable inside the warm palette. Amber, orange, and slate already fit.
 export const CATEGORY_COLORS: Record<string, string> = {

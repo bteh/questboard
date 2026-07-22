@@ -214,7 +214,7 @@ function RunProgress() {
         })}
       </ul>
       <p className="mt-3 text-xs text-text-muted">
-        Runs in your own Claude, about a minute or two. You can keep using the app.
+        Takes about two minutes. You can keep using the app.
       </p>
     </div>
   );
@@ -257,7 +257,7 @@ export function AssistantRunPanel() {
           // ranked cards below.
           void queryClient.invalidateQueries({ queryKey: ['applications'] });
         },
-        onError: (error) => setHttpError(error instanceof Error ? error.message : 'Something went wrong.'),
+        onError: (error) => setHttpError(error instanceof Error ? error.message : 'Something went wrong. Try again in a minute.'),
       },
     );
   };
@@ -271,8 +271,8 @@ export function AssistantRunPanel() {
         <div className="min-w-0 flex-1">
           <p className="text-base font-semibold text-text-primary">Find and rank with your assistant</p>
           <p className="mt-1 text-sm text-text-secondary">
-            It reads your resume and ranks the board against your experience, then tells you why the
-            top few fit. Runs in your own Claude, so Questboard adds no AI cost. Takes a minute or two.
+            It reads your resume and ranks every job on the board. The top few come back with
+            reasons. Runs in your own Claude, at no cost from Questboard. Takes about two minutes.
           </p>
 
           {!claudeInstalled && !clients.isLoading && (

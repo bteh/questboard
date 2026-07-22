@@ -60,7 +60,7 @@ function getKpis(stats: DashboardStats) {
 
   return [
     { label: 'jobs found', value: stats.total_jobs },
-    { label: 'average match score', value: avgScore },
+    { label: 'average keyword score', value: avgScore },
     { label: 'strong matches', value: stats.strong_apply_count },
     { label: 'applied', value: stats.applied_count },
     { label: 'interview rate', value: interviewRate, suffix: '%' },
@@ -103,8 +103,8 @@ function NumbersPage() {
 
           <div className="qb-chartgrid">
             <ChartCard
-              title="Match scores"
-              description="How well jobs match your resume on a 0 to 100 scale"
+              title="Keyword scores"
+              description="How closely each job matched your roles and keywords, 0 to 100"
               isLoading={l1}
               isEmpty={!scores?.length}
             >
@@ -112,8 +112,8 @@ function NumbersPage() {
             </ChartCard>
 
             <ChartCard
-              title="Worth applying to"
-              description="How many jobs are worth your time"
+              title="Rough verdicts"
+              description="Based on keywords and filters, not your resume"
               isLoading={l2}
               isEmpty={!recs?.length}
             >

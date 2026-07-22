@@ -53,7 +53,8 @@ function HealthRow({ entry, onDrill }: { entry: SourceHealthEntry; onDrill: (sou
           {entry.display_name}
         </button>
       </td>
-      <td className="qb-health-lane">{entry.vertical}</td>
+      {/* lane ids can carry underscores; the label reads as words */}
+      <td className="qb-health-lane">{entry.vertical.replace(/_/g, ' ')}</td>
       <td><Chip label={label} tone={tone} /></td>
       <td className="qb-health-when">{agoLabel(entry.last_run_at)}</td>
       <td className="qb-health-num">

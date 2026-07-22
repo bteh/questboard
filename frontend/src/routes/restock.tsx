@@ -226,7 +226,7 @@ function RestockPage() {
       },
       {
         onSuccess: () => toast.success('Saved as your default'),
-        onError: (error) => toast.error(error instanceof Error ? error.message : 'Failed to save your defaults'),
+        onError: (error) => toast.error(error instanceof Error ? error.message : 'Could not save your defaults. Try again in a minute.'),
       },
     );
   };
@@ -235,11 +235,11 @@ function RestockPage() {
     // The form disables its start button on these, but guard here too so a
     // first visit with nothing filled in never round-trips a server error.
     if (missingSearchTerms) {
-      toast.error('Add at least one role or keyword first. Fill from resume works too.', { id: SEARCH_TOAST_ID });
+      toast.error('Add at least one role. Type it in the roles box.', { id: SEARCH_TOAST_ID });
       return;
     }
     if (missingLocations) {
-      toast.error('Add a place first, or switch to remote.', { id: SEARCH_TOAST_ID });
+      toast.error('Add a place in the filters. Or choose remote only.', { id: SEARCH_TOAST_ID });
       return;
     }
     const aiEnabledForRun = selectedMode !== 'search_only' && llmAvailable;
@@ -269,13 +269,13 @@ function RestockPage() {
         activate(data.run_id, selectedMode, runSnapshot);
       },
       onError: (error) => {
-        const message = error instanceof Error ? error.message : 'Failed to start the restock';
+        const message = error instanceof Error ? error.message : 'Could not start the restock. Try again in a minute.';
         if (message.includes('At least one role or keyword')) {
-          toast.error('We still need at least one role or keyword. Try filling from your resume again, or type one manually.', { id: SEARCH_TOAST_ID });
+          toast.error('Add at least one role. Type it in the roles box.', { id: SEARCH_TOAST_ID });
           return;
         }
         if (message.includes('At least one location')) {
-          toast.error('Add a place first, or switch to Remote only.', { id: SEARCH_TOAST_ID });
+          toast.error('Add a place in the filters. Or choose remote only.', { id: SEARCH_TOAST_ID });
           return;
         }
         toast.error(message, { id: SEARCH_TOAST_ID });
@@ -289,7 +289,7 @@ function RestockPage() {
 
   const handleSuggest = () => {
     if (!llmAvailable) {
-      toast.error('Auto-fill needs an AI. You can type your target roles by hand instead, no AI needed.');
+      toast.error('Auto-fill needs a connected AI. Type your target roles by hand instead.');
       return;
     }
     suggest.mutate(profile, {
@@ -315,7 +315,7 @@ function RestockPage() {
         ].filter(Boolean);
 
         if (updatedParts.length === 0) {
-          toast.error('Resume analysis finished, but it did not return usable terms. Add a role or keyword manually and continue.', {
+          toast.error('Your resume gave no usable terms. Type a role in the roles box.', {
             id: SUGGEST_TOAST_ID,
           });
           return;
@@ -330,15 +330,15 @@ function RestockPage() {
         const message = error instanceof Error ? error.message : '';
         const msg = error instanceof Error ? error.message : '';
         if (msg.includes('No LLM') || msg.includes('provider')) {
-          toast.error('Reading your resume automatically needs an AI. Type your target roles by hand instead.', { id: SUGGEST_TOAST_ID });
+          toast.error('Reading your resume needs a connected AI. Type your target roles by hand instead.', { id: SUGGEST_TOAST_ID });
         } else if (msg.includes('No resume') || msg.includes('Upload')) {
           toast.error('Upload your resume in Settings first.', { id: SUGGEST_TOAST_ID });
         } else if (message.includes('too long')) {
-          toast.error('Resume analysis took too long. You can still restock now, or try again later.', { id: SUGGEST_TOAST_ID });
+          toast.error('Reading your resume took too long. You can still restock now, or try again later.', { id: SUGGEST_TOAST_ID });
         } else if (message.includes('unreadable')) {
-          toast.error('Resume analysis came back in an unreadable format. You can still restock now, or try again later.', { id: SUGGEST_TOAST_ID });
+          toast.error('The resume reader sent back something unreadable. You can still restock now, or try again later.', { id: SUGGEST_TOAST_ID });
         } else {
-          toast.error('Resume analysis failed. Try again or fill in the fields manually.', { id: SUGGEST_TOAST_ID });
+          toast.error('Could not read your resume. Try again, or type the fields yourself.', { id: SUGGEST_TOAST_ID });
         }
       },
     });
@@ -478,7 +478,7 @@ function RestockPage() {
         {assistantReady ? (
           <details className="group rounded-2xl border border-border-default bg-bg-card">
             <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-4 text-sm font-medium text-text-secondary transition-colors hover:text-text-primary">
-              <span>Prefer to set your roles and restock by hand?</span>
+              <span>Restock by hand instead</span>
               <span className="text-text-muted transition-transform group-open:rotate-90">›</span>
             </summary>
             <div className="border-t border-border-default p-4">{manualForm}</div>

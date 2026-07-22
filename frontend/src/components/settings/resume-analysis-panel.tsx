@@ -12,12 +12,12 @@ import type { WorkspacePreferences } from '@/types/workspace';
 
 interface ResumeAnalysisPanelProps {
   analysis: ResumeAnalysisSummary;
-  /** Current saved preferences — the base the edited roles/keywords are merged into. */
+  /** Current saved preferences, the base the edited roles/keywords are merged into. */
   preferences: WorkspacePreferences;
 }
 
 /**
- * "What we read from your resume" — review-and-correct panel shown after a
+ * "What we read from your resume": the review-and-correct panel shown after a
  * resume upload that produced an analysis.
  *
  * Skills, target roles, and keywords are editable chip lists. Roles and
@@ -39,7 +39,7 @@ export function ResumeAnalysisPanel({ analysis, preferences }: ResumeAnalysisPan
   const handlePromoteSkills = () => {
     if (skills.length === 0) return;
     setKeywords((prev) => mergeKeywordLists(prev, skills));
-    toast.success('Skills added to search keywords — save to apply');
+    toast.success('Skills added to keywords. Save to apply.');
   };
 
   const handleSave = () => {
@@ -54,7 +54,7 @@ export function ResumeAnalysisPanel({ analysis, preferences }: ResumeAnalysisPan
       {
         onSuccess: () => toast.success('Search preferences updated from your resume'),
         onError: (error) =>
-          toast.error(error instanceof Error ? error.message : 'Failed to save preferences'),
+          toast.error(error instanceof Error ? error.message : 'Could not save. Try again in a minute.'),
       },
     );
   };
@@ -71,7 +71,7 @@ export function ResumeAnalysisPanel({ analysis, preferences }: ResumeAnalysisPan
             What we read from your resume
           </h3>
           <p className="mt-0.5 text-xs text-text-muted">
-            Review and correct what was extracted — these drive your search and scoring.
+            Fix anything wrong here. These drive your search and ranking.
           </p>
         </div>
       </div>
@@ -110,7 +110,7 @@ export function ResumeAnalysisPanel({ analysis, preferences }: ResumeAnalysisPan
         <TagListInput
           value={skills}
           onChange={setSkills}
-          placeholder="Add a skill — press Enter"
+          placeholder="Add a skill, press Enter"
           emptyText="No skills extracted."
           helperText="Skills found on your resume. Use 'Add all to keywords' to make them search terms."
         />
@@ -121,7 +121,7 @@ export function ResumeAnalysisPanel({ analysis, preferences }: ResumeAnalysisPan
         <TagListInput
           value={roles}
           onChange={setRoles}
-          placeholder="Add a role — press Enter"
+          placeholder="Add a role, press Enter"
           emptyText="No target roles suggested."
         />
       </div>
@@ -131,7 +131,7 @@ export function ResumeAnalysisPanel({ analysis, preferences }: ResumeAnalysisPan
         <TagListInput
           value={keywords}
           onChange={setKeywords}
-          placeholder="Add a keyword — press Enter"
+          placeholder="Add a keyword, press Enter"
           emptyText="No keywords suggested."
         />
       </div>
@@ -166,7 +166,7 @@ export function ResumeAnalysisPanel({ analysis, preferences }: ResumeAnalysisPan
               <li key={`${entry.degree}-${entry.institution}-${index}`}>
                 {[entry.degree, entry.field].filter(Boolean).join(' in ')}
                 {entry.institution && (
-                  <span className="text-text-muted"> — {entry.institution}</span>
+                  <span className="text-text-muted">, {entry.institution}</span>
                 )}
               </li>
             ))}

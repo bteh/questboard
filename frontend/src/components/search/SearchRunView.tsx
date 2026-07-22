@@ -144,8 +144,8 @@ export function SearchRunView({
           )}
           {snapshot && !snapshot.use_ai && (
             <div className="qb-restock-note" style={{ marginTop: 14 }}>
-              <b>This run ranked by keywords and filters.</b> For resume-fit ranking and drafted
-              notes, your connected assistant (Claude or Codex) reads these results and does that part.
+              <b>This run ranked by keywords and filters.</b> Your connected assistant (Claude or
+              Codex) can rank these by resume fit.
             </div>
           )}
         </div>
@@ -197,8 +197,8 @@ export function SearchRunView({
               />
               <SnapshotField label="Ranking" value={snapshot.use_ai ? 'AI resume fit' : 'Keyword only'} />
               <SnapshotField label="Workplace" value={getWorkplacePreferenceLabel(snapshot.workplace_preference)} />
-              <SnapshotField label="Window" value={`${snapshot.max_days_old} days`} />
-              <SnapshotField label="LinkedIn" value={snapshot.include_linkedin_jobs ? 'Enabled' : 'Disabled'} />
+              <SnapshotField label="Posted within" value={`${snapshot.max_days_old} days`} />
+              <SnapshotField label="LinkedIn" value={snapshot.include_linkedin_jobs ? 'On' : 'Off'} />
               <SnapshotField label="Current title" value={snapshot.current_title || 'Not set'} />
               <SnapshotField label="Current level" value={snapshot.current_level ? titleCase(snapshot.current_level) : 'Not set'} />
               <SnapshotField
@@ -207,17 +207,17 @@ export function SearchRunView({
                 hint="Loose pulls a wider net; Strict keeps only tight matches"
               />
               <SnapshotField label="Currency" value={`${snapshot.compensation_currency}, ${snapshot.compensation_period}`} />
-              <SnapshotField label="Current TC" value={formatCurrency(snapshot.current_tc, snapshot.compensation_currency)} />
-              <SnapshotField label="Target TC" value={formatCurrency(snapshot.target_total_comp, snapshot.compensation_currency)} />
+              <SnapshotField label="Current pay" value={formatCurrency(snapshot.current_tc, snapshot.compensation_currency)} />
+              <SnapshotField label="Target pay" value={formatCurrency(snapshot.target_total_comp, snapshot.compensation_currency)} />
               <SnapshotField
-                label="Min base"
+                label="Min base salary"
                 value={formatCurrency(snapshot.min_base, snapshot.compensation_currency)}
                 hint="Floor on base salary, bonus and equity excluded"
               />
               <SnapshotField
-                label="Min TC"
+                label="Min total pay"
                 value={formatCurrency(snapshot.min_acceptable_tc, snapshot.compensation_currency)}
-                hint="Skips jobs paying total comp below this"
+                hint="Skips jobs paying less than this in total"
               />
               <SnapshotField
                 label="Equity"

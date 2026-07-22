@@ -91,7 +91,7 @@ describe('CompaniesTab', () => {
     renderTab();
 
     expect(
-      await screen.findByText('No companies yet. Add one and its job board gets checked on every refresh.'),
+      await screen.findByText('No companies yet. Add one to check its job board on every refresh.'),
     ).toBeDefined();
   });
 

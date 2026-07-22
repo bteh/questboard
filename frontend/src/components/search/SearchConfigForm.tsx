@@ -132,9 +132,8 @@ export function SearchConfigForm({
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         {!llmAvailable && (
           <div className="qb-restock-note">
-            <b>The board restocks and ranks on its own, no AI needed.</b> For resume-fit ranking
-            and drafted notes, your connected assistant (Claude or Codex) reads the board over the
-            local link and does that part.
+            <b>The board restocks and ranks on its own. No AI needed.</b> Connect Claude or Codex
+            in Settings for resume-fit ranking.
           </div>
         )}
 
@@ -183,20 +182,20 @@ export function SearchConfigForm({
                 <SuggestLoadingState />
               ) : canSuggest ? (
                 <button type="button" className="qb-restock-note" onClick={handleSuggest}>
-                  <b>Fill this in from your resume.</b> It reads your resume and suggests
-                  roles, keywords, and places to restock with.
+                  <b>Fill this in from your resume.</b> One click suggests roles, keywords,
+                  and places.
                 </button>
               ) : !llmAvailable && (
                 <div className="qb-restock-note">
                   <b>
                     {canUseResumeFallback
-                      ? 'You can restock from your uploaded resume, or type roles and keywords below.'
-                      : 'Type your target roles and keywords below to get going.'}
+                      ? 'Restock straight from your uploaded resume, or type roles below.'
+                      : 'Type your target roles below to get going.'}
                   </b>
                   <div className="qb-notefoot">
                     {onboarding?.resume.exists
-                      ? 'Questboard can derive a first restock from your resume right away.'
-                      : 'A resume and AI can come later; the board works without them.'}
+                      ? 'Your resume alone is enough for a first restock.'
+                      : 'The board works without a resume or AI. Add them later.'}
                   </div>
                 </div>
               ))}
@@ -212,7 +211,7 @@ export function SearchConfigForm({
                     rows={4}
                     placeholder="e.g. Marketing Manager&#10;Product Designer&#10;Nurse Practitioner"
                   />
-                  <p className="qb-fhelp">One role per line</p>
+                  <p className="qb-fhelp">Type one role per line.</p>
                 </div>
                 <div>
                   <label className="qb-flabel" htmlFor="restock-keywords">Keywords</label>
@@ -223,7 +222,7 @@ export function SearchConfigForm({
                     rows={4}
                     placeholder="e.g. Project Management&#10;Patient Care&#10;Data Analysis"
                   />
-                  <p className="qb-fhelp">One keyword per line</p>
+                  <p className="qb-fhelp">Type one keyword per line.</p>
                 </div>
               </div>
 
@@ -408,8 +407,8 @@ export function SearchConfigForm({
                 )}
                 <p className="qb-fhelp">
                   {suggestedCompanies.length > 0
-                    ? 'Their career pages get restocked directly, on top of the job boards.'
-                    : 'Optional: name companies to restock their career pages directly.'}
+                    ? 'Their career pages get checked directly, on top of the job boards.'
+                    : 'Optional: add a company to check its career page directly.'}
                 </p>
               </div>
 
@@ -468,12 +467,12 @@ export function SearchConfigForm({
                 </button>
                 {missingSearchTerms && (
                   <p className="qb-fhelp" style={{ textAlign: 'center', marginTop: 8 }}>
-                    Add at least one role or keyword above to start.
+                    Add at least one role. Type it in the roles box above.
                   </p>
                 )}
                 {!missingSearchTerms && missingLocations && (
                   <div style={{ marginTop: 10, textAlign: 'center' }}>
-                    <p className="qb-fhelp">Add a place first, or run this restock remote.</p>
+                    <p className="qb-fhelp">Add a place, or pick a remote option below.</p>
                     <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 14, marginTop: 6 }}>
                       <button type="button" className="qb-textlink" style={{ fontSize: 13.5 }} onClick={() => setWorkplacePreference('remote_friendly')}>
                         Remote plus selected places
@@ -486,12 +485,12 @@ export function SearchConfigForm({
                 )}
                 {!missingSearchTerms && !missingLocations && parsedRoles.length === 0 && parsedKeywords.length === 0 && canUseResumeFallback && (
                   <p className="qb-fhelp" style={{ textAlign: 'center', marginTop: 8 }}>
-                    No roles or keywords typed, so this run derives them from your uploaded resume.
+                    No roles typed yet. This run reads them from your resume instead.
                   </p>
                 )}
                 {!missingSearchTerms && !missingLocations && usesRemoteFallback && (
                   <p className="qb-fhelp" style={{ textAlign: 'center', marginTop: 8 }}>
-                    No place picked yet, so this run keeps remote jobs from everywhere until you add one.
+                    No place picked yet. This run keeps remote jobs from everywhere.
                   </p>
                 )}
                 {suggestedCompanies.length > 0 && !missingSearchTerms && !missingLocations && (

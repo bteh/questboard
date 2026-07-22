@@ -51,8 +51,8 @@ export function CompaniesTab() {
       </CardHeader>
       <CardContent className="space-y-4">
         <p className="text-sm text-text-secondary">
-          Add a company by name and Questboard finds its job board. Watched boards get checked
-          directly on every refresh, so new postings show up without the wait.
+          Add a company by name. Questboard finds its job board and checks it on every refresh,
+          so new postings show up without the wait.
         </p>
 
         <form onSubmit={handleAdd} className="flex items-center gap-2">
@@ -86,7 +86,7 @@ export function CompaniesTab() {
           </p>
         ) : companies.length === 0 ? (
           <p className="text-sm text-text-muted">
-            No companies yet. Add one and its job board gets checked on every refresh.
+            No companies yet. Add one to check its job board on every refresh.
           </p>
         ) : (
           <div className="space-y-2">

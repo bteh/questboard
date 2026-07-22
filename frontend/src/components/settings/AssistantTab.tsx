@@ -10,10 +10,10 @@ import { isDesktopApp } from '@/lib/platform';
 import { openExternal } from '@/lib/open-external';
 import type { AgentClientStatus } from '@/types/resume';
 
-/* The one message that drives the whole career flow through the agent: it
+/* The one message that drives the whole career flow through the assistant.
    Roles are already auto-derived from the resume on upload, so this asks the
-   agent to sharpen them if they're off (via set_career_preferences), then do
-   the part the board can't: judge which postings fit the resume and why.
+   assistant to sharpen them if they're off (via set_career_preferences), then
+   do the part the board can't: judge which postings fit the resume and why.
    Consent-gated. The user pastes it into Claude or Codex once connected. */
 const SETUP_PROMPT =
   'Use my local Questboard MCP tools: read my resume, sharpen my target roles and keywords if they need it, then find me matching work and tell me which postings fit my experience best and why.';
@@ -61,8 +61,8 @@ export function AssistantTab() {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-text-secondary">
-            Connecting Claude or Codex happens in the desktop app, which runs the link on your own
-            machine. Open Questboard on your Mac to set it up.
+            Open Questboard on your Mac to connect Claude or Codex. The link runs on your own
+            machine, so only the desktop app can set it up.
           </p>
         </CardContent>
       </Card>
@@ -79,9 +79,9 @@ export function AssistantTab() {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-text-secondary">
-            Questboard finds and filters the work. Your own assistant (Claude or Codex) does the
-            resume-fit ranking and drafts notes, over a link that stays on your machine. No AI key,
-            and no cost from us.
+            Questboard finds and filters the work. Your own assistant (Claude or Codex) ranks jobs
+            by resume fit and drafts notes. The link stays on your machine. No AI key, no cost
+            from us.
           </p>
 
           <div className="space-y-2">
@@ -197,8 +197,8 @@ export function AssistantTab() {
           <div className="space-y-2">
             <p className="text-sm font-medium text-text-primary">Step 2 (optional): go deeper with your assistant</p>
             <p className="text-sm text-text-secondary">
-              Your target roles are already set from your resume. Paste this to have your assistant
-              sharpen them and judge which postings actually fit your experience, and why.
+              Your target roles are already set from your resume. Paste this message into your
+              assistant. It sharpens your roles and explains which postings fit you.
             </p>
             <div className="rounded-xl border border-border-default bg-bg-card p-3 text-sm leading-relaxed text-text-primary">
               {SETUP_PROMPT}

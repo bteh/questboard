@@ -107,7 +107,7 @@ function SignupRow() {
         <span className="qb-grow">
           {rejected
             ? 'That does not look like an email address.'
-            : 'It stays in this browser for now; sync ships later.'}
+            : 'It stays in this browser for now. Sync ships later.'}
         </span>
         <input
           type="email"
@@ -207,7 +207,7 @@ function LogCard({ app, labels }: { app: ApplicationResponse; labels: Record<str
               className="qb-affinput"
               autoFocus
               inputMode="numeric"
-              placeholder="Paid something? Type the amount, or just press enter"
+              placeholder="Type the amount paid, or press Enter to skip"
               aria-label="Paid amount, optional"
               onKeyDown={(event) => {
                 if (event.key === 'Enter') markDone(event.currentTarget.value);
@@ -366,7 +366,7 @@ function LogPage() {
 
         {(personal.isError || board.isError) && (
           <p className="qb-log-empty">
-            Your log could not reach the backend. Start it with make dev and reload.
+            Could not load your log. Start the backend (make dev) and reload.
           </p>
         )}
 

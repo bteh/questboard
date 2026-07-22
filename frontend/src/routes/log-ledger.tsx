@@ -57,11 +57,20 @@ const WORK_TYPES = [
 ] as const;
 
 const REC_OPTIONS = [
-  { value: 'STRONG_APPLY', label: 'Strong Apply' },
-  { value: 'APPLY', label: 'Apply' },
+  { value: 'STRONG_APPLY', label: 'Strong match' },
+  { value: 'APPLY', label: 'Good match' },
   { value: 'MAYBE', label: 'Maybe' },
-  { value: 'SKIP', label: 'Skip' },
+  { value: 'SKIP', label: 'Weak match' },
 ] as const;
+
+/* The stored sort keys keep their names; only the visible words change.
+   overall_score is the rough keyword score, and the label says so. */
+const SORT_LABELS: Record<string, string> = {
+  overall_score: 'Keyword score (rough)',
+  date_found: 'Newest first',
+  company: 'Company name',
+  job_title: 'Job title',
+};
 
 /** Maps raw source values (from DB) to display labels. */
 const SOURCE_LABEL_MAP: Record<string, string> = {
@@ -105,17 +114,17 @@ function LedgerPage() {
     mutationFn: () => checkUrls(undefined, 100),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['applications'] });
-      toast.success(`Checked ${result.checked} URLs: ${result.alive} alive, ${result.dead} expired`);
+      toast.success(`Checked ${result.checked} links. ${result.alive} still live, ${result.dead} expired.`);
     },
-    onError: () => toast.error('Failed to check URLs'),
+    onError: () => toast.error('Could not check the links. Try again in a minute.'),
   });
   const purgeAll = useMutation({
     mutationFn: () => purgeAllApplications(profile),
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['applications'] });
-      toast.success(`Cleared ${result.purged} applications`);
+      toast.success(`Cleared ${result.purged} tracked jobs`);
     },
-    onError: () => toast.error('Failed to clear applications'),
+    onError: () => toast.error('Could not clear your tracked jobs. Try again in a minute.'),
   });
   const csvExport = useMutation({
     mutationFn: () => exportApplicationsCsv(profile),
@@ -129,7 +138,7 @@ function LedgerPage() {
       anchor.remove();
       URL.revokeObjectURL(url);
     },
-    onError: () => toast.error('The export could not be built'),
+    onError: () => toast.error('Could not build the CSV. Try again in a minute.'),
   });
   const { data: sourcesData } = useQuery({
     queryKey: ['analytics', 'sources', profile ?? 'default', effectiveRunId],
@@ -212,9 +221,9 @@ function LedgerPage() {
   if (filters.status) activeFilters.push({ key: 'status', label: 'Status', display: STATUS_LABELS[filters.status] || filters.status });
   if (filters.recommendation) {
     const rec = REC_OPTIONS.find((r) => r.value === filters.recommendation);
-    activeFilters.push({ key: 'recommendation', label: 'Recommendation', display: rec?.label || filters.recommendation });
+    activeFilters.push({ key: 'recommendation', label: 'Keyword match', display: rec?.label || filters.recommendation });
   }
-  if (filters.company_type) activeFilters.push({ key: 'company_type', label: 'Company', display: filters.company_type });
+  if (filters.company_type) activeFilters.push({ key: 'company_type', label: 'Company tier', display: filters.company_type });
   if (filters.work_type) {
     const wt = WORK_TYPES.find((w) => w.value === filters.work_type);
     activeFilters.push({ key: 'work_type', label: 'Work', display: wt?.label || filters.work_type });
@@ -222,7 +231,7 @@ function LedgerPage() {
   if (filters.source) {
     activeFilters.push({ key: 'source', label: 'Source', display: SOURCE_LABEL_MAP[filters.source] || filters.source });
   }
-  if (filters.min_score) activeFilters.push({ key: 'min_score', label: 'Score', display: `${filters.min_score}+` });
+  if (filters.min_score) activeFilters.push({ key: 'min_score', label: 'Keyword score', display: `${filters.min_score}+` });
 
   const hasActiveFilters = activeFilters.length > 0 || !!searchInput;
 
@@ -357,13 +366,13 @@ function LedgerPage() {
         <Select value={filters.sort_by || 'overall_score'} onValueChange={(v) => updateFilter('sort_by', v)}>
           <SelectTrigger className="h-9 w-auto gap-1.5">
             <ArrowUpDown className="h-3.5 w-3.5 text-text-muted" />
-            <SelectValue placeholder="Match Score">
-              {SORT_OPTIONS.find((o) => o.value === (filters.sort_by || 'overall_score'))?.label ?? 'Match Score'}
+            <SelectValue placeholder="Keyword score (rough)">
+              {SORT_LABELS[filters.sort_by || 'overall_score'] ?? 'Keyword score (rough)'}
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
             {SORT_OPTIONS.map((o) => (
-              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              <SelectItem key={o.value} value={o.value}>{SORT_LABELS[o.value] ?? o.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -408,14 +417,14 @@ function LedgerPage() {
             options={STATUS_OPTIONS.map((s) => ({ value: s, label: STATUS_LABELS[s] || s }))}
           />
           <FilterSelect
-            label="Match"
+            label="Keyword match"
             value={filters.recommendation}
             onValueChange={(v) => updateFilter('recommendation', v)}
             placeholder="All"
             options={REC_OPTIONS.map((r) => ({ value: r.value, label: r.label }))}
           />
           <FilterSelect
-            label="Company"
+            label="Company tier"
             value={filters.company_type}
             onValueChange={(v) => updateFilter('company_type', v)}
             placeholder="All"
@@ -437,7 +446,7 @@ function LedgerPage() {
           />
           <div className="min-w-[140px]">
             <span className="text-[11px] font-medium text-text-muted mb-1.5 block">
-              Min score
+              Min keyword score
             </span>
             <div className="flex items-center gap-2.5 h-8">
               <Slider
@@ -474,12 +483,12 @@ function LedgerPage() {
               <button
                 type="button"
                 onClick={() => {
-                  if (window.confirm('Clear all saved applications? This cannot be undone. Personal quests in your log stay.')) {
+                  if (window.confirm('Clear all tracked jobs? This cannot be undone. Personal quests in your log stay.')) {
                     purgeAll.mutate();
                   }
                 }}
                 disabled={purgeAll.isPending}
-                title="Delete all saved applications and start fresh"
+                title="Delete every tracked job and start fresh"
                 className="inline-flex items-center gap-1.5 h-8 px-2.5 text-xs text-danger/70 hover:text-danger transition-colors rounded-md hover:bg-danger/10 cursor-pointer disabled:opacity-50"
               >
                 {purgeAll.isPending ? (

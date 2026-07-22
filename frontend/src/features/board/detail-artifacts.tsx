@@ -216,7 +216,7 @@ export function DetailArtifacts({ app }: { app: ApplicationResponse }) {
       {letter && (
         <Fold
           name="draft cover letter"
-          caveat="A generated draft. Check it before sending; company facts in it are not verified."
+          caveat="Check this generated draft before sending; the company facts are not verified."
         >
           <div className="qb-jda-rowhead qb-jda-lonecopy">
             <CopyLink text={letter} what="cover letter" />
@@ -228,7 +228,7 @@ export function DetailArtifacts({ app }: { app: ApplicationResponse }) {
       {kit && (
         <Fold
           name="application kit"
-          caveat="Generated materials to paste by hand. Nothing is sent for you."
+          caveat="Generated materials to paste by hand; nothing is sent for you."
         >
           {kit.title && (
             <KitRow label="suggested title" copyText={kit.title} copyWhat="suggested title">
@@ -281,7 +281,7 @@ export function DetailArtifacts({ app }: { app: ApplicationResponse }) {
         <Fold
           name="requirement check"
           count={requirements.length}
-          caveat="A generated mapping of the posting's requirements to your resume. Check the quotes yourself."
+          caveat="A generated map of the posting's requirements to your resume; check the quotes yourself."
         >
           <ul className="qb-jda-reqs">
             {requirements.map((row, i) => (
@@ -305,7 +305,7 @@ export function DetailArtifacts({ app }: { app: ApplicationResponse }) {
       {notes.length > 0 && (
         <Fold
           name="company notes"
-          caveat="Generated notes, not verified facts. Check anything before repeating it."
+          caveat="Generated notes, not verified facts; check before repeating anything."
         >
           {notes.map((row) => (
             <div key={row.label} className="qb-jda-row">

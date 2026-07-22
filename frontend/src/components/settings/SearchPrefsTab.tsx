@@ -48,12 +48,16 @@ export function SearchPrefsTab({ onboarding, navigate }: SearchPrefsTabProps) {
       onSuccess: () => toast.success('Preferences saved', {
         action: { label: 'Restock the board', onClick: () => navigate({ to: '/restock' }) },
       }),
-      onError: () => toast.error('Failed to save preferences'),
+      onError: () => toast.error('Could not save your preferences. Try again in a minute.'),
     });
   };
 
   return (
     <>
+    <p className="text-sm text-text-secondary">
+      Set what every restock looks for. Save at the bottom when you are done.
+    </p>
+
     {/* What you're looking for */}
     <Card>
       <CardHeader>
@@ -168,7 +172,7 @@ export function SearchPrefsTab({ onboarding, navigate }: SearchPrefsTabProps) {
                 placeholder="150,000"
               />
             </div>
-            <p className="text-xs text-text-muted">Your connected agent can use this when prioritizing finalists.</p>
+            <p className="text-xs text-text-muted">Your assistant uses this when ranking your matches.</p>
           </div>
         </div>
 
@@ -199,10 +203,10 @@ export function SearchPrefsTab({ onboarding, navigate }: SearchPrefsTabProps) {
             {(['loose', 'balanced', 'strict'] as const).map((value) => {
               const selected = prefsForm.match_strictness === value;
               const hint = value === 'loose'
-                ? 'Wider net, more results, looser matches'
+                ? 'Wider net: more results, looser matches'
                 : value === 'balanced'
-                  ? 'Default behavior, matches most users'
-                  : 'Tight matches only, fewer and more relevant';
+                  ? 'The default; fits most people'
+                  : 'Tight matches only, fewer results';
               return (
                 <button
                   key={value}
@@ -247,7 +251,7 @@ export function SearchPrefsTab({ onboarding, navigate }: SearchPrefsTabProps) {
                     onChange={(event) => setPrefsForm((prev) => ({ ...prev, current_title: event.target.value }))}
                     placeholder="e.g. Senior Engineer"
                   />
-                  <p className="text-xs text-text-muted">Helps your connected agent judge level and career progression.</p>
+                  <p className="text-xs text-text-muted">Helps your assistant judge level fit.</p>
                 </div>
                 <div className="space-y-1.5">
                   <Label>Current level</Label>

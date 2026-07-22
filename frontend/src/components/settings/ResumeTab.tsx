@@ -39,24 +39,24 @@ export function ResumeTab({ onboarding, navigate }: ResumeTabProps) {
         setLastUpload(normalized);
         setUploadCount((count) => count + 1);
         if (normalized.parseCode === 'SCANNED_PDF') {
-          toast.error('Resume saved, but no text could be read from it');
+          toast.error('Resume saved, but it has no readable text. Export a text PDF and upload again.');
         } else if (normalized.analysisStatus === 'completed') {
-          toast.success('Resume uploaded and analyzed');
+          toast.success('Resume saved and analyzed');
         } else if (normalized.analysisStatus === 'analysis_error') {
-          toast.warning('Resume saved. The AI step didn’t finish, so no skills yet. Try again in a moment.');
+          toast.warning('Resume saved. The AI step did not finish. Try again in a moment.');
         } else if (normalized.analysisStatus === 'skipped_no_llm') {
           toast.success(
             normalized.derivedRoles.length > 0
-              ? `Resume saved. Set ${normalized.derivedRoles.length} target roles from it.`
+              ? `Resume saved. ${normalized.derivedRoles.length} target roles set.`
               : 'Resume saved. Add your target roles to start finding work.',
           );
         } else if (normalized.analysisStatus === 'failed') {
-          toast.warning('Resume saved, but we couldn’t read any text from it');
+          toast.warning('Resume saved, but no text could be read from it. Try a text PDF.');
         } else {
-          toast.success('Resume uploaded');
+          toast.success('Resume saved');
         }
       },
-      onError: (error) => toast.error(error instanceof Error ? error.message : 'Upload failed'),
+      onError: (error) => toast.error(error instanceof Error ? error.message : 'Upload failed. Try again in a minute.'),
     });
     // Allow re-selecting the same file after a failed/scanned upload.
     event.target.value = '';
@@ -88,18 +88,18 @@ export function ResumeTab({ onboarding, navigate }: ResumeTabProps) {
               </div>
             </div>
           ) : (
-            <p className="text-sm text-text-tertiary">No resume uploaded yet. Upload one so your connected agent can compare job requirements with your experience.</p>
+            <p className="text-sm text-text-tertiary">Upload your resume. Your connected assistant uses it to judge which jobs fit you.</p>
           )}
         </div>
 
         <div className="rounded-xl border border-border-default bg-bg-subtle/40 p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-sm font-medium text-text-primary">Let your agent read your resume</p>
+              <p className="text-sm font-medium text-text-primary">Let your assistant read your resume</p>
               <p className="mt-1 text-xs text-text-muted">
                 {consent.data?.granted
-                  ? 'Allowed. Your connected Codex or Claude can read your resume to match jobs. Questboard never sends it anywhere.'
-                  : 'Off. Your agent can browse jobs but cannot read your resume until you allow it.'}
+                  ? 'Allowed. Your connected Claude or Codex can read your resume to match jobs. Questboard never sends it anywhere.'
+                  : 'Off. Your assistant can browse jobs but cannot read your resume until you allow it.'}
               </p>
             </div>
             <Button
@@ -111,8 +111,8 @@ export function ResumeTab({ onboarding, navigate }: ResumeTabProps) {
                   onSuccess: (data) =>
                     toast.success(
                       data.granted
-                        ? 'Agent can now read your resume'
-                        : 'Agent resume access turned off',
+                        ? 'Your assistant can now read your resume'
+                        : 'Resume access turned off',
                     ),
                   onError: (error) =>
                     toast.error(error instanceof Error ? error.message : 'Could not update access'),
@@ -126,13 +126,13 @@ export function ResumeTab({ onboarding, navigate }: ResumeTabProps) {
 
         {onboarding?.resume.exists && (
           <div className="rounded-xl border border-success/20 bg-success/5 p-3 text-sm text-text-secondary">
-            Resume saved locally. Next, restock the board; Questboard will retrieve your target roles and your connected agent can evaluate the finalists.{' '}
+            Resume saved on this machine. Next, restock the board to find matching jobs.{' '}
             <button
               type="button"
               onClick={() => navigate({ to: '/restock' })}
               className="font-medium text-brand underline underline-offset-2"
             >
-              Find target-role jobs →
+              See your matches
             </button>
           </div>
         )}
