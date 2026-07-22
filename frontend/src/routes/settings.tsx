@@ -15,9 +15,10 @@ import { useOnboardingState } from '@/hooks/use-workspace';
 import { cx } from '@questboard/ui';
 import '@/components/settings/settings.css';
 
-/* Settings, trade paper: four tabs via ?tab=. Search became Restock; old
-   ?tab=search links map onto it. The tab contents keep their working
-   forms. The footer holds the one link back out to the front page. */
+/* Settings, trade paper: four tabs via ?tab=. The restock tab (id kept for
+   old links; ?tab=search also maps onto it) is labeled "Search defaults".
+   The tab contents keep their working forms. The footer holds the one link
+   back out to the front page. */
 
 export const Route = createRoute({
   getParentRoute: () => appRoute,
@@ -31,7 +32,7 @@ export const Route = createRoute({
 const TAB_LABELS: Record<SettingsTab, string> = {
   resume: 'Resume',
   assistant: 'Assistant',
-  restock: 'Restock',
+  restock: 'Search defaults',
   companies: 'Companies',
 };
 

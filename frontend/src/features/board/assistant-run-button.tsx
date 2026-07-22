@@ -49,6 +49,10 @@ export function AssistantRunButton({
   // Don't flash the "connect" link before we know the real state.
   if (!run.isPending && (clients.isLoading || consent.isLoading)) return null;
 
+  // Claude only, on purpose: the backend's run_headless rejects codex because
+  // `codex exec` can't be pinned to the Questboard tool allow-list yet (see
+  // backend/app/services/agent_integration_service.py). Codex users get the
+  // pasteable prompt in Settings > Assistant instead.
   const claude = clients.data?.clients.find((c) => c.id === 'claude');
   const ready = (claude?.installed ?? false) && (consent.data?.granted ?? false);
 

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Bot, Check, Copy, Loader2, Plug } from 'lucide-react';
+import { Link } from '@tanstack/react-router';
+import { Bot, Check, Copy, Loader2, Plug, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -10,11 +11,11 @@ import { isDesktopApp } from '@/lib/platform';
 import { openExternal } from '@/lib/open-external';
 import type { AgentClientStatus } from '@/types/resume';
 
-/* The one message that drives the whole career flow through the assistant.
-   Roles are already auto-derived from the resume on upload, so this asks the
-   assistant to sharpen them if they're off (via set_career_preferences), then
-   do the part the board can't: judge which postings fit the resume and why.
-   Consent-gated. The user pastes it into Claude or Codex once connected. */
+/* The chat fallback for the board's "Rank these with your assistant" run.
+   The backend's find_and_rank task covers the same ground (read resume,
+   sharpen roles via set_career_preferences, rank postings with reasons), but
+   headless runs are Claude-only today, so this pasteable prompt is the only
+   automatic-ish path for Codex users. Consent-gated. */
 const SETUP_PROMPT =
   'Use my local Questboard MCP tools: read my resume, sharpen my target roles and keywords if they need it, then find me matching work and tell me which postings fit my experience best and why.';
 
@@ -164,13 +165,13 @@ export function AssistantTab() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <Plug className="h-4 w-4" /> Set up your job search in one message
+            <Sparkles className="h-4 w-4" /> Rank jobs by resume fit
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between gap-3 rounded-xl border border-border-default bg-bg-subtle/40 p-3">
             <div className="min-w-0">
-              <p className="text-sm font-medium text-text-primary">Step 1: let your assistant read your resume</p>
+              <p className="text-sm font-medium text-text-primary">Let your assistant read your resume</p>
               <p className="text-xs text-text-muted">
                 {consent.data?.granted
                   ? 'Allowed. It reads your resume to match roles. Questboard never sends it anywhere.'
@@ -194,20 +195,35 @@ export function AssistantTab() {
             </Button>
           </div>
 
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-text-primary">Step 2 (optional): go deeper with your assistant</p>
-            <p className="text-sm text-text-secondary">
-              Your target roles are already set from your resume. Paste this message into your
-              assistant. It sharpens your roles and explains which postings fit you.
-            </p>
-            <div className="rounded-xl border border-border-default bg-bg-card p-3 text-sm leading-relaxed text-text-primary">
-              {SETUP_PROMPT}
+          <p className="text-sm text-text-secondary">
+            Then open{' '}
+            <Link
+              to="/board"
+              search={{ v: 'work' }}
+              className="font-medium text-brand underline underline-offset-2"
+            >
+              Find work
+            </Link>{' '}
+            on the board and click &ldquo;Rank these with your assistant&rdquo;.
+          </p>
+
+          <details className="rounded-xl border border-border-default bg-bg-subtle/40 p-3">
+            <summary className="cursor-pointer text-sm font-medium text-text-primary">
+              Run it from chat instead
+            </summary>
+            <div className="mt-3 space-y-2">
+              <p className="text-sm text-text-secondary">
+                Paste this into Claude or Codex; it does the same run.
+              </p>
+              <div className="rounded-xl border border-border-default bg-bg-card p-3 text-sm leading-relaxed text-text-primary">
+                {SETUP_PROMPT}
+              </div>
+              <Button variant="outline" size="sm" onClick={copyPrompt} disabled={!consent.data?.granted}>
+                {copied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
+                {consent.data?.granted ? (copied ? 'Copied' : 'Copy prompt') : 'Allow resume access first'}
+              </Button>
             </div>
-            <Button variant="outline" size="sm" onClick={copyPrompt} disabled={!consent.data?.granted}>
-              {copied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
-              {consent.data?.granted ? (copied ? 'Copied' : 'Copy prompt') : 'Allow resume access first'}
-            </Button>
-          </div>
+          </details>
         </CardContent>
       </Card>
     </div>
