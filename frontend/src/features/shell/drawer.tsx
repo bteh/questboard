@@ -111,7 +111,8 @@ export interface DrawerProps {
   onClose: () => void;
   onHome: boolean;
   onBoard: boolean;
-  /** the board's Find Work lane (?v=work); onBoard excludes it */
+  /** the board's Find work lane (?v=work); onBoard excludes it so the
+      sub-entry alone lights up there */
   onWork: boolean;
   onLog: boolean;
   onSettings: boolean;
@@ -155,15 +156,16 @@ export function Drawer({ open, onClose, onHome, onBoard, onWork, onLog, onSettin
             The board
             {summary && <span className="qb-nmeta">{summary.total.toLocaleString()} up</span>}
           </Link>
-          {/* Find Work is the second workflow, not a quest kind, so it gets
-              its own standing door regardless of how many rows are live */}
+          {/* Find work is the board's second lane (?v=work), so it reads as
+              part of The board: an indented sub-entry directly under it,
+              standing regardless of how many rows are live */}
           <Link
             to="/board"
             search={{ v: 'work' }}
-            className={onWork ? 'qb-nav-item qb-active' : 'qb-nav-item'}
+            className={onWork ? 'qb-nav-item qb-nav-sub qb-active' : 'qb-nav-item qb-nav-sub'}
             onClick={onClose}
           >
-            <span className="qb-nico"><HugeiconsIcon icon={Briefcase01Icon} size={18} strokeWidth={STROKE} /></span>
+            <span className="qb-nico"><HugeiconsIcon icon={Briefcase01Icon} size={15} strokeWidth={STROKE} /></span>
             Find work
           </Link>
           <Link to="/log" className={onLog ? 'qb-nav-item qb-active' : 'qb-nav-item'} onClick={onClose}>

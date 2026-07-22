@@ -4,7 +4,7 @@
    whole board: rows whose taping already happened drop, rows with no event
    date (career jobs) pass untouched. */
 
-import { KINDS, facetsFor, kindById, kindForVertical, verticalValuesFor } from '@questboard/kinds';
+import { KINDS, facetsFor, kindForVertical, verticalValuesFor } from '@questboard/kinds';
 import type { ApplicationFilters } from '@/types/application';
 
 export type KindKey = string; /* a kind id from @questboard/kinds, or 'all' */
@@ -24,6 +24,17 @@ export function isCareerKind(id: string | undefined): boolean {
   return id !== undefined && CAREER.has(id);
 }
 
+/* The board's two workflows: Side quests (the quest board) and Find work
+   (the career lane, ?v=work). The page's lane switcher reflects and sets
+   this; every ?v value belongs to exactly one tab. */
+export type Workflow = 'quests' | 'work';
+
+/** Which workflow tab a ?v= kind belongs to. Legacy values normalize
+    through normalizeKindKey before they get here. */
+export function workflowForKind(key: KindKey | undefined): Workflow {
+  return isCareerKind(key) ? 'work' : 'quests';
+}
+
 /** Every vertical value a quest refresh may target: quest kind ids plus
     their legacy stored values, career excluded. POST /quests/refresh
     validates against the same registry-derived vocabulary on the backend. */
@@ -34,27 +45,6 @@ export function questRefreshVerticals(): string[] {
 /* every stored vertical value the default board spans: quest kinds only,
    career excluded */
 const ALL_QUEST_VALUES = questRefreshVerticals().join(',');
-
-export interface RailEntry {
-  id: string;
-  label: string;
-  sub: string;
-  count: number;
-}
-
-/** The rail's Jobs lane rows. The quest grid hides kinds with nothing live,
-    but the Jobs lane is a workflow door, not a shelf: it stays reachable at
-    zero rows. Live summary rows keep their counts; a career kind the
-    summary does not carry falls back to its registry entry at count 0. */
-export function careerRailEntries(kinds: readonly RailEntry[]): RailEntry[] {
-  const byId = new Map(kinds.map((k) => [k.id, k]));
-  return CAREER_KIND_IDS.map((id) => {
-    const row = byId.get(id);
-    if (row) return row;
-    const kind = kindById(id);
-    return { id, label: kind?.label ?? 'Find work', sub: kind?.sub ?? '', count: 0 };
-  });
-}
 
 export function kindParams(key: KindKey): Pick<ApplicationFilters, 'vertical' | 'upcoming_only'> {
   return {

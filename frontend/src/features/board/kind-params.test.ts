@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
-  careerRailEntries,
   isCareerKind,
   kindParams,
   normalizeFacetKey,
+  normalizeKindKey,
   questRefreshVerticals,
   questTotal,
+  workflowForKind,
 } from './kind-params';
 
 describe('the board kind params', () => {
@@ -47,24 +48,15 @@ describe('the board kind params', () => {
     expect(kindParams('work').upcoming_only).toBe(true);
   });
 
-  it('keeps the jobs door on the rail regardless of supply', () => {
-    // live summary row: its count rides along
-    expect(careerRailEntries([
-      { id: 'think', label: 'Tell them what you think', sub: 'focus groups', count: 40 },
-      { id: 'work', label: 'Find work', sub: 'jobs, full-time, contract', count: 7 },
-    ])).toEqual([
-      { id: 'work', label: 'Find work', sub: 'jobs, full-time, contract', count: 7 },
-    ]);
-    // zero rows: the door stays
-    expect(careerRailEntries([
-      { id: 'work', label: 'Find work', sub: 'jobs, full-time, contract', count: 0 },
-    ])[0].count).toBe(0);
-    // no career row in the summary at all: the registry fills the door in
-    const fallback = careerRailEntries([{ id: 'think', label: 'x', sub: 'y', count: 3 }]);
-    expect(fallback).toHaveLength(1);
-    expect(fallback[0].id).toBe('work');
-    expect(fallback[0].label).toBe('Find work');
-    expect(fallback[0].count).toBe(0);
+  it('assigns each ?v value to its workflow tab', () => {
+    // the career lane lands on the Find work tab
+    expect(workflowForKind('work')).toBe('work');
+    // everything else, including no kind at all, is the Side quests tab
+    expect(workflowForKind('all')).toBe('quests');
+    expect(workflowForKind('skill')).toBe('quests');
+    expect(workflowForKind(undefined)).toBe('quests');
+    // a legacy ?v=career deep link normalizes first, then lands on Find work
+    expect(workflowForKind(normalizeKindKey('career'))).toBe('work');
   });
 
   it('refreshes quest verticals only, never the career pipeline', () => {

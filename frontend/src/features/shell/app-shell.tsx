@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link, Outlet, useMatchRoute, useMatches, useNavigate } from '@tanstack/react-router';
 import { HugeiconsIcon } from '@hugeicons/react';
 import {
-  Briefcase01Icon,
   Home01Icon,
   Menu01Icon,
   Notebook01Icon,
@@ -66,11 +65,11 @@ export function AppShell() {
 
   const onHome = Boolean(matchRoute({ to: '/home' }));
   const onBoardRoute = Boolean(matchRoute({ to: '/board' }));
-  /* the board's Find Work lane (?v=work) is the second workflow's door and
-     lights its own nav entry; the quest board keeps the rest */
+  /* Find work (?v=work) is the board's second lane, not a separate place:
+     the stub bar lights The board for both lanes, and only the drawer's
+     sub-entry distinguishes the work lane */
   const lastSearch = (matches[matches.length - 1]?.search ?? {}) as { v?: string };
   const onWork = onBoardRoute && lastSearch.v === 'work';
-  const onBoard = onBoardRoute && !onWork;
   /* fuzzy so the ledger and the numbers keep the log tab lit */
   const onLog = Boolean(matchRoute({ to: '/log', fuzzy: true }));
   const onSettings = Boolean(matchRoute({ to: '/settings' }));
@@ -83,7 +82,7 @@ export function AppShell() {
           open={menuOpen}
           onClose={closeMenu}
           onHome={onHome}
-          onBoard={onBoard}
+          onBoard={onBoardRoute && !onWork}
           onWork={onWork}
           onLog={onLog}
           onSettings={onSettings}
@@ -118,13 +117,9 @@ export function AppShell() {
               <HugeiconsIcon icon={Home01Icon} size={18} strokeWidth={1.7} />
               Home
             </Link>
-            <Link to="/board" className={cx('qb-stub', onBoard && 'qb-stub-on')}>
+            <Link to="/board" className={cx('qb-stub', onBoardRoute && 'qb-stub-on')}>
               <HugeiconsIcon icon={PinIcon} size={18} strokeWidth={1.7} />
               The board
-            </Link>
-            <Link to="/board" search={{ v: 'work' }} className={cx('qb-stub', onWork && 'qb-stub-on')}>
-              <HugeiconsIcon icon={Briefcase01Icon} size={18} strokeWidth={1.7} />
-              Find work
             </Link>
             <Link to="/log" className={cx('qb-stub', onLog && 'qb-stub-on')}>
               <HugeiconsIcon icon={Notebook01Icon} size={18} strokeWidth={1.7} />

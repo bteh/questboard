@@ -38,8 +38,15 @@ import {
 } from '@/utils/board-card';
 import { checkedAgoLabel } from '@/features/board/freshness';
 import { FacetChips } from '@/features/board/facet-chips';
-import { isCareerKind, kindParams, type KindKey } from '@/features/board/kind-params';
+import {
+  isCareerKind,
+  kindParams,
+  workflowForKind,
+  type KindKey,
+  type Workflow,
+} from '@/features/board/kind-params';
 import { KindRail } from '@/features/board/kind-rail';
+import { LaneTabs } from '@/features/board/lane-tabs';
 import { PlacePicker } from '@/features/board/place-picker';
 import { JobsSetupStrip } from '@/features/board/jobs-callout';
 import { showBankBonusBridge } from '@/features/board/bridge-line';
@@ -123,6 +130,28 @@ const PRESETS: Preset[] = [
 ];
 
 const PRESET_KEYS = PRESETS.map((p) => p.key);
+
+/* Moving to another kind or lane: a facet belongs to its kind, and a
+   hidden careerOnly preset must not keep silently filtering the feed. */
+function kindSearch(prev: BoardParams, key: KindKey): BoardParams {
+  let keys = presetKeysFrom(prev.p, PRESET_KEYS);
+  if (!isCareerKind(key)) {
+    keys = new Set([...keys].filter((k) => !PRESETS.find((p) => p.key === k)?.careerOnly));
+  }
+  return {
+    ...prev,
+    v: key === 'all' ? undefined : key,
+    f: (prev.v ?? 'all') === key ? prev.f : undefined,
+    p: presetKeysTo(keys, PRESET_KEYS),
+  };
+}
+
+/* The lane switcher's targets. The active tab keeps its state (clicking it
+   goes nowhere new); the other tab lands on its lane's root. */
+function laneSearchFor(lane: Workflow) {
+  return (prev: BoardParams): BoardParams =>
+    workflowForKind(prev.v) === lane ? prev : kindSearch(prev, lane === 'work' ? 'work' : 'all');
+}
 
 function presetParams(activeKeys: Set<string>): Partial<ApplicationFilters> {
   let merged: Partial<ApplicationFilters> = {};
@@ -472,20 +501,7 @@ function BoardPage() {
   function selectKind(key: KindKey) {
     void navigate({
       to: '/board',
-      search: (prev: BoardParams) => {
-        let keys = presetKeysFrom(prev.p, PRESET_KEYS);
-        if (!isCareerKind(key)) {
-          /* a hidden careerOnly preset must not keep silently filtering the feed */
-          keys = new Set([...keys].filter((k) => !PRESETS.find((p) => p.key === k)?.careerOnly));
-        }
-        return {
-          ...prev,
-          v: key === 'all' ? undefined : key,
-          /* a facet belongs to its kind; switching lanes drops it */
-          f: (prev.v ?? 'all') === key ? prev.f : undefined,
-          p: presetKeysTo(keys, PRESET_KEYS),
-        };
-      },
+      search: (prev: BoardParams) => kindSearch(prev, key),
     });
   }
 
@@ -578,12 +594,17 @@ function BoardPage() {
           )}
         </div>
 
+        {/* the two workflows, named as the page's primary structure; the
+            kind rail below belongs to Side quests, the Find work lane keeps
+            its own toolbar */}
+        <LaneTabs kindKey={kindKey} searchFor={laneSearchFor} />
+
         {/* the Jobs lane's toolbar owns its own run door and status line */}
         {!careerLane && <RestockLine />}
 
-        <KindRail selected={kindKey} onSelect={selectKind} />
+        {!careerLane && <KindRail selected={kindKey} onSelect={selectKind} />}
 
-        {kindKey !== 'all' && (
+        {!careerLane && kindKey !== 'all' && (
           <FacetChips
             kind={kindKey}
             selected={params.f}
@@ -592,17 +613,19 @@ function BoardPage() {
           />
         )}
 
-        <div className="qb-preset-row">
-          {visiblePresets.map((preset) => (
-            <PresetChip
-              key={preset.key}
-              preset={preset}
-              active={activeKeys.has(preset.key)}
-              countFilters={countFilters(preset)}
-              onToggle={() => toggle(preset.key)}
-            />
-          ))}
-        </div>
+        {!careerLane && (
+          <div className="qb-preset-row">
+            {visiblePresets.map((preset) => (
+              <PresetChip
+                key={preset.key}
+                preset={preset}
+                active={activeKeys.has(preset.key)}
+                countFilters={countFilters(preset)}
+                onToggle={() => toggle(preset.key)}
+              />
+            ))}
+          </div>
+        )}
 
         {careerLane ? (
           <>

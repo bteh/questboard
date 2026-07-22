@@ -1,16 +1,15 @@
 import { KindStamp } from '@questboard/ui';
 import { useBoardSummary } from '@/hooks/use-board-summary';
-import { careerRailEntries, isCareerKind, questTotal, type KindKey } from '@/features/board/kind-params';
+import { isCareerKind, questTotal, type KindKey } from '@/features/board/kind-params';
 
 /* The kind rail: a labeled, even grid of two-line tags (name over real
    examples), counts right-aligned, in registry order.
    Supply honesty: a kind with nothing live stays off the rail rather than
    posing as a stocked shelf. That includes Party, which has no source and led
    to an empty board when tapped; it returns only if a real source ever fills it.
-   Career sits apart in its own Jobs lane so the quest grid stays quests.
-   The Jobs lane is the one exception to supply honesty: it is a workflow
-   door, so it stays on the rail at zero rows. Its lane explains the setup
-   that fills it; hiding the door would hide the instructions too. */
+   Career rows never appear here: Find work is the board's other workflow,
+   reached by the lane switcher above the rail, so the quest grid stays
+   quests and a job posting never poses as a side quest. */
 
 function Tag({
   active,
@@ -37,9 +36,7 @@ export function KindRail({
 }) {
   const { data } = useBoardSummary();
   if (!data) return null;
-  const shown = data.kinds.filter((k) => k.count > 0);
-  const quests = shown.filter((k) => !isCareerKind(k.id));
-  const jobs = careerRailEntries(data.kinds);
+  const quests = data.kinds.filter((k) => k.count > 0 && !isCareerKind(k.id));
   const questCount = questTotal(data.kinds);
   const questNew = data.kinds.reduce((sum, k) => (isCareerKind(k.id) ? sum : sum + k.new_today), 0);
   return (
@@ -66,21 +63,6 @@ export function KindRail({
             <span className="qb-ktag-count">{kind.count.toLocaleString()}</span>
           </Tag>
         ))}
-      </div>
-      <div className="qb-rail-work">
-        <span className="qb-rail-label qb-rail-work-label">Looking for a job?</span>
-        <div className="qb-rail">
-          {jobs.map((kind) => (
-            <Tag key={kind.id} active={selected === kind.id} onClick={() => onSelect(kind.id)}>
-              <KindStamp kind={kind.id} size={21} className="qb-ktag-stamp" />
-              <span className="qb-ktag-col">
-                <b>{kind.label}</b>
-                <span className="qb-ktag-sub">{kind.sub}</span>
-              </span>
-              <span className="qb-ktag-count">{kind.count.toLocaleString()}</span>
-            </Tag>
-          ))}
-        </div>
       </div>
     </>
   );
