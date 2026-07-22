@@ -76,3 +76,54 @@ describe('PosterWall clipped stamp', () => {
     expect(screen.queryByText(/in your log/)).toBeNull();
   });
 });
+
+describe('PosterWall fit grouping', () => {
+  const withFit = (
+    id: number,
+    verdict: 'strong' | 'good' | 'reach' | 'skip',
+    rank: number | null,
+  ) =>
+    app({
+      id,
+      vertical: 'career',
+      job_title: `Job ${id}`,
+      company: 'Stripe',
+      agent_fit: { rank, verdict, why: '', caveat: '' },
+    });
+
+  it('renders the digest, labeled group rules, and the skip fold', () => {
+    render(
+      <PosterWall
+        items={[withFit(3, 'skip', null), withFit(1, 'strong', 1), withFit(2, 'good', 2)]}
+        labels={{}}
+        fitGrouped
+        onOpenSheet={() => {}}
+        onExplain={() => {}}
+      />,
+    );
+    expect(screen.getByText('Your assistant ranked 2 jobs: 1 strong, 1 good.')).toBeTruthy();
+    expect(screen.getByText('Strong fit (1)')).toBeTruthy();
+    expect(screen.getByText('Good fit (1)')).toBeTruthy();
+    /* an empty group renders nothing */
+    expect(screen.queryByText(/Worth a reach/)).toBeNull();
+    /* the skipped row lives inside the native fold, not the open wall */
+    const summary = screen.getByText('Skipped by your assistant (1)');
+    const fold = summary.closest('details');
+    expect(fold).toBeTruthy();
+    expect(fold!.textContent).toContain('Job 3');
+  });
+
+  it('keeps the plain wall exactly as today when fit grouping is off', () => {
+    render(
+      <PosterWall
+        items={[withFit(1, 'strong', 1)]}
+        labels={{}}
+        onOpenSheet={() => {}}
+        onExplain={() => {}}
+      />,
+    );
+    expect(screen.queryByText(/Strong fit \(/)).toBeNull();
+    expect(screen.queryByText(/Your assistant ranked/)).toBeNull();
+    expect(screen.queryByText(/Skipped by your assistant/)).toBeNull();
+  });
+});

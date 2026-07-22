@@ -61,6 +61,7 @@ import {
   readWorkCutoff,
 } from '@/features/board/new-since';
 import { JobDetailSheet } from '@/features/board/job-detail-sheet';
+import { newestFirst } from '@/features/board/poster-model';
 import { PosterWall } from '@/features/board/poster-wall';
 import { useBoardSummary } from '@/hooks/use-board-summary';
 import type {
@@ -324,6 +325,9 @@ function BoardPage() {
   /* newest first by default: the API's score sort floats unscored rows to
      the top (desc nullsfirst), which reads as noise on a board */
   const [sortNewest, setSortNewest] = useState(() => readSavedBoardState()?.sort !== 'score');
+  /* has the reader clicked the sort this visit? Until they do, verdicts from
+     the assistant's last run make fit order the work lane's default */
+  const [sortTouched, setSortTouched] = useState(false);
   /* pages loaded, keyed to the filters that loaded them: any filter change
      starts back at one page without an effect */
   const [pageState, setPageState] = useState<{ key: string; pages: number }>({ key: '', pages: 1 });
@@ -475,6 +479,15 @@ function BoardPage() {
      re-split by recency or claim an exact "new since" count, both of which
      assume newest-first. */
   const hasAgentVerdicts = careerLane && visibleItems.some((app) => app.agent_fit);
+  /* fit order is the default the moment verdicts exist; an explicit sort
+     click this visit wins either way */
+  const fitOrder = hasAgentVerdicts && (sortTouched ? !sortNewest : true);
+  /* what the sort control honestly shows: fit order reads as best score */
+  const sortShowsBest = fitOrder || !sortNewest;
+  /* the roles API keeps ranked rows first whatever sort it is asked for, so
+     an explicit "newly found" pick with verdicts re-orders the loaded rows */
+  const wallItems =
+    careerLane && hasAgentVerdicts && !fitOrder ? newestFirst(visibleItems) : visibleItems;
 
   /* the work lane's filter status line compares what shows against the
      whole lane. The baseline count only fetches while a toolbar filter
@@ -642,8 +655,15 @@ function BoardPage() {
               rows), so the toggle lives on the work lane; quest lanes are
               always newest first and say so without a dead switch */}
           {careerLane ? (
-            <button type="button" className="qb-sort" onClick={() => setSortNewest((v) => !v)}>
-              Matches your target roles · sort: <b>{sortNewest ? 'newly found' : 'best score'}</b>
+            <button
+              type="button"
+              className="qb-sort"
+              onClick={() => {
+                setSortTouched(true);
+                setSortNewest(sortShowsBest);
+              }}
+            >
+              Matches your target roles · sort: <b>{sortShowsBest ? 'best score' : 'newly found'}</b>
             </button>
           ) : (
             <span className="qb-sort">newest first</span>
@@ -834,14 +854,17 @@ function BoardPage() {
         {careerLane && sinceLine && (
           <p className="qb-sinceline">
             {sinceLine}
-            {!sortNewest && (
+            {sortShowsBest && (
               <>
                 {' '}
                 <button
                   type="button"
                   className="qb-textlink"
                   style={{ fontSize: 'inherit' }}
-                  onClick={() => setSortNewest(true)}
+                  onClick={() => {
+                    setSortTouched(true);
+                    setSortNewest(true);
+                  }}
                 >
                   show new first
                 </button>
@@ -854,10 +877,11 @@ function BoardPage() {
           <div className="qb-felt">
             <div className="qb-wall">
               <PosterWall
-                items={visibleItems}
+                items={wallItems}
                 labels={labels}
                 cutoff={careerLane ? workCutoff : undefined}
                 grouped={careerLane && sortNewest && !hasAgentVerdicts}
+                fitGrouped={fitOrder}
                 onOpenSheet={setSheetApp}
                 onExplain={setExplainApp}
                 onOpenDetail={careerLane ? openDetail : undefined}

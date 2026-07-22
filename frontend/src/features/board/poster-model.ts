@@ -9,7 +9,7 @@ import { cleanCompany, toBoardCard, type BoardCardModel } from '@/utils/board-ca
 import { kindCopy, type KindCopy } from '@/features/board/kind-copy';
 import { getCompanyLogoUrl } from '@/utils/company-domains';
 import { avatarColor } from '@/utils/colors';
-import type { ApplicationResponse } from '@/types/application';
+import type { AgentFitVerdict, ApplicationResponse } from '@/types/application';
 
 /** The career poster's fixed logo tile; the monogram fallback derives
     deterministically from the company name (CompanyAvatar's pattern). */
@@ -61,6 +61,100 @@ export function fitBadgeFor(app: ApplicationResponse): PosterModel['fitBadge'] {
   const word = FIT_WORD[fit.verdict];
   const label = fit.verdict !== 'skip' && fit.rank ? `#${fit.rank} · ${word}` : word;
   return { label, verdict: fit.verdict };
+}
+
+/* ---- fit order: the wall's grouping when the assistant has ranked ----
+   The API's roles feed floats ranked rows first but ignores the sort param
+   and never sends skips last, so the wall does the residual ordering here.
+   Pure and structural: poster-wall hands in the loaded rows, nothing else. */
+
+type FitRow = { agent_fit?: { verdict: AgentFitVerdict; rank: number | null } | null };
+type FitVerdictShown = Exclude<AgentFitVerdict, 'skip'>;
+
+const FIT_GROUP_ORDER: readonly FitVerdictShown[] = ['strong', 'good', 'reach'];
+const FIT_GROUP_LABEL: Record<FitVerdictShown, string> = {
+  strong: 'Strong fit',
+  good: 'Good fit',
+  reach: 'Worth a reach',
+};
+
+export interface FitGroup<T> {
+  verdict: FitVerdictShown;
+  label: string;
+  items: T[];
+}
+
+export interface FitWall<T> {
+  /** verdict groups in strong/good/reach order; empty groups omitted */
+  groups: FitGroup<T>[];
+  /** rows the assistant never judged, original order, after the groups */
+  unranked: T[];
+  /** verdict skip, last; these fold away rather than hang on the wall */
+  skips: T[];
+}
+
+/* rank asc, unranked members after ranked ones, original order as the tie */
+function byRankThenPosition<T>(rows: { row: T; rank: number | null; i: number }[]): T[] {
+  return rows
+    .sort((a, b) => (a.rank ?? Infinity) - (b.rank ?? Infinity) || a.i - b.i)
+    .map((e) => e.row);
+}
+
+/** The loaded rows in the assistant's fit order, grouped for the wall. */
+export function fitGroups<T extends FitRow>(items: T[]): FitWall<T> {
+  const byVerdict = new Map<AgentFitVerdict, { row: T; rank: number | null; i: number }[]>();
+  const unranked: T[] = [];
+  items.forEach((row, i) => {
+    const fit = row.agent_fit;
+    if (!fit) {
+      unranked.push(row);
+      return;
+    }
+    const bucket = byVerdict.get(fit.verdict) ?? [];
+    bucket.push({ row, rank: fit.rank, i });
+    byVerdict.set(fit.verdict, bucket);
+  });
+  const groups = FIT_GROUP_ORDER.filter((v) => byVerdict.has(v)).map((verdict) => ({
+    verdict,
+    label: FIT_GROUP_LABEL[verdict],
+    items: byRankThenPosition(byVerdict.get(verdict)!),
+  }));
+  return { groups, unranked, skips: byRankThenPosition(byVerdict.get('skip') ?? []) };
+}
+
+/** "Your assistant ranked 12 jobs: 6 strong, 4 good, 2 reach." Zero groups
+    stay out; null when nothing but skips carries a verdict (the fold's own
+    count tells that story). */
+export function fitDigest<T>(wall: FitWall<T>): string | null {
+  const parts = wall.groups.map((g) => `${g.items.length} ${g.verdict}`);
+  const n = wall.groups.reduce((sum, g) => sum + g.items.length, 0);
+  if (n === 0) return null;
+  return `Your assistant ranked ${n} job${n === 1 ? '' : 's'}: ${parts.join(', ')}.`;
+}
+
+/* date_found comes back as naive UTC (new-since pins the same way): fix the
+   zone so the order never drifts with the reader's timezone */
+function foundAtMs(value: string | null | undefined): number | null {
+  if (!value) return null;
+  let v = value.trim().replace(' ', 'T');
+  if (!/(?:Z|[+-]\d{2}:?\d{2})$/.test(v)) v = `${v}Z`;
+  const t = Date.parse(v);
+  return Number.isNaN(t) ? null : t;
+}
+
+/** The loaded rows by date_found desc, unknown dates last, ties in the given
+    order. The roles API keeps ranked rows first whatever sort it is asked
+    for, so an explicit "newly found" pick re-orders the loaded rows here. */
+export function newestFirst<T extends { date_found: string | null }>(items: T[]): T[] {
+  return items
+    .map((row, i) => ({ row, i, t: foundAtMs(row.date_found) }))
+    .sort((a, b) => {
+      if (a.t === b.t) return a.i - b.i;
+      if (a.t === null) return 1;
+      if (b.t === null) return -1;
+      return b.t - a.t;
+    })
+    .map((e) => e.row);
 }
 
 /** First sentence of the posting's own description, capped for scanning.

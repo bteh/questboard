@@ -79,6 +79,43 @@
 }
 .qb-since-line { flex: 1; border-top: 1px solid rgba(90, 74, 52, .38); }
 
+/* fit order: the assistant's digest line, then one labeled rule per verdict
+   group, all in the since-rule's quiet grammar */
+.qb-fit-digest {
+  column-span: all;
+  margin: 0 0 22px;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  color: var(--mute);
+}
+.qb-fit-rule {
+  column-span: all;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0 30px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .04em;
+  color: var(--soft);
+}
+
+/* skipped rows fold behind a native disclosure after the last group */
+.qb-skip-fold { column-span: all; margin-top: 2px; }
+.qb-skip-fold summary {
+  cursor: pointer;
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .04em;
+  color: var(--soft);
+}
+.qb-skip-fold summary:hover { color: var(--ink); }
+.qb-skip-posters { margin-top: 24px; columns: 3; column-gap: 26px; }
+@media (max-width: 1180px) { .qb-skip-posters { columns: 2; } }
+@media (max-width: 720px) { .qb-skip-posters { columns: 1; } }
+
 /* facet chips: a kind's own sub-filters, one quiet row under the rail */
 .qb-facet-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
 
