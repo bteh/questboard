@@ -4,7 +4,7 @@
    "profile candidates") stays gone. */
 
 import { describe, expect, it } from 'vitest';
-import { filterPlaceholder, filterStatusText } from './work-toolbar';
+import { filterPlaceholder, filterStatusText, pullNote } from './work-toolbar';
 
 describe('the filter box placeholder', () => {
   it('carries the loaded total', () => {
@@ -77,5 +77,32 @@ describe('the status line under the filters', () => {
     expect(filterStatusText({ shown: 1, laneTotal: 66, filtered: true, checkedAgo: null })).toBe(
       'Showing 1 of 66 jobs',
     );
+  });
+});
+
+describe('pullNote', () => {
+  it('names the first saved role and counts the rest', () => {
+    expect(pullNote(['Data Engineering Manager', 'Staff Data Engineer', 'Lead Data Engineer'])).toEqual({
+      text: 'Pulls fresh postings for Data Engineering Manager and 2 more roles.',
+      linkLabel: 'Edit roles',
+    });
+  });
+
+  it('speaks singular for one saved role', () => {
+    expect(pullNote(['Staff Data Engineer'])).toEqual({
+      text: 'Pulls fresh postings for Staff Data Engineer.',
+      linkLabel: 'Edit roles',
+    });
+  });
+
+  it('asks for roles when none are saved', () => {
+    expect(pullNote([])).toEqual({
+      text: 'No target roles saved yet.',
+      linkLabel: 'Set roles',
+    });
+    expect(pullNote(undefined)).toEqual({
+      text: 'Pulls fresh postings for your target roles.',
+      linkLabel: 'Edit roles',
+    });
   });
 });

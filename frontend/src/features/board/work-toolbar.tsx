@@ -18,6 +18,7 @@ import { useSearchContext } from '@/contexts/search-context';
 import { restockProgress } from '@/components/board/restock-logic';
 import { PlacePicker } from '@/features/board/place-picker';
 import { useRunWorkSearch } from '@/features/board/use-run-work-search';
+import { useOnboardingState } from '@/hooks/use-workspace';
 import { formatStatedPay, parseAmount } from '@/utils/board-card';
 
 interface WorkToolbarProps {
@@ -50,6 +51,25 @@ interface FilterChip {
 }
 
 const TIMED_OUT_RE = /^\s+.+: timed out$/;
+
+/* The pull note names the actual saved roles the run will use, so the user
+   can verify them at the point of use instead of trusting a vague phrase.
+   Undefined means still loading; the generic phrase holds until then. */
+export function pullNote(roles: string[] | undefined): { text: string; linkLabel: string } {
+  if (roles === undefined) {
+    return { text: 'Pulls fresh postings for your target roles.', linkLabel: 'Edit roles' };
+  }
+  if (roles.length === 0) {
+    return { text: 'No target roles saved yet.', linkLabel: 'Set roles' };
+  }
+  if (roles.length === 1) {
+    return { text: `Pulls fresh postings for ${roles[0]}.`, linkLabel: 'Edit roles' };
+  }
+  return {
+    text: `Pulls fresh postings for ${roles[0]} and ${roles.length - 1} more roles.`,
+    linkLabel: 'Edit roles',
+  };
+}
 
 /* The placeholder names the box's real job: it narrows rows already on the
    board, and the count keeps that concrete. Under two rows, or while the
@@ -176,6 +196,9 @@ export function WorkToolbar({
   onPayTo,
 }: WorkToolbarProps) {
   const { run, ready, running } = useRunWorkSearch();
+  const { data: onboarding } = useOnboardingState();
+  const savedRoles = onboarding ? (onboarding.preferences?.roles ?? []) : undefined;
+  const note = pullNote(savedRoles);
 
   const payFloor = parseAmount(payFrom.trim());
   const payCeiling = parseAmount(payTo.trim());
@@ -207,10 +230,10 @@ export function WorkToolbar({
         <SageButton onClick={run} disabled={!ready}>
           {running ? 'Getting jobs…' : 'Get new jobs'}
         </SageButton>
-        <span className="qb-workactions-note">
-          Pulls fresh postings for your target roles.{' '}
+        <span className="qb-workactions-note" title={savedRoles?.join(', ') || undefined}>
+          {note.text}{' '}
           <Link to="/settings" search={{ tab: 'restock' }} className="qb-textlink">
-            Edit roles
+            {note.linkLabel}
           </Link>
         </span>
         {assistantSlot}
