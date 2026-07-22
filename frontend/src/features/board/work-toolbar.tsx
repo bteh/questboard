@@ -169,8 +169,8 @@ export function WorkToolbar({
         <label className="qb-tray-field qb-tray-grow">
           <HugeiconsIcon icon={Search01Icon} size={16} strokeWidth={1.7} />
           <input
-            placeholder="Search the cached jobs"
-            aria-label="Search the cached jobs"
+            placeholder="Search these jobs"
+            aria-label="Search these jobs"
             value={search}
             onChange={(e) => onSearch(e.target.value)}
           />

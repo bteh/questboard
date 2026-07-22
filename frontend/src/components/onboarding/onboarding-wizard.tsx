@@ -53,8 +53,8 @@ interface OnboardingWizardProps {
 /**
  * Two-step first-run onboarding for the desktop app.
  *
- * Step 1 — Upload Your Resume: drop target + skip path
- * Step 2 — What are you looking for?: roles + locations only, then GO
+ * Step 1, Upload Your Resume: drop target + skip path
+ * Step 2, What are you looking for?: roles + locations only, then GO
  *
  * Everything else (AI provider, salary, posted-within window, LinkedIn,
  * companies, etc.) is intentionally NOT here. The desktop-first plan in
@@ -95,7 +95,7 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
   const resumeUploaded = data?.resume.exists === true;
   const prefilledFromResume = form.roles.length > 0;
   const [aiFailed, setAiFailed] = useState(false);
-  // Outcome of the most recent upload — drives the scanned-PDF / no-AI banner.
+  // Outcome of the most recent upload; drives the scanned-PDF / no-AI banner.
   const [uploadNotice, setUploadNotice] = useState<NormalizedResumeUpload | null>(null);
 
   // Skip directly to step 2 if a resume is already on disk when the wizard
@@ -154,7 +154,7 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
         const normalized = normalizeWorkspaceUpload(result);
         setUploadNotice(normalized);
         if (normalized.parseCode === 'SCANNED_PDF') {
-          // Stay on the resume step — the banner explains how to fix the file,
+          // Stay on the resume step: the banner explains how to fix the file,
           // and the skip path is still available for keyword-only searching.
           toast.error('Resume saved, but no text could be read from it');
           return;
@@ -179,7 +179,7 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
         }
         setStep('search');
 
-        // Fire a background AI suggest if AI is connected — fills companies
+        // Fire a background AI suggest if AI is connected; fills companies
         // and reinforces roles/keywords without blocking the user.
         if (llm?.available) {
           suggestSearch.mutate('workspace', {
@@ -206,7 +206,7 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
         }
       },
       onError: (error) => {
-        toast.error(error instanceof Error ? error.message : 'Upload failed');
+        toast.error(error instanceof Error ? error.message : 'The upload did not finish. Try again.');
       },
     });
   };
@@ -221,7 +221,7 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
       return;
     }
 
-    // Save preferences only — DO NOT auto-fire a search. The dashboard's
+    // Save preferences only, DO NOT auto-fire a search. The dashboard's
     // "Ready to launch" hero owns the moment of clicking Start so the user
     // never feels rushed past their settings.
     savePreferences.mutate(form, {
@@ -229,12 +229,12 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
         // The restock page consumes this flag when the first run completes
         // and opens the results, so the new user is never stranded.
         markFirstRunPending();
-        toast.success('Preferences saved. Review and start your search when ready.');
+        toast.success('Preferences saved. Start your search when ready.');
         onComplete();
         navigate({ to: '/board' });
       },
       onError: (error) =>
-        toast.error(error instanceof Error ? error.message : 'Failed to save preferences'),
+        toast.error(error instanceof Error ? error.message : 'Could not save preferences. Try again.'),
     });
   };
 
@@ -243,7 +243,7 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
   return (
     <Dialog open={open} onOpenChange={(next) => { if (!next) handleDismiss(); }}>
       <DialogContent showCloseButton={false} className="sm:max-w-xl p-0 overflow-hidden">
-        {/* Close button — positioned absolutely so it doesn't fight the
+        {/* Close button, positioned absolutely so it doesn't fight the
             step indicator for layout space. Dismissing via this button
             persists to localStorage so the wizard stays closed on reload. */}
         <button
@@ -255,7 +255,7 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
           <X className="h-4 w-4" />
         </button>
 
-        {/* Step indicator — minimal, two dots */}
+        {/* Step indicator: minimal, two dots */}
         <div className="flex justify-center gap-1.5 pt-5">
           {STEPS.map((value) => (
             <div
@@ -365,10 +365,10 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
                 </h2>
                 <p className="mx-auto max-w-md text-sm leading-relaxed text-text-tertiary">
                   {prefilledFromResume
-                    ? 'We pulled these from your resume. Tweak anything below, then start your first search.'
+                    ? 'We pulled these from your resume. Change anything that looks off.'
                     : resumeUploaded
-                      ? 'Your resume is uploaded. Add a role to focus the search, or skip and let us read it.'
-                      : "Tell us a target role and where. You can fine-tune everything later in Settings."}
+                      ? 'Add a role to focus the search. Blank searches from your resume alone.'
+                      : 'Add a target role and a place to search. Fine-tune later in Settings.'}
                 </p>
               </div>
 
@@ -434,7 +434,7 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
               </div>
               {resumeUploaded && form.roles.length === 0 && form.keywords.length === 0 && (
                 <p className="text-center text-[11px] text-text-muted">
-                  No roles entered. Questboard will derive them from your resume for this first run.
+                  No roles entered. Questboard reads them from your resume for this first run.
                 </p>
               )}
             </div>

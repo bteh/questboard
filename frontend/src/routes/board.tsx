@@ -42,6 +42,7 @@ import { isCareerKind, kindParams, type KindKey } from '@/features/board/kind-pa
 import { KindRail } from '@/features/board/kind-rail';
 import { PlacePicker } from '@/features/board/place-picker';
 import { JobsSetupStrip } from '@/features/board/jobs-callout';
+import { showBankBonusBridge } from '@/features/board/bridge-line';
 import { WorkToolbar } from '@/features/board/work-toolbar';
 import { SourceCategoryChips } from '@/features/board/source-category-chips';
 import { AssistantRunButton } from '@/features/board/assistant-run-button';
@@ -569,7 +570,7 @@ function BoardPage() {
           <h1>The board</h1>
           <span className="qb-live">{total !== undefined ? `${total} live` : 'loading'}</span>
           {careerLane ? (
-            <span className="qb-sort">Profile-role candidates · newest first</span>
+            <span className="qb-sort">Matches your target roles · newest first</span>
           ) : (
             <button type="button" className="qb-sort" onClick={() => setSortNewest((v) => !v)}>
               Sort: <b>{sortNewest ? 'newly found' : 'best score'}</b>
@@ -624,20 +625,13 @@ function BoardPage() {
               onPayTo={setPayToRaw}
             />
             <div className="mt-2">
-              <AssistantRunButton />
+              <AssistantRunButton rowCount={visibleItems.length} hasVerdicts={hasAgentVerdicts} />
             </div>
             <SourceCategoryChips
               counts={workMeta?.source_categories}
               selected={sourceCategory}
               onSelect={setSourceCategory}
             />
-            <p className="qb-jobs-bridge">
-              Landed something? A new paycheck is the best moment for a{' '}
-              <button type="button" className="qb-textlink" onClick={() => selectKind('house')}>
-                bank bonus
-              </button>
-              .
-            </p>
           </>
         ) : (
           <>
@@ -692,11 +686,28 @@ function BoardPage() {
                     : ' A place keeps remote and no-place quests too. Tick near me only to hide them.'}
                 </>
               ) : (
-                'Pay counts only what the posting states; no stated pay keeps a quest on the board. A place keeps remote and no-place quests too.'
+                'Pay counts only what the posting states. Quests with no stated pay stay on the board. A place keeps remote and no-place quests too.'
               )}
             </p>
             <FirstRunNotice onStartHere={startHere} />
           </>
+        )}
+
+        {/* the bridge only where it belongs: the work lane (a new paycheck)
+            and the house lane (the bonuses themselves); the link only where
+            it goes somewhere else */}
+        {showBankBonusBridge(kindKey) && (
+          <p className="qb-jobs-bridge">
+            Turn a new paycheck into a{' '}
+            {kindKey === 'house' ? (
+              'bank bonus'
+            ) : (
+              <button type="button" className="qb-textlink" onClick={() => selectKind('house')}>
+                bank bonus
+              </button>
+            )}
+            .
+          </p>
         )}
 
         {firstPage.isError && (
@@ -789,24 +800,32 @@ function BoardPage() {
           <div className="qb-board-empty" role="status">
             <p className="qb-board-empty-lead">No jobs on your board for these roles yet.</p>
             <p>
-              Click <b>“Get new jobs”</b> above to pull fresh postings from your sources onto the board.
-              It takes about a minute.
+              Click <b>“Get new jobs”</b> above to pull fresh postings. The pull takes about a
+              minute.
             </p>
           </div>
         )}
 
-        <p className="qb-board-legend">
-          Pull <b>take it</b> to go straight to the source. <b>The colour of the pin tells you the kind of quest.</b>{' '}
-          Every date on this board is the true post date; postings with no verifiable date say nothing.
-          {checkedAgo && (
-            <>
-              {' '}Quests the sources stop listing come down on their own.{' '}
-              <Link to="/health" className="qb-legend-link" title="Source health">
-                <b>{checkedAgo}.</b>
-              </Link>
-            </>
-          )}
-        </p>
+        {/* one line, then a native disclosure for the rest: the legend must
+            never read as a third paragraph of competing instructions */}
+        <div className="qb-board-legend">
+          <p>
+            Pull <b>take it</b> to go straight to the source.
+          </p>
+          <details className="qb-legend-more">
+            <summary>How the board works</summary>
+            <p>The colour of the pin shows the kind of quest.</p>
+            <p>Every date is the true post date. Postings with no verifiable date say nothing.</p>
+            <p>Quests the sources stop listing come down on their own.</p>
+            {checkedAgo && (
+              <p>
+                <Link to="/health" className="qb-legend-link" title="Source health">
+                  <b>{checkedAgo}.</b>
+                </Link>
+              </p>
+            )}
+          </details>
+        </div>
       </div>
 
       <RequirementSheet app={sheetApp} labels={labels} onClose={() => setSheetApp(null)} />

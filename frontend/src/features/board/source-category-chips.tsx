@@ -1,6 +1,6 @@
 /* Browse the full career inventory by source kind. "My roles" is the default
    focused view (candidates that match your target roles); the other chips open
-   everything available from that kind of source — founder/VC boards, crypto,
+   everything available from that kind of source: founder/VC boards, crypto,
    remote-first boards, company ATS pages, the big boards. Counts are the full
    inventory, so you see the real breadth even when your roles match few. */
 

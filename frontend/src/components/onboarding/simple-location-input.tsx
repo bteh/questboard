@@ -84,7 +84,7 @@ export function SimpleLocationInput({
     const next = preferredPlaces.filter((item) => item.label !== label);
     onPreferredPlacesChange(next);
     if (next.length === 0 && workplacePreference === 'location_only') {
-      // Don't strand the user with zero places and no remote — flip back.
+      // Don't strand the user with zero places and no remote; flip back.
       onWorkplacePreferenceChange('remote_only');
     }
   };
@@ -181,7 +181,7 @@ export function SimpleLocationInput({
 
       {noPlacesAndRemoteOff && (
         <p className="text-xs text-amber-700 dark:text-amber-300">
-          Add a city or turn remote back on — there's nothing to search yet.
+          Nothing to search yet. Add a city or turn remote back on.
         </p>
       )}
     </div>

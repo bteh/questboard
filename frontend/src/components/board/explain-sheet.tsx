@@ -53,7 +53,7 @@ function ConsentArea({
         title="First time only."
         body={
           <>
-            Your computer can do this work itself, so it's free and nothing you type leaves it.
+            Your computer can do this read itself, free. Nothing you type leaves it.
             One download first, about <span className="qb-num">1.1 GB</span>, the size of a movie.
           </>
         }

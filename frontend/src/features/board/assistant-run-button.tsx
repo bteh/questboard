@@ -9,10 +9,28 @@ import { isDesktopApp } from '@/lib/platform';
 
 const PHASES = ['Reading your resume', 'Searching the board', 'Ranking against your experience'];
 
+export type AssistantEmphasis = 'quiet' | 'elevated';
+
+/* One primary action per lane: "Get new jobs" keeps the only filled button.
+   This door elevates (bordered, tinted) only when there are rows to rank and
+   no verdicts stored yet; at zero rows, or once ranked, it reads as a quiet
+   text link. Pinned by assistant-emphasis.test.ts. */
+export function assistantRunEmphasis(rowCount: number, hasVerdicts: boolean): AssistantEmphasis {
+  return rowCount > 0 && !hasVerdicts ? 'elevated' : 'quiet';
+}
+
 /* The AI run, right on the Find-work board next to search: tap it and your own
    Claude reads your resume, ranks the board, and its verdicts land on the
    posters (badges + explain). Desktop-only; the run spawns your local agent. */
-export function AssistantRunButton() {
+export function AssistantRunButton({
+  rowCount = 0,
+  hasVerdicts = false,
+}: {
+  /** loaded rows on the lane; zero keeps the door quiet */
+  rowCount?: number;
+  /** true once assistant verdicts are stored; keeps the door quiet again */
+  hasVerdicts?: boolean;
+}) {
   const run = useRunAgent();
   const clients = useAgentClients();
   const consent = useAgentConsent();
@@ -44,7 +62,8 @@ export function AssistantRunButton() {
           void queryClient.invalidateQueries({ queryKey: ['profile-work'] });
           void queryClient.invalidateQueries({ queryKey: ['applications'] });
         },
-        onError: (err) => setError(err instanceof Error ? err.message : 'Something went wrong.'),
+        onError: (err) =>
+          setError(err instanceof Error ? err.message : 'The run did not finish. Try again.'),
       },
     );
   };
@@ -73,16 +92,27 @@ export function AssistantRunButton() {
     );
   }
 
+  const emphasis = assistantRunEmphasis(rowCount, hasVerdicts);
   return (
     <span className="inline-flex items-center gap-2">
-      <button
-        type="button"
-        onClick={start}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-brand bg-brand/10 px-3 py-2 text-sm font-medium text-brand transition-colors hover:bg-brand/15"
-      >
-        <Sparkles className="h-4 w-4" />
-        Rank these with your assistant
-      </button>
+      {emphasis === 'elevated' ? (
+        <button
+          type="button"
+          onClick={start}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-brand bg-brand/10 px-3 py-2 text-sm font-medium text-brand transition-colors hover:bg-brand/15"
+        >
+          <Sparkles className="h-4 w-4" />
+          Rank these with your assistant
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={start}
+          className="text-sm font-medium text-brand underline underline-offset-2"
+        >
+          Rank these with your assistant
+        </button>
+      )}
       {error && <span className="text-xs text-amber-700 dark:text-amber-300">{error}</span>}
     </span>
   );

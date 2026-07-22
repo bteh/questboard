@@ -1,8 +1,11 @@
 import { Link } from '@tanstack/react-router';
 import { useOnboardingState } from '@/hooks/use-workspace';
+import { pickSetupStep } from '@/features/board/jobs-setup';
 
 /* The Work lane retrieves target-role candidates locally. Resume-fit judgment
-   belongs to the user's connected agent, never an invisible server score. */
+   belongs to the user's connected agent, never an invisible server score.
+   Setup shows ONE prompt at a time (pickSetupStep): a single sentence leading
+   with the verb, plus one link. Complete setup shows nothing here. */
 export function JobsSetupStrip({
   profileConfigured,
   jurisdictionConfigured,
@@ -12,36 +15,35 @@ export function JobsSetupStrip({
 }) {
   const { data: onboarding } = useOnboardingState();
   if (!onboarding) return null;
-  const needsResume = onboarding.resume?.exists !== true;
+  const step = pickSetupStep({
+    resumeExists: onboarding.resume?.exists === true,
+    profileConfigured,
+    jurisdictionConfigured,
+  });
+  if (step === null) return null;
   return (
     <div className="qb-jobs-setup">
-      {needsResume && (
+      {step === 'resume' && (
         <span>
-          <b>Add your resume</b> so your agent can compare finalists with your experience.{' '}
+          <b>Add your resume</b> to compare finalists against your experience.{' '}
           <Link to="/settings" search={{ tab: 'resume' }} className="qb-jobs-cta">
             Add it →
           </Link>
         </span>
       )}
-      {profileConfigured === false && (
+      {step === 'roles' && (
         <span>
-          <b>No target roles saved.</b>{' '}
+          <b>Choose your target roles</b> to pull matching jobs.{' '}
           <Link to="/settings" search={{ tab: 'restock' }} className="qb-jobs-cta">
             Choose roles →
           </Link>
         </span>
       )}
-      {profileConfigured !== false && (
+      {step === 'country' && (
         <span>
-          <b>These match your target roles.</b> “Get new jobs” pulls fresh postings from your sources;
-          “Rank these with your assistant” has your AI score what’s already here.
-        </span>
-      )}
-      {jurisdictionConfigured === false && (
-        <span>
-          <b>Remote has no country attached.</b>{' '}
+          <b>Add a country</b> so remote jobs match where you can work.{' '}
           <Link to="/settings" search={{ tab: 'restock' }} className="qb-jobs-cta">
-            Add a city or country →
+            Add it →
           </Link>
         </span>
       )}

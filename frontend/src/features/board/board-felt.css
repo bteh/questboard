@@ -171,6 +171,11 @@
 .qb-house .qb-house-sig { font-weight: 700; color: var(--ink); }
 
 .qb-board-legend { margin-top: 24px; font-size: 12px; color: var(--mute); text-align: center; line-height: 1.6; }
+.qb-board-legend p { margin: 0 0 4px; }
+/* the rest of the legend folds behind a native disclosure */
+.qb-legend-more summary { cursor: pointer; display: inline-block; color: var(--mute); }
+.qb-legend-more summary:hover { color: var(--soft); }
+.qb-legend-more[open] summary { margin-bottom: 4px; }
 .qb-board-empty { text-align: center; padding: 44px 20px 24px; color: var(--soft); font-size: 14px; line-height: 1.6; }
 .qb-board-empty-lead { font-family: var(--serif); font-size: 19px; color: var(--ink); margin: 0 0 6px; }
 .qb-board-empty b { color: var(--ink); }
