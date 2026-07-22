@@ -127,3 +127,39 @@ describe('PosterWall fit grouping', () => {
     expect(screen.queryByText(/Skipped by your assistant/)).toBeNull();
   });
 });
+
+/* WebKit repaints multicol fragments around column-span elements on every
+   hover of a transformed child, which flickered the desktop app. The wall
+   therefore renders one .qb-wall columns block per segment, with digest,
+   rules, and the skip fold BETWEEN blocks, never inside one. */
+describe('wall segments avoid column spanners', () => {
+  const ranked = [
+    app({ id: 1, vertical: 'career', agent_fit: { verdict: 'strong', rank: 1, why: 'w', caveat: '' } }),
+    app({ id: 2, vertical: 'career', agent_fit: { verdict: 'reach', rank: 2, why: 'w', caveat: '' } }),
+    app({ id: 3, vertical: 'career', agent_fit: { verdict: 'skip', why: 'w', caveat: '', rank: null } }),
+  ] as ApplicationResponse[];
+
+  afterEach(cleanup);
+
+  it('fit-grouped: rules and digest sit between walls, posters inside walls', () => {
+    const { container } = render(
+      <PosterWall items={ranked} labels={{}} onOpenSheet={() => {}} onExplain={() => {}} fitGrouped />,
+    );
+    const walls = container.querySelectorAll('.qb-wall');
+    expect(walls.length).toBeGreaterThanOrEqual(2);
+    for (const cls of ['.qb-fit-digest', '.qb-fit-rule', '.qb-skip-fold']) {
+      for (const el of container.querySelectorAll(cls)) {
+        expect(el.closest('.qb-wall')).toBeNull();
+      }
+    }
+    for (const poster of container.querySelectorAll('.qb-poster')) {
+      expect(poster.closest('.qb-wall, .qb-skip-posters')).not.toBeNull();
+    }
+  });
+
+  it('plain wall: posters render inside a single .qb-wall block', () => {
+    const { container } = render(<PosterWall items={[app()]} labels={{}} onOpenSheet={() => {}} onExplain={() => {}} />);
+    expect(container.querySelectorAll('.qb-wall').length).toBe(1);
+    expect(container.querySelector('.qb-wall .qb-poster')).not.toBeNull();
+  });
+});

@@ -875,19 +875,17 @@ function BoardPage() {
 
         {total !== undefined && total > 0 && (
           <div className="qb-felt">
-            <div className="qb-wall">
-              <PosterWall
-                items={wallItems}
-                labels={labels}
-                cutoff={careerLane ? workCutoff : undefined}
-                grouped={careerLane && sortNewest && !hasAgentVerdicts}
-                fitGrouped={fitOrder}
-                onOpenSheet={setSheetApp}
-                onExplain={setExplainApp}
-                onOpenDetail={careerLane ? openDetail : undefined}
-              />
-              <HouseRules />
-            </div>
+            <PosterWall
+              items={wallItems}
+              labels={labels}
+              cutoff={careerLane ? workCutoff : undefined}
+              grouped={careerLane && sortNewest && !hasAgentVerdicts}
+              fitGrouped={fitOrder}
+              onOpenSheet={setSheetApp}
+              onExplain={setExplainApp}
+              onOpenDetail={careerLane ? openDetail : undefined}
+            />
+            <HouseRules />
             {pages * PAGE_SIZE < total && (
               <div style={{ display: 'flex', justifyContent: 'center', marginTop: 6 }}>
                 <button

@@ -67,7 +67,6 @@
 
 /* the rule between since-your-last-visit and earlier, spanning the felt */
 .qb-since-rule {
-  column-span: all;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -82,7 +81,6 @@
 /* fit order: the assistant's digest line, then one labeled rule per verdict
    group, all in the since-rule's quiet grammar */
 .qb-fit-digest {
-  column-span: all;
   margin: 0 0 22px;
   font-family: var(--mono);
   font-variant-numeric: tabular-nums;
@@ -90,7 +88,6 @@
   color: var(--mute);
 }
 .qb-fit-rule {
-  column-span: all;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -102,7 +99,7 @@
 }
 
 /* skipped rows fold behind a native disclosure after the last group */
-.qb-skip-fold { column-span: all; margin-top: 2px; }
+.qb-skip-fold { margin-top: 2px; }
 .qb-skip-fold summary {
   cursor: pointer;
   display: inline-block;
@@ -241,3 +238,7 @@
 /* The freshness phrase doubles as the door to /health. */
 .qb-legend-link { color: inherit; text-decoration: none; border-bottom: 1px dotted var(--step4); }
 .qb-legend-link:hover, .qb-legend-link:hover b { color: var(--sage); border-bottom-color: var(--sage); }
+
+/* the house card sits after the last wall block now, so it needs its own
+   column width instead of inheriting one from the multicol flow */
+.qb-felt > .qb-house { max-width: 322px; }

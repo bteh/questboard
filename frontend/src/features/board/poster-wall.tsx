@@ -120,6 +120,10 @@ export function PosterWall({
     );
   }
 
+  /* Each segment is its own .qb-wall columns block, with the digest, rules,
+     and the skip fold BETWEEN blocks. column-span inside one multicol flow
+     made WebKit repaint the surrounding fragments on every hover of a
+     transformed poster, which flickered the desktop app. */
   if (fitGrouped) {
     const wall = fitGroups(items);
     const digest = fitDigest(wall);
@@ -129,7 +133,7 @@ export function PosterWall({
         {wall.groups.map((group) => (
           <Fragment key={group.verdict}>
             <FitRule label={`${group.label} (${group.items.length})`} />
-            {group.items.map(renderPoster)}
+            <div className="qb-wall">{group.items.map(renderPoster)}</div>
           </Fragment>
         ))}
         {/* rows the assistant never judged: after the groups, under their own
@@ -137,7 +141,9 @@ export function PosterWall({
         {wall.unranked.length > 0 && wall.groups.length > 0 && (
           <FitRule label={`Not ranked (${wall.unranked.length})`} />
         )}
-        {wall.unranked.map(renderPoster)}
+        {wall.unranked.length > 0 && (
+          <div className="qb-wall">{wall.unranked.map(renderPoster)}</div>
+        )}
         {wall.skips.length > 0 && (
           <details className="qb-skip-fold">
             <summary>Skipped by your assistant ({wall.skips.length})</summary>
@@ -151,11 +157,11 @@ export function PosterWall({
     const { fresh, earlier } = splitBySince(items, cutoff);
     return (
       <>
-        {fresh.map(renderPoster)}
+        {fresh.length > 0 && <div className="qb-wall">{fresh.map(renderPoster)}</div>}
         {fresh.length > 0 && earlier.length > 0 && <SinceRule />}
-        {earlier.map(renderPoster)}
+        {earlier.length > 0 && <div className="qb-wall">{earlier.map(renderPoster)}</div>}
       </>
     );
   }
-  return <>{items.map(renderPoster)}</>;
+  return <div className="qb-wall">{items.map(renderPoster)}</div>;
 }
