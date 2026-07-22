@@ -91,6 +91,12 @@ describe('validateBoardSearch', () => {
     expect(params).toEqual({ v: undefined, q: 'editor', from: '150k', to: undefined, p: 'remote' });
   });
 
+  it('carries the work-lane source-category chip (?src) like any other param', () => {
+    expect(validateBoardSearch({ src: 'crypto' }).src).toBe('crypto');
+    expect(validateBoardSearch({ src: '' }).src).toBeUndefined();
+    expect(validateBoardSearch({}).src).toBeUndefined();
+  });
+
   it('parses ?job however the router round-trips it, dropping junk', () => {
     expect(validateBoardSearch({ job: 123 }).job).toBe(123);
     expect(validateBoardSearch({ job: '123' }).job).toBe(123);
@@ -115,6 +121,7 @@ describe('hasBoardParams', () => {
     expect(hasBoardParams({ v: 'study' })).toBe(true);
     expect(hasBoardParams({ v: 'lookafter', f: 'pets' })).toBe(true);
     expect(hasBoardParams({ p: 'noexp' })).toBe(true);
+    expect(hasBoardParams({ src: 'crypto' })).toBe(true);
   });
 });
 
@@ -158,6 +165,13 @@ describe('board state persistence', () => {
     const store = stubStorage();
     saveBoardState({ q: 'editor' });
     expect(JSON.parse(store.get(BOARD_STATE_KEY)!)).toEqual({ q: 'editor' });
+  });
+
+  it('persists the work-lane source-category chip so reload keeps it', () => {
+    const store = stubStorage();
+    saveBoardState({ v: 'work', src: 'startup' });
+    expect(readSavedBoardState()?.src).toBe('startup');
+    expect(JSON.parse(store.get(BOARD_STATE_KEY)!)).toEqual({ v: 'work', src: 'startup' });
   });
 
   it('persists a facet with its kind and validates it on read', () => {

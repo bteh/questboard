@@ -260,6 +260,11 @@ def list_applications(
         ge=0,
         description="Annual pay floor; drops rows whose stated pay sits below it, keeps rows with no pay data",
     ),
+    salary_max: float | None = Query(
+        None,
+        ge=0,
+        description="Annual pay ceiling; drops rows whose stated pay sits above it, keeps rows with no pay data",
+    ),
     profile: str | None = None,
     search_run_id: str | None = None,
     first_seen_run_id: str | None = None,
@@ -329,6 +334,7 @@ def list_applications(
             location_strict=location_strict,
             facet=facet,
             salary_min=salary_min,
+            salary_max=salary_max,
             profile=None if ws_scope else profile,
             workspace_id=ws_scope,
             shared_quest_workspace=ws_scope if scope == "board" else None,
@@ -361,6 +367,11 @@ def list_profile_work(
     location: str | None = Query(None, max_length=120),
     location_strict: bool = False,
     salary_min: float | None = Query(None, ge=0),
+    salary_max: float | None = Query(
+        None,
+        ge=0,
+        description="Annual pay ceiling; drops rows whose stated pay sits above it, keeps rows with no pay data",
+    ),
     is_remote: bool | None = None,
     posted_within_days: int | None = Query(None, ge=1, le=365),
     source_category: str | None = Query(
@@ -396,15 +407,30 @@ def list_profile_work(
             retrieval_note="Add target roles to your local profile before browsing Work.",
         )
 
-    # Category counts across the FULL career inventory (what's available), so
-    # the browse chips show the real breadth, not just the role-matched set.
+    # Category counts across the whole career inventory the board's active
+    # filters keep (not just the role-matched set), through the SAME shared
+    # predicates as the results: place, pay, search, and the dead-link rule
+    # all apply here, so a chip never promises rows the view below hides.
     cat_map = _source_category_map()
     category_counts: dict[str, int] = {}
-    for (src,) in (
+    badge_query = (
         db.query(ApplicationRecord.source)
         .filter(ApplicationRecord.vertical.in_(("career", "work")))
-        .all()
+        # confirmed-dead and expired tombstones stay out, like My roles
+        .filter(ApplicationRecord.url_status.notin_(("dead", "expired")))
+    )
+    for condition in application_service.board_filter_conditions(
+        ApplicationRecord,
+        search=search,
+        location=location or None,
+        location_strict=bool(location and location_strict),
+        salary_min=salary_min,
+        salary_max=salary_max,
+        is_remote=is_remote,
+        posted_within_days=posted_within_days,
     ):
+        badge_query = badge_query.filter(condition)
+    for (src,) in badge_query.all():
         cat = cat_map.get((src or "").lower())
         if cat:
             category_counts[cat] = category_counts.get(cat, 0) + 1
@@ -415,7 +441,8 @@ def list_profile_work(
 
     if source_category:
         # Browse everything available in this source kind, beyond the user's
-        # configured roles. Honors the board's place / pay / remote filters.
+        # configured roles. Honors the board's place / pay / remote filters,
+        # and hides confirmed-dead links exactly like My roles does.
         # workspace_id stays None: local career rows live in the unscoped pool.
         records, _ = application_service.get_applications(
             db,
@@ -423,8 +450,10 @@ def list_profile_work(
             location=location or None,
             location_strict=bool(location and location_strict),
             salary_min=salary_min,
+            salary_max=salary_max,
             is_remote=is_remote,
             posted_within_days=posted_within_days,
+            exclude_dead=True,
             sort_by="date_found",
             sort_dir="desc",
             page=1,
@@ -454,6 +483,17 @@ def list_profile_work(
             .all()
         } if candidate_ids else {}
         ordered = [records_by_id[item_id] for item_id in candidate_ids if item_id in records_by_id]
+
+    # The server-side pay ceiling, applied before the total so the count and
+    # the pager can never promise rows the ceiling hides. The browse path
+    # already filtered in SQL; this mirror is the same semantics for the
+    # rows search_work handed back (no stated pay and session pay stay).
+    if salary_max is not None:
+        ordered = [
+            record
+            for record in ordered
+            if application_service.stated_pay_within_ceiling(record, salary_max)
+        ]
 
     if search:
         needle = search.casefold().strip()

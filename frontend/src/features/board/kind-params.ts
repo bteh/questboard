@@ -59,6 +59,13 @@ export function questTotal(kinds: readonly { id: string; count: number }[]): num
   return kinds.reduce((sum, k) => (isCareerKind(k.id) ? sum : sum + k.count), 0);
 }
 
+/** The lane's honest sort. Quest rows carry no rank_score, so a best-score
+    sort cannot reorder them: only the work lane offers it, and quest lanes
+    always get the date sort. */
+export function sortByFor(kind: KindKey, newestFirst: boolean): 'date_found' | 'rank' {
+  return isCareerKind(kind) && !newestFirst ? 'rank' : 'date_found';
+}
+
 /** Old ?v= values (career, camera, study, lens) keep working: they resolve
     to the kind that absorbed them. Unknown values fall back to All. */
 export function normalizeKindKey(raw: string | undefined): KindKey | undefined {

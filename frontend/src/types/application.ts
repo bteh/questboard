@@ -256,6 +256,8 @@ export interface ApplicationFilters {
   is_remote?: boolean;
   /** Annual pay floor; the API keeps rows with no stated pay. */
   salary_min?: number;
+  /** Annual pay ceiling; the API keeps rows with no stated pay. */
+  salary_max?: number;
   page?: number;
   page_size?: number;
   profile?: string;

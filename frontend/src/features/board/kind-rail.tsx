@@ -1,4 +1,5 @@
 import { KindStamp } from '@questboard/ui';
+import type { BoardSummaryFilters } from '@/api/board';
 import { useBoardSummary } from '@/hooks/use-board-summary';
 import { isCareerKind, questTotal, type KindKey } from '@/features/board/kind-params';
 
@@ -30,11 +31,15 @@ function Tag({
 export function KindRail({
   selected,
   onSelect,
+  filters,
 }: {
   selected: KindKey;
   onSelect: (key: KindKey) => void;
+  /** The board's active filters: the counts must describe the board the
+      reader is actually looking at, not the unfiltered whole. */
+  filters?: BoardSummaryFilters;
 }) {
-  const { data } = useBoardSummary();
+  const { data } = useBoardSummary(filters);
   if (!data) return null;
   const quests = data.kinds.filter((k) => k.count > 0 && !isCareerKind(k.id));
   const questCount = questTotal(data.kinds);

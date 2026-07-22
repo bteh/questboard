@@ -3,16 +3,20 @@
    three exits work (the X, the scrim, Escape). Local mode shows the
    local-first card instead of an account. */
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
+
+afterEach(cleanup);
+
+const navigateMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@tanstack/react-router', () => ({
   Link: ({ children, className, onClick }: { children: ReactNode; className?: string; onClick?: () => void }) => (
     <a className={className} onClick={onClick}>{children}</a>
   ),
   Outlet: () => null,
-  useNavigate: () => vi.fn(),
+  useNavigate: () => navigateMock,
   useMatchRoute: () => () => false,
   useMatches: () => [],
 }));
@@ -73,6 +77,46 @@ describe('the app shell drawer', () => {
     expect(screen.getByText('Local workspace')).toBeTruthy();
     expect(screen.getByText('everything stays on this machine')).toBeTruthy();
     expect(screen.getByText(/pinned here, it's real/)).toBeTruthy();
+    cleanup();
+  });
+});
+
+describe('the topbar search box', () => {
+  /* A submit must MERGE ?q into the board's current params, not replace
+     them: someone on the work lane with a place and a pay floor set stays
+     on their lane with their filters when they search. */
+  it('merges the query into the existing board params', () => {
+    navigateMock.mockClear();
+    render(<AppShell />);
+
+    const input = screen.getByLabelText('Search the board');
+    fireEvent.change(input, { target: { value: '  editor  ' } });
+    fireEvent.submit(input.closest('form')!);
+
+    expect(navigateMock).toHaveBeenCalledTimes(1);
+    const call = navigateMock.mock.calls[0][0];
+    expect(call.to).toBe('/board');
+    /* a functional updater keeps whatever is already in the URL */
+    expect(typeof call.search).toBe('function');
+    expect(call.search({ v: 'work', place: 'LA', near: '1', src: 'crypto' })).toEqual({
+      v: 'work',
+      place: 'LA',
+      near: '1',
+      src: 'crypto',
+      q: 'editor',
+    });
+    cleanup();
+  });
+
+  it('an empty submit clears the query but keeps the rest', () => {
+    navigateMock.mockClear();
+    render(<AppShell />);
+
+    const input = screen.getByLabelText('Search the board');
+    fireEvent.submit(input.closest('form')!);
+
+    const call = navigateMock.mock.calls[0][0];
+    expect(call.search({ v: 'work', q: 'old' })).toEqual({ v: 'work', q: undefined });
     cleanup();
   });
 });

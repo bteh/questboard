@@ -400,6 +400,7 @@ def test_profile_work_api_returns_application_cards_for_the_active_profile(
         location=None,
         location_strict=False,
         salary_min=None,
+        salary_max=None,
         is_remote=None,
         posted_within_days=None,
         source_category=None,

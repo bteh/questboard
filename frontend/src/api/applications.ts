@@ -18,6 +18,7 @@ export function getProfileWork(filters: ApplicationFilters = {}): Promise<Profil
     location: filters.location,
     location_strict: filters.location_strict,
     salary_min: filters.salary_min,
+    salary_max: filters.salary_max,
     is_remote: filters.is_remote,
     posted_within_days: filters.posted_within_days,
     source_category: filters.source_category,

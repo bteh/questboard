@@ -1,4 +1,19 @@
 import { apiGet } from '@/lib/api-client';
+import type { ApplicationFilters } from '@/types/application';
+
+/** The board filters the summary honors, same names and semantics as the
+    /applications list, so the rail counts and the list share predicates. */
+export type BoardSummaryFilters = Pick<
+  ApplicationFilters,
+  | 'search'
+  | 'location'
+  | 'location_strict'
+  | 'salary_min'
+  | 'salary_max'
+  | 'is_remote'
+  | 'first_quest_ok'
+  | 'posted_within_days'
+>;
 
 export interface KindSummary {
   id: string;
@@ -18,6 +33,6 @@ export interface BoardSummary {
   kinds: KindSummary[];
 }
 
-export function getBoardSummary(): Promise<BoardSummary> {
-  return apiGet<BoardSummary>('/board/summary');
+export function getBoardSummary(filters: BoardSummaryFilters = {}): Promise<BoardSummary> {
+  return apiGet<BoardSummary>('/board/summary', { ...filters });
 }

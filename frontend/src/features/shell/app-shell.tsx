@@ -31,11 +31,15 @@ const PAGE_TITLES: Record<string, string> = {
 function SearchBox() {
   const navigate = useNavigate();
   const [query, setQuery] = useState('');
-  /* submits into the board's own ?q= filter; explicit params beat the
-     board's saved state, so this always lands on the typed search */
+  /* submits into the board's own ?q= filter, MERGING into whatever board
+     params are already set: someone searching from the work lane stays on
+     their lane with their place/pay filters intact */
   function submit(event: FormEvent) {
     event.preventDefault();
-    void navigate({ to: '/board', search: { q: query.trim() || undefined } });
+    void navigate({
+      to: '/board',
+      search: (prev: Record<string, unknown>) => ({ ...prev, q: query.trim() || undefined }),
+    });
   }
   return (
     <form className="qb-search" role="search" onSubmit={submit}>

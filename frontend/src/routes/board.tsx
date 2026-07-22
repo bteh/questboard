@@ -34,17 +34,18 @@ import {
   CLIP_STATUS,
   parseAmount,
   toBoardCard,
-  withinPayCeiling,
 } from '@/utils/board-card';
 import { checkedAgoLabel } from '@/features/board/freshness';
 import { FacetChips } from '@/features/board/facet-chips';
 import {
   isCareerKind,
   kindParams,
+  sortByFor,
   workflowForKind,
   type KindKey,
   type Workflow,
 } from '@/features/board/kind-params';
+import type { BoardSummaryFilters } from '@/api/board';
 import { KindRail } from '@/features/board/kind-rail';
 import { LaneTabs } from '@/features/board/lane-tabs';
 import { PlacePicker } from '@/features/board/place-picker';
@@ -71,9 +72,9 @@ import type {
 import '@/components/board/board.css';
 import '@/features/board/board-felt.css';
 
-/* Filter state lives in the URL (?v, ?q, ?from, ?to, ?p): a filtered board
-   is a shareable address, back/forward walks chip changes, and the topbar
-   search box submits into ?q=. The last state persists at
+/* Filter state lives in the URL (?v, ?q, ?from, ?to, ?p, ?src): a filtered
+   board is a shareable address, back/forward walks chip changes, and the
+   topbar search box submits into ?q=. The last state persists at
    questboard:board.v1; a bare /board redirects to it once, so Tuesday's
    board is already set up on Wednesday, and explicit params always win. */
 export const Route = createRoute({
@@ -96,7 +97,7 @@ export const Route = createRoute({
         to: '/board',
         search: {
           v: saved.v, f: saved.f, q: saved.q, place: saved.place, near: saved.near,
-          from: saved.from, to: saved.to, p: saved.p,
+          from: saved.from, to: saved.to, p: saved.p, src: saved.src,
         },
         replace: true,
       });
@@ -131,8 +132,9 @@ const PRESETS: Preset[] = [
 
 const PRESET_KEYS = PRESETS.map((p) => p.key);
 
-/* Moving to another kind or lane: a facet belongs to its kind, and a
-   hidden careerOnly preset must not keep silently filtering the feed. */
+/* Moving to another kind or lane: a facet belongs to its kind, the
+   source-category chip belongs to the work lane, and a hidden careerOnly
+   preset must not keep silently filtering the feed. */
 function kindSearch(prev: BoardParams, key: KindKey): BoardParams {
   let keys = presetKeysFrom(prev.p, PRESET_KEYS);
   if (!isCareerKind(key)) {
@@ -143,6 +145,7 @@ function kindSearch(prev: BoardParams, key: KindKey): BoardParams {
     v: key === 'all' ? undefined : key,
     f: (prev.v ?? 'all') === key ? prev.f : undefined,
     p: presetKeysTo(keys, PRESET_KEYS),
+    src: isCareerKind(key) ? prev.src : undefined,
   };
 }
 
@@ -304,11 +307,12 @@ function BoardPage() {
   const labels = useSourceLabels();
   const navigate = useNavigate();
   const params = Route.useSearch();
-  const checkedAgo = checkedAgoLabel(useBoardSummary().data?.checked_at);
 
-  /* the URL is the one truth for the kind tag and presets */
+  /* the URL is the one truth for the kind tag, presets, and the work
+     lane's source-category chip */
   const kindKey: KindKey = params.v ?? 'all';
   const activeKeys = useMemo(() => presetKeysFrom(params.p, PRESET_KEYS), [params.p]);
+  const sourceCategory = params.src ?? null;
 
   /* text inputs buffer locally, debounce into the URL with replace so
      typing never spams history */
@@ -320,8 +324,6 @@ function BoardPage() {
   /* newest first by default: the API's score sort floats unscored rows to
      the top (desc nullsfirst), which reads as noise on a board */
   const [sortNewest, setSortNewest] = useState(() => readSavedBoardState()?.sort !== 'score');
-  /* browse the full career inventory by source kind (null = your target roles) */
-  const [sourceCategory, setSourceCategory] = useState<string | null>(null);
   /* pages loaded, keyed to the filters that loaded them: any filter change
      starts back at one page without an effect */
   const [pageState, setPageState] = useState<{ key: string; pages: number }>({ key: '', pages: 1 });
@@ -405,9 +407,10 @@ function BoardPage() {
       from: params.from,
       to: params.to,
       p: params.p,
+      src: params.src,
       sort: sortNewest ? undefined : 'score',
     });
-  }, [params.v, params.f, params.q, params.place, params.near, params.from, params.to, params.p, sortNewest]);
+  }, [params.v, params.f, params.q, params.place, params.near, params.from, params.to, params.p, params.src, sortNewest]);
 
   const baseFilters = useMemo<ApplicationFilters>(
     () => ({
@@ -418,14 +421,32 @@ function BoardPage() {
       location: place || undefined,
       location_strict: nearParam ? true : undefined,
       salary_min: payFloor ?? undefined,
+      salary_max: payCeiling ?? undefined,
       source_category: sourceCategory ?? undefined,
-      sort_by: sortNewest ? 'date_found' : 'rank',
+      /* quest rows have no rank_score, so only the work lane offers the
+         best-score sort; quest lanes stay on the honest date sort */
+      sort_by: sortByFor(kindKey, sortNewest),
       sort_order: 'desc',
       page_size: PAGE_SIZE,
       scope: 'board',
     }),
-    [kindKey, activeKeys, params.f, search, place, nearParam, payFloor, sortNewest, sourceCategory],
+    [kindKey, activeKeys, params.f, search, place, nearParam, payFloor, payCeiling, sortNewest, sourceCategory],
   );
+
+  /* the rail's counts must describe THIS board: the same user filters ride
+     the summary query (per-kind counts stay per-kind, so no vertical) */
+  const summaryFilters = useMemo<BoardSummaryFilters>(
+    () => ({
+      ...presetParams(activeKeys),
+      search: search || undefined,
+      location: place || undefined,
+      location_strict: nearParam ? true : undefined,
+      salary_min: payFloor ?? undefined,
+      salary_max: payCeiling ?? undefined,
+    }),
+    [activeKeys, search, place, nearParam, payFloor, payCeiling],
+  );
+  const checkedAgo = checkedAgoLabel(useBoardSummary(summaryFilters).data?.checked_at);
 
   const filtersKey = JSON.stringify(baseFilters);
   const pages = pageState.key === filtersKey ? pageState.pages : 1;
@@ -447,11 +468,9 @@ function BoardPage() {
   const workMeta = careerLane
     ? firstPage.data as ProfileWorkListResponse | undefined
     : undefined;
-  /* The API only takes the floor today, so the typed to-bound trims the
-     loaded pages client-side with the same keep-unknown-pay semantics. */
-  const visibleItems = pageQueries
-    .flatMap((q) => q.data?.items ?? [])
-    .filter((app) => withinPayCeiling(app, payCeiling));
+  /* the pay ceiling is a server param now (salary_max in baseFilters), so
+     the pages arrive already trimmed and the total matches what shows */
+  const visibleItems = pageQueries.flatMap((q) => q.data?.items ?? []);
   /* Once the assistant has ranked, its fit order (from the API) wins: don't
      re-split by recency or claim an exact "new since" count, both of which
      assume newest-first. */
@@ -510,6 +529,15 @@ function BoardPage() {
     void navigate({
       to: '/board',
       search: (prev: BoardParams) => ({ ...prev, f: prev.f === id ? undefined : id }),
+    });
+  }
+
+  /* the work lane's source-category chip rides the URL (?src=) and the
+     saved board state, so a reload or nav keeps the selection */
+  function selectSourceCategory(category: string | null) {
+    void navigate({
+      to: '/board',
+      search: (prev: BoardParams) => ({ ...prev, src: category ?? undefined }),
     });
   }
 
@@ -572,6 +600,7 @@ function BoardPage() {
       location: place || undefined,
       location_strict: nearParam ? true : undefined,
       salary_min: payFloor ?? undefined,
+      salary_max: payCeiling ?? undefined,
       page: 1,
       page_size: 1,
       scope: 'board',
@@ -585,12 +614,15 @@ function BoardPage() {
         <div className="qb-board-head">
           <h1>The board</h1>
           <span className="qb-live">{total !== undefined ? `${total} live` : 'loading'}</span>
+          {/* best score is honest only where rank_score exists (career
+              rows), so the toggle lives on the work lane; quest lanes are
+              always newest first and say so without a dead switch */}
           {careerLane ? (
-            <span className="qb-sort">Matches your target roles · newest first</span>
-          ) : (
             <button type="button" className="qb-sort" onClick={() => setSortNewest((v) => !v)}>
-              Sort: <b>{sortNewest ? 'newly found' : 'best score'}</b>
+              Matches your target roles · sort: <b>{sortNewest ? 'newly found' : 'best score'}</b>
             </button>
+          ) : (
+            <span className="qb-sort">newest first</span>
           )}
         </div>
 
@@ -602,7 +634,9 @@ function BoardPage() {
         {/* the Jobs lane's toolbar owns its own run door and status line */}
         {!careerLane && <RestockLine />}
 
-        {!careerLane && <KindRail selected={kindKey} onSelect={selectKind} />}
+        {!careerLane && (
+          <KindRail selected={kindKey} onSelect={selectKind} filters={summaryFilters} />
+        )}
 
         {!careerLane && kindKey !== 'all' && (
           <FacetChips
@@ -653,7 +687,7 @@ function BoardPage() {
             <SourceCategoryChips
               counts={workMeta?.source_categories}
               selected={sourceCategory}
-              onSelect={setSourceCategory}
+              onSelect={selectSourceCategory}
             />
           </>
         ) : (

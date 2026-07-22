@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import and_, case, func, or_
+from sqlalchemy import and_, case, func, literal, or_
 from sqlalchemy.orm import Session
 
 # The mandatory vertical scope. Every list-level read of applications goes
@@ -101,6 +101,256 @@ def time_sensitive_stale(model, now: datetime | None = None):
     )
 
 
+# Per-period -> annual multipliers for pay filtering. "session" is absent on
+# purpose: per-gig pay is not a rate and can neither pass nor fail an annual
+# scale, so those rows are treated like no-stated-pay (always kept).
+_PERIOD_TO_ANNUAL = {"hourly": 2080, "daily": 260, "weekly": 52, "monthly": 12}
+_SESSION_PERIOD = "session"
+
+
+def _annual_pay_bounds(model):
+    """Annual-scale (lo, hi) pay expressions for filtering.
+
+    Prefer the parser's annualized columns; when they are empty (most stored
+    rows carry only the raw per-period numbers) annualize the raw value at
+    comparison time from salary_period. Unknown/annual periods compare as-is.
+    Display never uses these: the card always shows the raw stated numbers.
+    """
+
+    def annualize(raw):
+        return case(
+            *(
+                (func.lower(func.coalesce(model.salary_period, "")) == period, raw * mult)
+                for period, mult in _PERIOD_TO_ANNUAL.items()
+            ),
+            else_=raw,
+        )
+
+    lo = func.coalesce(model.salary_min_annualized, annualize(model.salary_min))
+    hi = func.coalesce(model.salary_max_annualized, annualize(model.salary_max))
+    return lo, hi
+
+
+def stated_pay_filter(model, salary_min: float | None = None, salary_max: float | None = None):
+    """The annual pay floor/ceiling as one condition, or None when unset.
+
+    Mirrors job_finder.pipeline._job_salary_passes: use the range midpoint
+    when both ends are stated, the one stated bound otherwise, and KEEP rows
+    with no salary data (dropping them would hide most listings, and "no pay
+    stated" is neither "below the floor" nor "above the ceiling"). Per-gig
+    "session" pay is kept without comparison, like no-stated-pay.
+    """
+    if salary_min is None and salary_max is None:
+        return None
+    lo, hi = _annual_pay_bounds(model)
+
+    def bounds_pass(check):
+        return or_(
+            and_(lo.isnot(None), hi.isnot(None), check((lo + hi) / 2)),
+            and_(lo.is_(None), hi.isnot(None), check(hi)),
+            and_(lo.isnot(None), hi.is_(None), check(lo)),
+        )
+
+    checks = []
+    if salary_min is not None:
+        checks.append(bounds_pass(lambda value: value >= salary_min))
+    if salary_max is not None:
+        checks.append(bounds_pass(lambda value: value <= salary_max))
+    return or_(
+        and_(lo.is_(None), hi.is_(None)),
+        func.lower(func.coalesce(model.salary_period, "")) == _SESSION_PERIOD,
+        and_(*checks),
+    )
+
+
+def stated_pay_within_ceiling(record, ceiling: float | None) -> bool:
+    """Python mirror of stated_pay_filter's ceiling, for rows a service
+    already fetched (the work lane's roles view orders in Python). Keep the
+    two in sync: no stated pay and per-gig session pay always pass."""
+    if ceiling is None:
+        return True
+    period = (getattr(record, "salary_period", "") or "").lower()
+    if period == _SESSION_PERIOD:
+        return True
+    mult = _PERIOD_TO_ANNUAL.get(period, 1)
+
+    def annual(annualized, raw):
+        if annualized is not None:
+            return annualized
+        return raw * mult if raw is not None else None
+
+    lo = annual(getattr(record, "salary_min_annualized", None), record.salary_min)
+    hi = annual(getattr(record, "salary_max_annualized", None), record.salary_max)
+    if lo is None and hi is None:
+        return True
+    if lo is not None and hi is not None:
+        return (lo + hi) / 2 <= ceiling
+    return (hi if hi is not None else lo) <= ceiling
+
+
+def _word_padded_location(model):
+    """The location text with common list delimiters flattened to spaces and
+    a space at each end, so ' XX ' patterns match on word boundaries: "OR/WA
+    only" carries " WA ", "San Diego, CA" carries " CA ", and Casablanca
+    never does. Dots collapse first so "D.C." reads as one DC token."""
+    text = func.replace(model.location, ".", "")
+    for delimiter in (",", "(", ")", "/", "&", ";", "-"):
+        text = func.replace(text, delimiter, " ")
+    return literal(" ") + text + literal(" ")
+
+
+def place_filter(model, location: str | None, location_strict: bool = False):
+    """The board's reachability filter as one condition, or None when unset.
+
+    A place filter narrows to quests you can actually reach; it must never
+    hide work-from-anywhere. Rows pass when their location matches, when
+    they say remote/online/nationwide in any wording, or when the source
+    stated no place at all (unknown is not "elsewhere"). A typed US state
+    (either spelling) matches the pre-parsed state_codes token field, so
+    "Georgia" and "GA" both find a "VA, GA & NC only" bonus and neither
+    matches "Guadalajara" or "West Virginia" (job_finder.us_states explains
+    why this beats tokenizing prose in SQL). state_codes is only populated
+    on rows saved since the parser shipped, so a state ALSO matches the raw
+    location text: the spelled-out name on a leading word boundary (minus
+    any longer state name that contains it, so Virginia still never leaks
+    West Virginia), and the UPPERCASE abbreviation as a whole word
+    (case-sensitive, so prose "in" is never Indiana). A typed city or free
+    text keeps a plain location substring match.
+    """
+    if not location:
+        return None
+    from job_finder.us_states import STATE_TO_ABBR, state_aliases
+
+    metro = _metro_cities_for(location)
+    aliases = state_aliases(location)
+    if metro:
+        # "Los Angeles" also finds Beverly Hills / Santa Monica / etc. — the
+        # seeker means the metro, not only rows that name the core city.
+        place_match = or_(*[model.location.ilike(f"%{c}%") for c in metro])
+    elif aliases:
+        full_name, abbr = aliases
+        token_match = model.state_codes.like(f"%,{abbr},%")
+        padded = _word_padded_location(model)
+        name_match = padded.ilike(f"% {full_name}%")
+        longer_names = [
+            name for name in STATE_TO_ABBR if name != full_name and full_name in name
+        ]
+        if longer_names:
+            name_match = and_(
+                name_match,
+                *(~func.lower(model.location).like(f"%{name}%") for name in longer_names),
+            )
+        # length-vs-replace is the portable case-sensitive containment test:
+        # SQLite LIKE ignores ASCII case, replace() never does.
+        abbr_match = func.length(padded) != func.length(
+            func.replace(padded, f" {abbr} ", "")
+        )
+        place_match = or_(token_match, name_match, abbr_match)
+    else:
+        place_match = model.location.ilike(f"%{location.strip()}%")
+    if location_strict:
+        # "near me only": keep only rows that actually match the place, so
+        # the filter visibly bites. Remote and placeless supply drop.
+        return place_match
+    # Remote passes only when it is remote FOR YOU: a row whose stated
+    # scope names another country ("Remote, India", "Remote (UK Based
+    # only)") is not reachable from a US place and must earn its spot
+    # through the place match instead. Unstated scope ('' / NULL) stays
+    # conservatively kept.
+    not_intl_only = or_(
+        model.remote_scope.is_(None),
+        model.remote_scope != "intl",
+    )
+    remote_ish = or_(
+        model.location.ilike("%remote%"),
+        model.location.ilike("%online%"),
+        model.location.ilike("%nationwide%"),
+        model.location.ilike("%anywhere%"),
+        model.is_remote.is_(True),
+    )
+    return or_(
+        place_match,
+        model.location.is_(None),
+        model.location == "",
+        and_(remote_ish, not_intl_only),
+    )
+
+
+def board_filter_conditions(
+    model,
+    *,
+    search: str | None = None,
+    location: str | None = None,
+    location_strict: bool = False,
+    salary_min: float | None = None,
+    salary_max: float | None = None,
+    is_remote: bool | None = None,
+    first_quest_ok: bool | None = None,
+    posted_within_days: int | None = None,
+) -> list:
+    """The user-set board filters as reusable SQLAlchemy conditions.
+
+    One vocabulary for every surface: the /applications list, the
+    /board/summary rail counts, and the work lane's category badges all
+    build from here, so a filtered board and its counts cannot disagree.
+    ``model`` is the caller's ApplicationRecord class, like
+    time_sensitive_stale.
+    """
+    conditions: list = []
+    if is_remote is not None:
+        conditions.append(model.is_remote == is_remote)
+    place = place_filter(model, location, location_strict)
+    if place is not None:
+        conditions.append(place)
+    pay = stated_pay_filter(model, salary_min, salary_max)
+    if pay is not None:
+        conditions.append(pay)
+    if first_quest_ok is not None:
+        # "No experience needed", provably. Only rows whose source stated a
+        # beginner-friendly signal carry the flag; career rows and unmarked
+        # quest rows never have it, so they drop rather than get guessed in.
+        if first_quest_ok:
+            conditions.append(model.first_quest_ok.is_(True))
+        else:
+            conditions.append(
+                or_(
+                    model.first_quest_ok.is_(False),
+                    model.first_quest_ok.is_(None),
+                )
+            )
+    if posted_within_days is not None:
+        # "Posted in the last N days", provably. date_posted is a raw source
+        # string, ISO-8601 when the source stated a real date and free text
+        # ("Reposted 9 Days Ago") when it did not. Only rows whose stored
+        # value sorts inside [now - N days, now + 1 day] count; ISO strings
+        # compare correctly as text, and the future-bounded upper edge drops
+        # every non-ISO value (letters and bare day counts sort above it).
+        # A date-only string from yesterday cannot prove it is inside a
+        # 24-hour window, so it does not count: undercounting is the honest
+        # side of that ambiguity. Rows the classifier marked "missing" never
+        # count even if a string survives.
+        now = datetime.now(timezone.utc)
+        lower = (now - timedelta(days=posted_within_days)).strftime("%Y-%m-%dT%H:%M:%S")
+        upper = (now + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S")
+        conditions.append(model.date_posted >= lower)
+        conditions.append(model.date_posted <= upper)
+        conditions.append(
+            func.lower(func.coalesce(model.date_confidence, "")) != "missing"
+        )
+    if search:
+        pattern = f"%{search}%"
+        conditions.append(
+            or_(
+                model.job_title.ilike(pattern),
+                model.company.ilike(pattern),
+                model.description.ilike(pattern),
+                # a typed city must find the sit whose location says it
+                model.location.ilike(pattern),
+            )
+        )
+    return conditions
+
+
 def get_applications(
     db: Session,
     *,
@@ -119,6 +369,7 @@ def get_applications(
     location_strict: bool = False,
     facet: str | None = None,
     salary_min: float | None = None,
+    salary_max: float | None = None,
     profile: str | None = None,
     workspace_id: str | None = None,
     shared_quest_workspace: str | None = None,
@@ -177,63 +428,23 @@ def get_applications(
             query = query.filter(func.lower(ApplicationRecord.source) == "\x00__none__")
     if company_type:
         query = query.filter(ApplicationRecord.company_type == company_type)
-    if is_remote is not None:
-        query = query.filter(ApplicationRecord.is_remote == is_remote)
     if work_type:
         query = query.filter(ApplicationRecord.work_type == work_type)
-    if location:
-        # A place filter narrows to quests you can actually reach; it must
-        # never hide work-from-anywhere. Rows pass when their location
-        # matches, when they say remote/online/nationwide in any wording,
-        # or when the source stated no place at all (unknown is not
-        # "elsewhere"). A typed US state (either spelling) matches the
-        # pre-parsed state_codes token field, so "Georgia" and "GA" both
-        # find a "VA, GA & NC only" bonus and neither matches
-        # "Guadalajara" or "West Virginia" (job_finder.us_states explains
-        # why this beats tokenizing prose in SQL). A typed city or free
-        # text keeps a plain location substring match.
-        from job_finder.us_states import state_aliases
-
-        metro = _metro_cities_for(location)
-        aliases = state_aliases(location)
-        if metro:
-            # "Los Angeles" also finds Beverly Hills / Santa Monica / etc. — the
-            # seeker means the metro, not only rows that name the core city.
-            place_match = or_(*[ApplicationRecord.location.ilike(f"%{c}%") for c in metro])
-        elif aliases:
-            _full_name, abbr = aliases
-            place_match = ApplicationRecord.state_codes.like(f"%,{abbr},%")
-        else:
-            place_match = ApplicationRecord.location.ilike(f"%{location.strip()}%")
-        if location_strict:
-            # "near me only": keep only rows that actually match the place, so
-            # the filter visibly bites. Remote and placeless supply drop.
-            query = query.filter(place_match)
-        else:
-            # Remote passes only when it is remote FOR YOU: a row whose
-            # stated scope names another country ("Remote, India",
-            # "Remote (UK Based only)") is not reachable from a US place
-            # and must earn its spot through the place match instead.
-            # Unstated scope ('' / NULL) stays conservatively kept.
-            not_intl_only = or_(
-                ApplicationRecord.remote_scope.is_(None),
-                ApplicationRecord.remote_scope != "intl",
-            )
-            remote_ish = or_(
-                ApplicationRecord.location.ilike("%remote%"),
-                ApplicationRecord.location.ilike("%online%"),
-                ApplicationRecord.location.ilike("%nationwide%"),
-                ApplicationRecord.location.ilike("%anywhere%"),
-                ApplicationRecord.is_remote.is_(True),
-            )
-            query = query.filter(
-                or_(
-                    place_match,
-                    ApplicationRecord.location.is_(None),
-                    ApplicationRecord.location == "",
-                    and_(remote_ish, not_intl_only),
-                )
-            )
+    # The user-set board filters (place, pay, remote, search, freshness,
+    # no-experience) come from the shared builder so /board/summary and the
+    # work lane's badges apply the exact same predicates.
+    for condition in board_filter_conditions(
+        ApplicationRecord,
+        search=search,
+        location=location,
+        location_strict=location_strict,
+        salary_min=salary_min,
+        salary_max=salary_max,
+        is_remote=is_remote,
+        first_quest_ok=first_quest_ok,
+        posted_within_days=posted_within_days,
+    ):
+        query = query.filter(condition)
     if facet:
         # A facet is a kind's own sub-shelf (packages/kinds/kinds.json):
         # rows pass when any of its terms appears in the title or the
@@ -263,25 +474,6 @@ def get_applications(
                         padded_desc.like(f"% {term.lower()}%"),
                     )
                 )
-            )
-        )
-    if salary_min is not None:
-        # Annual pay floor. Mirrors job_finder.pipeline._job_salary_passes:
-        # prefer annualized values, use the range midpoint when both ends are
-        # stated, and KEEP rows with no salary data (dropping them would hide
-        # most listings, and "no pay stated" is not "pays below the floor").
-        lo = func.coalesce(
-            ApplicationRecord.salary_min_annualized, ApplicationRecord.salary_min
-        )
-        hi = func.coalesce(
-            ApplicationRecord.salary_max_annualized, ApplicationRecord.salary_max
-        )
-        query = query.filter(
-            or_(
-                and_(lo.is_(None), hi.is_(None)),
-                and_(lo.isnot(None), hi.isnot(None), (lo + hi) / 2 >= salary_min),
-                and_(lo.is_(None), hi.isnot(None), hi >= salary_min),
-                and_(lo.isnot(None), hi.is_(None), lo >= salary_min),
             )
         )
     if shared_quest_workspace:
@@ -317,38 +509,6 @@ def get_applications(
         # Casting calls carry their date only in the text, so also drop the
         # ones whose publish date is past the shelf life.
         query = query.filter(~time_sensitive_stale(ApplicationRecord))
-    if first_quest_ok is not None:
-        # "No experience needed", provably. Only rows whose source stated a
-        # beginner-friendly signal carry the flag; career rows and unmarked
-        # quest rows never have it, so they drop rather than get guessed in.
-        if first_quest_ok:
-            query = query.filter(ApplicationRecord.first_quest_ok.is_(True))
-        else:
-            query = query.filter(
-                or_(
-                    ApplicationRecord.first_quest_ok.is_(False),
-                    ApplicationRecord.first_quest_ok.is_(None),
-                )
-            )
-    if posted_within_days is not None:
-        # "Posted in the last N days", provably. date_posted is a raw source
-        # string, ISO-8601 when the source stated a real date and free text
-        # ("Reposted 9 Days Ago") when it did not. Only rows whose stored
-        # value sorts inside [now - N days, now + 1 day] count; ISO strings
-        # compare correctly as text, and the future-bounded upper edge drops
-        # every non-ISO value (letters and bare day counts sort above it).
-        # A date-only string from yesterday cannot prove it is inside a
-        # 24-hour window, so it does not count: undercounting is the honest
-        # side of that ambiguity. Rows the classifier marked "missing" never
-        # count even if a string survives.
-        now = datetime.now(timezone.utc)
-        lower = (now - timedelta(days=posted_within_days)).strftime("%Y-%m-%dT%H:%M:%S")
-        upper = (now + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S")
-        query = query.filter(
-            ApplicationRecord.date_posted >= lower,
-            ApplicationRecord.date_posted <= upper,
-            func.lower(func.coalesce(ApplicationRecord.date_confidence, "")) != "missing",
-        )
     if event_within_days is not None:
         # Rows whose taping/session date falls inside the next N days. Only
         # real event_start values count; rows with no event date are not
@@ -358,17 +518,6 @@ def get_applications(
             ApplicationRecord.event_start.isnot(None),
             ApplicationRecord.event_start >= now_naive,
             ApplicationRecord.event_start <= now_naive + timedelta(days=event_within_days),
-        )
-    if search:
-        pattern = f"%{search}%"
-        query = query.filter(
-            or_(
-                ApplicationRecord.job_title.ilike(pattern),
-                ApplicationRecord.company.ilike(pattern),
-                ApplicationRecord.description.ilike(pattern),
-                # a typed city must find the sit whose location says it
-                ApplicationRecord.location.ilike(pattern),
-            )
         )
     if title_token_groups:
         # Role-family retrieval is order-independent: "Manager, Data

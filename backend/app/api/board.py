@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import case, func, or_
 from sqlalchemy.orm import Session
 
@@ -19,7 +19,7 @@ from app.dependencies import get_active_workspace_context, workspace_scope_id
 from app.models.database import get_db
 from app.schemas.board import BoardSummaryResponse, KindSummary
 
-from app.services.application_service import time_sensitive_stale
+from app.services.application_service import board_filter_conditions, time_sensitive_stale
 from job_finder.kinds import get_kinds, kind_for_vertical
 from job_finder.models.database import ApplicationRecord, ScrapeRunRecord
 
@@ -31,10 +31,30 @@ router = APIRouter(prefix="/board", tags=["board"])
 @router.get("/summary", response_model=BoardSummaryResponse)
 def board_summary(
     profile: str | None = None,
+    search: str | None = Query(None, max_length=120),
+    location: str | None = Query(
+        None,
+        max_length=120,
+        description="Place text; same reachability rules as the /applications list",
+    ),
+    location_strict: bool = Query(
+        False,
+        description='"Near me only": with a location set, keeps only rows that match the place',
+    ),
+    salary_min: float | None = Query(None, ge=0, description="Annual pay floor; keeps rows with no pay data"),
+    salary_max: float | None = Query(None, ge=0, description="Annual pay ceiling; keeps rows with no pay data"),
+    is_remote: bool | None = None,
+    first_quest_ok: bool | None = None,
+    posted_within_days: int | None = Query(None, ge=1),
     workspace = Depends(get_active_workspace_context),
     db: Session = Depends(get_db),
 ):
-    """Counts per kind plus how many arrived in the last 24 hours."""
+    """Counts per kind plus how many arrived in the last 24 hours.
+
+    Takes the board's own filter params and applies them through the shared
+    service predicates, so the rail's badges and the "All quests" total
+    always agree with the filtered list they sit above.
+    """
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     day_ago = now - timedelta(hours=24)
 
@@ -62,6 +82,20 @@ def board_summary(
         # ones whose publish date is past the shelf life so counts match the list
         .filter(~time_sensitive_stale(ApplicationRecord))
     )
+    # the user's own filters, via the same predicates the list applies,
+    # never re-derived here, so the two surfaces cannot drift apart
+    for condition in board_filter_conditions(
+        ApplicationRecord,
+        search=search,
+        location=location,
+        location_strict=location_strict,
+        salary_min=salary_min,
+        salary_max=salary_max,
+        is_remote=is_remote,
+        first_quest_ok=first_quest_ok,
+        posted_within_days=posted_within_days,
+    ):
+        query = query.filter(condition)
     scope = workspace_scope_id(workspace)
     if scope:
         # hosted: the shared quest pool plus this workspace's own rows

@@ -281,3 +281,87 @@ def test_dotted_dc_matches_both_ways(api_client) -> None:
     )
     titles = {r["job_title"] for r in resp.json()["items"]}
     assert "DC-corridor bonus" in titles
+
+
+def _blank_state_codes(jf_db, url: str) -> None:
+    """Simulate a row saved before the state parser shipped: raw location
+    text, empty state_codes (the live DB is mostly these)."""
+    from sqlalchemy import text as sql_text
+
+    session = jf_db._SessionLocal()
+    try:
+        session.execute(
+            sql_text("UPDATE applications SET state_codes = '' WHERE job_url = :u"),
+            {"u": url},
+        )
+        session.commit()
+    finally:
+        session.close()
+
+
+def _seed_unparsed(jf_db) -> None:
+    rows = (
+        ("San Diego sit", "https://x.example/sd", "San Diego, CA", "lookafter"),
+        ("Sacramento study", "https://x.example/sac", "Sacramento, California", "body"),
+        ("Charleston WV sit", "https://x.example/chswv", "Charleston, West Virginia", "lookafter"),
+    )
+    for title, url, location, vertical in rows:
+        jf_db.save_application(
+            job_title=title, company="Fixture", job_url=url,
+            location=location, vertical=vertical,
+        )
+        _blank_state_codes(jf_db, url)
+
+
+def test_state_query_falls_back_to_raw_location_text(api_client) -> None:
+    """A typed state must still find rows whose state_codes never got
+    parsed: match the raw location against the state's full name and its
+    abbreviation (word-boundary style, so no substring noise)."""
+    client, jf_db = api_client
+    _seed_unparsed(jf_db)
+
+    resp = client.get(
+        "/api/v1/applications",
+        params={"vertical": VERTS, "location": "California", "location_strict": "true"},
+    )
+    titles = {r["job_title"] for r in resp.json()["items"]}
+    assert "San Diego sit" in titles       # ", CA" abbreviation, no codes
+    assert "Sacramento study" in titles    # spelled-out name, no codes
+
+
+def test_abbrev_query_falls_back_to_raw_location_text(api_client) -> None:
+    client, jf_db = api_client
+    _seed_unparsed(jf_db)
+
+    resp = client.get(
+        "/api/v1/applications",
+        params={"vertical": VERTS, "location": "CA", "location_strict": "true"},
+    )
+    titles = {r["job_title"] for r in resp.json()["items"]}
+    assert "San Diego sit" in titles
+    assert "Sacramento study" in titles
+
+
+def test_raw_text_fallback_keeps_the_false_positive_guards(api_client) -> None:
+    client, jf_db = api_client
+    _seed_unparsed(jf_db)
+    _seed_states(jf_db)
+
+    # Virginia must not leak West Virginia even with no codes to lean on
+    resp = client.get(
+        "/api/v1/applications",
+        params={"vertical": VERTS, "location": "Virginia", "location_strict": "true"},
+    )
+    titles = {r["job_title"] for r in resp.json()["items"]}
+    assert "Charleston WV sit" not in titles
+    assert "West Virginia bonus" not in titles
+
+    # lowercase prose "in" is still never Indiana, and GA still never
+    # matches cities that merely contain the letters
+    for state, trap in (("Indiana", "Austin prose sit"), ("GA", "Niagara sit")):
+        resp = client.get(
+            "/api/v1/applications",
+            params={"vertical": VERTS, "location": state, "location_strict": "true"},
+        )
+        titles = {r["job_title"] for r in resp.json()["items"]}
+        assert trap not in titles, state

@@ -21,10 +21,13 @@ let kinds: {
   new_today: number;
 }[] = [];
 
+const summaryCalls: unknown[] = [];
+
 vi.mock('@/hooks/use-board-summary', () => ({
-  useBoardSummary: () => ({
-    data: { total: 0, new_today: 0, checked_at: null, kinds },
-  }),
+  useBoardSummary: (filters?: unknown) => {
+    summaryCalls.push(filters);
+    return { data: { total: 0, new_today: 0, checked_at: null, kinds } };
+  },
 }));
 
 import { KindRail } from './kind-rail';
@@ -81,5 +84,13 @@ describe('the kind rail', () => {
     const top = document.querySelector('.qb-rail-top') as HTMLElement;
     expect(within(top).getByText('12')).toBeTruthy();
     expect(screen.queryByText('19')).toBeNull();
+  });
+
+  it('threads the board filters into the summary so counts match the list', () => {
+    kinds = [think];
+    const filters = { search: 'seat', location: 'Chicago', salary_max: 90000 };
+    render(<KindRail selected="all" onSelect={() => {}} filters={filters} />);
+
+    expect(summaryCalls.at(-1)).toEqual(filters);
   });
 });

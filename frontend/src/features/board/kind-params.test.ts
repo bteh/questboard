@@ -6,6 +6,7 @@ import {
   normalizeKindKey,
   questRefreshVerticals,
   questTotal,
+  sortByFor,
   workflowForKind,
 } from './kind-params';
 
@@ -67,6 +68,18 @@ describe('the board kind params', () => {
     expect(verticals).toContain('study');
     expect(verticals).not.toContain('career');
     expect(verticals).not.toContain('work');
+  });
+
+  it('offers best-score sort only on the work lane', () => {
+    // the work lane owns best score: rank_score only exists on career rows
+    expect(sortByFor('work', false)).toBe('rank');
+    expect(sortByFor('work', true)).toBe('date_found');
+    // quest rows have no rank_score, so a best-score sort cannot reorder
+    // them; quest lanes always get the honest date sort
+    expect(sortByFor('all', false)).toBe('date_found');
+    expect(sortByFor('all', true)).toBe('date_found');
+    expect(sortByFor('perform', false)).toBe('date_found');
+    expect(sortByFor('think', true)).toBe('date_found');
   });
 
   it('keeps a facet only when the kind carries it', () => {
