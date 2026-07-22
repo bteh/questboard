@@ -16,7 +16,6 @@ import { Route as designRoute } from './routes/design';
 import { Route as boardRoute } from './routes/board';
 import { Route as homeRoute } from './routes/home';
 import { Route as healthRoute } from './routes/health';
-import { Route as moneyRoute } from './routes/how-we-make-money';
 
 /* App pages live under the pathless 'app' layout (the trade-paper shell
    plus the hosted auth gate). The entry switch at /, the landing at
@@ -36,7 +35,6 @@ const routeTree = rootRoute.addChildren([
     settingsRoute,
     boardRoute,
     healthRoute,
-    moneyRoute,
   ]),
   indexRoute,
   welcomeRoute,
