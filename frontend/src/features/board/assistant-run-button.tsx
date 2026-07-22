@@ -7,7 +7,7 @@ import { useAgentClients, useRunAgent } from '@/hooks/use-agent-clients';
 import { useAgentConsent } from '@/hooks/use-agent-consent';
 import { isDesktopApp } from '@/lib/platform';
 
-const PHASES = ['Reading your resume', 'Searching the board', 'Ranking against your experience'];
+const PHASES = ['Reading your resume', 'Pulling fresh postings', 'Ranking against your experience'];
 
 export type AssistantEmphasis = 'quiet' | 'elevated';
 
@@ -74,7 +74,7 @@ export function AssistantRunButton({
   };
 
   if (run.isPending) {
-    const phase = elapsed < 7 ? PHASES[0] : elapsed < 20 ? PHASES[1] : PHASES[2];
+    const phase = elapsed < 8 ? PHASES[0] : elapsed < 100 ? PHASES[1] : PHASES[2];
     const clock = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
     return (
       <span className="inline-flex items-center gap-2 rounded-lg border border-brand/25 bg-brand/5 px-3 py-2 text-sm text-text-primary">
@@ -107,7 +107,7 @@ export function AssistantRunButton({
           className="inline-flex items-center gap-1.5 rounded-lg border border-brand bg-brand/10 px-3 py-2 text-sm font-medium text-brand transition-colors hover:bg-brand/15"
         >
           <Sparkles className="h-4 w-4" />
-          Rank these with your assistant
+          Find and rank with your assistant
         </button>
       ) : (
         <button
@@ -115,7 +115,7 @@ export function AssistantRunButton({
           onClick={start}
           className="text-sm font-medium text-brand underline underline-offset-2"
         >
-          Rank these with your assistant
+          Find and rank with your assistant
         </button>
       )}
       {error && <span className="text-xs text-amber-700 dark:text-amber-300">{error}</span>}

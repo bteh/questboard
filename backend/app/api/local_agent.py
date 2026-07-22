@@ -34,9 +34,14 @@ _AGENT_TASKS: dict[str, dict[str, object]] = {
         "needs_resume": True,
         "prompt": (
             "Use the Questboard MCP tools. First call read_resume_for_matching to read my "
-            "resume, then get_career_preferences for my saved target roles. If my target "
-            "roles are empty or clearly off, call set_career_preferences to set sharper ones "
-            "from my resume. Then call search_work to find matching jobs. Retrieval order is "
+            "resume, then get_career_preferences for my saved target roles. Always judge the "
+            "role list against my resume: sharpen it AND broaden it with adjacent titles and "
+            "variants I might not think to search for (related functions, level-appropriate "
+            "alternates), keep it focused at 6 to 10 roles, and save the result with "
+            "set_career_preferences. Then call refresh_work with those roles to pull fresh "
+            "postings from the sources; poll get_refresh_status about every 10 seconds for up "
+            "to 90 seconds, and if it is still running continue anyway, new rows land on the "
+            "board when it finishes. Then call search_work to find matching jobs. Retrieval order is "
             "not a fit verdict, so map each candidate against my actual background. "
             "Then call set_work_fit ONCE and give EVERY candidate search_work returned its own "
             "verdict, so my whole board is scored, not just the top few. Verdict scale: "
@@ -45,7 +50,8 @@ _AGENT_TASKS: dict[str, dict[str, object]] = {
             "need no rank. Keep it FAST: each 'why' is a short phrase (a few words, <=12), and "
             "add a 'caveat' only when there's a real risk (wrong level, comp floor, remote "
             "unclear). Each needs its opportunity_id. set_work_fit is what puts your verdicts "
-            "on my board. After that, reply with just a one-line summary (e.g. 'Scored 28: 6 "
+            "on my board. After that, reply with just a one-line summary that also names any "
+            "roles you added (e.g. 'Added Analytics Engineering Manager; scored 28: 6 "
             "strong/good, rest reach or skip; GitLab EM is #1.'). Be honest; don't invent postings."
         ),
     },

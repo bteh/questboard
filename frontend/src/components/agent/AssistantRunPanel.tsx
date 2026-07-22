@@ -159,8 +159,8 @@ function renderInline(text: string): React.ReactNode {
 // card never shows a fake "done".
 const RUN_STEPS = [
   { at: 0, label: 'Reading your resume' },
-  { at: 7, label: 'Searching the board' },
-  { at: 20, label: 'Ranking against your experience' },
+  { at: 8, label: 'Pulling fresh postings' },
+  { at: 100, label: 'Ranking against your experience' },
 ];
 
 /** A live progress card during the ~1-2 min run: a running clock and the
@@ -214,7 +214,7 @@ function RunProgress() {
         })}
       </ul>
       <p className="mt-3 text-xs text-text-muted">
-        Takes about two minutes. You can keep using the app.
+        Takes three to five minutes. You can keep using the app.
       </p>
     </div>
   );
@@ -271,8 +271,9 @@ export function AssistantRunPanel() {
         <div className="min-w-0 flex-1">
           <p className="text-base font-semibold text-text-primary">Find and rank with your assistant</p>
           <p className="mt-1 text-sm text-text-secondary">
-            It reads your resume and ranks every job on the board. The top few come back with
-            reasons. Runs in your own Claude, at no cost from Questboard. Takes about two minutes.
+            It reads your resume, adds job titles you might not think to search for, pulls
+            fresh postings, and ranks every job on the board with reasons. Runs in your own
+            Claude, at no cost from Questboard. Takes three to five minutes.
           </p>
 
           {!claudeInstalled && !clients.isLoading && (

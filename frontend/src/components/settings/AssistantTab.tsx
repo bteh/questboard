@@ -11,13 +11,13 @@ import { isDesktopApp } from '@/lib/platform';
 import { openExternal } from '@/lib/open-external';
 import type { AgentClientStatus } from '@/types/resume';
 
-/* The chat fallback for the board's "Rank these with your assistant" run.
+/* The chat fallback for the board's "Find and rank with your assistant" run.
    The backend's find_and_rank task covers the same ground (read resume,
    sharpen roles via set_career_preferences, rank postings with reasons), but
    headless runs are Claude-only today, so this pasteable prompt is the only
    automatic-ish path for Codex users. Consent-gated. */
 const SETUP_PROMPT =
-  'Use my local Questboard MCP tools: read my resume, sharpen my target roles and keywords if they need it, then find me matching work and tell me which postings fit my experience best and why.';
+  'Use my local Questboard MCP tools: read my resume, sharpen my target roles and broaden them with adjacent titles I might not think to search for, save them, refresh work with those roles, then find me matching work and tell me which postings fit my experience best and why.';
 
 export function AssistantTab() {
   const clientsQuery = useAgentClients();
@@ -204,7 +204,7 @@ export function AssistantTab() {
             >
               Find work
             </Link>{' '}
-            on the board and click &ldquo;Rank these with your assistant&rdquo;.
+            on the board and click &ldquo;Find and rank with your assistant&rdquo;.
           </p>
 
           <details className="rounded-xl border border-border-default bg-bg-subtle/40 p-3">
