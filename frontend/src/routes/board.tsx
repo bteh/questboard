@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createRoute, Link, redirect, useNavigate } from '@tanstack/react-router';
-import { useQueries } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { CoinsDollarIcon, Search01Icon } from '@hugeicons/core-free-icons';
 import { Route as appRoute } from './app';
@@ -476,6 +476,30 @@ function BoardPage() {
      assume newest-first. */
   const hasAgentVerdicts = careerLane && visibleItems.some((app) => app.agent_fit);
 
+  /* the work lane's filter status line compares what shows against the
+     whole lane. The baseline count only fetches while a toolbar filter
+     narrows; otherwise the filtered total already IS the lane total. */
+  const workFiltersOn =
+    careerLane && Boolean(search || place || payFloor !== null || payCeiling !== null);
+  const workLaneBase = useMemo<ApplicationFilters>(
+    () => ({
+      ...kindParams(kindKey),
+      ...presetParams(activeKeys),
+      facet: params.f,
+      source_category: sourceCategory ?? undefined,
+      page: 1,
+      page_size: 1,
+      scope: 'board',
+    }),
+    [kindKey, activeKeys, params.f, sourceCategory],
+  );
+  const workLaneTotalQuery = useQuery({
+    queryKey: ['profile-work', workLaneBase],
+    queryFn: () => getProfileWork(workLaneBase),
+    enabled: workFiltersOn,
+  });
+  const workLaneTotal = workFiltersOn ? workLaneTotalQuery.data?.total : total;
+
   /* careerOnly presets lean on fields only career rows carry (score,
      company type), and career rows only live in the Jobs lane now, so the
      presets show there and nowhere else */
@@ -669,7 +693,11 @@ function BoardPage() {
             />
             <WorkToolbar
               checkedAgo={checkedAgo}
-              candidateCount={total}
+              shownCount={total}
+              laneTotal={workLaneTotal}
+              assistantSlot={
+                <AssistantRunButton rowCount={visibleItems.length} hasVerdicts={hasAgentVerdicts} />
+              }
               search={searchRaw}
               onSearch={setSearchRaw}
               place={placeRaw}
@@ -681,9 +709,6 @@ function BoardPage() {
               payTo={payToRaw}
               onPayTo={setPayToRaw}
             />
-            <div className="mt-2">
-              <AssistantRunButton rowCount={visibleItems.length} hasVerdicts={hasAgentVerdicts} />
-            </div>
             <SourceCategoryChips
               counts={workMeta?.source_categories}
               selected={sourceCategory}

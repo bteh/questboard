@@ -19,9 +19,10 @@ export function assistantRunEmphasis(rowCount: number, hasVerdicts: boolean): As
   return rowCount > 0 && !hasVerdicts ? 'elevated' : 'quiet';
 }
 
-/* The AI run, right on the Find-work board next to search: tap it and your own
-   Claude reads your resume, ranks the board, and its verdicts land on the
-   posters (badges + explain). Desktop-only; the run spawns your local agent. */
+/* The AI run, in the work lane's actions row right after "Get new jobs":
+   tap it and your own Claude reads your resume, ranks the board, and its
+   verdicts land on the posters (badges + explain). Desktop-only; the run
+   spawns your local agent. */
 export function AssistantRunButton({
   rowCount = 0,
   hasVerdicts = false,

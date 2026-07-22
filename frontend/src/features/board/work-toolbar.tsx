@@ -1,11 +1,16 @@
-/* The Jobs lane's one toolbar: search, place, minimum listed pay, the
-   active filter chips, and the Run search button. Typing keeps filtering
-   the cached list instantly, exactly like the shared tray; only the button
-   touches the network, through the same pipeline the Restock page runs.
-   The status line under it states only what the data backs. */
+/* The Jobs lane's top block, in reading order. The actions row leads with
+   the one filled "Get new jobs" button and says in plain words what it
+   pulls (saved target roles, editable in Settings); the assistant's ranking
+   door sits on the same row, and the run status line reports on the pull.
+   The filter tray sits demoted below: three fields that only narrow rows
+   already on the board, with no button, so it cannot read as a search form.
+   Only "Get new jobs" touches the network, through the same pipeline the
+   Restock page runs. The line under the filters states only what the data
+   backs. */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
+import { Link } from '@tanstack/react-router';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { CoinsDollarIcon, Search01Icon } from '@hugeicons/core-free-icons';
 import { SageButton } from '@questboard/ui';
@@ -18,7 +23,12 @@ import { formatStatedPay, parseAmount } from '@/utils/board-card';
 interface WorkToolbarProps {
   /** the board summary's honest "sources checked Xh ago", or null */
   checkedAgo: string | null;
-  candidateCount?: number;
+  /** rows the current toolbar filters keep: the filtered query's total */
+  shownCount?: number;
+  /** every job on the lane before the toolbar filters bite */
+  laneTotal?: number;
+  /** the assistant's ranking door, rendered inside the actions row */
+  assistantSlot?: ReactNode;
   search: string;
   onSearch: (value: string) => void;
   place: string;
@@ -41,16 +51,44 @@ interface FilterChip {
 
 const TIMED_OUT_RE = /^\s+.+: timed out$/;
 
-function StatusLine({
+/* The placeholder names the box's real job: it narrows rows already on the
+   board, and the count keeps that concrete. Under two rows, or while the
+   total is loading, the words stand alone. */
+export function filterPlaceholder(count: number | undefined): string {
+  return count !== undefined && count > 1 ? `Filter these ${count} jobs` : 'Filter these jobs';
+}
+
+/* The line under the filters, in plain words: what shows against the whole
+   lane while a filter narrows, the bare total otherwise, with the honest
+   freshness phrase. Never claims a lane smaller than what shows. */
+export function filterStatusText({
+  shown,
+  laneTotal,
+  filtered,
   checkedAgo,
-  candidateCount,
 }: {
+  shown: number | undefined;
+  laneTotal: number | undefined;
+  filtered: boolean;
   checkedAgo: string | null;
-  candidateCount?: number;
-}) {
+}): string {
+  if (shown === undefined) return checkedAgo ?? '';
+  const jobs = (n: number) => `${n} job${n === 1 ? '' : 's'}`;
+  const lead = filtered
+    ? laneTotal !== undefined && laneTotal >= shown
+      ? `Showing ${shown} of ${jobs(laneTotal)}`
+      : `Showing ${jobs(shown)}`
+    : jobs(shown);
+  return checkedAgo ? `${lead} · ${checkedAgo}` : lead;
+}
+
+/* The pull's own report, under the actions row it belongs to: a running
+   clock while sources answer, the failure with its retry door, and the
+   completed tally. Idle renders nothing; the filter line below carries the
+   board's counts. Stays mounted so the completion toast can fire even when
+   the run ends off-screen. */
+function RunStatusLine() {
   const { state, messages, progress, result, error } = useSearchContext();
-  const cached = candidateCount === undefined ? null : `${candidateCount} profile candidates`;
-  const cachedLine = [cached, checkedAgo].filter(Boolean).join(', ');
 
   // A running clock so the wait shows life, plus a toast on the running->done
   // transition so you know it finished even if you'd tabbed away.
@@ -101,8 +139,7 @@ function StatusLine({
   if (state === 'failed') {
     return (
       <p className="qb-workline" role="status">
-        That didn’t finish{error ? `: ${error}` : ''}. Click <b>“Get new jobs”</b> to try again
-        {cachedLine ? `. ${cachedLine}` : ''}.
+        That didn’t finish{error ? `: ${error}` : ''}. Click <b>“Get new jobs”</b> to try again.
       </p>
     );
   }
@@ -115,17 +152,18 @@ function StatusLine({
       <p className="qb-workline" role="status">
         {lead} ({result.jobs_found} scanned)
         {timeouts > 0 ? ` · ${timeouts} source${timeouts === 1 ? '' : 's'} timed out` : ''}.
-        {cachedLine ? ` ${cachedLine}.` : ''}
       </p>
     );
   }
 
-  return <p className="qb-workline">{cachedLine || ' '}</p>;
+  return null;
 }
 
 export function WorkToolbar({
   checkedAgo,
-  candidateCount,
+  shownCount,
+  laneTotal,
+  assistantSlot,
   search,
   onSearch,
   place,
@@ -165,12 +203,25 @@ export function WorkToolbar({
 
   return (
     <div className="qb-worktool">
+      <div className="qb-workactions">
+        <SageButton onClick={run} disabled={!ready}>
+          {running ? 'Getting jobs…' : 'Get new jobs'}
+        </SageButton>
+        <span className="qb-workactions-note">
+          Pulls fresh postings for your target roles.{' '}
+          <Link to="/settings" search={{ tab: 'restock' }} className="qb-textlink">
+            Edit roles
+          </Link>
+        </span>
+        {assistantSlot}
+      </div>
+      <RunStatusLine />
       <div className="qb-tray" role="search">
         <label className="qb-tray-field qb-tray-grow">
           <HugeiconsIcon icon={Search01Icon} size={16} strokeWidth={1.7} />
           <input
-            placeholder="Search these jobs"
-            aria-label="Search these jobs"
+            placeholder={filterPlaceholder(shownCount)}
+            aria-label="Filter these jobs"
             value={search}
             onChange={(e) => onSearch(e.target.value)}
           />
@@ -192,11 +243,6 @@ export function WorkToolbar({
             onChange={(e) => onPayFrom(e.target.value)}
           />
         </label>
-        <div className="qb-tray-run">
-          <SageButton onClick={run} disabled={!ready}>
-            {running ? 'Getting jobs…' : 'Get new jobs'}
-          </SageButton>
-        </div>
       </div>
       {(chips.length > 0 || place.trim()) && (
         <div className="qb-workchips">
@@ -226,7 +272,14 @@ export function WorkToolbar({
           )}
         </div>
       )}
-      <StatusLine checkedAgo={checkedAgo} candidateCount={candidateCount} />
+      <p className="qb-workline">
+        {filterStatusText({
+          shown: shownCount,
+          laneTotal,
+          filtered: chips.length > 0,
+          checkedAgo,
+        })}
+      </p>
     </div>
   );
 }

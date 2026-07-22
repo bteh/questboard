@@ -82,19 +82,30 @@
 /* facet chips: a kind's own sub-filters, one quiet row under the rail */
 .qb-facet-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
 
-/* the Jobs toolbar: one block; filters bite instantly, one button runs.
+/* the Jobs toolbar, in reading order: the actions row runs the pull, and
+   the demoted tray below only narrows rows already on the board.
    The fields reuse the shared tray grammar from board.css. */
 .qb-worktool { margin-top: 12px; }
-.qb-worktool .qb-tray { margin-top: 0; }
+.qb-workactions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.qb-workactions-note { font-size: 12.5px; color: var(--mute); }
+.qb-workactions-note .qb-textlink { font-size: inherit; }
+/* quieter than the quest tray on purpose: no raised paper, no bottom edge,
+   so the row reads as filters and never as the page's search form */
+.qb-worktool .qb-tray {
+  margin-top: 12px;
+  background: transparent;
+  border-color: var(--hair);
+  border-bottom: 1px solid var(--hair);
+}
 .qb-tray-label { font-family: var(--mono); font-size: 12px; color: var(--soft); white-space: nowrap; }
 .qb-tray-minpay { flex: 0 0 auto; }
 .qb-tray-minpay input { width: 64px; }
-.qb-tray-run { display: flex; align-items: center; padding: 4px 4px 4px 12px; margin-left: auto; }
 .qb-workchips { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
 .qb-workchip-x { color: var(--mute); font-size: 13px; line-height: 1; }
 .qb-workchips .qb-pchip:hover .qb-workchip-x { color: var(--ink); }
 
-/* the persistent status line: cached count, honest freshness, live runs */
+/* the two quiet lines: the pull's live report under the actions row, and
+   the showing-of-total tally under the filters */
 .qb-workline {
   display: flex; align-items: center; gap: 10px; margin: 8px 0 0;
   font-family: var(--mono); font-variant-numeric: tabular-nums;
@@ -118,8 +129,7 @@
 
 @media (max-width: 700px) {
   .qb-tray-minpay { flex: 1 1 100%; }
-  .qb-tray-run { flex: 1 1 100%; margin-left: 0; padding: 6px 8px 8px; }
-  .qb-tray-run .qb-btn-sage { width: 100%; min-height: 44px; }
+  .qb-workactions .qb-btn-sage { flex: 1 1 100%; min-height: 44px; }
   .qb-workchips .qb-pchip { min-height: 44px; }
 }
 
