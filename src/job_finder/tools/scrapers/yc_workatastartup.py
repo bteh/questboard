@@ -205,6 +205,14 @@ def _normalize_json_job(item: dict) -> dict:
     )
 
     job_url = item.get("url", "") or item.get("job_url", "")
+    if not job_url:
+        # Live data-page shape (2026-07): no url/job_url keys. The public
+        # detail page is /jobs/<id> (verified 200 unauthenticated). The
+        # ``applyUrl`` field is an account.ycombinator.com/authenticate
+        # redirect (login-gated, never a valid row URL).
+        job_id = item.get("id")
+        if job_id:
+            job_url = f"/jobs/{job_id}"
     if job_url and not job_url.startswith("http"):
         job_url = f"{_BASE_URL}{job_url}"
 
@@ -368,11 +376,11 @@ def _fetch_job_detail(job_url: str) -> dict:
     url="https://workatastartup.com",
     description="YC Work at a Startup job listings",
     category="startup",
-    # Off by default: the current data-page shape returns jobs whose apply
-    # link isn't under the url/job_url keys this scraper reads, so every row
-    # lands with an empty URL and is dropped as a dead link (verified on the
-    # live board). Re-enable once the real URL field is confirmed live.
-    enabled_by_default=False,
+    # Re-enabled 2026-07-22: rows now get their URL from the ``id`` field
+    # (public detail page /jobs/<id>, verified live), so they survive the
+    # dead-link filter. Note the unauthenticated /jobs page only exposes a
+    # ~26-job teaser list; full YC coverage requires a logged-in session.
+    enabled_by_default=True,
 )
 def search_yc_jobs(
     roles: list[str] | None = None,

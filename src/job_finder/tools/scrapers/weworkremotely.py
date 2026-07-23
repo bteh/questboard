@@ -14,13 +14,53 @@ from job_finder.tools.scrapers._utils import _HEADERS, _TIMEOUT, _match_roles, _
 logger = logging.getLogger(__name__)
 _SEEN_PARSE_FAILURES: set[str] = set()
 
-_WWR_CATEGORIES = {
-    "programming": "remote-programming-jobs",
-    "data": "remote-programming-jobs",
-    "devops": "remote-devops-sysadmin-jobs",
-    "management": "remote-management-finance-jobs",
-    "all": "remote-jobs",
+# WWR reorganized its RSS surface (verified by live probe, 2026-07-22):
+# - "remote-programming-jobs" no longer serves the programming category
+#   (the old slug now returns a generic latest-25 mixed feed);
+#   programming split into full-stack / back-end / front-end feeds.
+# - "remote-management-finance-jobs" was renamed with an "and"
+#   ("remote-management-and-finance-jobs"); the old slug 301s with an
+#   EMPTY body and NO Location header, which raise_for_status() does not
+#   catch, so the run just silently parsed zero bytes.
+# - The all-jobs feed moved OUT of /categories/ to /remote-jobs.rss.
+# WWR has no dedicated data category; data roles post under programming.
+_WWR_SITE_FEED = "https://weworkremotely.com/remote-jobs.rss"
+
+_WWR_CATEGORIES: dict[str, tuple[str, ...]] = {
+    "programming": (
+        "remote-full-stack-programming-jobs",
+        "remote-back-end-programming-jobs",
+        "remote-front-end-programming-jobs",
+    ),
+    "data": (
+        "remote-full-stack-programming-jobs",
+        "remote-back-end-programming-jobs",
+    ),
+    "devops": ("remote-devops-sysadmin-jobs",),
+    "management": ("remote-management-and-finance-jobs",),
 }
+
+
+def _feed_urls(cats: list[str]) -> list[str]:
+    """Resolve category names to a deduplicated, ordered list of feed URLs.
+
+    "all" maps to the site-wide feed; unknown names are treated as literal
+    category slugs so callers can pass a raw WWR slug directly.
+    """
+    urls: list[str] = []
+    for cat in cats:
+        if cat == "all":
+            urls.append(_WWR_SITE_FEED)
+            continue
+        for slug in _WWR_CATEGORIES.get(cat, (cat,)):
+            urls.append(f"https://weworkremotely.com/categories/{slug}.rss")
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for u in urls:
+        if u not in seen:
+            seen.add(u)
+            deduped.append(u)
+    return deduped
 
 
 @register_scraper(
@@ -44,9 +84,7 @@ def search_weworkremotely(
     cats = categories or ["programming", "devops", "management", "all"]
     all_items: list[dict] = []
 
-    for cat in cats:
-        slug = _WWR_CATEGORIES.get(cat, cat)
-        url = f"https://weworkremotely.com/categories/{slug}.rss"
+    for url in _feed_urls(cats):
         try:
             resp = requests.get(url, headers={
                 "User-Agent": _HEADERS["User-Agent"],
@@ -54,17 +92,20 @@ def search_weworkremotely(
             }, timeout=_TIMEOUT)
             resp.raise_for_status()
         except requests.RequestException as e:
-            logger.warning("WWR RSS fetch failed for %s: %s", cat, e)
+            logger.warning("WWR RSS fetch failed for %s: %s", url, e)
             continue
 
         try:
             root = ET.fromstring(resp.content)
         except ET.ParseError as e:
-            if cat not in _SEEN_PARSE_FAILURES:
-                _SEEN_PARSE_FAILURES.add(cat)
-                logger.warning("WWR RSS parse failed for %s: %s", cat, e)
+            # A retired slug 301s with an empty body (no Location header),
+            # which raise_for_status() passes. The ParseError here is the
+            # only signal that a feed URL has died. Warn once per URL.
+            if url not in _SEEN_PARSE_FAILURES:
+                _SEEN_PARSE_FAILURES.add(url)
+                logger.warning("WWR RSS parse failed for %s: %s", url, e)
             else:
-                logger.debug("WWR RSS parse failed for %s: %s", cat, e)
+                logger.debug("WWR RSS parse failed for %s: %s", url, e)
             continue
 
         for item in root.iter("item"):

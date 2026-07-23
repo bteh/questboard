@@ -56,3 +56,59 @@ def test_string_salary_is_parsed_to_min_max():
     result = _normalize_json_job(item)
     assert result["salary_min"] == 200000
     assert result["salary_max"] == 250000
+
+
+# ── 2026-07-22 live shape: no url/job_url keys, only id + login applyUrl ──
+#
+# The live data-page job object carries ``id`` (the public detail page is
+# ``https://www.workatastartup.com/jobs/<id>``, verified 200 unauthenticated)
+# and ``applyUrl`` (an account.ycombinator.com/authenticate redirect, login
+# gated, never a valid row URL). The scraper was disabled because every row
+# landed with an empty URL and got dropped as a dead link; building the URL
+# from ``id`` is the fix.
+
+_LIVE_ITEM = {
+    "id": "92753",
+    "title": "Senior Software Engineer, Email Team",
+    "jobType": "Fulltime",
+    "location": "United States - Remote / Remote (US)",
+    "roleType": "Full stack",
+    "salary": "None",
+    "companyName": "OneSignal",
+    "companySlug": "onesignal",
+    "companyBatch": "S11",
+    "applyUrl": (
+        "https://account.ycombinator.com/authenticate?continue="
+        "https%3A%2F%2Fwww.workatastartup.com%2Fapplication_flow%2F92753"
+    ),
+}
+
+
+def test_url_built_from_id_for_live_shape():
+    result = _normalize_json_job(dict(_LIVE_ITEM))
+    assert result["url"] == "https://www.workatastartup.com/jobs/92753"
+
+
+def test_login_gated_apply_url_is_never_the_row_url():
+    result = _normalize_json_job(dict(_LIVE_ITEM))
+    assert "authenticate" not in result["url"]
+
+
+def test_explicit_url_still_wins_over_id():
+    item = dict(_LIVE_ITEM)
+    item["url"] = "/jobs/555"
+    assert _normalize_json_job(item)["url"] == "https://www.workatastartup.com/jobs/555"
+
+
+def test_string_none_salary_stays_unset():
+    """The live shape emits the literal string 'None' for missing salary."""
+    result = _normalize_json_job(dict(_LIVE_ITEM))
+    assert result["salary_min"] is None
+    assert result["salary_max"] is None
+
+
+def test_scraper_reenabled_now_that_urls_resolve():
+    from job_finder.tools.scrapers._registry import get_registry
+
+    meta = get_registry()["workatastartup"]
+    assert meta.enabled_by_default is True

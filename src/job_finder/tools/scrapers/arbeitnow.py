@@ -6,7 +6,7 @@ import logging
 from typing import Any
 
 from job_finder.tools.scrapers._registry import register_scraper
-from job_finder.tools.scrapers._utils import _get_json, _match_roles, _parse_salary, _strip_html
+from job_finder.tools.scrapers._utils import _get_json, _match_roles, _strip_html
 
 logger = logging.getLogger(__name__)
 
@@ -57,9 +57,10 @@ def search_arbeitnow(
 
             is_remote = bool(job.get("remote", False))
 
-            # Extract salary from description text
-            salary_min, salary_max = _parse_salary(description)
-
+            # No loose salary parse of the description here: prose numbers
+            # ("5 years", "Python 3") became fake pay figures. The shared
+            # finalize_scraper_jobs step recovers real ranges conservatively
+            # via extract_salary_range and stamps salary_source honestly.
             results.append({
                 "title": title,
                 "company": job.get("company_name", ""),
@@ -67,8 +68,8 @@ def search_arbeitnow(
                 "url": job.get("url", ""),
                 "source": "arbeitnow",
                 "description": description[:3000],
-                "salary_min": salary_min,
-                "salary_max": salary_max,
+                "salary_min": None,
+                "salary_max": None,
                 "date_posted": job.get("created_at", ""),
                 "is_remote": is_remote,
                 "company_size": "",

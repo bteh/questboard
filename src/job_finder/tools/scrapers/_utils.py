@@ -114,10 +114,15 @@ def _get_json(
 
 
 def _parse_salary(text: str | None) -> tuple[float | None, float | None]:
-    """Extract min/max salary from a text string like '$120,000 - $180,000'."""
+    """Extract min/max salary from a text string like '$120,000 - $180,000'.
+
+    The number pattern requires a leading digit: ``[\\d,]+`` used to match a
+    bare comma, and ``float(','.replace(',', ''))`` == ``float('')`` raised
+    ValueError, which killed the whole Arbeitnow run on ordinary prose.
+    """
     if not text:
         return None, None
-    matches = re.findall(r'\$?([\d,]+(?:\.\d+)?)\s*[kK]?', text)
+    matches = re.findall(r'\$?(\d[\d,]*(?:\.\d+)?)\s*[kK]?', text)
     if len(matches) >= 2:
         lo = float(matches[0].replace(",", ""))
         hi = float(matches[1].replace(",", ""))

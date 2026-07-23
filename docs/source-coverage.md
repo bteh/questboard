@@ -228,6 +228,91 @@ shopping-feed drift; only relevant once the flip lane re-enters),
 UW-Madison local student jobs (odd; the campus-boards pilot, see the
 supply-push verdicts), donedirtcheap.app (odd; watch for launch).
 
+## The 2026-07-22 career-source audit (live probes on every broken source)
+
+Trigger: yesterday's run log showed arbeitnow finishing "exception",
+weworkremotely and workatastartup at zero_rows, and greenhouse/ashby both
+returning exactly 100 rows (a cap smell). Every claim below was verified by
+running the scraper in isolation against the live site.
+
+**Fixed, with regression tests:**
+
+- **arbeitnow (exception, 0 rows): our bug.** `_parse_salary`'s number
+  pattern `[\d,]+` also matched a bare comma, so `float('')` raised
+  ValueError on the first matched job whose description contained commas,
+  which is any ordinary prose. The regex now requires a leading digit, and
+  arbeitnow no longer loose-parses the whole description for pay (prose
+  numbers like "5 years" were becoming fake salaries). The shared
+  `finalize_scraper_jobs` recovers real ranges conservatively. Live rerun: 20
+  rows. Tests: `tests/test_arbeitnow_scraper.py`.
+- **weworkremotely (zero_rows): WWR reorganized its RSS surface.** The
+  management slug gained an "and" (`remote-management-and-finance-jobs`),
+  the all-jobs feed moved out of `/categories/` to `/remote-jobs.rss`, and
+  programming split into full-stack, back-end, and front-end feeds. Retired
+  slugs 301 with an empty body and no Location header, which
+  `raise_for_status()` does not catch, so the run silently parsed zero
+  bytes. The category map now targets the live feeds (probe-verified). Live
+  rerun: 236 raw rows. Tests: `tests/test_weworkremotely_scraper.py`.
+- **workatastartup (zero_rows): re-enabled.** The live data-page job objects
+  carry no `url`/`job_url` keys, only `id` plus a login-gated
+  `account.ycombinator.com/authenticate` applyUrl, so every row failed the
+  row contract as missing_url. Rows now build their URL from `id`
+  (`workatastartup.com/jobs/<id>`, verified 200 unauthenticated). Caveat
+  that stays true: the unauthenticated /jobs page is a ~26-job teaser list;
+  full YC coverage needs a logged-in session. Tests in
+  `tests/test_yc_workatastartup.py`.
+
+**Cap sweep (same two-role probe, cap lifted to measure true supply):**
+
+- greenhouse: 912 matches uncapped vs the 100 the live run returned, and
+  ashby 203 vs 100. Both scrapers rank by relevance before honoring the
+  caller's `max_results`, so the truncation lived in the caller: the
+  pipeline's per-source cap. That floor was raised to 500 in c82a27a
+  (2026-07-21); after a server restart ashby is fully covered and
+  greenhouse keeps the 500 strongest of 912. No scraper-side cap to fix.
+- lever's no-param API call returns whole boards (gopuff: 834 postings), so
+  no hidden first-page cap. greenhouse/ashby/workable board APIs are also
+  full-board per call.
+- Real per-scraper ceilings that remain, all judged acceptable today:
+  workday fetches at most 20 postings per query (a Workday CXS limit) with
+  no offset loop, 6 role queries per employer; raising it means more N+1
+  detail fetches against the 60s scraper timeout, so it stays. builtin is
+  politeness-capped at 4 pages x 25 per role (3 roles). cryptojobslist
+  stops at 100 (4 pages x 25) and getro at 100 per network; both are
+  opt-in crypto boards running far under their ceilings. themuse stops at
+  ~420, himalayas at ~1050 scanned, arbeitnow at 20 pages. None were
+  binding in yesterday's run.
+- Legitimately small, not broken: themuse 2, remotive 2, remoteok 6,
+  himalayas 5 rows reflect those boards' actual data-role volume, verified
+  by inspecting the live feeds.
+
+**Career boards NOT covered today (senior-data-engineering lens):**
+
+- Deliberately disabled JobSpy boards: Glassdoor (400), ZipRecruiter
+  (Cloudflare 403), Google Jobs (CAPTCHA). Revisit only via a
+  browser-automation path (playwright-stealth class), which is a product
+  decision, not a scraper tweak.
+- **SmartRecruiters** (never added): open per-company postings API, the
+  same pattern as our greenhouse scraper; the clearest cheap ATS win.
+- **Recruitee, Teamtailor, Personio, BambooHR** (never added): all expose
+  open per-company JSON or XML feeds; EU/SMB skew; same seed-list pattern.
+- **ai-jobs.net** (never added): data/ML-specific board, server-rendered
+  with RSS; high fit for the data lane, small volume.
+- **Dice** (never added): tech-staple board, server-rendered search, no
+  open API; medium effort, high contract-role noise.
+- **Wellfound/AngelList** (blocked): login-walled GraphQL behind
+  Cloudflare; YC WaaS plus the ATS seed lists cover much of the same
+  startup cohort.
+- **Otta / Welcome to the Jungle** (never added): curated tech listings in
+  Next.js data; medium effort, medium volume.
+- **USAJOBS** (never added): official free-key API; only relevant if
+  federal data roles are in scope.
+- **Monster, CareerBuilder, SimplyHired** (skip): bot-walled or
+  Indeed-duplicative; low marginal value over JobSpy's Indeed + LinkedIn.
+- **iCIMS, Taleo, SuccessFactors, Jobvite** (research task): per-tenant
+  endpoints exist but are inconsistent across tenants; the big-enterprise
+  ATS class is the largest genuinely uncovered surface after Workday.
+
 ## Ingest guardrails (apply to every future source)
 
 - Pay renders only as the source states it; "up to $X" maps to a
