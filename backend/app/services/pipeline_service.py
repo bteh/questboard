@@ -780,53 +780,79 @@ Resume:
 
 
 def _auto_deduplicate(profile: str | None = None, workspace_id: str | None = None) -> int:
-    """Merge cross-source duplicates in the DB after a pipeline run."""
+    """Collapse cross-source duplicates in the DB after a pipeline run.
+
+    Uses the shared key and predicate in job_finder.dedup (squashed company
+    and title, compatible location, same_posting confirmation), so this stays
+    in lockstep with the in-memory pipeline pass and the startup data repair.
+    Career rows only. Rows whose status records user work (clipped, applied,
+    ...) are never losers. Losers are tombstoned (status and url_status set
+    to 'expired' plus a note), never deleted, so the log keeps its receipts.
+    """
     try:
-        from job_finder.pipeline import _normalize_company, _normalize_title
+        from sqlalchemy import or_
+
+        from job_finder.dedup import cluster_jobs, is_protected_status, richness_key
         from app.models.application import ApplicationRecord
         from app.models.database import get_db
 
         session_gen = get_db()
         session = next(session_gen)
         try:
-            query = session.query(ApplicationRecord)
+            query = session.query(ApplicationRecord).filter(
+                ApplicationRecord.vertical == "career",
+                or_(
+                    ApplicationRecord.status.is_(None),
+                    ApplicationRecord.status != "expired",
+                ),
+            )
             if workspace_id:
                 query = query.filter(ApplicationRecord.workspace_id == workspace_id)
             elif profile:
                 query = query.filter(ApplicationRecord.profile == profile)
-            all_records = query.all()
 
-            groups: dict[str, list] = {}
-            for rec in all_records:
-                co = _normalize_company(rec.company or "")
-                ti = _normalize_title(rec.job_title or "")
-                if not co or not ti:
-                    continue
-                key = f"{co}||{ti}"
-                groups.setdefault(key, []).append(rec)
+            jobs = [
+                {
+                    "title": rec.job_title or "",
+                    "company": rec.company or "",
+                    "location": rec.location or "",
+                    "is_remote": bool(rec.is_remote),
+                    "url": rec.job_url or "",
+                    "source": rec.source or "",
+                    "description": rec.description or "",
+                    "salary_min": rec.salary_min,
+                    "salary_max": rec.salary_max,
+                    "_rec": rec,
+                }
+                for rec in query.all()
+            ]
 
+            def _rank(job: dict) -> tuple:
+                rec = job["_rec"]
+                return (
+                    1 if is_protected_status(rec.status) else 0,
+                    0 if (rec.url_status or "") in ("dead", "expired") else 1,
+                    1 if rec.cover_letter else 0,
+                    1 if rec.company_intel_json else 0,
+                ) + richness_key(job)
+
+            clusters, _keyless = cluster_jobs(jobs)
             removed = 0
-            for group in groups.values():
-                if len(group) <= 1:
+            for cluster in clusters:
+                if len(cluster) < 2:
                     continue
-                # Keep richest record
-                group.sort(
-                    key=lambda r: (
-                        1 if r.status and r.status != "found" else 0,
-                        1 if r.cover_letter else 0,
-                        1 if r.company_intel_json else 0,
-                        1 if (r.salary_min or r.salary_max) else 0,
-                        r.overall_score or 0,
-                        len(r.description or ""),
-                    ),
-                    reverse=True,
-                )
-                keeper = group[0]
-                for dup in group[1:]:
+                keeper = max(cluster, key=_rank)["_rec"]
+                for job in cluster:
+                    dup = job["_rec"]
+                    if dup is keeper or is_protected_status(dup.status):
+                        continue
                     if not keeper.salary_min and dup.salary_min:
                         keeper.salary_min = dup.salary_min
                     if not keeper.salary_max and dup.salary_max:
                         keeper.salary_max = dup.salary_max
+                    if not keeper.date_posted and dup.date_posted:
+                        keeper.date_posted = dup.date_posted
+                        keeper.date_confidence = dup.date_confidence
                     if not keeper.cover_letter and dup.cover_letter:
                         keeper.cover_letter = dup.cover_letter
                     if not keeper.company_intel_json and dup.company_intel_json:
@@ -846,7 +872,19 @@ def _auto_deduplicate(profile: str | None = None, workspace_id: str | None = Non
                         keeper.key_gaps = dup.key_gaps
                     if len(dup.description or "") > len(keeper.description or ""):
                         keeper.description = dup.description
-                    session.delete(dup)
+                    note = (
+                        f"Cross-source duplicate of #{keeper.id} "
+                        f"({keeper.source or 'unknown source'}); collapsed after a search run."
+                    )
+                    prior = (dup.notes or "").strip()
+                    dup.notes = f"{prior}\n{note}" if prior else note
+                    dup.status = "expired"
+                    dup.url_status = "expired"
+                    logger.info(
+                        "auto-dedup: expired #%s (%s) into #%s (%s) for '%s / %s'",
+                        dup.id, dup.source, keeper.id, keeper.source,
+                        keeper.company, keeper.job_title,
+                    )
                     removed += 1
             if removed > 0:
                 session.commit()

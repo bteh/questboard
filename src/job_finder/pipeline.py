@@ -13,10 +13,8 @@ import os
 import re
 import threading
 import time
-import unicodedata
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
-from difflib import SequenceMatcher
 from typing import Any, Callable
 
 import yaml
@@ -131,80 +129,24 @@ def _load_search_config(profile: str | None = None) -> dict:
     return _validate_config(config, config_path)
 
 
-def _normalize_company(name: str) -> str:
-    """Normalize a company name for dedup comparison."""
-    if not name:
-        return ""
-    t = name.lower().strip()
-    t = unicodedata.normalize("NFKD", t)
-    # Remove common corporate suffixes
-    for suffix in (
-        ", inc.", ", inc", ", llc", ", corp.", ", corp", ", ltd.", ", ltd",
-        ", limited", ", co.", " inc.", " inc", " llc", " corp.", " corp",
-        " ltd.", " ltd", " limited", " co.", " gmbh", " ag", " plc",
-        " sa", " sas", " bv", " s.a.", " s.r.l.",
-    ):
-        if t.endswith(suffix):
-            t = t[: -len(suffix)]
-            break
-    # Strip non-alphanumeric, collapse whitespace
-    t = re.sub(r"[^a-z0-9\s]", "", t)
-    return re.sub(r"\s+", " ", t).strip()
-
-
-def _normalize_title(title: str) -> str:
-    """Normalize a job title for dedup comparison."""
-    if not title:
-        return ""
-    t = title.lower().strip()
-    t = unicodedata.normalize("NFKD", t)
-    # Remove common level prefixes/suffixes that vary across sources
-    t = re.sub(r"\b(sr\.?|senior|jr\.?|junior|lead|principal|staff)\b", lambda m: {
-        "sr": "senior", "sr.": "senior", "jr": "junior", "jr.": "junior",
-    }.get(m.group(0).lower(), m.group(0).lower()), t)
-    # Strip non-alphanumeric, collapse whitespace
-    t = re.sub(r"[^a-z0-9\s]", "", t)
-    return re.sub(r"\s+", " ", t).strip()
-
-
-def _normalize_location(location: str) -> str:
-    """Normalize a location string for dedup comparison."""
-    if not location:
-        return ""
-    t = unicodedata.normalize("NFKD", location.lower().strip())
-    if "remote" in t:
-        return "remote"
-    if "hybrid" in t:
-        return "hybrid"
-    t = re.sub(r"[^a-z0-9\s]", " ", t)
-    return re.sub(r"\s+", " ", t).strip()
-
-
-def _normalize_description(text: str) -> str:
-    """Normalize descriptions so obviously identical postings cluster together."""
-    if not text:
-        return ""
-    t = unicodedata.normalize("NFKD", text.lower())
-    t = re.sub(r"[^a-z0-9\s]", " ", t)
-    return re.sub(r"\s+", " ", t).strip()
-
-
-def _descriptions_look_duplicate(left: str, right: str) -> bool:
-    """Return True only when two descriptions look like the same posting."""
-    left_norm = _normalize_description(left)
-    right_norm = _normalize_description(right)
-    if not left_norm or not right_norm:
-        return False
-
-    shorter, longer = sorted((left_norm, right_norm), key=len)
-    if len(shorter) >= 120 and shorter in longer:
-        return True
-
-    return SequenceMatcher(
-        None,
-        left_norm[:1600],
-        right_norm[:1600],
-    ).ratio() >= 0.82
+# Dedup primitives live in job_finder.dedup so the pipeline, the post-run DB
+# merge (backend pipeline_service), and the startup data repair (models.
+# maintenance) share ONE definition of "duplicate". The underscore aliases
+# keep this module's long-standing import surface for existing consumers.
+from job_finder.dedup import (
+    cluster_jobs as _cluster_jobs,
+    describe_collapse as _describe_collapse,
+    descriptions_look_duplicate as _descriptions_look_duplicate,
+    loc_is_remote as _loc_is_remote,
+    locations_compatible as _locations_compatible,
+    normalize_company as _normalize_company,
+    normalize_description as _normalize_description,
+    normalize_location as _normalize_location,
+    normalize_title as _normalize_title,
+    richness_key as _dedup_richness_key,
+    same_posting as _same_posting,
+    short_or_empty_description as _short_or_empty_description,
+)
 
 
 def _dedup_key(company: str, title: str, location: str = "") -> str:
@@ -214,55 +156,6 @@ def _dedup_key(company: str, title: str, location: str = "") -> str:
         _normalize_title(title),
         _normalize_location(location),
     ))
-
-
-def _loc_is_remote(job: dict) -> bool:
-    if job.get("is_remote"):
-        return True
-    loc = (job.get("location") or "").lower()
-    return any(k in loc for k in ("remote", "anywhere", "worldwide", "distributed"))
-
-
-def _short_or_empty_description(text: str) -> bool:
-    """True when a description is too thin to disprove a cross-board duplicate."""
-    return len(_normalize_description(text or "")) < 120
-
-
-def _locations_compatible(a: dict, b: dict) -> bool:
-    """Could two same-company/title jobs be the same posting, by location?
-
-    Remote↔remote and same-concrete-location (or one unknown) are compatible;
-    remote↔onsite and two DIFFERENT concrete cities are distinct openings.
-    """
-    a_rem, b_rem = _loc_is_remote(a), _loc_is_remote(b)
-    if a_rem and b_rem:
-        return True
-    if a_rem != b_rem:
-        return False
-    loc_a = _normalize_location(a.get("location", ""))
-    loc_b = _normalize_location(b.get("location", ""))
-    if not loc_a or not loc_b:
-        return True
-    return loc_a == loc_b
-
-
-def _same_posting(a: dict, b: dict) -> bool:
-    """Cross-board duplicate detection: the same opening from different sources.
-
-    Merges when locations are compatible AND either the descriptions look like
-    the same posting OR one side's description is too thin to disprove it.
-    Two substantial-but-different descriptions at a compatible location are
-    treated as distinct roles (no over-merge).
-    """
-    if not _locations_compatible(a, b):
-        return False
-    desc_a = a.get("description", "")
-    desc_b = b.get("description", "")
-    if _descriptions_look_duplicate(desc_a, desc_b):
-        return True
-    if _short_or_empty_description(desc_a) or _short_or_empty_description(desc_b):
-        return True
-    return False
 
 
 # -- Seniority / management prefixes used for search-term consolidation ------
@@ -615,24 +508,13 @@ def _consolidate_search_terms(
 
 
 def _pick_best_job(group: list[dict]) -> dict:
-    """From a group of duplicate jobs, pick the one with the richest data."""
-    def _richness(job: dict) -> tuple:
-        desc_len = len(job.get("description") or "")
-        has_salary = 1 if (job.get("salary_min") or job.get("salary_max")) else 0
-        has_url = 1 if job.get("url") else 0
-        # Prefer sources that tend to have richer descriptions
-        source_rank = {
-            "indeed": 5, "linkedin": 4,
-            "greenhouse": 4, "lever": 4, "ashby": 4, "workday": 4,
-            "glassdoor": 3, "workatastartup": 3,
-            "remotive": 2, "himalayas": 2, "remoteok": 2, "hackernews": 2,
-            "weworkremotely": 2, "cryptojobslist": 2, "arbeitnow": 2,
-            "themuse": 2, "zip_recruiter": 2, "google": 1,
-        }
-        src = source_rank.get((job.get("source") or "").lower(), 0)
-        return (has_salary, desc_len, has_url, src)
+    """From a group of duplicate jobs, pick the keeper and merge siblings in.
 
-    best = max(group, key=_richness)
+    A direct ATS/company source beats an aggregator copy of the same posting
+    (job_trust.DIRECT_SOURCES); among equals the richest record wins (stated
+    pay, then description length; see dedup.richness_key).
+    """
+    best = max(group, key=_dedup_richness_key)
 
     # Merge useful data from siblings into the best pick
     all_sources = list({j.get("source", "") for j in group if j.get("source")})
@@ -670,13 +552,16 @@ def _deduplicate(jobs: list[dict]) -> list[dict]:
 
     When the same job appears from multiple sources (e.g. Indeed, Glassdoor,
     Google Jobs), keeps the version with the richest data and merges salary
-    info from siblings. Fuzzy merges only happen when company, title, and
-    location all match and the descriptions look materially identical.
+    info from siblings. Cross-source merges cluster on the SQUASHED company
+    and title keys (dedup.cluster_jobs), so "ALO" on LinkedIn and "Aloyoga"
+    on the greenhouse watchlist collide, and only happen when the location is
+    compatible and _same_posting confirms (ATS job token, materially identical
+    descriptions, or one side too thin to disprove it). A direct ATS/company
+    source wins its cluster over aggregator copies.
     """
     from job_finder.tools.scrapers._utils import canonicalize_job_url
 
     url_groups: dict[str, list[dict]] = {}
-    groups: dict[str, list[dict]] = {}
     unique: list[dict] = []
 
     for job in jobs:
@@ -694,39 +579,21 @@ def _deduplicate(jobs: list[dict]) -> list[dict]:
         collapsed.append(_pick_best_job(group) if len(group) > 1 else group[0])
     collapsed.extend(unique)
 
+    # Cross-source pass: cluster on squashed company+title (no location in the
+    # key, so cross-board duplicates that differ in location text, or have no
+    # location on one source, still land in the same group; _same_posting then
+    # separates distinct openings).
+    clusters, no_key = _cluster_jobs(collapsed)
+
     unique = []
-    no_key: list[dict] = []
-    for job in collapsed:
-        company = job.get("company", "")
-        title = job.get("title", "")
-        # Key on company+title only (no location) so cross-board duplicates that
-        # differ in location text — or have no location on one source — still
-        # land in the same group. _same_posting then separates distinct openings
-        # (different cities, remote-vs-onsite, or both-substantial-different).
-        if company and title:
-            key = _dedup_key(company, title)
-            groups.setdefault(key, []).append(job)
-        else:
-            no_key.append(job)
-
-    for group in groups.values():
-        if len(group) == 1:
-            unique.append(group[0])
+    for cluster in clusters:
+        if len(cluster) == 1:
+            unique.append(cluster[0])
             continue
-
-        clusters: list[list[dict]] = []
-        for job in group:
-            placed = False
-            for cluster in clusters:
-                if _same_posting(job, cluster[0]):
-                    cluster.append(job)
-                    placed = True
-                    break
-            if not placed:
-                clusters.append([job])
-
-        for cluster in clusters:
-            unique.append(_pick_best_job(cluster) if len(cluster) > 1 else cluster[0])
+        best = _pick_best_job(cluster)
+        losers = [j for j in cluster if j is not best]
+        logger.info(_describe_collapse(best, losers))
+        unique.append(best)
 
     unique.extend(no_key)
     return unique

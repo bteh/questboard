@@ -111,7 +111,7 @@ cd frontend && pnpm run test   # vitest unit tests
 
 - Offline search, scoring, persistence, and ATS detection are deterministic local code paths.
 - LLM outputs are drafts. Cover letters and company research are not grounded by web browsing in the current pipeline, so factual company claims must be verified manually.
-- Deduplication is currently keyed to job URLs; exact duplicates are removed reliably, but cross-board duplicates with different URLs can survive.
+- Deduplication runs in two passes: exact URL matches, then the cross-source key in `src/job_finder/dedup.py` (normalized company + title + compatible location, ATS job-token confirmation when both URLs carry one). Direct ATS records beat aggregators; losers soft-expire and merge their pay/dates into the keeper. A versioned startup repair (`cross_source_dedup` in models/maintenance.py) collapses historical duplicates.
 
 **Pattern for new LLM features:**
 ```python

@@ -17,6 +17,16 @@ Current repairs:
   Rows without markup remnants are left byte-identical (Ashby-style
   plaintext keeps its newlines; the cleaner would collapse them).
 
+  cross_source_dedup v1 -- rows saved before the squashed-company dedup fix
+  can sit on the board twice: the same opening once from a direct ATS source
+  and once from an aggregator, under different URLs (the Alo "Manager of
+  Data Engineering" pair: "Aloyoga" on greenhouse vs "ALO" on LinkedIn).
+  Finds those clusters with the shared key in job_finder.dedup, keeps the
+  best row (protected statuses first, then direct source, then richness),
+  merges pay/dates the keeper lacked, and tombstones the losers with
+  status='expired' plus a note. Losers are never hard-deleted, so the log
+  and its receipts survive.
+
 Runnable directly against a DB file:
 
     python -m job_finder.models.maintenance --db data/job_tracker.db
@@ -28,11 +38,13 @@ import argparse
 import logging
 import os
 import re
+from collections import defaultdict
 from datetime import datetime, timezone
 from html import unescape
 
 from sqlalchemy import create_engine, inspect, text
 
+from job_finder.dedup import cluster_jobs, is_protected_status, richness_key
 from job_finder.tools.scrapers._utils import _strip_html
 
 logger = logging.getLogger(__name__)
@@ -167,6 +179,213 @@ def repair_descriptions(engine, *, force: bool = False) -> int:
         return changed
 
 
+DUPLICATE_REPAIR_NAME = "cross_source_dedup"
+DUPLICATE_REPAIR_VERSION = 1
+
+# Columns the duplicate repair reads and writes. All of them exist after
+# _migrate_db has run (the startup path); the guard in repair_duplicates
+# skips the scan on a legacy DB reached through the CLI before migration.
+_DUP_REQUIRED_COLS = (
+    "id", "job_title", "company", "location", "job_url", "source", "status",
+    "description", "vertical", "notes", "url_status",
+)
+_DUP_OPTIONAL_COLS = (
+    "is_remote", "profile", "workspace_id",
+    "salary_min", "salary_max", "salary_currency", "salary_period",
+    "salary_min_annualized", "salary_max_annualized", "salary_source",
+    "date_posted", "date_confidence",
+)
+_DUP_PAY_COLS = (
+    "salary_min", "salary_max", "salary_currency", "salary_period",
+    "salary_min_annualized", "salary_max_annualized", "salary_source",
+)
+
+
+def _keeper_rank(job: dict) -> tuple:
+    """Sort key for the cluster keeper (bigger wins).
+
+    A protected status (anything past found/reviewed records user work)
+    always wins its cluster regardless of source. Among equals, a live row
+    beats a url_status tombstone, then the shared richness order applies
+    (direct ATS source, stated pay, description length).
+    """
+    row = job["_row"]
+    protected = 1 if is_protected_status(row.get("status")) else 0
+    live = 0 if (row.get("url_status") or "").lower() in ("dead", "expired") else 1
+    return (protected, live) + richness_key(job)
+
+
+def _merge_missing_fields(conn, keeper: dict, losers: list[dict]) -> None:
+    """Copy pay/date/description data the keeper lacks from its losers.
+
+    Losers are consulted best-first. ``updated_at`` is left alone on purpose,
+    a data repair must not reshuffle the user's board.
+    """
+    row = keeper["_row"]
+    updates: dict[str, object] = {}
+    ordered = sorted(losers, key=_keeper_rank, reverse=True)
+
+    for col in _DUP_PAY_COLS:
+        if col not in row or row.get(col):
+            continue
+        for loser in ordered:
+            value = loser["_row"].get(col)
+            if value:
+                updates[col] = value
+                break
+
+    if "date_posted" in row and (row.get("date_confidence") or "").lower() not in (
+        "exact", "fuzzy",
+    ):
+        for loser in ordered:
+            lrow = loser["_row"]
+            if lrow.get("date_posted") and (
+                (lrow.get("date_confidence") or "").lower() in ("exact", "fuzzy")
+            ):
+                updates["date_posted"] = lrow["date_posted"]
+                updates["date_confidence"] = lrow.get("date_confidence") or ""
+                break
+
+    if not (row.get("description") or "").strip():
+        best_desc = max(
+            (loser["_row"].get("description") or "" for loser in ordered),
+            key=len,
+            default="",
+        )
+        if best_desc:
+            updates["description"] = best_desc
+
+    if updates:
+        assignments = ", ".join(f"{col} = :{col}" for col in updates)
+        updates["_id"] = row["id"]
+        conn.execute(
+            text(f"UPDATE applications SET {assignments} WHERE id = :_id"),
+            updates,
+        )
+
+
+def _collapse_cluster(conn, cluster: list[dict]) -> int:
+    """Collapse one duplicate cluster; returns the number of losers expired.
+
+    Rows whose status records user work (clipped, applied, ...) are never
+    losers: they all survive, and the best of them becomes the keeper the
+    found/reviewed copies merge into.
+    """
+    keeper = max(cluster, key=_keeper_rank)
+    losers = [
+        job for job in cluster
+        if job is not keeper and not is_protected_status(job["_row"].get("status"))
+    ]
+    if not losers:
+        return 0
+
+    _merge_missing_fields(conn, keeper, losers)
+
+    keeper_row = keeper["_row"]
+    for job in losers:
+        row = job["_row"]
+        note = (
+            f"Cross-source duplicate of #{keeper_row['id']} "
+            f"({keeper.get('source') or 'unknown source'}, "
+            f"{keeper.get('url') or 'no url'}). This {job.get('source') or 'duplicate'} "
+            f"copy was collapsed by data repair {DUPLICATE_REPAIR_NAME} "
+            f"v{DUPLICATE_REPAIR_VERSION}."
+        )
+        prior = (row.get("notes") or "").strip()
+        conn.execute(
+            text(
+                "UPDATE applications SET status = 'expired', "
+                "url_status = 'expired', notes = :n WHERE id = :i"
+            ),
+            {"n": f"{prior}\n{note}" if prior else note, "i": row["id"]},
+        )
+        logger.info(
+            "duplicate repair: expired #%s (%s, %s) into #%s (%s, %s) for '%s / %s'",
+            row["id"], job.get("source"), job.get("url") or "no url",
+            keeper_row["id"], keeper.get("source"), keeper.get("url") or "no url",
+            keeper.get("company"), keeper.get("title"),
+        )
+    return len(losers)
+
+
+def _scan_and_collapse_duplicates(conn, available_cols: set[str]) -> int:
+    """Collapse every cross-source duplicate cluster; returns losers expired.
+
+    Career rows only (two quests from the same org with the same title are
+    usually different sessions), scoped by (workspace_id, profile) so rows
+    from different boards never merge into each other. Per-cluster failures
+    are logged and skipped, one weird cluster must never abort the repair.
+    """
+    select_cols = list(_DUP_REQUIRED_COLS) + [
+        c for c in _DUP_OPTIONAL_COLS if c in available_cols
+    ]
+    rows = conn.execute(text(
+        f"SELECT {', '.join(select_cols)} FROM applications "
+        "WHERE vertical = 'career' "
+        "AND (status IS NULL OR lower(status) != 'expired')"
+    )).mappings().fetchall()
+
+    scopes: dict[tuple[str, str], list[dict]] = defaultdict(list)
+    for r in rows:
+        row = dict(r)
+        scopes[(row.get("workspace_id") or "", row.get("profile") or "")].append({
+            "title": row.get("job_title") or "",
+            "company": row.get("company") or "",
+            "location": row.get("location") or "",
+            "is_remote": bool(row.get("is_remote")),
+            "url": row.get("job_url") or "",
+            "source": row.get("source") or "",
+            "description": row.get("description") or "",
+            "salary_min": row.get("salary_min"),
+            "salary_max": row.get("salary_max"),
+            "_row": row,
+        })
+
+    changed = 0
+    for jobs in scopes.values():
+        clusters, _keyless = cluster_jobs(jobs)
+        for cluster in clusters:
+            if len(cluster) < 2:
+                continue
+            try:
+                changed += _collapse_cluster(conn, cluster)
+            except Exception:
+                logger.warning(
+                    "duplicate repair: cluster for %r / %r failed, skipping",
+                    cluster[0].get("company"), cluster[0].get("title"),
+                    exc_info=True,
+                )
+    return changed
+
+
+def repair_duplicates(engine, *, force: bool = False) -> int:
+    """Run the cross-source duplicate collapse once; returns losers expired.
+
+    Same idempotency contract as repair_descriptions: the version marker
+    skips the scan entirely on later calls (``force=True`` scans anyway),
+    and a forced re-run finds nothing new because losers leave the scan's
+    status filter. Scan, updates, and the marker share one transaction, so
+    a crash leaves the DB unrepaired but consistent, and the repair retries
+    next launch.
+    """
+    inspector = inspect(engine)
+    has_applications = "applications" in inspector.get_table_names()
+    available: set[str] = set()
+    if has_applications:
+        available = {c["name"] for c in inspector.get_columns("applications")}
+    runnable = has_applications and set(_DUP_REQUIRED_COLS).issubset(available)
+    with engine.begin() as conn:
+        if (
+            _applied_version(conn, DUPLICATE_REPAIR_NAME)
+            >= DUPLICATE_REPAIR_VERSION
+            and not force
+        ):
+            return 0
+        changed = _scan_and_collapse_duplicates(conn, available) if runnable else 0
+        _record_version(conn, DUPLICATE_REPAIR_NAME, DUPLICATE_REPAIR_VERSION)
+        return changed
+
+
 def run_startup_repairs(engine) -> None:
     """Startup hook, called from ``database._migrate_db``. Never raises."""
     try:
@@ -180,14 +399,25 @@ def run_startup_repairs(engine) -> None:
         logger.warning(
             "description repair failed; will retry next launch", exc_info=True
         )
+    try:
+        collapsed = repair_duplicates(engine)
+        if collapsed:
+            logger.info(
+                "duplicate repair v%d: expired %d duplicate row(s)",
+                DUPLICATE_REPAIR_VERSION, collapsed,
+            )
+    except Exception:
+        logger.warning(
+            "duplicate repair failed; will retry next launch", exc_info=True
+        )
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Re-clean stored job descriptions damaged by the pre-2026-07-21 "
-            "HTML cleaner. Safe to re-run; a version marker makes later runs "
-            "no-ops."
+            "Run the one-time data repairs (description re-clean, cross-source "
+            "duplicate collapse) against a local DB. Safe to re-run; version "
+            "markers make later runs no-ops."
         ),
     )
     parser.add_argument(
@@ -198,7 +428,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--force",
         action="store_true",
-        help="Scan even if the version marker says this repair already ran",
+        help="Scan even if the version markers say these repairs already ran",
     )
     args = parser.parse_args(argv)
 
@@ -213,11 +443,16 @@ def main(argv: list[str] | None = None) -> int:
     )
     try:
         changed = repair_descriptions(engine, force=args.force)
+        collapsed = repair_duplicates(engine, force=args.force)
     finally:
         engine.dispose()
     print(
         f"description repair v{DESCRIPTION_REPAIR_VERSION}: "
         f"{changed} row(s) re-cleaned in {db_path}"
+    )
+    print(
+        f"duplicate repair v{DUPLICATE_REPAIR_VERSION}: "
+        f"{collapsed} duplicate row(s) expired in {db_path}"
     )
     return 0
 
