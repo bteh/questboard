@@ -70,6 +70,41 @@ describe('the status line under the filters', () => {
     ).toBe('');
   });
 
+  it('appends the honest hidden-dates clause while the days filter narrows', () => {
+    expect(
+      filterStatusText({
+        shown: 12,
+        laneTotal: 66,
+        filtered: true,
+        checkedAgo: 'sources checked 1h ago',
+        hiddenNote: 'postings without a verifiable date are hidden',
+      }),
+    ).toBe(
+      'Showing 12 of 66 jobs · sources checked 1h ago · postings without a verifiable date are hidden',
+    );
+    expect(
+      filterStatusText({
+        shown: 12,
+        laneTotal: 66,
+        filtered: true,
+        checkedAgo: null,
+        hiddenNote: 'postings without a verifiable date are hidden',
+      }),
+    ).toBe('Showing 12 of 66 jobs · postings without a verifiable date are hidden');
+  });
+
+  it('holds the clause back before the first page lands', () => {
+    expect(
+      filterStatusText({
+        shown: undefined,
+        laneTotal: undefined,
+        filtered: true,
+        checkedAgo: 'sources checked 1h ago',
+        hiddenNote: 'postings without a verifiable date are hidden',
+      }),
+    ).toBe('sources checked 1h ago');
+  });
+
   it('speaks singular for one job', () => {
     expect(filterStatusText({ shown: 1, laneTotal: 1, filtered: false, checkedAgo: null })).toBe(
       '1 job',

@@ -15,6 +15,8 @@ export interface BoardFilterSignals {
   facet?: string;
   presetCount?: number;
   sourceCategory?: string | null;
+  /** the posted-within window (?days); set means the reader narrowed by date */
+  postedDays?: string;
 }
 
 function set(text: string | undefined): boolean {
@@ -29,7 +31,8 @@ export function boardFiltersActive(signals: BoardFilterSignals): boolean {
     set(signals.payTo) ||
     Boolean(signals.facet) ||
     (signals.presetCount ?? 0) > 0 ||
-    Boolean(signals.sourceCategory)
+    Boolean(signals.sourceCategory) ||
+    Boolean(signals.postedDays)
   );
 }
 

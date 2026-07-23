@@ -97,6 +97,32 @@ describe('validateBoardSearch', () => {
     expect(validateBoardSearch({}).src).toBeUndefined();
   });
 
+  it('carries the posted window (?days) and drops junk', () => {
+    expect(validateBoardSearch({ days: '7' }).days).toBe('7');
+    expect(validateBoardSearch({ days: 30 }).days).toBe('30');
+    expect(validateBoardSearch({ days: '14' }).days).toBeUndefined();
+    expect(validateBoardSearch({ days: '' }).days).toBeUndefined();
+    expect(validateBoardSearch({}).days).toBeUndefined();
+  });
+
+  it('folds the legacy fresh preset (?p=fresh) into days=7', () => {
+    const params = validateBoardSearch({ p: 'fresh' });
+    expect(params.days).toBe('7');
+    expect(params.p).toBeUndefined();
+  });
+
+  it('keeps the other preset keys while folding fresh away', () => {
+    const params = validateBoardSearch({ p: 'noexp,fresh' });
+    expect(params.days).toBe('7');
+    expect(params.p).toBe('noexp');
+  });
+
+  it('lets an explicit days beat the legacy fresh spelling', () => {
+    const params = validateBoardSearch({ p: 'fresh', days: '30' });
+    expect(params.days).toBe('30');
+    expect(params.p).toBeUndefined();
+  });
+
   it('parses ?job however the router round-trips it, dropping junk', () => {
     expect(validateBoardSearch({ job: 123 }).job).toBe(123);
     expect(validateBoardSearch({ job: '123' }).job).toBe(123);
@@ -122,6 +148,7 @@ describe('hasBoardParams', () => {
     expect(hasBoardParams({ v: 'lookafter', f: 'pets' })).toBe(true);
     expect(hasBoardParams({ p: 'noexp' })).toBe(true);
     expect(hasBoardParams({ src: 'crypto' })).toBe(true);
+    expect(hasBoardParams({ days: '7' })).toBe(true);
   });
 });
 
@@ -165,6 +192,20 @@ describe('board state persistence', () => {
     const store = stubStorage();
     saveBoardState({ q: 'editor' });
     expect(JSON.parse(store.get(BOARD_STATE_KEY)!)).toEqual({ q: 'editor' });
+  });
+
+  it('persists the posted window like place and pay', () => {
+    const store = stubStorage();
+    saveBoardState({ q: 'editor', days: '7' });
+    expect(readSavedBoardState()?.days).toBe('7');
+    expect(JSON.parse(store.get(BOARD_STATE_KEY)!)).toEqual({ q: 'editor', days: '7' });
+  });
+
+  it('migrates a saved fresh preset to the posted window on read', () => {
+    stubStorage({ [BOARD_STATE_KEY]: JSON.stringify({ p: 'fresh' }) });
+    const saved = readSavedBoardState();
+    expect(saved?.days).toBe('7');
+    expect(saved?.p).toBeUndefined();
   });
 
   it('persists the work-lane source-category chip so reload keeps it', () => {

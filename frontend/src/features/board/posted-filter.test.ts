@@ -1,0 +1,86 @@
+/* The posted-within filter both lanes share. The vocabulary is four fixed
+   windows (?days=1|3|7|30); anything else means any time. The labels stay
+   in the trade-paper register, and the hidden-dates clause only speaks
+   while the filter is on AND the shown count actually dropped. */
+
+import { describe, expect, it } from 'vitest';
+import {
+  POSTED_OPTIONS,
+  hiddenDatesClause,
+  normalizePostedDays,
+  postedChipLabel,
+  postedWithinDays,
+} from './posted-filter';
+
+describe('normalizePostedDays', () => {
+  it('accepts the four windows however the router round-trips them', () => {
+    expect(normalizePostedDays('1')).toBe('1');
+    expect(normalizePostedDays('3')).toBe('3');
+    expect(normalizePostedDays('7')).toBe('7');
+    expect(normalizePostedDays('30')).toBe('30');
+    expect(normalizePostedDays(7)).toBe('7');
+    expect(normalizePostedDays(30)).toBe('30');
+  });
+
+  it('drops anything outside the vocabulary', () => {
+    expect(normalizePostedDays('0')).toBeUndefined();
+    expect(normalizePostedDays('14')).toBeUndefined();
+    expect(normalizePostedDays('')).toBeUndefined();
+    expect(normalizePostedDays('week')).toBeUndefined();
+    expect(normalizePostedDays(2)).toBeUndefined();
+    expect(normalizePostedDays(null)).toBeUndefined();
+    expect(normalizePostedDays(undefined)).toBeUndefined();
+  });
+});
+
+describe('the posted select options', () => {
+  it('offers the five windows in order, any time first', () => {
+    expect(POSTED_OPTIONS.map((o) => o.value)).toEqual(['', '1', '3', '7', '30']);
+    expect(POSTED_OPTIONS.map((o) => o.label)).toEqual([
+      'any time',
+      'today',
+      'last 3 days',
+      'this week',
+      'this month',
+    ]);
+  });
+});
+
+describe('postedChipLabel', () => {
+  it('names the active window in plain words', () => {
+    expect(postedChipLabel('1')).toBe('posted today');
+    expect(postedChipLabel('3')).toBe('posted in the last 3 days');
+    expect(postedChipLabel('7')).toBe('posted this week');
+    expect(postedChipLabel('30')).toBe('posted this month');
+  });
+});
+
+describe('postedWithinDays', () => {
+  it('turns the URL value into the API number', () => {
+    expect(postedWithinDays('7')).toBe(7);
+    expect(postedWithinDays('30')).toBe(30);
+    expect(postedWithinDays(undefined)).toBeUndefined();
+  });
+});
+
+describe('the hidden-dates clause', () => {
+  it('speaks while the filter is on and the count dropped', () => {
+    expect(hiddenDatesClause({ days: '7', shown: 12, baseline: 66 })).toBe(
+      'postings without a verifiable date are hidden',
+    );
+  });
+
+  it('stays silent while the filter is off', () => {
+    expect(hiddenDatesClause({ days: undefined, shown: 12, baseline: 66 })).toBeNull();
+  });
+
+  it('stays silent while nothing dropped', () => {
+    expect(hiddenDatesClause({ days: '7', shown: 66, baseline: 66 })).toBeNull();
+    expect(hiddenDatesClause({ days: '7', shown: 70, baseline: 66 })).toBeNull();
+  });
+
+  it('stays silent while either count is still loading', () => {
+    expect(hiddenDatesClause({ days: '7', shown: undefined, baseline: 66 })).toBeNull();
+    expect(hiddenDatesClause({ days: '7', shown: 12, baseline: undefined })).toBeNull();
+  });
+});

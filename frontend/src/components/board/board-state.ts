@@ -1,7 +1,8 @@
 /* The board's filter state, serialized two ways and pinned by
    board-state.test.ts:
-   - URL search params (?v, ?q, ?place, ?from, ?to, ?p, ?src) so a filtered
-     board is a shareable address and back/forward walks filter changes;
+   - URL search params (?v, ?q, ?place, ?from, ?to, ?p, ?days, ?src) so a
+     filtered board is a shareable address and back/forward walks filter
+     changes;
    - localStorage at questboard:board.v1 so Tuesday's board is already set
      up on Wednesday. Params beat saved state: the board route redirects a
      bare /board to the saved params once, then the URL is the only truth.
@@ -9,6 +10,7 @@
    a locked-down browser just gets the default board. */
 
 import { normalizeFacetKey, normalizeKindKey, type KindKey } from '@/features/board/kind-params';
+import { normalizePostedDays, type PostedDaysKey } from '@/features/board/posted-filter';
 
 export const BOARD_STATE_KEY = 'questboard:board.v1';
 export const BOARD_NOTICE_KEY = 'questboard:board-notice';
@@ -30,6 +32,9 @@ export interface BoardParams {
   to?: string;
   /** Active preset keys, comma list ("noexp,remote"). */
   p?: string;
+  /** Posted-within window in days ('1'|'3'|'7'|'30'); absent = any time.
+      The legacy fresh preset (?p=fresh) folds into days=7 on read. */
+  days?: PostedDaysKey;
   /** Work-lane source-category chip ('startup', 'crypto', ...); absent =
       "My roles". Persisted like every other filter so reload keeps it. */
   src?: string;
@@ -56,6 +61,19 @@ function cleanId(value: unknown): number | undefined {
 
 export function validateBoardSearch(search: Record<string, unknown>): BoardParams {
   const v = normalizeKindKey(cleanString(search.v));
+  /* the old fresh preset (?p=fresh) is the days filter now; fold it in so
+     saved boards and shared links keep their meaning. An explicit ?days=
+     wins over the legacy spelling. */
+  let p = cleanString(search.p);
+  let days = normalizePostedDays(search.days);
+  if (p) {
+    const keys = p.split(',').map((k) => k.trim()).filter(Boolean);
+    if (keys.includes('fresh')) {
+      days = days ?? '7';
+      const rest = keys.filter((k) => k !== 'fresh');
+      p = rest.length > 0 ? rest.join(',') : undefined;
+    }
+  }
   return {
     v,
     f: normalizeFacetKey(v, cleanString(search.f)),
@@ -67,7 +85,8 @@ export function validateBoardSearch(search: Record<string, unknown>): BoardParam
       search.near === '1' || search.near === 1 || search.near === true ? '1' : undefined,
     from: cleanString(search.from),
     to: cleanString(search.to),
-    p: cleanString(search.p),
+    p,
+    days,
     src: cleanString(search.src),
     job: cleanId(search.job),
   };
@@ -79,7 +98,7 @@ export function validateBoardSearch(search: Record<string, unknown>): BoardParam
 export function hasBoardParams(params: BoardParams): boolean {
   return Boolean(
     params.v || params.f || params.q || params.place || params.near ||
-      params.from || params.to || params.p || params.src,
+      params.from || params.to || params.p || params.days || params.src,
   );
 }
 
@@ -111,7 +130,7 @@ export function readSavedBoardState(): SavedBoardState | null {
 export function saveBoardState(state: SavedBoardState): void {
   try {
     const compact: Record<string, string> = {};
-    for (const key of ['v', 'f', 'q', 'place', 'near', 'from', 'to', 'p', 'src', 'sort'] as const) {
+    for (const key of ['v', 'f', 'q', 'place', 'near', 'from', 'to', 'p', 'days', 'src', 'sort'] as const) {
       const value = state[key];
       if (value) compact[key] = value;
     }

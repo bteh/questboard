@@ -2,7 +2,7 @@
    the one filled "Get new jobs" button and says in plain words what it
    pulls (saved target roles, editable in Settings); the assistant's ranking
    door sits on the same row, and the run status line reports on the pull.
-   The filter tray sits demoted below: three fields that only narrow rows
+   The filter tray sits demoted below: four fields that only narrow rows
    already on the board, with no button, so it cannot read as a search form.
    Only "Get new jobs" touches the network, through the same pipeline the
    Restock page runs. The line under the filters states only what the data
@@ -17,6 +17,13 @@ import { SageButton } from '@questboard/ui';
 import { useSearchContext } from '@/contexts/search-context';
 import { restockProgress } from '@/components/board/restock-logic';
 import { PlacePicker } from '@/features/board/place-picker';
+import {
+  POSTED_OPTIONS,
+  hiddenDatesClause,
+  normalizePostedDays,
+  postedChipLabel,
+  type PostedDaysKey,
+} from '@/features/board/posted-filter';
 import { useRunWorkSearch } from '@/features/board/use-run-work-search';
 import { useOnboardingState } from '@/hooks/use-workspace';
 import { formatStatedPay, parseAmount } from '@/utils/board-card';
@@ -42,6 +49,10 @@ interface WorkToolbarProps {
       as a removable chip */
   payTo: string;
   onPayTo: (value: string) => void;
+  /** the posted window (?days): narrows the VIEW only; the saved
+      max_days_old in Settings stays the PULL window and is untouched */
+  postedDays: PostedDaysKey | undefined;
+  onPostedDays: (value: PostedDaysKey | undefined) => void;
 }
 
 interface FilterChip {
@@ -95,17 +106,21 @@ export function filterPlaceholder(count: number | undefined): string {
 
 /* The line under the filters, in plain words: what shows against the whole
    lane while a filter narrows, the bare total otherwise, with the honest
-   freshness phrase. Never claims a lane smaller than what shows. */
+   freshness phrase. Never claims a lane smaller than what shows. The
+   hiddenNote is the posted filter's confession (rows without a verifiable
+   date are dropped); it rides the end of the line when set. */
 export function filterStatusText({
   shown,
   laneTotal,
   filtered,
   checkedAgo,
+  hiddenNote,
 }: {
   shown: number | undefined;
   laneTotal: number | undefined;
   filtered: boolean;
   checkedAgo: string | null;
+  hiddenNote?: string | null;
 }): string {
   if (shown === undefined) return checkedAgo ?? '';
   const jobs = (n: number) => `${n} job${n === 1 ? '' : 's'}`;
@@ -114,7 +129,8 @@ export function filterStatusText({
       ? `Showing ${shown} of ${jobs(laneTotal)}`
       : `Showing ${jobs(shown)}`
     : jobs(shown);
-  return checkedAgo ? `${lead} · ${checkedAgo}` : lead;
+  const line = checkedAgo ? `${lead} · ${checkedAgo}` : lead;
+  return hiddenNote ? `${line} · ${hiddenNote}` : line;
 }
 
 /* The pull's own report, under the actions row it belongs to: a running
@@ -209,6 +225,8 @@ export function WorkToolbar({
   onPayFrom,
   payTo,
   onPayTo,
+  postedDays,
+  onPostedDays,
 }: WorkToolbarProps) {
   const { run, ready, running } = useRunWorkSearch();
   const { data: onboarding } = useOnboardingState();
@@ -238,6 +256,13 @@ export function WorkToolbar({
       key: 'to',
       label: formatStatedPay(null, payCeiling),
       clear: () => onPayTo(''),
+    });
+  }
+  if (postedDays) {
+    chips.push({
+      key: 'days',
+      label: postedChipLabel(postedDays),
+      clear: () => onPostedDays(undefined),
     });
   }
 
@@ -283,6 +308,20 @@ export function WorkToolbar({
             onChange={(e) => onPayFrom(e.target.value)}
           />
         </label>
+        <label className="qb-tray-field qb-tray-posted">
+          <span className="qb-tray-label">posted</span>
+          <select
+            aria-label="Posted within"
+            value={postedDays ?? ''}
+            onChange={(e) => onPostedDays(normalizePostedDays(e.target.value))}
+          >
+            {POSTED_OPTIONS.map((opt) => (
+              <option key={opt.value || 'any'} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
       {(chips.length > 0 || place.trim()) && (
         <div className="qb-workchips">
@@ -318,6 +357,11 @@ export function WorkToolbar({
           laneTotal,
           filtered: chips.length > 0,
           checkedAgo,
+          hiddenNote: hiddenDatesClause({
+            days: postedDays,
+            shown: shownCount,
+            baseline: laneTotal,
+          }),
         })}
       </p>
     </div>

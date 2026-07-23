@@ -36,6 +36,13 @@ import {
   toBoardCard,
 } from '@/utils/board-card';
 import { checkedAgoLabel } from '@/features/board/freshness';
+import {
+  POSTED_OPTIONS,
+  hiddenDatesClause,
+  normalizePostedDays,
+  postedWithinDays,
+  type PostedDaysKey,
+} from '@/features/board/posted-filter';
 import { FacetChips } from '@/features/board/facet-chips';
 import {
   isCareerKind,
@@ -98,7 +105,7 @@ export const Route = createRoute({
         to: '/board',
         search: {
           v: saved.v, f: saved.f, q: saved.q, place: saved.place, near: saved.near,
-          from: saved.from, to: saved.to, p: saved.p, src: saved.src,
+          from: saved.from, to: saved.to, p: saved.p, days: saved.days, src: saved.src,
         },
         replace: true,
       });
@@ -125,11 +132,20 @@ interface Preset {
 const PRESETS: Preset[] = [
   { key: 'noexp', label: 'no experience needed', params: { first_quest_ok: true } },
   { key: 'remote', label: 'remote', params: { is_remote: true } },
-  { key: 'fresh', label: 'new this week', params: { posted_within_days: 7 } },
   /* score_source narrows to AI-scored rows: the keyword fallback stamps
      STRONG_APPLY on a lenient scale, and those guesses must not pad this
      chip's count or ride its filter */
 ];
+
+/* "new this week" stays on the chip row, but it writes ?days=7 now: the
+   posted select is the one source of truth for freshness, and the chip
+   lights whenever the select says this week. Legacy ?p=fresh URLs fold
+   into days=7 inside validateBoardSearch. */
+const FRESH_CHIP: Preset = {
+  key: 'fresh',
+  label: 'new this week',
+  params: { posted_within_days: 7 },
+};
 
 const PRESET_KEYS = PRESETS.map((p) => p.key);
 
@@ -314,6 +330,10 @@ function BoardPage() {
   const kindKey: KindKey = params.v ?? 'all';
   const activeKeys = useMemo(() => presetKeysFrom(params.p, PRESET_KEYS), [params.p]);
   const sourceCategory = params.src ?? null;
+  /* the posted window (?days) narrows the view on every lane; the work
+     lane's saved max_days_old stays the pull window, untouched by this */
+  const postedDays = params.days;
+  const postedWithin = postedWithinDays(postedDays);
 
   /* text inputs buffer locally, debounce into the URL with replace so
      typing never spams history */
@@ -411,10 +431,11 @@ function BoardPage() {
       from: params.from,
       to: params.to,
       p: params.p,
+      days: params.days,
       src: params.src,
       sort: sortNewest ? undefined : 'score',
     });
-  }, [params.v, params.f, params.q, params.place, params.near, params.from, params.to, params.p, params.src, sortNewest]);
+  }, [params.v, params.f, params.q, params.place, params.near, params.from, params.to, params.p, params.days, params.src, sortNewest]);
 
   const baseFilters = useMemo<ApplicationFilters>(
     () => ({
@@ -426,6 +447,7 @@ function BoardPage() {
       location_strict: nearParam ? true : undefined,
       salary_min: payFloor ?? undefined,
       salary_max: payCeiling ?? undefined,
+      posted_within_days: postedWithin,
       source_category: sourceCategory ?? undefined,
       /* quest rows have no rank_score, so only the work lane offers the
          best-score sort; quest lanes stay on the honest date sort */
@@ -434,7 +456,7 @@ function BoardPage() {
       page_size: PAGE_SIZE,
       scope: 'board',
     }),
-    [kindKey, activeKeys, params.f, search, place, nearParam, payFloor, payCeiling, sortNewest, sourceCategory],
+    [kindKey, activeKeys, params.f, search, place, nearParam, payFloor, payCeiling, postedWithin, sortNewest, sourceCategory],
   );
 
   /* the rail's counts must describe THIS board: the same user filters ride
@@ -447,8 +469,9 @@ function BoardPage() {
       location_strict: nearParam ? true : undefined,
       salary_min: payFloor ?? undefined,
       salary_max: payCeiling ?? undefined,
+      posted_within_days: postedWithin,
     }),
-    [activeKeys, search, place, nearParam, payFloor, payCeiling],
+    [activeKeys, search, place, nearParam, payFloor, payCeiling, postedWithin],
   );
   const checkedAgo = checkedAgoLabel(useBoardSummary(summaryFilters).data?.checked_at);
 
@@ -493,7 +516,8 @@ function BoardPage() {
      whole lane. The baseline count only fetches while a toolbar filter
      narrows; otherwise the filtered total already IS the lane total. */
   const workFiltersOn =
-    careerLane && Boolean(search || place || payFloor !== null || payCeiling !== null);
+    careerLane &&
+    Boolean(search || place || payFloor !== null || payCeiling !== null || postedDays);
   const workLaneBase = useMemo<ApplicationFilters>(
     () => ({
       ...kindParams(kindKey),
@@ -512,6 +536,27 @@ function BoardPage() {
     enabled: workFiltersOn,
   });
   const workLaneTotal = workFiltersOn ? workLaneTotalQuery.data?.total : total;
+
+  /* the quest lanes' honest clause needs a baseline: the same query without
+     the posted window (count only), fetched only while the window is on.
+     shown < baseline means the window hid rows, some of them for having no
+     verifiable date, and the tray note says so. */
+  const questBaselineFilters = useMemo<ApplicationFilters>(
+    () => ({ ...baseFilters, posted_within_days: undefined, page: 1, page_size: 1 }),
+    [baseFilters],
+  );
+  const questBaselineQuery = useQuery({
+    queryKey: ['applications', questBaselineFilters],
+    queryFn: () => getApplications(questBaselineFilters),
+    enabled: !careerLane && Boolean(postedDays),
+  });
+  const questHiddenNote = careerLane
+    ? null
+    : hiddenDatesClause({
+        days: postedDays,
+        shown: total,
+        baseline: questBaselineQuery.data?.total,
+      });
 
   /* careerOnly presets lean on fields only career rows carry (score,
      company type), and career rows only live in the Jobs lane now, so the
@@ -543,6 +588,7 @@ function BoardPage() {
       facet: params.f,
       presetCount: activeKeys.size,
       sourceCategory,
+      postedDays,
     }),
   );
 
@@ -575,6 +621,14 @@ function BoardPage() {
     void navigate({
       to: '/board',
       search: (prev: BoardParams) => ({ ...prev, src: category ?? undefined }),
+    });
+  }
+
+  /* the posted window rides the URL (?days=) like every other filter */
+  function setPostedDays(value: PostedDaysKey | undefined) {
+    void navigate({
+      to: '/board',
+      search: (prev: BoardParams) => ({ ...prev, days: value }),
     });
   }
 
@@ -638,6 +692,10 @@ function BoardPage() {
       location_strict: nearParam ? true : undefined,
       salary_min: payFloor ?? undefined,
       salary_max: payCeiling ?? undefined,
+      posted_within_days: postedWithin,
+      /* the probed chip's own params win: the fresh chip counts its 7-day
+         window even while the select holds a different one */
+      ...preset.params,
       page: 1,
       page_size: 1,
       scope: 'board',
@@ -702,6 +760,12 @@ function BoardPage() {
                 onToggle={() => toggle(preset.key)}
               />
             ))}
+            <PresetChip
+              preset={FRESH_CHIP}
+              active={postedDays === '7'}
+              countFilters={countFilters(FRESH_CHIP)}
+              onToggle={() => setPostedDays(postedDays === '7' ? undefined : '7')}
+            />
           </div>
         )}
 
@@ -728,6 +792,8 @@ function BoardPage() {
               onPayFrom={setPayFromRaw}
               payTo={payToRaw}
               onPayTo={setPayToRaw}
+              postedDays={postedDays}
+              onPostedDays={setPostedDays}
             />
             <SourceCategoryChips
               counts={workMeta?.source_categories}
@@ -771,6 +837,20 @@ function BoardPage() {
                   onChange={(e) => setPayToRaw(e.target.value)}
                 />
               </label>
+              <label className="qb-tray-field qb-tray-posted">
+                <span className="qb-tray-label">posted</span>
+                <select
+                  aria-label="Posted within"
+                  value={postedDays ?? ''}
+                  onChange={(e) => setPostedDays(normalizePostedDays(e.target.value))}
+                >
+                  {POSTED_OPTIONS.map((opt) => (
+                    <option key={opt.value || 'any'} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
             <p className="qb-tray-note">
               {placeRaw.trim() ? (
@@ -790,6 +870,10 @@ function BoardPage() {
               ) : (
                 'Pay counts only what the posting states. Quests with no stated pay stay on the board. A place keeps remote and no-place quests too.'
               )}
+              {/* the posted window's confession, one quiet sentence, only
+                  while the window is on and actually hid rows */}
+              {questHiddenNote &&
+                ` ${questHiddenNote.charAt(0).toUpperCase()}${questHiddenNote.slice(1)}.`}
             </p>
             <FirstRunNotice onStartHere={startHere} />
           </>
