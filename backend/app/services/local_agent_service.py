@@ -535,7 +535,7 @@ def _dedupe_work_key(record: ApplicationRecord) -> tuple[str, tuple[str, ...]]:
 
 
 def _dedupe_work_priority(record: ApplicationRecord) -> tuple[Any, ...]:
-    age_days = _source_age_days(record.date_posted)
+    age_days = _source_age_days(record.date_posted, record.date_found)
     found = record.date_found or datetime.min
     return (
         age_days is not None,
@@ -546,31 +546,68 @@ def _dedupe_work_priority(record: ApplicationRecord) -> tuple[Any, ...]:
     )
 
 
-def _source_age_days(value: str | None) -> float | None:
-    """Normalize exact and human-readable source dates into an age in days."""
+def _anchor_age_days(anchor: datetime | str | None) -> float | None:
+    """Age of an anchor timestamp in days, or None when it can't be read.
+
+    Accepts the ORM's datetime (naive means UTC, how SQLite hands
+    ``date_found`` back) or a stored ISO string.
+    """
+    if isinstance(anchor, str):
+        try:
+            anchor = datetime.fromisoformat(anchor.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    if not isinstance(anchor, datetime):
+        return None
+    if anchor.tzinfo is None:
+        anchor = anchor.replace(tzinfo=timezone.utc)
+    elapsed = datetime.now(timezone.utc) - anchor.astimezone(timezone.utc)
+    return max(0.0, elapsed.total_seconds() / 86_400)
+
+
+def _source_age_days(
+    value: str | None, anchor: datetime | str | None = None
+) -> float | None:
+    """Normalize exact and human-readable source dates into an age in days.
+
+    Relative prose ("Reposted 3 Days Ago", "Yesterday") only means something
+    relative to the moment the source said it, which is when WE scraped the
+    row. ``anchor`` is that moment (the record's date_found): with it, age =
+    age(anchor) + the stated offset, so a row scraped six days ago saying
+    "3 Days Ago" reads ~9 days old instead of eternally 3. Without an anchor
+    the prose is unknowable and returns None. Absolute values (ISO, epoch)
+    carry their own instant and ignore the anchor.
+    """
 
     normalized = " ".join(str(value or "").strip().split())
     if not normalized:
         return None
     lowered = normalized.lower()
+    offset_days: float | None = None
     if re.fullmatch(r"(?:re)?posted\s+today|today", lowered):
-        return 0.0
-    if re.fullmatch(r"(?:re)?posted\s+yesterday|yesterday", lowered):
-        return 1.0
-
-    relative = re.fullmatch(
-        r"(?:(?:re)?posted\s+)?(\d+)\s+"
-        r"(minute|minutes|hour|hours|day|days)\s+ago",
-        lowered,
-    )
-    if relative:
-        amount = int(relative.group(1))
-        unit = relative.group(2)
-        if unit.startswith("minute"):
-            return amount / (24 * 60)
-        if unit.startswith("hour"):
-            return amount / 24
-        return float(amount)
+        offset_days = 0.0
+    elif re.fullmatch(r"(?:re)?posted\s+yesterday|yesterday", lowered):
+        offset_days = 1.0
+    else:
+        relative = re.fullmatch(
+            r"(?:(?:re)?posted\s+)?(\d+)\s+"
+            r"(minute|minutes|hour|hours|day|days)\s+ago",
+            lowered,
+        )
+        if relative:
+            amount = int(relative.group(1))
+            unit = relative.group(2)
+            if unit.startswith("minute"):
+                offset_days = amount / (24 * 60)
+            elif unit.startswith("hour"):
+                offset_days = amount / 24
+            else:
+                offset_days = float(amount)
+    if offset_days is not None:
+        anchor_age = _anchor_age_days(anchor)
+        if anchor_age is None:
+            return None
+        return anchor_age + offset_days
 
     if re.fullmatch(r"\d{10,13}", normalized):
         timestamp = int(normalized)
@@ -678,7 +715,7 @@ def search_work(
         if terms and not _title_is_in_lane(row.job_title, terms):
             title_mismatch_excluded += 1
             continue
-        age_days = _source_age_days(row.date_posted)
+        age_days = _source_age_days(row.date_posted, row.date_found)
         if effective_freshness_window is not None and age_days is not None:
             if age_days > effective_freshness_window:
                 stale_excluded += 1

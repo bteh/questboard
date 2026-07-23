@@ -27,6 +27,15 @@ Current repairs:
   status='expired' plus a note. Losers are never hard-deleted, so the log
   and its receipts survive.
 
+  date_reclean v1 -- rows scraped before the freshness-anchor fix store the
+  source's words ("Reposted 3 Days Ago", "Yesterday") or a bare unix epoch
+  as date_posted. Relative prose anchored to NOW at query time made those
+  rows eternally fresh: a row scraped six days ago saying "3 Days Ago" read
+  as 3 days old forever. The repair converts prose to ISO computed as
+  date_found (scrape time) minus the stated offset with date_confidence
+  'fuzzy', converts bare 10-13 digit epochs to the ISO instant they encode
+  (confidence kept), and leaves rows with no usable date_found untouched.
+
 Runnable directly against a DB file:
 
     python -m job_finder.models.maintenance --db data/job_tracker.db
@@ -39,7 +48,7 @@ import logging
 import os
 import re
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from html import unescape
 
 from sqlalchemy import create_engine, inspect, text
@@ -386,6 +395,159 @@ def repair_duplicates(engine, *, force: bool = False) -> int:
         return changed
 
 
+DATE_REPAIR_NAME = "date_reclean"
+DATE_REPAIR_VERSION = 1
+
+# Columns the date repair reads and writes; all exist after _migrate_db.
+_DATE_REQUIRED_COLS = ("id", "date_posted", "date_confidence", "date_found")
+
+# The relative-prose grammar the board's freshness parser understands
+# (local_agent_service._source_age_days). Kept in exact parity: whatever
+# that parser calls prose, this repair converts; everything else it leaves.
+_PROSE_TODAY_RE = re.compile(r"(?:re)?posted\s+today|today")
+_PROSE_YESTERDAY_RE = re.compile(r"(?:re)?posted\s+yesterday|yesterday")
+_PROSE_RELATIVE_RE = re.compile(
+    r"(?:(?:re)?posted\s+)?(\d+)\s+(minute|minutes|hour|hours|day|days)\s+ago"
+)
+_EPOCH_RE = re.compile(r"\d{10,13}")
+
+
+def _prose_offset(value: str) -> timedelta | None:
+    """The backward offset a relative-prose date states, else None."""
+    lowered = " ".join(value.strip().split()).lower()
+    if _PROSE_TODAY_RE.fullmatch(lowered):
+        return timedelta()
+    if _PROSE_YESTERDAY_RE.fullmatch(lowered):
+        return timedelta(days=1)
+    relative = _PROSE_RELATIVE_RE.fullmatch(lowered)
+    if not relative:
+        return None
+    amount = int(relative.group(1))
+    unit = relative.group(2)
+    if unit.startswith("minute"):
+        return timedelta(minutes=amount)
+    if unit.startswith("hour"):
+        return timedelta(hours=amount)
+    return timedelta(days=amount)
+
+
+def _parse_anchor(value) -> datetime | None:
+    """date_found as a UTC datetime, however the driver hands it back."""
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    if not isinstance(value, datetime):
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _reclean_date(date_posted: str, date_found) -> tuple[str, str | None] | None:
+    """(new date_posted, new confidence or None to keep) for one row.
+
+    None means leave the row byte-identical: already ISO, free text outside
+    the prose grammar, or prose with no usable date_found anchor. The output
+    is naive-UTC ISO at second precision, the shape every reader handles
+    (string comparison in SQL, fromisoformat in the services).
+    """
+    normalized = " ".join(str(date_posted or "").strip().split())
+    if not normalized:
+        return None
+
+    offset = _prose_offset(normalized)
+    if offset is not None:
+        anchor = _parse_anchor(date_found)
+        if anchor is None:
+            return None
+        posted = anchor - offset
+        return posted.strftime("%Y-%m-%dT%H:%M:%S"), "fuzzy"
+
+    if _EPOCH_RE.fullmatch(normalized):
+        timestamp = int(normalized)
+        if len(normalized) == 13:
+            timestamp /= 1000
+        try:
+            posted = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+        except (OverflowError, OSError, ValueError):
+            return None
+        return posted.strftime("%Y-%m-%dT%H:%M:%S"), None
+
+    return None
+
+
+def _scan_and_repair_dates(conn, available_cols: set[str]) -> int:
+    """Convert every prose/epoch date_posted; returns the number rewritten.
+
+    Per-row failures are logged and skipped, one weird value must never
+    abort the repair. ``updated_at`` is left alone on purpose: the log
+    sorts by it and a data repair must not reshuffle the user's board.
+    """
+    if not set(_DATE_REQUIRED_COLS).issubset(available_cols):
+        return 0
+    rows = conn.execute(text(
+        "SELECT id, date_posted, date_confidence, date_found FROM applications "
+        "WHERE date_posted IS NOT NULL AND date_posted != ''"
+    )).fetchall()
+    changed = 0
+    for row_id, date_posted, date_confidence, date_found in rows:
+        if not isinstance(date_posted, str):
+            continue
+        try:
+            result = _reclean_date(date_posted, date_found)
+        except Exception:
+            logger.warning(
+                "date repair: row %s failed, skipping", row_id, exc_info=True
+            )
+            continue
+        if result is None:
+            continue
+        new_posted, new_confidence = result
+        if new_confidence is None:
+            conn.execute(
+                text("UPDATE applications SET date_posted = :p WHERE id = :i"),
+                {"p": new_posted, "i": row_id},
+            )
+        else:
+            conn.execute(
+                text(
+                    "UPDATE applications SET date_posted = :p, "
+                    "date_confidence = :c WHERE id = :i"
+                ),
+                {"p": new_posted, "c": new_confidence, "i": row_id},
+            )
+        changed += 1
+    return changed
+
+
+def repair_dates(engine, *, force: bool = False) -> int:
+    """Run the date re-clean repair once; returns rows rewritten.
+
+    Same idempotency contract as repair_descriptions: the version marker
+    skips the scan entirely on later calls (``force=True`` scans anyway),
+    and a forced re-run converts nothing because ISO output no longer
+    matches the prose or epoch shapes. Scan, updates, and the marker share
+    one transaction, so a crash leaves the DB unrepaired but consistent and
+    the repair retries next launch.
+    """
+    inspector = inspect(engine)
+    has_applications = "applications" in inspector.get_table_names()
+    available: set[str] = set()
+    if has_applications:
+        available = {c["name"] for c in inspector.get_columns("applications")}
+    with engine.begin() as conn:
+        if (
+            _applied_version(conn, DATE_REPAIR_NAME) >= DATE_REPAIR_VERSION
+            and not force
+        ):
+            return 0
+        changed = _scan_and_repair_dates(conn, available) if has_applications else 0
+        _record_version(conn, DATE_REPAIR_NAME, DATE_REPAIR_VERSION)
+        return changed
+
+
 def run_startup_repairs(engine) -> None:
     """Startup hook, called from ``database._migrate_db``. Never raises."""
     try:
@@ -410,14 +572,25 @@ def run_startup_repairs(engine) -> None:
         logger.warning(
             "duplicate repair failed; will retry next launch", exc_info=True
         )
+    try:
+        converted = repair_dates(engine)
+        if converted:
+            logger.info(
+                "date repair v%d: converted %d date_posted row(s)",
+                DATE_REPAIR_VERSION, converted,
+            )
+    except Exception:
+        logger.warning(
+            "date repair failed; will retry next launch", exc_info=True
+        )
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
             "Run the one-time data repairs (description re-clean, cross-source "
-            "duplicate collapse) against a local DB. Safe to re-run; version "
-            "markers make later runs no-ops."
+            "duplicate collapse, date re-clean) against a local DB. Safe to "
+            "re-run; version markers make later runs no-ops."
         ),
     )
     parser.add_argument(
@@ -444,6 +617,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         changed = repair_descriptions(engine, force=args.force)
         collapsed = repair_duplicates(engine, force=args.force)
+        converted = repair_dates(engine, force=args.force)
     finally:
         engine.dispose()
     print(
@@ -453,6 +627,10 @@ def main(argv: list[str] | None = None) -> int:
     print(
         f"duplicate repair v{DUPLICATE_REPAIR_VERSION}: "
         f"{collapsed} duplicate row(s) expired in {db_path}"
+    )
+    print(
+        f"date repair v{DATE_REPAIR_VERSION}: "
+        f"{converted} date_posted row(s) converted in {db_path}"
     )
     return 0
 

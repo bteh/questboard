@@ -280,9 +280,15 @@ def test_conflict_rejection_covers_the_domain_tokens():
 def test_source_age_days_parses_relative_and_unix():
     from app.services.local_agent_service import _source_age_days
 
-    assert _source_age_days("Posted Today") == 0.0
-    assert _source_age_days("Reposted Yesterday") == 1.0
-    assert _source_age_days("Reposted 5 Days Ago") == 5.0
+    # Relative prose is only meaningful against the scrape moment (the row's
+    # date_found anchor); with a fresh anchor the stated offset is the age.
+    now = datetime.now(timezone.utc)
+    assert _source_age_days("Posted Today", now) < 0.1
+    assert 0.9 < _source_age_days("Reposted Yesterday", now) < 1.1
+    assert 4.9 < _source_age_days("Reposted 5 Days Ago", now) < 5.1
+    # Without an anchor, prose is unknowable, never eternally fresh.
+    assert _source_age_days("Posted Today") is None
+    assert _source_age_days("Reposted 5 Days Ago") is None
     # unix seconds and the same instant as 13-digit millis agree
     import time
 
