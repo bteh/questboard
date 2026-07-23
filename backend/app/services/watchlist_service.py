@@ -491,6 +491,68 @@ def discover_company(name: str) -> dict:
     return {"name": name, "slug": slugs[0], "ats": "unknown", "job_count": 0, "careers_url": ""}
 
 
+def _full_entry(data: dict, fallback_name: str = "") -> dict:
+    """Coerce any resolver output to the canonical five-key company entry."""
+    return {
+        "name": (str(data.get("name") or fallback_name) or "").strip(),
+        "slug": str(data.get("slug", "") or ""),
+        "ats": str(data.get("ats", "") or ""),
+        "job_count": int(data.get("job_count", 0) or 0),
+        "careers_url": str(data.get("careers_url", "") or ""),
+    }
+
+
+def resolve_company_entry(name: str = "", url: str = "") -> tuple[dict, str]:
+    """Resolve a company to a confirmed ATS board entry, without persisting.
+
+    Same discovery as ``add_company`` (careers-link paste-through, curated
+    catalog, application evidence, then slug guessing) but returns the entry
+    for the caller to store wherever it likes — used by the workspace
+    companies store so the desktop pull reads one source of truth.
+
+    Returns ``(entry, message)``. ``entry`` always has the five canonical keys.
+    A bare name that resolves to no board yields an ``ats="unknown"`` entry and
+    a user-facing ``message`` asking for the careers link. Raises
+    ``BoardUrlError`` when a pasted URL is unsupported or unconfirmable.
+    """
+    name = (name or "").strip()
+    url = (url or "").strip()
+    if not url and _looks_like_board_url(name):
+        # The user pasted a link into the name field; treat it as one.
+        name, url = "", name
+
+    if url:
+        return _full_entry(resolve_board_url(url, name=name), fallback_name=name), ""
+
+    from job_finder.config.company_catalog import lookup_company
+
+    match = lookup_company(name)
+    if match and match.get("ats") not in ("", "unknown") and match.get("slug"):
+        return {
+            "name": name or match["name"],
+            "slug": match["slug"],
+            "ats": match["ats"],
+            "job_count": 0,
+            "careers_url": "",
+        }, ""
+
+    logger.info("Discovering ATS for company: %s", name)
+    result = discover_company(name)
+    if result.get("ats") in ("", "unknown") or not result.get("slug"):
+        display = (result.get("name") or name).strip()
+        return {
+            "name": name or display,
+            "slug": "",
+            "ats": "unknown",
+            "job_count": 0,
+            "careers_url": "",
+        }, (
+            f"Could not find a job board for {name or display}. "
+            "Paste its careers page link to finish setup."
+        )
+    return _full_entry(result, fallback_name=name), ""
+
+
 def build_watchlist_entries(company_names: list[str]) -> list[dict]:
     """Discover ATS-backed watchlist entries for a list of company names.
 

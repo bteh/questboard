@@ -4,7 +4,11 @@ import { Building2, Loader2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { useAddCompany, useRemoveCompany, useWatchlist } from '@/hooks/use-watchlist';
+import {
+  useAddWorkspaceCompany,
+  useRemoveWorkspaceCompany,
+  useWorkspaceCompanies,
+} from '@/hooks/use-workspace-companies';
 import { openExternalClick } from '@/lib/open-external';
 import type { WatchlistCompany } from '@/api/watchlist';
 
@@ -41,9 +45,9 @@ function looksLikeUrl(value: string): boolean {
 }
 
 export function CompaniesTab() {
-  const watchlist = useWatchlist();
-  const add = useAddCompany();
-  const remove = useRemoveCompany();
+  const watchlist = useWorkspaceCompanies();
+  const add = useAddWorkspaceCompany();
+  const remove = useRemoveWorkspaceCompany();
   const [name, setName] = useState('');
   const [linkDrafts, setLinkDrafts] = useState<Record<string, string>>({});
 

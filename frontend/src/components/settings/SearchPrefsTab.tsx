@@ -44,7 +44,10 @@ export function SearchPrefsTab({ onboarding, navigate }: SearchPrefsTabProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const handleSavePreferences = () => {
-    savePreferences.mutate(prefsForm, {
+    // Companies are owned by the Companies tab now. Pass the freshest saved
+    // list straight through (never the draft) so saving search prefs can't wipe
+    // a company the user just added there.
+    savePreferences.mutate({ ...prefsForm, companies: serverPrefs.companies }, {
       onSuccess: () => toast.success('Preferences saved', {
         action: { label: 'Restock the board', onClick: () => navigate({ to: '/restock' }) },
       }),
@@ -87,16 +90,20 @@ export function SearchPrefsTab({ onboarding, navigate }: SearchPrefsTabProps) {
         </div>
 
         <div className="space-y-1.5">
-          <Label
-            title="Searches these companies' ATS career pages (Greenhouse, Lever, Ashby, Workday) directly."
+          <Label>Target companies</Label>
+          <p className="text-xs text-text-muted">
+            Managed in the Companies tab now, so a company you add always drives the pull.
+            {prefsForm.companies.length > 0
+              ? ` Watching ${prefsForm.companies.length} ${prefsForm.companies.length === 1 ? 'company' : 'companies'}.`
+              : ''}
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate({ to: '/settings', search: { tab: 'companies' } })}
+            className="text-sm font-medium text-brand underline underline-offset-2"
           >
-            Target companies
-          </Label>
-          <TagListInput
-            value={prefsForm.companies}
-            onChange={(companies) => setPrefsForm((prev) => ({ ...prev, companies }))}
-            placeholder="e.g. Stripe, then press Enter"
-          />
+            Manage companies
+          </button>
         </div>
       </CardContent>
     </Card>

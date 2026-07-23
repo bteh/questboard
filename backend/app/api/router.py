@@ -17,6 +17,7 @@ from app.api import (
     session,
     settings,
     watchlist,
+    workspace_companies,
 )
 
 api_router = APIRouter()
@@ -40,3 +41,4 @@ api_router.include_router(resume.router, prefix="/api/v1")
 api_router.include_router(local_agent.router, prefix="/api/v1")
 api_router.include_router(scrapers.router, prefix="/api/v1")
 api_router.include_router(watchlist.router, prefix="/api/v1")
+api_router.include_router(workspace_companies.router, prefix="/api/v1")

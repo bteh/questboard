@@ -56,11 +56,13 @@ def _migrate_db(engine) -> None:
         ("llm_api_key", "ALTER TABLE workspace_preferences ADD COLUMN llm_api_key TEXT DEFAULT ''"),
         ("llm_model", "ALTER TABLE workspace_preferences ADD COLUMN llm_model VARCHAR(255) DEFAULT ''"),
         ("target_companies_json", "ALTER TABLE workspace_preferences ADD COLUMN target_companies_json TEXT DEFAULT '[]'"),
+        ("target_companies_meta_json", "ALTER TABLE workspace_preferences ADD COLUMN target_companies_meta_json TEXT DEFAULT '[]'"),
         ("include_linkedin_jobs", "ALTER TABLE workspace_preferences ADD COLUMN include_linkedin_jobs BOOLEAN DEFAULT 0"),
     ])
     with engine.begin() as conn:
         if "workspace_preferences" in insp.get_table_names():
             conn.execute(text("UPDATE workspace_preferences SET target_companies_json = COALESCE(target_companies_json, '[]')"))
+            conn.execute(text("UPDATE workspace_preferences SET target_companies_meta_json = COALESCE(target_companies_meta_json, '[]')"))
             conn.execute(text("UPDATE workspace_preferences SET include_linkedin_jobs = COALESCE(include_linkedin_jobs, 0)"))
 
     _add_missing_columns(engine, "workspaces", [

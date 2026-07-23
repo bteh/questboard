@@ -104,6 +104,10 @@ class WorkspacePreferences(Base):
     roles_json = Column(Text, default="[]")
     keywords_json = Column(Text, default="[]")
     target_companies_json = Column(Text, default="[]")
+    # Resolved ATS board cache aligned to target_companies_json by name:
+    # [{"name","ats","slug","job_count","careers_url"}]. Lets the pull scrape a
+    # confirmed board (incl. exotic Workday / BILL tokens) without re-discovery.
+    target_companies_meta_json = Column(Text, default="[]")
     preferred_places_json = Column(Text, default="[]")
     workplace_preference = Column(String(32), default="remote_friendly")
     max_days_old = Column(Integer, default=14)

@@ -33,6 +33,7 @@ from app.models.workspace import (
     WorkspaceSession,
 )
 from app.schemas.workspace import (
+    CompanyTarget,
     CompensationPreference,
     HostedBootstrapResponse,
     HostedFeatureFlags,
@@ -145,6 +146,227 @@ def _clean_string_list(values: Any, limit: int = 25) -> list[str]:
         if len(cleaned) >= limit:
             break
     return cleaned
+
+
+# ── Watched-companies store ──────────────────────────────────────────────────
+# ``target_companies_json`` holds the user's company NAMES (the source of truth
+# for which companies to watch). ``target_companies_meta_json`` caches each
+# name's resolved ATS board so the pull scrapes it directly — no lossy
+# re-discovery — and an exotic Workday / BILL token survives to the scraper.
+# The two are kept aligned by case-insensitive name.
+
+
+def _full_company_entry(data: dict[str, Any], fallback_name: str = "") -> dict[str, Any]:
+    return {
+        "name": (str(data.get("name") or fallback_name) or "").strip(),
+        "slug": str(data.get("slug", "") or ""),
+        "ats": str(data.get("ats", "") or ""),
+        "job_count": int(data.get("job_count", 0) or 0),
+        "careers_url": str(data.get("careers_url", "") or ""),
+    }
+
+
+def _company_is_confirmed(entry: dict[str, Any] | None) -> bool:
+    return bool(entry and entry.get("ats") not in ("", "unknown") and entry.get("slug"))
+
+
+def _load_company_names(record: WorkspacePreferences | None) -> list[str]:
+    if not record:
+        return []
+    try:
+        raw = json.loads(record.target_companies_json or "[]")
+    except (json.JSONDecodeError, TypeError):
+        return []
+    return _clean_string_list(raw, 60)
+
+
+def _load_company_meta(record: WorkspacePreferences | None) -> dict[str, dict[str, Any]]:
+    """Return the resolved-board cache keyed by lowercased company name."""
+    if not record:
+        return {}
+    try:
+        raw = json.loads(getattr(record, "target_companies_meta_json", None) or "[]")
+    except (json.JSONDecodeError, TypeError):
+        return {}
+    meta: dict[str, dict[str, Any]] = {}
+    for item in raw if isinstance(raw, list) else []:
+        if isinstance(item, dict) and str(item.get("name", "")).strip():
+            entry = _full_company_entry(item)
+            meta[entry["name"].lower()] = entry
+    return meta
+
+
+def _persist_companies(
+    db: Session,
+    record: WorkspacePreferences,
+    names: list[str],
+    meta: dict[str, dict[str, Any]],
+) -> None:
+    """Write names + meta, pruning meta to the current names and keeping order."""
+    cleaned = _clean_string_list(names, 60)
+    record.target_companies_json = json.dumps(cleaned)
+    record.target_companies_meta_json = json.dumps(
+        [
+            {**meta[name.lower()], "name": name}
+            for name in cleaned
+            if name.lower() in meta
+        ]
+    )
+    db.commit()
+
+
+def _companies_response(record: WorkspacePreferences | None) -> list[dict[str, Any]]:
+    """Build the Companies-tab list from the stored names + resolved cache.
+
+    Pure: never touches the network. A name with no confirmed board renders as
+    an ``unknown`` row so the UI can ask for the careers link.
+    """
+    names = _load_company_names(record)
+    meta = _load_company_meta(record)
+    out: list[dict[str, Any]] = []
+    for name in names:
+        entry = meta.get(name.lower())
+        if _company_is_confirmed(entry):
+            out.append(
+                {
+                    "name": name,
+                    "slug": entry["slug"],
+                    "ats": entry["ats"],
+                    "job_count": entry["job_count"],
+                    "careers_url": entry["careers_url"],
+                }
+            )
+        else:
+            out.append({"name": name, "slug": "", "ats": "unknown", "job_count": 0, "careers_url": ""})
+    return out
+
+
+def _reconcile_company_meta(record: WorkspacePreferences | None, names: list[str]) -> str:
+    """Meta JSON filtered to ``names`` (drops removed companies), order preserved."""
+    meta = _load_company_meta(record)
+    return json.dumps(
+        [{**meta[name.lower()], "name": name} for name in names if name.lower() in meta]
+    )
+
+
+def get_workspace_companies(db: Session, workspace_id: str) -> dict[str, Any]:
+    """Companies-tab read: resolve any never-seen names once, then serve cache.
+
+    Names saved before this store existed (or added elsewhere as bare names)
+    carry no cached board. They are resolved here exactly once — via the same
+    discovery the pull uses — and the result is cached, so the existing list a
+    user already had surfaces with its real ATS info and later reads are free.
+    """
+    record = _get_workspace_preferences_record(db, workspace_id)
+    if not record:
+        return {"companies": [], "message": ""}
+    names = _load_company_names(record)
+    meta = _load_company_meta(record)
+    unresolved = [name for name in names if name.lower() not in meta]
+    if unresolved:
+        from app.services import watchlist_service
+
+        for name in unresolved:
+            try:
+                entry, _message = watchlist_service.resolve_company_entry(name=name)
+            except Exception:
+                logger.debug("Company resolve failed for %s", name, exc_info=True)
+                entry = {"name": name, "slug": "", "ats": "unknown", "job_count": 0, "careers_url": ""}
+            meta[name.lower()] = {**entry, "name": name}
+        _persist_companies(db, record, names, meta)
+    return {"companies": _companies_response(record), "message": ""}
+
+
+def add_workspace_company(
+    db: Session,
+    workspace_id: str,
+    *,
+    name: str = "",
+    url: str = "",
+) -> dict[str, Any]:
+    """Add one company to the workspace store the pull reads.
+
+    Runs the shared discover/resolve flow, appends the NAME to
+    target_companies_json, and caches the resolved ats/slug so the pull scrapes
+    the board directly without re-discovery. A same-named entry is completed in
+    place (so a pasted link can finish an unfinished row). Raises
+    ``BoardUrlError`` when a pasted URL is unsupported/unconfirmable.
+    """
+    from app.services import watchlist_service
+
+    record = _get_workspace_preferences_record(db, workspace_id)
+    if not record:
+        record = WorkspacePreferences(workspace_id=workspace_id)
+        db.add(record)
+        db.flush()
+
+    entry, message = watchlist_service.resolve_company_entry(name=name, url=url)
+    display_name = entry["name"]
+    if not display_name:
+        raise HTTPException(status_code=400, detail="Company name or careers link is required")
+
+    names = _load_company_names(record)
+    meta = _load_company_meta(record)
+    key = display_name.lower()
+    for index, existing in enumerate(names):
+        if existing.lower() == key:
+            names[index] = display_name
+            break
+    else:
+        names.append(display_name)
+    meta[key] = {**entry, "name": display_name}
+
+    _persist_companies(db, record, names, meta)
+    return {"companies": _companies_response(record), "message": message}
+
+
+def remove_workspace_company(db: Session, workspace_id: str, name: str) -> dict[str, Any]:
+    """Remove a company (and its cached board) from the workspace store."""
+    record = _get_workspace_preferences_record(db, workspace_id)
+    if not record:
+        return {"companies": [], "message": ""}
+    key = (name or "").strip().lower()
+    names = [existing for existing in _load_company_names(record) if existing.lower() != key]
+    meta = {k: v for k, v in _load_company_meta(record).items() if k != key}
+    _persist_companies(db, record, names, meta)
+    return {"companies": _companies_response(record), "message": ""}
+
+
+def build_workspace_watchlist(preferences: WorkspacePreferencesSchema) -> list[dict[str, Any]]:
+    """Watchlist entries for the pull, trusting cached tokens first.
+
+    A company with a confirmed cached board keeps its exact ats/slug (so a
+    Workday token or a catalog-unknown token like BILL -> billcom reaches the
+    scraper verbatim). Names without a confirmed board fall back to live ATS
+    discovery, exactly as before.
+    """
+    from app.services.watchlist_service import build_watchlist_entries
+
+    names = _clean_string_list(preferences.companies, 60)
+    meta = {
+        target.name.strip().lower(): target
+        for target in (preferences.company_targets or [])
+        if target.name.strip()
+    }
+    entries: list[dict[str, Any]] = []
+    unresolved: list[str] = []
+    for name in names:
+        target = meta.get(name.lower())
+        if target and target.ats and target.ats != "unknown" and target.slug:
+            entries.append(
+                {
+                    "name": target.name or name,
+                    "ats": target.ats,
+                    "slug": target.slug,
+                    "job_count": target.job_count,
+                    "careers_url": target.careers_url,
+                }
+            )
+        else:
+            unresolved.append(name)
+    if unresolved:
+        entries.extend(build_watchlist_entries(unresolved))
+    return entries
 
 
 def _default_place(label: str) -> dict[str, Any]:
@@ -326,10 +548,18 @@ def _prefs_to_schema(prefs: WorkspacePreferences | None) -> WorkspacePreferences
         companies = json.loads(prefs.target_companies_json or "[]")
     except json.JSONDecodeError:
         companies = []
+    cleaned_companies = _clean_string_list(companies, 60)
+    meta = _load_company_meta(prefs)
+    company_targets = [
+        CompanyTarget(**meta[name.lower()])
+        for name in cleaned_companies
+        if name.lower() in meta
+    ]
     return WorkspacePreferencesSchema(
         roles=_clean_string_list(roles, 15),
         keywords=_clean_string_list(keywords, 20),
-        companies=_clean_string_list(companies, 60),
+        companies=cleaned_companies,
+        company_targets=company_targets,
         preferred_places=_deserialize_places(prefs.preferred_places_json),
         workplace_preference=prefs.workplace_preference or "remote_friendly",
         max_days_old=int(prefs.max_days_old or 30),
@@ -695,7 +925,13 @@ def save_workspace_preferences(
 
     record.roles_json = json.dumps(_clean_string_list(preferences.roles, 15))
     record.keywords_json = json.dumps(_clean_string_list(preferences.keywords, 20))
-    record.target_companies_json = json.dumps(_clean_string_list(preferences.companies, 60))
+    cleaned_companies = _clean_string_list(preferences.companies, 60)
+    # The resolved-board cache is owned by the Companies endpoints, not this
+    # general save. Reconcile it against the incoming names (drop removed
+    # companies, keep the rest) rather than trusting preferences.company_targets,
+    # so a search-prefs POST that omits the cache can never wipe a token.
+    record.target_companies_meta_json = _reconcile_company_meta(record, cleaned_companies)
+    record.target_companies_json = json.dumps(cleaned_companies)
     record.preferred_places_json = _serialize_places(preferences.preferred_places)
     record.workplace_preference = preferences.workplace_preference
     record.max_days_old = preferences.max_days_old
@@ -1885,7 +2121,6 @@ def list_recent_worker_heartbeats(
 
 
 def build_pipeline_config_override(preferences: WorkspacePreferencesSchema, workspace_id: str) -> dict[str, Any]:
-    from app.services.watchlist_service import build_watchlist_entries
     from job_finder.company_classifier import parse_location
 
     preferred_places = [place.model_dump() for place in preferences.preferred_places]
@@ -1904,7 +2139,7 @@ def build_pipeline_config_override(preferences: WorkspacePreferencesSchema, work
     )
     include_remote = effective_preference != "location_only"
     remote_only = effective_preference == "remote_only"
-    watchlist = build_watchlist_entries(_clean_string_list(preferences.companies, 60))
+    watchlist = build_workspace_watchlist(preferences)
     job_boards = list(_DEFAULT_JOBSPY_BOARDS)
     if preferences.include_linkedin_jobs:
         job_boards.insert(1, _LINKEDIN_JOBSPY_BOARD)

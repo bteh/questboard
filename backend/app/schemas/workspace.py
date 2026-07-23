@@ -74,10 +74,32 @@ class CompensationPreference(BaseModel):
     include_equity: bool = True
 
 
+class CompanyTarget(BaseModel):
+    """A watched company resolved to its ATS board.
+
+    ``companies`` holds the user's names (the source of truth for *which*
+    companies); this carries the resolved token so the pull scrapes the board
+    directly without a lossy re-discovery. ``ats`` "unknown" / empty ``slug``
+    means the board is not confirmed yet (the user still needs to paste a
+    careers link). Aligned to ``companies`` by case-insensitive ``name``.
+    """
+
+    name: str
+    slug: str = ""
+    ats: str = ""
+    job_count: int = 0
+    careers_url: str = ""
+
+
 class WorkspacePreferences(BaseModel):
     roles: list[str] = Field(default_factory=list)
     keywords: list[str] = Field(default_factory=list)
     companies: list[str] = Field(default_factory=list)
+    # Resolved ATS board for each watched company (name -> ats/slug cache).
+    # Read-only from the client's point of view: it is written by the Companies
+    # endpoints, not the general preferences save, so a stale search-prefs POST
+    # can never wipe a confirmed token. Backend fills it from the stored cache.
+    company_targets: list[CompanyTarget] = Field(default_factory=list)
     preferred_places: list[PlaceSelection] = Field(default_factory=list)
     workplace_preference: Literal["remote_friendly", "remote_only", "location_only"] = "remote_friendly"
     max_days_old: int = 30

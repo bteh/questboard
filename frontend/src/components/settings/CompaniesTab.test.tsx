@@ -3,30 +3,31 @@
    add one by name or careers link (the backend resolves the board), remove
    one, and keep the empty and error states to one plain line each. Entries
    without a confirmed board render as unfinished, with an inline input to
-   paste the careers link. The api module is mocked with a small in-memory
-   watchlist so react-query's invalidate-and-refetch cycle runs for real. */
+   paste the careers link. It talks to the WORKSPACE companies store (the one
+   the pull reads), so the api module is mocked with a small in-memory list and
+   react-query's invalidate-and-refetch cycle runs for real. */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { WatchlistAddPayload, WatchlistCompany } from '@/api/watchlist';
 
-vi.mock('@/contexts/profile-context', () => ({
-  useProfile: () => ({ profile: 'default', setProfile: vi.fn() }),
+vi.mock('@/api/workspace-companies', () => ({
+  getWorkspaceCompanies: vi.fn(),
+  addWorkspaceCompany: vi.fn(),
+  removeWorkspaceCompany: vi.fn(),
 }));
 
-vi.mock('@/api/watchlist', () => ({
-  getWatchlist: vi.fn(),
-  addWatchlistCompany: vi.fn(),
-  removeWatchlistCompany: vi.fn(),
-}));
-
-import { getWatchlist, addWatchlistCompany, removeWatchlistCompany } from '@/api/watchlist';
+import {
+  getWorkspaceCompanies,
+  addWorkspaceCompany,
+  removeWorkspaceCompany,
+} from '@/api/workspace-companies';
 import { CompaniesTab } from './CompaniesTab';
 
-const mockGet = vi.mocked(getWatchlist);
-const mockAdd = vi.mocked(addWatchlistCompany);
-const mockRemove = vi.mocked(removeWatchlistCompany);
+const mockGet = vi.mocked(getWorkspaceCompanies);
+const mockAdd = vi.mocked(addWorkspaceCompany);
+const mockRemove = vi.mocked(removeWorkspaceCompany);
 
 let serverCompanies: WatchlistCompany[];
 
@@ -46,7 +47,7 @@ function unknownCompany(name = 'Umbra'): WatchlistCompany {
 }
 
 function respond(message = '') {
-  return Promise.resolve({ profile: 'default', companies: [...serverCompanies], message });
+  return Promise.resolve({ profile: 'workspace', companies: [...serverCompanies], message });
 }
 
 function applyAdd(payload: WatchlistAddPayload): WatchlistCompany {
@@ -79,11 +80,11 @@ function renderTab() {
 beforeEach(() => {
   serverCompanies = [];
   mockGet.mockImplementation(() => respond());
-  mockAdd.mockImplementation((_profile, payload) => {
+  mockAdd.mockImplementation((payload) => {
     applyAdd(payload);
     return respond();
   });
-  mockRemove.mockImplementation((_profile, name) => {
+  mockRemove.mockImplementation((name) => {
     serverCompanies = serverCompanies.filter((c) => c.name !== name);
     return respond();
   });
@@ -121,7 +122,7 @@ describe('CompaniesTab', () => {
     fireEvent.change(input, { target: { value: 'Netflix' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
 
-    await waitFor(() => expect(mockAdd).toHaveBeenCalledWith('default', { name: 'Netflix' }));
+    await waitFor(() => expect(mockAdd).toHaveBeenCalledWith({ name: 'Netflix' }));
     expect(await screen.findByText('Netflix')).toBeDefined();
     await waitFor(() => expect(input.value).toBe(''));
   });
@@ -135,7 +136,7 @@ describe('CompaniesTab', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
 
     await waitFor(() =>
-      expect(mockAdd).toHaveBeenCalledWith('default', { url: 'https://jobs.lever.co/umbra-hq' }),
+      expect(mockAdd).toHaveBeenCalledWith({ url: 'https://jobs.lever.co/umbra-hq' }),
     );
     expect(await screen.findByText('Umbra')).toBeDefined();
   });
@@ -161,7 +162,7 @@ describe('CompaniesTab', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save link for Umbra' }));
 
     await waitFor(() =>
-      expect(mockAdd).toHaveBeenCalledWith('default', {
+      expect(mockAdd).toHaveBeenCalledWith({
         name: 'Umbra',
         url: 'https://jobs.lever.co/umbra-hq',
       }),
@@ -171,7 +172,7 @@ describe('CompaniesTab', () => {
   });
 
   it('surfaces the add response message when discovery fails', async () => {
-    mockAdd.mockImplementation((_profile, payload) => {
+    mockAdd.mockImplementation((payload) => {
       serverCompanies.push(unknownCompany(payload.name ?? ''));
       return respond('Could not find a job board for Umbra. Paste its careers page link to finish setup.');
     });
@@ -217,7 +218,7 @@ describe('CompaniesTab', () => {
   it('disables the add button while the add is in flight', async () => {
     let release: () => void = () => {};
     mockAdd.mockImplementation(
-      (_profile, payload) =>
+      (payload) =>
         new Promise((resolve) => {
           release = () => {
             applyAdd(payload);
@@ -246,7 +247,7 @@ describe('CompaniesTab', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove Alo Yoga' }));
 
-    await waitFor(() => expect(mockRemove).toHaveBeenCalledWith('default', 'Alo Yoga'));
+    await waitFor(() => expect(mockRemove).toHaveBeenCalledWith('Alo Yoga'));
     await waitFor(() => expect(screen.queryByText('Alo Yoga')).toBeNull());
   });
 
@@ -257,7 +258,7 @@ describe('CompaniesTab', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Remove Umbra' }));
 
-    await waitFor(() => expect(mockRemove).toHaveBeenCalledWith('default', 'Umbra'));
+    await waitFor(() => expect(mockRemove).toHaveBeenCalledWith('Umbra'));
     await waitFor(() => expect(screen.queryByText('Umbra')).toBeNull());
   });
 
