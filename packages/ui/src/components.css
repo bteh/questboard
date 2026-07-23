@@ -185,13 +185,26 @@
   background: radial-gradient(circle at 34% 30%, #fff 0%, var(--qb-hue, var(--sage)) 34%, color-mix(in srgb, var(--qb-hue, var(--sage)) 62%, #000) 100%);
   box-shadow: 0 3px 4px -1px rgba(30, 20, 8, .5), inset 0 -2px 3px rgba(0, 0, 0, .35);
 }
+/* WebKit-stable hover: the poster keeps its own compositing layer
+   (will-change) so hovering never creates and destroys layers, only
+   transform animates, and the deeper hover shadow fades in on a pseudo
+   element via opacity instead of animating box-shadow. Animated shadows
+   plus layer churn made the desktop webview flicker when the mouse moved
+   between posters. */
 .qb-poster {
   position: relative; width: 100%;
   background: var(--paper);
   padding: 26px 17px 0;
   transform: rotate(var(--qb-rot, 0deg));
-  transition: transform .16s cubic-bezier(.22, 1, .36, 1), box-shadow .16s cubic-bezier(.22, 1, .36, 1);
+  will-change: transform;
+  transition: transform .16s cubic-bezier(.22, 1, .36, 1);
   box-shadow: 0 1px 1px rgba(28, 27, 23, .05), 0 14px 26px -16px rgba(40, 30, 12, .5), 0 3px 8px -5px rgba(40, 30, 12, .4);
+}
+.qb-poster::before {
+  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: -1;
+  box-shadow: 0 2px 2px rgba(28, 27, 23, .06), 0 26px 44px -18px rgba(40, 30, 12, .55), 0 6px 14px -6px rgba(40, 30, 12, .4);
+  opacity: 0;
+  transition: opacity .16s cubic-bezier(.22, 1, .36, 1);
 }
 .qb-poster::after {
   content: ''; position: absolute; inset: 0; pointer-events: none;
@@ -199,10 +212,13 @@
 }
 .qb-slot:hover .qb-poster {
   transform: rotate(0deg) translateY(-3px);
-  box-shadow: 0 2px 2px rgba(28, 27, 23, .06), 0 26px 44px -18px rgba(40, 30, 12, .55), 0 6px 14px -6px rgba(40, 30, 12, .4);
 }
+.qb-slot:hover .qb-poster::before { opacity: 1; }
 .qb-slot:hover { z-index: 5; }
-@media (prefers-reduced-motion: reduce) { .qb-poster { transition: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .qb-poster { transition: none; }
+  .qb-poster::before { transition: none; }
+}
 
 .qb-poster-clip {
   position: absolute; top: 11px; right: 15px;
