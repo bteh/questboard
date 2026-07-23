@@ -218,15 +218,18 @@ def _looks_like_us_place(location: str) -> bool:
 
 
 def _nationwide_us_match(model):
-    """SQL for a location that is nationwide US: the whole string is a US
-    country term, or one is a full segment of a ';'-separated list."""
-    conds = []
-    for term in _US_COUNTRY_TERMS:
-        conds.append(func.lower(func.trim(model.location)) == term)
-        # a nationwide option inside "City, ST, US; ...; United States"
-        conds.append(func.lower(model.location).like(f"%; {term}"))
-        conds.append(func.lower(model.location).like(f"%;{term}"))
-    return or_(*conds)
+    """SQL for a location that is nationwide US: a US country term is a full
+    ';'-separated segment anywhere in the location, not only the whole string
+    or the trailing option. "United States; Canada" and "Canada; United
+    States; Mexico" both count; "New York, United States" (comma, not a
+    segment boundary) does not."""
+    # Collapse the spaces around every ';' so a segment is delimited the same
+    # way regardless of "; " / " ;" / ";", then wrap in ';' so the first and
+    # last segments have a boundary on both sides too.
+    lowered = func.lower(func.trim(model.location))
+    collapsed = func.replace(func.replace(lowered, "; ", ";"), " ;", ";")
+    padded = literal(";") + collapsed + literal(";")
+    return or_(*[padded.like(f"%;{term};%") for term in _US_COUNTRY_TERMS])
 
 
 def place_filter(model, location: str | None, location_strict: bool = False):

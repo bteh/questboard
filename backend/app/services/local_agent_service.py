@@ -609,7 +609,11 @@ def _source_age_days(
             return None
         return anchor_age + offset_days
 
-    if re.fullmatch(r"\d{10,13}", normalized):
+    # Only the two real epoch widths: 10 digits is seconds, 13 is
+    # milliseconds. An 11 or 12 digit value is malformed; guessing its unit
+    # lands it far in the future and clamps to age 0 (reads as posted today),
+    # so leave it unknown instead.
+    if re.fullmatch(r"\d{10}|\d{13}", normalized):
         timestamp = int(normalized)
         if len(normalized) == 13:
             timestamp /= 1000

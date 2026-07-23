@@ -221,3 +221,15 @@ def test_sql_posted_within_predicate_drops_prose_and_epoch(freshness_db) -> None
     assert "Prose yesterday row" not in titles
     assert "Bare epoch row" not in titles
     assert total == 1
+
+
+def test_ambiguous_epoch_length_is_unknown_not_fresh():
+    """Only 10-digit (seconds) and 13-digit (ms) epochs are real; an 11 or
+    12 digit value is malformed and must read as unknown, never age 0."""
+    from app.services.local_agent_service import _source_age_days
+
+    assert _source_age_days("100000000001") is None  # 12 digits
+    assert _source_age_days("10000000000") is None    # 11 digits
+    # the two valid widths still parse
+    assert _source_age_days("1784660000") is not None   # 10, seconds
+    assert _source_age_days("1784660000000") is not None  # 13, ms

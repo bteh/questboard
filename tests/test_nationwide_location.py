@@ -96,3 +96,11 @@ def test_strict_near_me_still_drops_nationwide(session):
     got = _matches(session, "Los Angeles", strict=True)
     assert "Nationwide role" not in got
     assert "LA role" in got
+
+
+def test_nationwide_us_matches_when_not_the_last_segment(session):
+    _add(session, "US and Canada role", "United States; Canada")
+    _add(session, "Canada then US", "Canada; United States")
+    _add(session, "US in the middle", "Canada; United States; Mexico")
+    got = _matches(session, "Los Angeles")
+    assert got == {"US and Canada role", "Canada then US", "US in the middle"}
