@@ -52,23 +52,38 @@ interface FilterChip {
 
 const TIMED_OUT_RE = /^\s+.+: timed out$/;
 
-/* The pull note names the actual saved roles the run will use, so the user
-   can verify them at the point of use instead of trusting a vague phrase.
-   Undefined means still loading; the generic phrase holds until then. */
-export function pullNote(roles: string[] | undefined): { text: string; linkLabel: string } {
-  if (roles === undefined) {
-    return { text: 'Pulls fresh postings for your target roles.', linkLabel: 'Edit roles' };
-  }
-  if (roles.length === 0) {
-    return { text: 'No target roles saved yet.', linkLabel: 'Set roles' };
-  }
-  if (roles.length === 1) {
-    return { text: `Pulls fresh postings for ${roles[0]}.`, linkLabel: 'Edit roles' };
-  }
-  return {
-    text: `Pulls fresh postings for ${roles[0]} and ${roles.length - 1} more roles.`,
-    linkLabel: 'Edit roles',
-  };
+const WORKPLACE_WORDS: Record<string, string> = {
+  remote_friendly: 'remote friendly',
+  remote_only: 'remote only',
+  location_only: 'on location',
+};
+
+/* The full receipt of the saved search the pull will run: roles, place,
+   remote stance, and pay floor on one line, so nobody has to open
+   Settings to learn what the button does. Undefined means still loading. */
+export function pullReceipt(
+  prefs:
+    | {
+        roles: string[];
+        preferred_places: { label: string }[];
+        workplace_preference: string;
+        compensation: { min_base: number | null };
+      }
+    | undefined,
+): string {
+  if (prefs === undefined) return 'Pulls fresh postings for your target roles.';
+  if (!prefs.roles.length) return 'No target roles saved yet.';
+  const roles =
+    prefs.roles.length === 1
+      ? prefs.roles[0]
+      : `${prefs.roles[0]} and ${prefs.roles.length - 1} more role${prefs.roles.length > 2 ? 's' : ''}`;
+  const parts = [`Pulls fresh postings for ${roles}`];
+  if (prefs.preferred_places.length > 0) parts.push(prefs.preferred_places[0].label);
+  const stance = WORKPLACE_WORDS[prefs.workplace_preference];
+  if (stance) parts.push(stance);
+  const floor = prefs.compensation?.min_base;
+  if (floor) parts.push(`$${Math.round(floor / 1000)}K+ base`);
+  return `${parts.join(' · ')}.`;
 }
 
 /* The placeholder names the box's real job: it narrows rows already on the
@@ -197,8 +212,10 @@ export function WorkToolbar({
 }: WorkToolbarProps) {
   const { run, ready, running } = useRunWorkSearch();
   const { data: onboarding } = useOnboardingState();
-  const savedRoles = onboarding ? (onboarding.preferences?.roles ?? []) : undefined;
-  const note = pullNote(savedRoles);
+  const prefs = onboarding?.preferences;
+  const savedRoles = onboarding ? (prefs?.roles ?? []) : undefined;
+  const noteText = pullReceipt(onboarding ? prefs : undefined);
+  const noteLink = savedRoles && savedRoles.length === 0 ? 'Set roles' : 'Edit search';
 
   const payFloor = parseAmount(payFrom.trim());
   const payCeiling = parseAmount(payTo.trim());
@@ -231,9 +248,9 @@ export function WorkToolbar({
           {running ? 'Getting jobs…' : 'Get new jobs'}
         </SageButton>
         <span className="qb-workactions-note" title={savedRoles?.join(', ') || undefined}>
-          {note.text}{' '}
+          {noteText}{' '}
           <Link to="/settings" search={{ tab: 'restock' }} className="qb-textlink">
-            {note.linkLabel}
+            {noteLink}
           </Link>
         </span>
         {assistantSlot}

@@ -4,7 +4,7 @@
    "profile candidates") stays gone. */
 
 import { describe, expect, it } from 'vitest';
-import { filterPlaceholder, filterStatusText, pullNote } from './work-toolbar';
+import { filterPlaceholder, filterStatusText, pullReceipt } from './work-toolbar';
 
 describe('the filter box placeholder', () => {
   it('carries the loaded total', () => {
@@ -80,29 +80,43 @@ describe('the status line under the filters', () => {
   });
 });
 
-describe('pullNote', () => {
-  it('names the first saved role and counts the rest', () => {
-    expect(pullNote(['Data Engineering Manager', 'Staff Data Engineer', 'Lead Data Engineer'])).toEqual({
-      text: 'Pulls fresh postings for Data Engineering Manager and 2 more roles.',
-      linkLabel: 'Edit roles',
-    });
+describe('pullReceipt', () => {
+  const prefs = {
+    roles: ['Data Engineering Manager', 'Staff Data Engineer'],
+    preferred_places: [{ label: 'Los Angeles, CA' }],
+    workplace_preference: 'remote_friendly',
+    compensation: { min_base: 190000 },
+  };
+
+  it('names roles, place, remote stance, and pay floor', () => {
+    expect(pullReceipt(prefs as never)).toBe(
+      'Pulls fresh postings for Data Engineering Manager and 1 more role · Los Angeles, CA · remote friendly · $190K+ base.',
+    );
   });
 
-  it('speaks singular for one saved role', () => {
-    expect(pullNote(['Staff Data Engineer'])).toEqual({
-      text: 'Pulls fresh postings for Staff Data Engineer.',
-      linkLabel: 'Edit roles',
-    });
+  it('omits what is not saved', () => {
+    expect(
+      pullReceipt({
+        roles: ['Staff Data Engineer'],
+        preferred_places: [],
+        workplace_preference: 'remote_only',
+        compensation: { min_base: null },
+      } as never),
+    ).toBe('Pulls fresh postings for Staff Data Engineer · remote only.');
   });
 
   it('asks for roles when none are saved', () => {
-    expect(pullNote([])).toEqual({
-      text: 'No target roles saved yet.',
-      linkLabel: 'Set roles',
-    });
-    expect(pullNote(undefined)).toEqual({
-      text: 'Pulls fresh postings for your target roles.',
-      linkLabel: 'Edit roles',
-    });
+    expect(
+      pullReceipt({
+        roles: [],
+        preferred_places: [],
+        workplace_preference: 'remote_friendly',
+        compensation: { min_base: null },
+      } as never),
+    ).toBe('No target roles saved yet.');
+  });
+
+  it('holds the generic line while loading', () => {
+    expect(pullReceipt(undefined)).toBe('Pulls fresh postings for your target roles.');
   });
 });
