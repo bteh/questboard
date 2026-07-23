@@ -473,19 +473,33 @@ function RestockPage() {
     );
 
     return (
-      <div className="space-y-4">
-        <AssistantRunPanel />
-        {assistantReady ? (
-          <details className="group rounded-2xl border border-border-default bg-bg-card">
-            <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-4 text-sm font-medium text-text-secondary transition-colors hover:text-text-primary">
-              <span>Restock by hand instead</span>
-              <span className="text-text-muted transition-transform group-open:rotate-90">›</span>
-            </summary>
-            <div className="border-t border-border-default p-4">{manualForm}</div>
-          </details>
-        ) : (
-          manualForm
+      <div className="qb-restock" style={{ maxWidth: 820, margin: '0 auto', padding: '0 44px 96px' }}>
+        {/* The manual form carries its own header; only add a page header
+            when it is collapsed behind the assistant panel. */}
+        {assistantReady && (
+          <>
+            <div className="qb-restock-head">
+              <h1>Restock the board</h1>
+            </div>
+            <p className="qb-restock-sub">
+              Pull fresh postings for your saved search, or let your assistant find and rank them.
+            </p>
+          </>
         )}
+        <div className="space-y-4">
+          <AssistantRunPanel />
+          {assistantReady ? (
+            <details className="group rounded-2xl border border-border-default bg-bg-card">
+              <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-4 text-sm font-medium text-text-secondary transition-colors hover:text-text-primary">
+                <span>Restock by hand instead</span>
+                <span className="text-text-muted transition-transform group-open:rotate-90">›</span>
+              </summary>
+              <div className="border-t border-border-default p-4">{manualForm}</div>
+            </details>
+          ) : (
+            manualForm
+          )}
+        </div>
       </div>
     );
   }
