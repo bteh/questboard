@@ -2,6 +2,8 @@
    (zero_rows, exception); the page speaks plain English. Color carries
    urgency only; the words say what happened. */
 
+import type { FunnelStage } from '@/types/search';
+
 export type VerdictTone = 'ok' | 'warn' | 'bad' | 'quiet';
 
 export function verdictMeta(verdict: string): { label: string; tone: VerdictTone } {
@@ -94,4 +96,16 @@ export function healthTiles(entries: HealthEntryLike[], needsAttention: number) 
     return !max || e.last_run_at > max ? e.last_run_at : max;
   }, null);
   return { sources: entries.length, needsAttention, rowsLatest, lastChecked };
+}
+
+/* The last pull's headline: rows found raw, and how many survived every
+   filter. Reads the first stage's input and the last stage's output, so it
+   holds however many stages ran. Null when no stage was recorded. */
+export function lastPullSummary(
+  stages: Pick<FunnelStage, 'count_in' | 'count_out'>[],
+): { raw: number; kept: number; dropped: number } | null {
+  if (stages.length === 0) return null;
+  const raw = stages[0].count_in;
+  const kept = stages[stages.length - 1].count_out;
+  return { raw, kept, dropped: Math.max(raw - kept, 0) };
 }

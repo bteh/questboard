@@ -5,7 +5,7 @@ import { Route as indexRoute } from './routes/index';
 import { Route as welcomeRoute } from './routes/welcome';
 import { Route as startRoute } from './routes/start';
 import { Route as searchRedirect } from './routes/search';
-import { Route as restockRoute } from './routes/restock';
+import { Route as restockRedirect } from './routes/restock';
 import { Route as logRoute } from './routes/log';
 import { Route as logLedgerRoute } from './routes/log-ledger';
 import { Route as logNumbersRoute } from './routes/log-numbers';
@@ -20,13 +20,13 @@ import { Route as healthRoute } from './routes/health';
 /* App pages live under the pathless 'app' layout (the trade-paper shell
    plus the hosted auth gate). The entry switch at /, the landing at
    /welcome, and the design sheet render bare under the root. The old
-   /applications, /analytics, and /search addresses redirect to their
-   new homes. */
+   /applications, /analytics, /restock, and /search addresses redirect to
+   their new homes. */
 const routeTree = rootRoute.addChildren([
   appRoute.addChildren([
     homeRoute,
-    restockRoute,
     searchRedirect,
+    restockRedirect,
     logRoute,
     logLedgerRoute,
     logNumbersRoute,

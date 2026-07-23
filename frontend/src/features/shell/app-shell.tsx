@@ -19,7 +19,6 @@ import './app-shell.css';
 
 const PAGE_TITLES: Record<string, string> = {
   '/home': 'Home',
-  '/restock': 'Restock',
   '/log': 'Your log',
   '/log/ledger': 'The full ledger',
   '/log/numbers': 'Your numbers',

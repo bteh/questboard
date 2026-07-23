@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { startSearchRun, getRunStatus, getSearchDefaults, getSearchRuns, suggestSearchParams } from '@/api/search';
+import { getLatestFunnel, startSearchRun, getRunStatus, getSearchDefaults, getSearchRuns, suggestSearchParams } from '@/api/search';
 import type { SearchSuggestions } from '@/api/search';
 import type { SearchRequest, RunStatus } from '@/types/search';
 
@@ -53,4 +53,12 @@ export function useSearchRuns(limit = 20) {
 export function pickLatestCompletedRun(runs: RunStatus[] | undefined): RunStatus | null {
   if (!runs || runs.length === 0) return null;
   return runs.find((run) => run.status === 'completed') ?? null;
+}
+
+export function useLatestFunnel() {
+  return useQuery({
+    queryKey: ['search', 'funnel', 'latest'],
+    queryFn: () => getLatestFunnel(),
+    staleTime: 30_000,
+  });
 }

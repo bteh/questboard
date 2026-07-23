@@ -129,7 +129,7 @@ export function ResumeTab({ onboarding, navigate }: ResumeTabProps) {
             Resume saved on this machine. Next, restock the board to find matching jobs.{' '}
             <button
               type="button"
-              onClick={() => navigate({ to: '/restock' })}
+              onClick={() => navigate({ to: '/board', search: { v: 'work' } })}
               className="font-medium text-brand underline underline-offset-2"
             >
               See your matches

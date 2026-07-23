@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /* The first-run hand-off is a two-party agreement: the onboarding wizard
-   marks the flag, the restock page consumes it once and opens the results.
-   This pins both sides to the same key, so the moment can actually fire. */
+   marks the flag, the board's Find work lane consumes it once and pulls the
+   first jobs. This pins both sides to the same key, so the moment can fire. */
 
 import { beforeEach, describe, expect, it } from 'vitest';
 import { consumeFirstRunPending, markFirstRunPending } from './first-run';
@@ -21,7 +21,7 @@ describe('the first-run hand-off flag', () => {
     expect(consumeFirstRunPending()).toBe(false);
   });
 
-  it('writes the key the restock page actually reads', () => {
+  it('writes the key the board work lane actually reads', () => {
     markFirstRunPending();
     expect(window.localStorage.getItem('questboard:first-run-pending')).toBe('1');
   });

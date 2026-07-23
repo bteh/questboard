@@ -54,7 +54,7 @@ export interface RestockProgress {
 /* The run's own progress messages carry the source arithmetic: the scraper
    registry announces "Searching {m} additional sources in parallel..." and
    then reports each source back with one of three line shapes. Counting
-   those lines is the same mechanism SearchRunView's log renders; nothing
+   those lines is what the work toolbar's run status line reads; nothing
    here is invented. */
 const TOTAL_RE = /Searching (\d+) additional sources in parallel/;
 const SOURCE_DONE_RES = [

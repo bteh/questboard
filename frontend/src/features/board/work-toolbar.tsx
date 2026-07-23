@@ -25,6 +25,7 @@ import {
   type PostedDaysKey,
 } from '@/features/board/posted-filter';
 import { useRunWorkSearch } from '@/features/board/use-run-work-search';
+import { consumeFirstRunPending } from '@/components/onboarding/first-run';
 import { useOnboardingState } from '@/hooks/use-workspace';
 import { formatStatedPay, parseAmount } from '@/utils/board-card';
 
@@ -229,6 +230,24 @@ export function WorkToolbar({
   onPostedDays,
 }: WorkToolbarProps) {
   const { run, ready, running } = useRunWorkSearch();
+
+  /* First-run hand-off: onboarding marks a flag and routes here, so the new
+     user's first pull fires on its own. The flag is read (and cleared) once,
+     into a ref, so it can never fire twice; the pull then fires the moment
+     the saved search has loaded. */
+  const firstRunChecked = useRef(false);
+  const firstRunPending = useRef(false);
+  const firstRunFired = useRef(false);
+  useEffect(() => {
+    if (!firstRunChecked.current) {
+      firstRunChecked.current = true;
+      firstRunPending.current = consumeFirstRunPending();
+    }
+    if (firstRunFired.current || !firstRunPending.current || !ready) return;
+    firstRunFired.current = true;
+    run();
+  }, [ready, run]);
+
   const { data: onboarding } = useOnboardingState();
   const prefs = onboarding?.preferences;
   const savedRoles = onboarding ? (prefs?.roles ?? []) : undefined;

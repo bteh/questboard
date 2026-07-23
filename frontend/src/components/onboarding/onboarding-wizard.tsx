@@ -226,12 +226,12 @@ export function OnboardingWizard({ open, onComplete, onDismiss }: OnboardingWiza
     // never feels rushed past their settings.
     savePreferences.mutate(form, {
       onSuccess: () => {
-        // The restock page consumes this flag when the first run completes
-        // and opens the results, so the new user is never stranded.
+        // The board's Find work lane consumes this flag on mount and pulls
+        // the first jobs once, so the new user lands on a lane that fills in.
         markFirstRunPending();
         toast.success('Preferences saved. Start your search when ready.');
         onComplete();
-        navigate({ to: '/board' });
+        navigate({ to: '/board', search: { v: 'work' } });
       },
       onError: (error) =>
         toast.error(error instanceof Error ? error.message : 'Could not save preferences. Try again.'),

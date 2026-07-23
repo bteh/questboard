@@ -535,7 +535,7 @@ function LedgerPage() {
                 Clear all filters
               </Button>
             ) : (
-              <Link to="/restock" className="qb-textlink">
+              <Link to="/board" search={{ v: 'work' }} className="qb-textlink">
                 Restock the board
               </Link>
             )}

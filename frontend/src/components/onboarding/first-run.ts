@@ -1,8 +1,8 @@
 /* The first-run hand-off flag, pinned by first-run.test.ts. One writer,
    one reader, one key: the onboarding wizard marks the flag when the
-   reader saves their first preferences, and the restock page consumes it
-   when that first run completes, opening the results so a brand-new user
-   is never stranded on the run log. Storage access follows lib/entry.ts:
+   reader saves their first preferences, and the board's Find work lane
+   consumes it on mount to pull the first jobs once, so a brand-new user
+   lands on a lane that fills itself in. Storage access follows lib/entry.ts:
    every read and write in try/catch, a locked-down browser just skips the
    hand-off. */
 

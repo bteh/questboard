@@ -4,6 +4,7 @@ import {
   durationLabel,
   filterRuns,
   healthTiles,
+  lastPullSummary,
   reasonMeta,
   sourceOptions,
   verdictMeta,
@@ -114,5 +115,28 @@ describe('healthTiles', () => {
       rowsLatest: 0,
       lastChecked: null,
     });
+  });
+});
+
+describe('lastPullSummary', () => {
+  it('reads raw from the first stage in and kept from the last stage out', () => {
+    const stages = [
+      { count_in: 1080, count_out: 612 },
+      { count_in: 612, count_out: 488 },
+      { count_in: 488, count_out: 300 },
+    ];
+    expect(lastPullSummary(stages)).toEqual({ raw: 1080, kept: 300, dropped: 780 });
+  });
+
+  it('never reports a negative drop', () => {
+    expect(lastPullSummary([{ count_in: 10, count_out: 12 }])).toEqual({
+      raw: 10,
+      kept: 12,
+      dropped: 0,
+    });
+  });
+
+  it('is null when no stage ran', () => {
+    expect(lastPullSummary([])).toBeNull();
   });
 });

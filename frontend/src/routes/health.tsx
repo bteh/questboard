@@ -13,6 +13,7 @@ import {
   sourceOptions,
   verdictMeta,
 } from '@/features/health/health-logic';
+import { LastPull } from '@/features/health/last-pull';
 import '@/features/health/health.css';
 
 /* Source health: the ops page behind the board's "sources checked" line.
@@ -180,6 +181,8 @@ function HealthPage() {
               </>
             )}
           </div>
+
+          <LastPull sources={entries} />
 
           <section className="qb-health-card">
             <div className="qb-health-cardhead">
