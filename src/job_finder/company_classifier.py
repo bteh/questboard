@@ -932,6 +932,49 @@ def _remote_region_scope(raw_location: str) -> str:
     return ""
 
 
+_US_COUNTRY_TERMS = (
+    "united states of america",
+    "united states",
+    "u.s.a.",
+    "u.s.",
+    "usa",
+    "us",
+)
+
+
+def _is_nationwide_us(job_location: str) -> bool:
+    """True when the location is a bare US country term as a whole string or a
+    ';'-separated segment ("United States", "Draper, UT; United States"), but
+    not a specific US city ("New York, United States")."""
+    if not job_location:
+        return False
+    collapsed = job_location.strip().lower().replace("; ", ";").replace(" ;", ";")
+    segments = [seg.strip() for seg in collapsed.split(";")]
+    return any(seg in _US_COUNTRY_TERMS for seg in segments)
+
+
+def _seeker_is_us(
+    preferred_countries: list[str] | None,
+    preferred_states: list[str] | None,
+    preferred_cities: list[str] | None,
+    preferred_places: list[dict[str, Any]] | None,
+) -> bool:
+    """True when the seeker's own preferences are US-based, so US-nationwide
+    postings are reachable for them and a non-US seeker never inherits that."""
+    if preferred_countries:
+        wants = {c.strip().lower() for c in preferred_countries}
+        if wants & {t.rstrip(".") for t in _US_COUNTRY_TERMS} or wants & set(_US_COUNTRY_TERMS):
+            return True
+        # A non-US country preference means not a US seeker.
+        return False
+    if preferred_states:
+        return True
+    for place in preferred_places or []:
+        if str(place.get("country_code", "")).upper() == "US":
+            return True
+    return False
+
+
 def location_matches_preferences(
     job_location: str,
     is_remote: bool,
@@ -984,6 +1027,14 @@ def location_matches_preferences(
                 wants = {c.strip().lower() for c in preferred_countries}
                 if scope.lower() not in wants:
                     return False
+        return True
+
+    # A bare-country "United States" role is nationwide: reachable from any US
+    # place. Without this it reads as an onsite job elsewhere and gets purged,
+    # which hid every US-wide posting from a seeker who saved a US city.
+    if _is_nationwide_us(job_location) and _seeker_is_us(
+        preferred_countries, preferred_states, preferred_cities, preferred_places
+    ):
         return True
 
     if preferred_places:
