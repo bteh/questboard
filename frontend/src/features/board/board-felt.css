@@ -109,9 +109,9 @@
   color: var(--soft);
 }
 .qb-skip-fold summary:hover { color: var(--ink); }
-.qb-skip-posters { margin-top: 24px; columns: 3; column-gap: 26px; }
-@media (max-width: 1180px) { .qb-skip-posters { columns: 2; } }
-@media (max-width: 720px) { .qb-skip-posters { columns: 1; } }
+.qb-skip-posters { margin-top: 24px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 26px; align-items: start; }
+@media (max-width: 1180px) { .qb-skip-posters { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 720px) { .qb-skip-posters { grid-template-columns: minmax(0, 1fr); } }
 
 /* facet chips: a kind's own sub-filters, one quiet row under the rail */
 .qb-facet-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
@@ -211,6 +211,19 @@
 .qb-wall .qb-slot { margin-bottom: 30px; }
 @media (max-width: 1180px) { .qb-wall { columns: 2; } }
 @media (max-width: 720px) { .qb-wall { columns: 1; } .qb-felt { padding: 24px 16px 28px; } }
+
+/* ranked segments read left to right in rank order, so they lay out as a
+   row-major grid instead of the collage's down-then-across columns, which
+   stacked #3 and #4 into one column and left holes beside them */
+.qb-wall-ranked {
+  columns: auto;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  column-gap: 26px;
+  align-items: start;
+}
+@media (max-width: 1180px) { .qb-wall-ranked { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 720px) { .qb-wall-ranked { grid-template-columns: minmax(0, 1fr); } }
 
 /* the house rules, pinned to the felt like everything else */
 .qb-house {

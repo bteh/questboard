@@ -133,7 +133,7 @@ export function PosterWall({
         {wall.groups.map((group) => (
           <Fragment key={group.verdict}>
             <FitRule label={`${group.label} (${group.items.length})`} />
-            <div className="qb-wall">{group.items.map(renderPoster)}</div>
+            <div className="qb-wall qb-wall-ranked">{group.items.map(renderPoster)}</div>
           </Fragment>
         ))}
         {/* rows the assistant never judged: after the groups, under their own
@@ -142,7 +142,7 @@ export function PosterWall({
           <FitRule label={`Not ranked (${wall.unranked.length})`} />
         )}
         {wall.unranked.length > 0 && (
-          <div className="qb-wall">{wall.unranked.map(renderPoster)}</div>
+          <div className="qb-wall qb-wall-ranked">{wall.unranked.map(renderPoster)}</div>
         )}
         {wall.skips.length > 0 && (
           <details className="qb-skip-fold">
