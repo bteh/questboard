@@ -25,16 +25,23 @@ async def get_watchlist(profile: str):
 
 @router.post("/profiles/{profile}/watchlist", response_model=WatchlistResponse)
 async def add_company(profile: str, req: WatchlistAddRequest):
-    """Add a company to the watchlist with auto-discovery.
+    """Add a company to the watchlist by name or careers link.
 
-    Tries Greenhouse, Lever, and Ashby APIs to find the company's career page.
+    A careers link (Greenhouse, Lever, Ashby, Workday) stores its exact
+    board token after one verification probe; an unsupported or
+    unconfirmable link is a 422. A bare name runs auto-discovery; when
+    discovery fails, the response ``message`` says so.
     """
     reject_legacy_route_in_hosted_mode("Profile watchlists are disabled in hosted mode")
     profile = sanitize_profile(profile)
-    if not req.name.strip():
-        raise HTTPException(400, "Company name is required")
+    name = req.name.strip()
+    url = req.url.strip()
+    if not name and not url:
+        raise HTTPException(400, "Company name or careers link is required")
     try:
-        return watchlist_service.add_company(profile, req.name.strip())
+        return watchlist_service.add_company(profile, name, url)
+    except watchlist_service.BoardUrlError as e:
+        raise HTTPException(422, detail=str(e))
     except Exception as e:
         logger.exception("Failed to add company to watchlist")
         raise HTTPException(500, detail=str(e))

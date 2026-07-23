@@ -1,14 +1,15 @@
 // @vitest-environment jsdom
 /* Companies tab data flow: list the watched companies with their ATS info,
-   add one by name (the backend does the ATS discovery), remove one, and
-   keep the empty and error states to one plain line each. The api module
-   is mocked with a small in-memory watchlist so react-query's
-   invalidate-and-refetch cycle runs for real. */
+   add one by name or careers link (the backend resolves the board), remove
+   one, and keep the empty and error states to one plain line each. Entries
+   without a confirmed board render as unfinished, with an inline input to
+   paste the careers link. The api module is mocked with a small in-memory
+   watchlist so react-query's invalidate-and-refetch cycle runs for real. */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import type { WatchlistCompany } from '@/api/watchlist';
+import type { WatchlistAddPayload, WatchlistCompany } from '@/api/watchlist';
 
 vi.mock('@/contexts/profile-context', () => ({
   useProfile: () => ({ profile: 'default', setProfile: vi.fn() }),
@@ -40,8 +41,25 @@ function company(overrides: Partial<WatchlistCompany> = {}): WatchlistCompany {
   };
 }
 
-function respond() {
-  return Promise.resolve({ profile: 'default', companies: [...serverCompanies] });
+function unknownCompany(name = 'Umbra'): WatchlistCompany {
+  return company({ name, slug: '', ats: 'unknown', job_count: 0, careers_url: '' });
+}
+
+function respond(message = '') {
+  return Promise.resolve({ profile: 'default', companies: [...serverCompanies], message });
+}
+
+function applyAdd(payload: WatchlistAddPayload): WatchlistCompany {
+  // Mimic the backend: a URL resolves to a lever board, a bare name
+  // stays unresolved until "discovery" (the default mock resolves it).
+  const name = payload.name || 'Umbra';
+  const resolved = payload.url
+    ? company({ name, slug: 'umbra-hq', ats: 'lever', job_count: 4, careers_url: payload.url })
+    : company({ name });
+  const index = serverCompanies.findIndex((c) => c.name === name);
+  if (index >= 0) serverCompanies[index] = resolved;
+  else serverCompanies.push(resolved);
+  return resolved;
 }
 
 function renderTab() {
@@ -61,8 +79,8 @@ function renderTab() {
 beforeEach(() => {
   serverCompanies = [];
   mockGet.mockImplementation(() => respond());
-  mockAdd.mockImplementation((_profile, name) => {
-    serverCompanies.push(company({ name, slug: '', ats: '', job_count: 0, careers_url: '' }));
+  mockAdd.mockImplementation((_profile, payload) => {
+    applyAdd(payload);
     return respond();
   });
   mockRemove.mockImplementation((_profile, name) => {
@@ -99,22 +117,110 @@ describe('CompaniesTab', () => {
     renderTab();
     await screen.findByText(/No companies yet/);
 
-    const input = screen.getByLabelText('Company name') as HTMLInputElement;
+    const input = screen.getByLabelText('Company name or careers link') as HTMLInputElement;
     fireEvent.change(input, { target: { value: 'Netflix' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
 
-    await waitFor(() => expect(mockAdd).toHaveBeenCalledWith('default', 'Netflix'));
+    await waitFor(() => expect(mockAdd).toHaveBeenCalledWith('default', { name: 'Netflix' }));
     expect(await screen.findByText('Netflix')).toBeDefined();
     await waitFor(() => expect(input.value).toBe(''));
+  });
+
+  it('sends a pasted careers link as a url, not a name', async () => {
+    renderTab();
+    await screen.findByText(/No companies yet/);
+
+    const input = screen.getByLabelText('Company name or careers link') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'https://jobs.lever.co/umbra-hq' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+
+    await waitFor(() =>
+      expect(mockAdd).toHaveBeenCalledWith('default', { url: 'https://jobs.lever.co/umbra-hq' }),
+    );
+    expect(await screen.findByText('Umbra')).toBeDefined();
+  });
+
+  it('renders an unknown entry as unfinished with a paste input', async () => {
+    serverCompanies = [unknownCompany()];
+    renderTab();
+
+    expect(await screen.findByText('Umbra')).toBeDefined();
+    expect(screen.getByText(/Job board not found yet/)).toBeDefined();
+    expect(screen.getByLabelText('Careers link for Umbra')).toBeDefined();
+    // An unfinished row never renders as a healthy board line.
+    expect(screen.queryByText(/open roles/)).toBeNull();
+  });
+
+  it('completes an unknown entry from its pasted careers link', async () => {
+    serverCompanies = [unknownCompany()];
+    renderTab();
+    await screen.findByText(/Job board not found yet/);
+
+    const input = screen.getByLabelText('Careers link for Umbra');
+    fireEvent.change(input, { target: { value: 'https://jobs.lever.co/umbra-hq' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save link for Umbra' }));
+
+    await waitFor(() =>
+      expect(mockAdd).toHaveBeenCalledWith('default', {
+        name: 'Umbra',
+        url: 'https://jobs.lever.co/umbra-hq',
+      }),
+    );
+    expect(await screen.findByText(/Lever board/)).toBeDefined();
+    await waitFor(() => expect(screen.queryByText(/Job board not found yet/)).toBeNull());
+  });
+
+  it('surfaces the add response message when discovery fails', async () => {
+    mockAdd.mockImplementation((_profile, payload) => {
+      serverCompanies.push(unknownCompany(payload.name ?? ''));
+      return respond('Could not find a job board for Umbra. Paste its careers page link to finish setup.');
+    });
+    renderTab();
+    await screen.findByText(/No companies yet/);
+
+    fireEvent.change(screen.getByLabelText('Company name or careers link'), {
+      target: { value: 'Umbra' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+
+    expect(
+      await screen.findByText(
+        'Could not find a job board for Umbra. Paste its careers page link to finish setup.',
+      ),
+    ).toBeDefined();
+    expect(await screen.findByText(/Job board not found yet/)).toBeDefined();
+  });
+
+  it('shows the server message when a pasted link is rejected', async () => {
+    const rejection = Object.assign(
+      new Error(
+        'Paste a careers link from Greenhouse, Lever, Ashby, or Workday. Other job boards are not supported yet.',
+      ),
+      { status: 422 },
+    );
+    mockAdd.mockRejectedValue(rejection);
+    renderTab();
+    await screen.findByText(/No companies yet/);
+
+    fireEvent.change(screen.getByLabelText('Company name or careers link'), {
+      target: { value: 'https://example.com/careers' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+
+    expect(
+      await screen.findByText(
+        'Paste a careers link from Greenhouse, Lever, Ashby, or Workday. Other job boards are not supported yet.',
+      ),
+    ).toBeDefined();
   });
 
   it('disables the add button while the add is in flight', async () => {
     let release: () => void = () => {};
     mockAdd.mockImplementation(
-      (_profile, name) =>
+      (_profile, payload) =>
         new Promise((resolve) => {
           release = () => {
-            serverCompanies.push(company({ name, ats: '', job_count: 0, careers_url: '' }));
+            applyAdd(payload);
             respond().then(resolve);
           };
         }),
@@ -122,7 +228,9 @@ describe('CompaniesTab', () => {
     renderTab();
     await screen.findByText(/No companies yet/);
 
-    fireEvent.change(screen.getByLabelText('Company name'), { target: { value: 'Netflix' } });
+    fireEvent.change(screen.getByLabelText('Company name or careers link'), {
+      target: { value: 'Netflix' },
+    });
     const button = screen.getByRole('button', { name: 'Add' });
     fireEvent.click(button);
 
@@ -142,6 +250,17 @@ describe('CompaniesTab', () => {
     await waitFor(() => expect(screen.queryByText('Alo Yoga')).toBeNull());
   });
 
+  it('still removes an entry whose board was never found', async () => {
+    serverCompanies = [unknownCompany()];
+    renderTab();
+    await screen.findByText('Umbra');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Umbra' }));
+
+    await waitFor(() => expect(mockRemove).toHaveBeenCalledWith('default', 'Umbra'));
+    await waitFor(() => expect(screen.queryByText('Umbra')).toBeNull());
+  });
+
   it('shows a plain line when the list cannot load', async () => {
     mockGet.mockRejectedValue(new Error('boom'));
     renderTab();
@@ -156,7 +275,9 @@ describe('CompaniesTab', () => {
     renderTab();
     await screen.findByText(/No companies yet/);
 
-    fireEvent.change(screen.getByLabelText('Company name'), { target: { value: 'Netflix' } });
+    fireEvent.change(screen.getByLabelText('Company name or careers link'), {
+      target: { value: 'Netflix' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
 
     expect(

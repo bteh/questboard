@@ -798,6 +798,34 @@ def _annualize_raw_salary(value: float | None, period: str | None) -> float | No
     return value
 
 
+def watchlist_tokens_by_ats(raw_watchlist: list, resolve) -> dict[str, list[str]]:
+    """Group watchlist board tokens by ATS, trusting stored tokens first.
+
+    Entries carrying a confirmed ats/slug keep them verbatim; a company the
+    catalog does not know (BILL -> billcom) must never lose its token to a
+    failed re-resolution. Bare names and unknown entries go through
+    ``resolve`` (the company catalog). Tokens dedupe per ATS.
+    """
+    by_ats: dict[str, list[str]] = {}
+
+    def _add(ats: str, slug: str) -> None:
+        if ats and slug and ats != "unknown" and slug not in by_ats.setdefault(ats, []):
+            by_ats[ats].append(slug)
+
+    unresolved: list[str] = []
+    for entry in raw_watchlist:
+        if isinstance(entry, dict) and entry.get("slug") and entry.get("ats", "unknown") != "unknown":
+            _add(entry["ats"], entry["slug"])
+        else:
+            name = entry.get("name", "") if isinstance(entry, dict) else str(entry)
+            if name:
+                unresolved.append(name)
+    if unresolved:
+        for entry in resolve(unresolved):
+            _add(entry.get("ats", ""), entry.get("slug", ""))
+    return {ats: slugs for ats, slugs in by_ats.items() if slugs}
+
+
 def _job_salary_passes(job: dict, hard_floor: float) -> bool:
     """Return True if the job's salary meets the hard floor, or is unknown.
 
@@ -1375,23 +1403,12 @@ class JobFinderPipeline:
                     enabled_names.append(name)
 
             # Build watchlist_by_ats from profile config + company catalog.
-            # The catalog resolves company names (e.g. "Anthropic") to their
-            # ATS platform and slug automatically, so users don't need to
-            # know about Greenhouse/Lever/Ashby internals.
+            # Entries that carry a confirmed ats/slug (discovery or a pasted
+            # careers link stored them) are trusted as-is; only bare names
+            # and unknowns go through the catalog.
             from job_finder.config.company_catalog import resolve_watchlist
             raw_watchlist = self.config.get("watchlist", [])
-            # Also resolve any target companies that are just names
-            target_company_names = [
-                entry.get("name", entry) if isinstance(entry, dict) else entry
-                for entry in raw_watchlist
-            ]
-            resolved = resolve_watchlist(target_company_names)
-            watchlist_by_ats: dict[str, list[str]] = {}
-            for entry in resolved:
-                ats = entry.get("ats", "")
-                slug = entry.get("slug", "")
-                if ats and slug and ats != "unknown":
-                    watchlist_by_ats.setdefault(ats, []).append(slug)
+            watchlist_by_ats = watchlist_tokens_by_ats(raw_watchlist, resolve=resolve_watchlist)
             # Enable ATS scrapers that have watchlist companies (career only)
             for ats_name in watchlist_by_ats:
                 if (
