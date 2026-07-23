@@ -48,8 +48,11 @@ export function SearchPrefsTab({ onboarding, navigate }: SearchPrefsTabProps) {
     // list straight through (never the draft) so saving search prefs can't wipe
     // a company the user just added there.
     savePreferences.mutate({ ...prefsForm, companies: serverPrefs.companies }, {
+      // Send them to the board's Find work lane, where "Get new jobs" applies
+      // these defaults in place. The board is the home for the pull; the
+      // standalone restock page is the advanced surface, not a save landing.
       onSuccess: () => toast.success('Preferences saved', {
-        action: { label: 'Restock the board', onClick: () => navigate({ to: '/restock' }) },
+        action: { label: 'Get new jobs', onClick: () => navigate({ to: '/board', search: { v: 'work' } }) },
       }),
       onError: () => toast.error('Could not save your preferences. Try again in a minute.'),
     });
