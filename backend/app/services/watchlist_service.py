@@ -39,7 +39,7 @@ def _generate_slugs(company_name: str) -> list[str]:
 
     # Common suffixes
     for base in [hyphenated, joined]:
-        for suffix in ["inc", "hq", "io", "ai", "jobs"]:
+        for suffix in ["com", "inc", "hq", "io", "ai", "jobs"]:
             slugs.append(f"{base}{suffix}")
             if "-" not in base or suffix not in base:
                 slugs.append(f"{base}-{suffix}")
