@@ -199,6 +199,36 @@ def _word_padded_location(model):
     return literal(" ") + text + literal(" ")
 
 
+# The country-level US names a nationwide posting carries when it names no
+# city. Matched as a whole location or as a trailing segment of a multi-place
+# list, never as a substring, so "New York, United States" stays a NY role.
+_US_COUNTRY_TERMS = (
+    "united states of america",
+    "united states",
+    "u.s.a.",
+    "u.s.",
+    "usa",
+    "us",
+)
+
+
+def _looks_like_us_place(location: str) -> bool:
+    """True when the seeker's own typed place is a US country term."""
+    return location.strip().lower().rstrip(".") in {t.rstrip(".") for t in _US_COUNTRY_TERMS}
+
+
+def _nationwide_us_match(model):
+    """SQL for a location that is nationwide US: the whole string is a US
+    country term, or one is a full segment of a ';'-separated list."""
+    conds = []
+    for term in _US_COUNTRY_TERMS:
+        conds.append(func.lower(func.trim(model.location)) == term)
+        # a nationwide option inside "City, ST, US; ...; United States"
+        conds.append(func.lower(model.location).like(f"%; {term}"))
+        conds.append(func.lower(model.location).like(f"%;{term}"))
+    return or_(*conds)
+
+
 def place_filter(model, location: str | None, location_strict: bool = False):
     """The board's reachability filter as one condition, or None when unset.
 
@@ -223,6 +253,9 @@ def place_filter(model, location: str | None, location_strict: bool = False):
 
     metro = _metro_cities_for(location)
     aliases = state_aliases(location)
+    # A US city or state means US-nationwide postings ("United States" with no
+    # city) are reachable for this seeker.
+    seeker_is_us = bool(metro or aliases) or _looks_like_us_place(location)
     if metro:
         # "Los Angeles" also finds Beverly Hills / Santa Monica / etc. — the
         # seeker means the metro, not only rows that name the core city.
@@ -268,12 +301,20 @@ def place_filter(model, location: str | None, location_strict: bool = False):
         model.location.ilike("%anywhere%"),
         model.is_remote.is_(True),
     )
-    return or_(
+    reachable = [
         place_match,
         model.location.is_(None),
         model.location == "",
         and_(remote_ish, not_intl_only),
-    )
+    ]
+    # A bare country ("United States", "USA") is a nationwide posting: reachable
+    # from any US place. Gated on a US seeker so a non-US city never inherits it,
+    # and matched as a whole segment so "New York, United States" (a specific NY
+    # role) is not swept in, while "...; United States" (a nationwide option in a
+    # multi-location list) is.
+    if seeker_is_us:
+        reachable.append(_nationwide_us_match(model))
+    return or_(*reachable)
 
 
 def board_filter_conditions(
