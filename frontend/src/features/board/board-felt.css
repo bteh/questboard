@@ -123,10 +123,18 @@
 .qb-workactions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
 .qb-workactions-note { font-size: 12.5px; color: var(--mute); }
 .qb-workactions-note .qb-textlink { font-size: inherit; }
+/* names the demoted tray's job so it never reads as the pull's config */
+.qb-tray-caption {
+  margin: 12px 0 0;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  letter-spacing: .03em;
+  color: var(--soft);
+}
 /* quieter than the quest tray on purpose: no raised paper, no bottom edge,
    so the row reads as filters and never as the page's search form */
 .qb-worktool .qb-tray {
-  margin-top: 12px;
+  margin-top: 6px;
   background: transparent;
   border-color: var(--hair);
   border-bottom: 1px solid var(--hair);

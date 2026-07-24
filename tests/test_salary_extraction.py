@@ -46,7 +46,47 @@ from job_finder.tools.scrapers._utils import (  # noqa: E402
         # up to -> max only
         ("earn up to $170,000", None, 170000.0, "annual"),
         ("up to $170k for senior candidates", None, 170000.0, "annual"),
+        # single annual figure with an annual anchor after it -> min only
+        ("This role pays $130,000/year", 130000.0, None, "annual"),
+        ("$180k per annum", 180000.0, None, "annual"),
+        ("Base is $150,000 annually", 150000.0, None, "annual"),
+        # single annual figure introduced by a salary/comp preamble -> min only
+        ("The base salary range for this position is $180,000", 180000.0, None, "annual"),
+        ("Compensation: $200,000", 200000.0, None, "annual"),
+        # 'USD'/'US$' ISO forms let a symbol-less range parse
+        ("USD 140,000 - 180,000 per year", 140000.0, 180000.0, "annual"),
+        ("US$130,000/year", 130000.0, None, "annual"),
+        # a stated range still wins over the single-value reading
+        ("$272,000 to $306,000 + equity", 272000.0, 306000.0, "annual"),
         # ── negative cases: numbers that are NOT salaries ────────────────
+        # sub-floor fees/stipends stay unparsed even with a comp label
+        ("Compensation: $250", None, None, None),
+        ("Salary: $700 signing bonus", None, None, None),
+        # a bare number with no currency symbol and no ISO code never parses
+        ("Salary: 90,000 - 120,000 per year", None, None, None),
+        ("This role pays 130,000/year", None, None, None),
+        # a 401k retirement match near a 'salary' word is not a $401,000 salary
+        ("Competitive Base Salary plus Pre-IPO Equity 401k Matching up to 4%", None, None, None),
+        ("Base Salary and 401k matching", None, None, None),
+        # a bare 401k figure a 'salary' word precedes, past a comma/word/period
+        ("Competitive salary, 401k, and health insurance", None, None, None),
+        ("We offer a great salary and 401k plan", None, None, None),
+        ("Competitive base salary plus 401k.", None, None, None),
+        # a single figure that is explicitly a bonus/stipend, not base pay
+        ("Competitive salary and a $30,000 annual bonus", None, None, None),
+        ("Base salary plus a $25,000 relocation stipend", None, None, None),
+        # company money stated as "$X per year", not pay
+        ("We are generating $250,000 per year", None, None, None),
+        ("Our platform processes $500,000 per year in fees", None, None, None),
+        # a range whose lead noun marks it as a bonus/equity/budget/ARR, not base pay
+        ("The annual bonus is $30k-$40k.", None, None, None),
+        ("Equity grant value: $100k-$150k.", None, None, None),
+        ("Our annual marketing budget is $140k-$170k.", None, None, None),
+        ("ARR was $140k-$170k.", None, None, None),
+        ("401(k) contribution is $25k-$30k per year.", None, None, None),
+        # a single base salary followed by a SEPARATE bonus/equity item still parses
+        ("Base salary is $150,000 per year plus a bonus.", 150000.0, None, "annual"),
+        ("Base salary is $150,000 per year plus an equity grant.", 150000.0, None, "annual"),
         ("5 years experience required", None, None, None),
         ("401k matching and great benefits", None, None, None),
         ("401(k) with company match", None, None, None),
@@ -143,3 +183,23 @@ def test_finalize_no_salary_anywhere():
     assert out.get("salary_min") is None
     assert out.get("salary_max") is None
     assert out["salary_source"] is None
+
+
+def test_iso_form_maps_currency_to_usd():
+    """The symbol-less 'USD' anchor still records the currency as USD."""
+    result = extract_salary_range("USD 140,000 - 180,000 per year")
+    assert result.currency == "USD"
+
+
+def test_finalize_parses_single_annual_figure():
+    """A greenhouse-style single stated figure fills salary_min, not 'not stated'."""
+    job = {
+        "title": "Data Engineer",
+        "description": "The base salary range for this position is $180,000.",
+        "salary_min": None,
+        "salary_max": None,
+    }
+    out = finalize_scraper_jobs([job])[0]
+    assert out["salary_min"] == 180000.0
+    assert out["salary_max"] is None
+    assert out["salary_source"] == "parsed_from_description"

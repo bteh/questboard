@@ -986,6 +986,7 @@ def location_matches_preferences(
     work_type: str = "",
     preferred_places: list[dict[str, Any]] | None = None,
     preferred_countries: list[str] | None = None,
+    nationwide_ok: bool = True,
 ) -> bool:
     """Check if a job location matches user preferences.
 
@@ -1031,8 +1032,11 @@ def location_matches_preferences(
 
     # A bare-country "United States" role is nationwide: reachable from any US
     # place. Without this it reads as an onsite job elsewhere and gets purged,
-    # which hid every US-wide posting from a seeker who saved a US city.
-    if _is_nationwide_us(job_location) and _seeker_is_us(
+    # which hid every US-wide posting from a seeker who saved a US city. The
+    # rescue is for UNCERTAIN bare-country rows; a caller that just got a
+    # confident hybrid/onsite verdict from AI passes nationwide_ok=False so a
+    # remote-washed role can't be kept as nationwide after it's unmasked.
+    if nationwide_ok and _is_nationwide_us(job_location) and _seeker_is_us(
         preferred_countries, preferred_states, preferred_cities, preferred_places
     ):
         return True

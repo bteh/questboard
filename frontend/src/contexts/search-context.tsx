@@ -241,7 +241,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
                 return;
               }
               if (s.status === 'failed') {
-                setError(s.error || 'The run failed.');
+                setError(s.error || 'The run failed');
                 setState('failed');
                 return;
               }
@@ -252,7 +252,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
           }
           // Gave up after ~90s with no terminal status.
           setState((prev) => (prev === 'running' ? 'failed' : prev));
-          setError((prev) => prev || 'Lost contact with the run. Your board may still have updated.');
+          setError((prev) => prev || 'Lost contact with the run. Your board may still have updated');
         })();
       }
       // readyState === CONNECTING means EventSource is auto-reconnecting

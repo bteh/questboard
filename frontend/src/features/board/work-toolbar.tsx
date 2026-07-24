@@ -1,16 +1,17 @@
-/* The Jobs lane's top block, in reading order. The actions row leads with
-   the one filled "Get new jobs" button and says in plain words what it
-   pulls (saved target roles, editable in Settings); the assistant's ranking
-   door sits on the same row, and the run status line reports on the pull.
-   The filter tray sits demoted below: four fields that only narrow rows
-   already on the board, with no button, so it cannot read as a search form.
-   Only "Get new jobs" touches the network, through the same pipeline the
-   Restock page runs. The line under the filters states only what the data
-   backs. */
+/* The Jobs lane's top block, in reading order. The actions row is one filled
+   button. When the local assistant is ready it reads the resume, pulls, and
+   ranks; otherwise it does the plain pull. Either way the receipt beside it
+   says in plain words what the click will do, and one status line under it
+   reports on whichever run is live. The filter tray sits demoted below: four
+   fields that only narrow rows already on the board, with no button, so it
+   cannot read as a search form. Only the top button touches the network,
+   through the same pipeline the Restock page runs. The line under the
+   filters states only what the data backs. */
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Link } from '@tanstack/react-router';
+import { Loader2 } from 'lucide-react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { CoinsDollarIcon, Search01Icon } from '@hugeicons/core-free-icons';
 import { SageButton } from '@questboard/ui';
@@ -25,9 +26,15 @@ import {
   type PostedDaysKey,
 } from '@/features/board/posted-filter';
 import { useRunWorkSearch } from '@/features/board/use-run-work-search';
+import { useAssistantReady } from '@/features/board/use-assistant-ready';
+import { useRunAssistant } from '@/features/board/use-run-assistant';
 import { consumeFirstRunPending } from '@/components/onboarding/first-run';
 import { useOnboardingState } from '@/hooks/use-workspace';
 import { formatStatedPay, parseAmount } from '@/utils/board-card';
+
+/* The assistant run's three phases, gated by elapsed seconds so the status
+   line moves while the local Claude works. */
+const PHASES = ['Reading your resume', 'Pulling fresh postings', 'Ranking against your experience'];
 
 interface WorkToolbarProps {
   /** the board summary's honest "sources checked Xh ago", or null */
@@ -36,8 +43,6 @@ interface WorkToolbarProps {
   shownCount?: number;
   /** every job on the lane before the toolbar filters bite */
   laneTotal?: number;
-  /** the assistant's ranking door, rendered inside the actions row */
-  assistantSlot?: ReactNode;
   search: string;
   onSearch: (value: string) => void;
   place: string;
@@ -70,9 +75,16 @@ const WORKPLACE_WORDS: Record<string, string> = {
   location_only: 'on location',
 };
 
-/* The full receipt of the saved search the pull will run: roles, place,
+/* Which run the one button fires: the assistant (pull plus ranking) when it's
+   ready, the plain pull otherwise. Pinned in work-toolbar.test.ts. */
+export function primaryRunKind(assistantReady: boolean): 'assistant' | 'pull' {
+  return assistantReady ? 'assistant' : 'pull';
+}
+
+/* The full receipt of the saved search the button will run: roles, place,
    remote stance, and pay floor on one line, so nobody has to open
-   Settings to learn what the button does. Undefined means still loading. */
+   Settings to learn what the click does. When the assistant is ready the lead
+   says it ranks too. Undefined means still loading. */
 export function pullReceipt(
   prefs:
     | {
@@ -82,6 +94,7 @@ export function pullReceipt(
         compensation: { min_base: number | null };
       }
     | undefined,
+  assistantReady = false,
 ): string {
   if (prefs === undefined) return 'Pulls fresh postings for your target roles.';
   if (!prefs.roles.length) return 'No target roles saved yet.';
@@ -89,7 +102,10 @@ export function pullReceipt(
     prefs.roles.length === 1
       ? prefs.roles[0]
       : `${prefs.roles[0]} and ${prefs.roles.length - 1} more role${prefs.roles.length > 2 ? 's' : ''}`;
-  const parts = [`Pulls fresh postings for ${roles}`];
+  const lead = assistantReady
+    ? `Pulls fresh postings and ranks them for ${roles}`
+    : `Pulls fresh postings for ${roles}`;
+  const parts = [lead];
   if (prefs.preferred_places.length > 0) parts.push(prefs.preferred_places[0].label);
   const stance = WORKPLACE_WORDS[prefs.workplace_preference];
   if (stance) parts.push(stance);
@@ -211,11 +227,29 @@ function RunStatusLine() {
   return null;
 }
 
+/* The assistant run's own report, in the same slot as the pull's line but
+   driven by a plain elapsed clock (the local agent has no SSE feed). Phases
+   advance by seconds; only one of the two lines mounts at a time. */
+function AssistantRunLine() {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setElapsed((s) => s + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+  const phase = elapsed < 8 ? PHASES[0] : elapsed < 100 ? PHASES[1] : PHASES[2];
+  const clock = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
+  return (
+    <p className="qb-workline" role="status">
+      <Loader2 className="h-4 w-4 animate-spin text-brand" aria-hidden="true" />
+      {phase} · <span className="qb-num">{clock}</span>. Keep browsing while it runs.
+    </p>
+  );
+}
+
 export function WorkToolbar({
   checkedAgo,
   shownCount,
   laneTotal,
-  assistantSlot,
   search,
   onSearch,
   place,
@@ -230,6 +264,31 @@ export function WorkToolbar({
   onPostedDays,
 }: WorkToolbarProps) {
   const { run, ready, running } = useRunWorkSearch();
+  const { ready: assistantReady, isDesktop, loading: assistantLoading } = useAssistantReady();
+  const assistant = useRunAssistant();
+  const kind = primaryRunKind(assistantReady);
+  const [lastRun, setLastRun] = useState<'assistant' | 'pull' | null>(null);
+
+  // One button, two runs. The assistant path (pull + rank) wins when ready;
+  // the plain pull is the fallback. Disable while either is in flight, and
+  // while assistant readiness is still loading so a click can't fire the plain
+  // pull a beat before we learn the assistant is connected.
+  const pending = assistant.isPending || running;
+  const startPrimary = () => {
+    if (pending) return;
+    if (kind === 'assistant') {
+      setLastRun('assistant');
+      assistant.start();
+      return;
+    }
+    setLastRun('pull');
+    run();
+  };
+  const primaryLabel = assistant.isPending
+    ? 'Finding & ranking…'
+    : running
+      ? 'Getting jobs…'
+      : 'Get new jobs';
 
   /* First-run hand-off: onboarding marks a flag and routes here, so the new
      user's first pull fires on its own. The flag is read (and cleared) once,
@@ -251,7 +310,7 @@ export function WorkToolbar({
   const { data: onboarding } = useOnboardingState();
   const prefs = onboarding?.preferences;
   const savedRoles = onboarding ? (prefs?.roles ?? []) : undefined;
-  const noteText = pullReceipt(onboarding ? prefs : undefined);
+  const noteText = pullReceipt(onboarding ? prefs : undefined, assistantReady);
   const noteLink = savedRoles && savedRoles.length === 0 ? 'Set roles' : 'Edit search';
 
   const payFloor = parseAmount(payFrom.trim());
@@ -288,18 +347,38 @@ export function WorkToolbar({
   return (
     <div className="qb-worktool">
       <div className="qb-workactions">
-        <SageButton onClick={run} disabled={!ready}>
-          {running ? 'Getting jobs…' : 'Get new jobs'}
+        <SageButton
+          onClick={startPrimary}
+          disabled={pending || assistantLoading || (kind === 'pull' && !ready)}
+        >
+          {primaryLabel}
         </SageButton>
         <span className="qb-workactions-note" title={savedRoles?.join(', ') || undefined}>
           {noteText}{' '}
           <Link to="/settings" search={{ tab: 'restock' }} className="qb-textlink">
             {noteLink}
           </Link>
+          {isDesktop && !assistantReady && (
+            <>
+              {' · '}
+              <Link to="/settings" search={{ tab: 'assistant' }} className="qb-textlink">
+                Connect your assistant to rank
+              </Link>
+            </>
+          )}
         </span>
-        {assistantSlot}
       </div>
-      <RunStatusLine />
+      {/* The assistant run has no SSE line of its own, so after it finishes the
+          toast is the report and the inline line clears. Only a plain pull owns
+          RunStatusLine, so its stale "N new" can't reappear under a rank. */}
+      {lastRun === 'assistant' ? (
+        assistant.isPending ? (
+          <AssistantRunLine />
+        ) : null
+      ) : (
+        <RunStatusLine />
+      )}
+      <p className="qb-tray-caption">Narrow what's on the board</p>
       <div className="qb-tray" role="search">
         <label className="qb-tray-field qb-tray-grow">
           <HugeiconsIcon icon={Search01Icon} size={16} strokeWidth={1.7} />

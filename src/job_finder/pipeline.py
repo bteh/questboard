@@ -2077,6 +2077,10 @@ class JobFinderPipeline:
         to hybrid/onsite we need to re-run the same location gate or those jobs
         leak back into the final saved results.
         """
+        # Read and clear the transient AI-downgrade marks up front, so they never
+        # reach the saved record even on the early return below. A downgraded row
+        # forfeits the nationwide bare-country rescue; an untouched row keeps it.
+        downgraded_ids = {id(j) for j in jobs if j.pop("_ai_downgraded", False)}
         loc_prefs = self.config.get("location_preferences", {})
         (
             pref_locations, pref_states, pref_cities, pref_places,
@@ -2088,8 +2092,8 @@ class JobFinderPipeline:
         if not (pref_locations or pref_states or pref_cities or pref_places or remote_only or not include_remote):
             return jobs
 
-        filtered = [
-            job for job in jobs
+        filtered = []
+        for job in jobs:
             if location_matches_preferences(
                 job.get("location", ""),
                 job.get("is_remote", False),
@@ -2101,8 +2105,9 @@ class JobFinderPipeline:
                 work_type=job.get("work_type", ""),
                 preferred_places=pref_places,
                 preferred_countries=pref_countries,
-            )
-        ]
+                nationwide_ok=id(job) not in downgraded_ids,
+            ):
+                filtered.append(job)
         dropped = len(jobs) - len(filtered)
         if dropped and progress:
             progress(
@@ -2164,6 +2169,7 @@ class JobFinderPipeline:
                 if ai_score:
                     # Check if AI corrected the work type
                     ai_wt = ai_score.get("work_type")
+                    was_remote = bool(job.get("is_remote")) or job.get("work_type") == "remote"
                     if ai_wt in ("remote", "hybrid", "onsite") and ai_wt != job.get("work_type"):
                         work_type_corrections += 1
                         logger.info(
@@ -2176,6 +2182,13 @@ class JobFinderPipeline:
                     if ai_wt in ("remote", "hybrid", "onsite"):
                         job["work_type"] = ai_wt
                         job["is_remote"] = ai_wt == "remote"
+                        # Remote-washing unmasked: a row admitted as remote that
+                        # AI now calls hybrid/onsite must not keep its nationwide
+                        # "United States" rescue in the recheck, since it really
+                        # needs an office. A row that was never remote (a genuine
+                        # nationwide onsite posting) keeps the rescue.
+                        if ai_wt in ("hybrid", "onsite") and was_remote:
+                            job["_ai_downgraded"] = True
                 else:
                     # LLM returned None — fall back to keyword scoring for this job
                     self._keyword_score_single(job, resume_text)

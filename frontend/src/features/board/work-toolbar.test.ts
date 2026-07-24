@@ -4,7 +4,7 @@
    "profile candidates") stays gone. */
 
 import { describe, expect, it } from 'vitest';
-import { filterPlaceholder, filterStatusText, pullReceipt } from './work-toolbar';
+import { filterPlaceholder, filterStatusText, primaryRunKind, pullReceipt } from './work-toolbar';
 
 describe('the filter box placeholder', () => {
   it('carries the loaded total', () => {
@@ -129,6 +129,12 @@ describe('pullReceipt', () => {
     );
   });
 
+  it('says it ranks too when the assistant is ready', () => {
+    expect(pullReceipt(prefs as never, true)).toBe(
+      'Pulls fresh postings and ranks them for Data Engineering Manager and 1 more role · Los Angeles, CA · remote friendly · $190K+ base.',
+    );
+  });
+
   it('omits what is not saved', () => {
     expect(
       pullReceipt({
@@ -153,5 +159,15 @@ describe('pullReceipt', () => {
 
   it('holds the generic line while loading', () => {
     expect(pullReceipt(undefined)).toBe('Pulls fresh postings for your target roles.');
+  });
+});
+
+describe('primaryRunKind', () => {
+  it('runs the assistant when it is ready', () => {
+    expect(primaryRunKind(true)).toBe('assistant');
+  });
+
+  it('falls back to a plain pull when the assistant is not ready', () => {
+    expect(primaryRunKind(false)).toBe('pull');
   });
 });

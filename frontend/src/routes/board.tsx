@@ -60,7 +60,6 @@ import { JobsSetupStrip } from '@/features/board/jobs-callout';
 import { showBankBonusBridge } from '@/features/board/bridge-line';
 import { WorkToolbar } from '@/features/board/work-toolbar';
 import { SourceCategoryChips } from '@/features/board/source-category-chips';
-import { AssistantRunButton } from '@/features/board/assistant-run-button';
 import {
   advanceWorkCutoff,
   countNewSince,
@@ -779,9 +778,6 @@ function BoardPage() {
               checkedAgo={checkedAgo}
               shownCount={total}
               laneTotal={workLaneTotal}
-              assistantSlot={
-                <AssistantRunButton rowCount={visibleItems.length} hasVerdicts={hasAgentVerdicts} />
-              }
               search={searchRaw}
               onSearch={setSearchRaw}
               place={placeRaw}

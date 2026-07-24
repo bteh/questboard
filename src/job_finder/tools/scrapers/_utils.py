@@ -200,11 +200,14 @@ _SAL_NUM = r"\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?"
 _SAL_SEP = r"\s*(?:-|–|—|to)\s*"
 _SAL_HOURLY_SUFFIX = r"\s*(?:/\s*(?:hr|hour)\b|per\s+hour\b|an\s+hour\b|hourly\b)"
 
-# Currency symbols we recognize in salary text. '$' stays currency-unknown
-# (USD/CAD/AUD are indistinguishable from the symbol alone); euro and pound
-# are unambiguous and map to a real ISO code.
-_SAL_CUR = r"[$€£]"
-_SAL_CURRENCY_CODES = {"€": "EUR", "£": "GBP"}
+# Currency anchors in salary text. '$' stays currency-unknown (USD/CAD/AUD are
+# indistinguishable from the symbol alone); '€'/'£' and the explicit 'USD'/'US$'
+# ISO forms are unambiguous and map to a real code. The ISO forms let a range
+# with no symbol anchor ("USD 140,000 - 180,000 per year") parse; a bare number
+# with neither a symbol nor an ISO code still never does. Matched case-sensitive
+# (the salary regexes are non-IGNORECASE) so 'us' inside a word can't anchor pay.
+_SAL_CUR = r"(?:US\$|USD|[$€£])"
+_SAL_CURRENCY_CODES = {"€": "EUR", "£": "GBP", "USD": "USD", "US$": "USD"}
 
 # One salary amount: optional currency symbol, the number, optional k suffix.
 # The leading lookbehind keeps us from matching inside a larger token
@@ -225,10 +228,30 @@ _SAL_HOURLY_SINGLE_RE = re.compile(
 )
 _SAL_UP_TO_RE = re.compile(rf"up\s+to\s+{_SAL_AMOUNT}", re.IGNORECASE)
 
+# Single annual figure with an explicit annual anchor after the amount
+# ("$130,000/year", "$180k per annum"). The (?i:) scopes case-insensitivity to
+# the anchor words only, so the case-sensitive currency codes above still hold.
+_SAL_ANNUAL_SUFFIX = (
+    r"\s*(?i:/\s*yr|/\s*year|/\s*annum|per\s+year|per\s+annum|a\s+year|annually)\b"
+)
+_SAL_ANNUAL_SINGLE_RE = re.compile(rf"{_SAL_AMOUNT}{_SAL_ANNUAL_SUFFIX}")
+_SAL_SINGLE_RE = re.compile(_SAL_AMOUNT)
+
+# A salary/compensation preamble in the same clause just before a single amount
+# ("The base salary range for this position is $180,000"). Bounded to one clause
+# and 40 chars so an unrelated later dollar figure never inherits the preamble.
+_SAL_PAY_LEAD_RE = re.compile(
+    r"(?:base\s+salary|salary\s+range|salary|compensation)\b[^.!?\n]{0,40}$",
+    re.IGNORECASE,
+)
+
 # Text right after a candidate match that marks it as NOT a salary:
-# percentages, durations, headcounts/traffic figures, 401(k) plans.
+# percentages, durations, headcounts/traffic figures, 401(k) plans. 'match(ing)'
+# and 'contribution' catch a retirement figure whose k is captured into the
+# amount ("401k Matching"), where the '(k)' rule can't see it.
 _SAL_BAD_TRAIL_RE = re.compile(
     r"^\s*(?:%|percent\b|years?\b|yrs?\b|\(?k\)|"
+    r"match(?:ing|es|ed)?\b|contributions?\b|"
     r"bonus\b|stipend\b|sign[- ]?on\b|signing\b|"
     r"\+?\s*(?:users|customers|clients|employees|engineers|people|members|"
     r"hires|downloads|installs|requests|visitors|followers|subscribers)\b)",
@@ -240,18 +263,33 @@ _SAL_BAD_TRAIL_RE = re.compile(
 # the SAME clause is rejected ("a $140k-$170k marketing budget").
 _SAL_BAD_CLAUSE_NOUN_RE = re.compile(
     r"\b(?:budgets?|revenues?|valuations?|funding|fundrais\w*|pre-?seed|"
-    r"round|mrr|arr|gmv|transactions?)\b",
+    r"round|mrr|arr|gmv|transactions?|fees?|sales|savings)\b",
     re.IGNORECASE,
 )
 _SAL_CLAUSE_END_RE = re.compile(r"[.!?\n;:,]")
 
-# Funding/revenue context directly BEFORE the amount ("raised a $500k…",
-# "revenue up to $170k"). Anchored adjacent on purpose: "raised our salary
-# bands to $140k" must still parse.
+# A not-pay noun directly BEFORE the amount marks it as company money or a comp
+# extra, not base pay ("the annual bonus is $30k", "ARR was $140k", "equity
+# grant value: $100k", "401(k) contribution is $25k"). The noun must sit
+# adjacent to the amount (optionally through one linking word like is/was/of/
+# value), so "raised our salary bands to $140k" and "our budget for this role
+# is $140k" still parse: their bad noun is not next to the figure.
 _SAL_BAD_LEAD_RE = re.compile(
-    r"\b(?:rais(?:e[sd]?|ing)|valued\s+at|valuations?(?:\s+of)?|"
-    r"budgets?\s+of|revenues?(?:\s+of)?|funding(?:\s+of)?|"
-    r"mrr|arr|gmv)\s+(?:an?\s+)?$",
+    r"\b(?:rais(?:e[sd]?|ing)|valued\s+at|valuations?|"
+    r"budgets?|revenues?|funding|generat(?:e|es|ing)|process(?:es|ing|ed)?|"
+    r"bonus(?:es)?|equity|grants?|stipends?|contributions?|"
+    r"mrr|arr|gmv)"
+    r"\s+(?:of\s+|an?\s+|is\s+|was\s+|were\s+|value[:\s]+|[:=]\s*)?$",
+    re.IGNORECASE,
+)
+
+# A single stated figure whose trailing clause marks it as NOT base pay: a
+# bonus/stipend/equity grant, or company money (fees/revenue/budget). Only the
+# single-value paths consult this; a stated range is the base pay even when a
+# bonus is mentioned after it ("$140k-$170k plus a bonus"), so ranges skip it.
+_SAL_SINGLE_BAD_TRAIL_RE = re.compile(
+    r"\b(?:bonus|stipend|relocation|signing|sign[- ]?on|equity|grants?|"
+    r"fees?|sales|savings|revenues?|budgets?)\b",
     re.IGNORECASE,
 )
 
@@ -310,6 +348,65 @@ def _sal_currency(*symbols: str | None) -> str | None:
     return None
 
 
+# The amount a single-value path is about to take is the tail of a range the
+# earlier range paths already ruled on ("...$25k-$30k per year"). Taking it
+# alone would resurrect a figure a range guard just rejected, so skip it.
+_SAL_RANGE_TAIL_RE = re.compile(r"(?:\d|[$€£k])\s*(?:-|–|—|to)\s*$", re.IGNORECASE)
+
+
+def _sal_is_range_tail(text: str, start: int) -> bool:
+    return bool(_SAL_RANGE_TAIL_RE.search(text[max(0, start - 12):start]))
+
+
+def _sal_single_not_base(text: str, end: int) -> bool:
+    """True when a preamble figure's trailing clause marks it as not base pay.
+
+    The preamble path grabs any figure after a 'salary' word, so a bonus,
+    stipend, or equity grant right after it ("$30,000 annual bonus") is a real
+    risk. The annual-anchor path skips this check: "$150,000 per year plus a
+    bonus" is base pay the anchor already vouches for, and the bonus is a
+    separate item after it.
+    """
+    trail_clause = _SAL_CLAUSE_END_RE.split(text[end:end + 60], 1)[0]
+    return bool(_SAL_SINGLE_BAD_TRAIL_RE.search(trail_clause))
+
+
+def _extract_single_annual(text: str) -> ExtractedSalary | None:
+    """A single stated annual figure (salary_max left None), else None.
+
+    Two shapes: an amount with an annual anchor after it ("$130,000/year") or an
+    amount a salary/compensation preamble introduces ("the base salary range for
+    this position is $180,000"). The preamble path requires a currency SYMBOL,
+    not merely a 'k' suffix, so a bare retirement token ("401k") that a 'salary'
+    word happens to precede never reads as $401,000, and rejects a trailing
+    bonus/stipend clause so "$30,000 annual bonus" is not pay. Both clear the
+    annual floor, so a bare number ("90,000 per year") and a sub-floor fee
+    ("Salary: $700") never parse.
+    """
+    for m in _SAL_ANNUAL_SINGLE_RE.finditer(text):
+        d, n, k = m.groups()
+        if _sal_is_range_tail(text, m.start()):
+            continue
+        if (d or k) and _sal_context_ok(text, m.start(), m.end()):
+            val = _sal_value(n, bool(k))
+            if _SAL_ANNUAL_MIN <= val <= _SAL_ANNUAL_MAX:
+                return ExtractedSalary(val, None, "annual", _sal_currency(d))
+    for m in _SAL_SINGLE_RE.finditer(text):
+        d, n, k = m.groups()
+        if not d or _sal_is_range_tail(text, m.start()):
+            continue
+        if not _SAL_PAY_LEAD_RE.search(text[:m.start()]):
+            continue
+        if not _sal_context_ok(text, m.start(), m.end()) or _sal_single_not_base(
+            text, m.end()
+        ):
+            continue
+        val = _sal_value(n, bool(k))
+        if _SAL_ANNUAL_MIN <= val <= _SAL_ANNUAL_MAX:
+            return ExtractedSalary(val, None, "annual", _sal_currency(d))
+    return None
+
+
 def extract_salary_range(text: str | None) -> ExtractedSalary:
     """Extract a raw (salary_min, salary_max, period, currency) from free text.
 
@@ -320,7 +417,11 @@ def extract_salary_range(text: str | None) -> ExtractedSalary:
     funding rounds, valuations, transaction volume — are rejected via
     same-clause context (:func:`_sal_context_ok`). Handles '$140k-$170k',
     '$140,000 to $170,000', '140-170k', 'between $X and $Y', hourly rates
-    ('$45/hr', '$45 per hour'), and 'up to $X' (max only).
+    ('$45/hr', '$45 per hour'), 'up to $X' (max only), a single annual figure
+    carrying an annual anchor or a salary preamble ('$130,000/year', 'the base
+    salary range ... is $180,000'), and the 'USD'/'US$' ISO forms so a
+    symbol-less range ('USD 140,000 - 180,000 per year') parses. A bare number
+    with no symbol and no ISO code never parses.
 
     Values are returned RAW with the pay period alongside ('hourly' rates are
     NOT annualized here — callers that need annual figures use the
@@ -375,6 +476,11 @@ def extract_salary_range(text: str | None) -> ExtractedSalary:
         val = _sal_value(n, bool(k))
         if _SAL_ANNUAL_MIN <= val <= _SAL_ANNUAL_MAX:
             return ExtractedSalary(None, val, "annual", _sal_currency(d))
+
+    # Single annual value last, so any range/hourly/up-to reading wins first.
+    single = _extract_single_annual(text)
+    if single is not None:
+        return single
 
     return _EMPTY_SALARY
 

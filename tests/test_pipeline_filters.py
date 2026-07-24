@@ -595,6 +595,60 @@ class AIWorkTypeCorrectionLocationFilterTest(unittest.TestCase):
         self.assertNotIn("Autodesk", companies)
         self.assertIn("RemoteCo", companies)
 
+    def test_nationwide_rescue_survives_for_uncorrected_onsite_us(self) -> None:
+        """A remote-washed role triggers the recheck, but a genuinely nationwide
+        "United States" role the AI does NOT downgrade must still pass via the
+        nationwide rescue. This is the ex-employer/BILL case (is_remote=False,
+        bare "United States", classified onsite) that round 12 exists to keep."""
+
+        class _FakeLLM:
+            is_configured = True
+
+        class _Pipeline(JobFinderPipeline):
+            def score_job_with_ai(self, job: dict, _resume_text: str) -> dict | None:
+                # "Washed" claimed remote but is really hybrid; "BillCo" stays onsite.
+                wt = "hybrid" if job["company"] == "Washed" else "onsite"
+                return {"overall_score": 85, "recommendation": "STRONG_APPLY", "work_type": wt}
+
+        pipe = _Pipeline(llm=_FakeLLM(), profile=None)
+        pipe.config = {
+            "locations": ["Los Angeles, CA", "Remote"],
+            "location_preferences": {
+                "filter_enabled": True,
+                "preferred_locations": ["Los Angeles, CA"],
+                "preferred_states": ["CA"],
+                "preferred_cities": ["Los Angeles"],
+                "preferred_places": [{
+                    "label": "Los Angeles, CA", "kind": "city", "match_scope": "city",
+                    "city": "Los Angeles", "region": "California", "country": "United States",
+                }],
+                "include_remote": True,
+                "remote_only": False,
+            },
+            "search_settings": {"ai_score_top_n": 0},
+        }
+
+        jobs = [
+            {  # remote-washed: admitted as remote, AI unmasks it as hybrid -> dropped
+                "title": "Staff Engineer", "company": "Washed", "location": "United States",
+                "url": "http://washed", "is_remote": True, "work_type": "remote",
+            },
+            {  # nationwide onsite the AI leaves as onsite -> kept via the rescue
+                "title": "Senior Staff Data Engineer", "company": "BillCo",
+                "location": "United States", "url": "http://billco",
+                "is_remote": False, "work_type": "onsite",
+            },
+        ]
+
+        scored = pipe._score_jobs_ai(jobs, "resume text")
+
+        companies = {job["company"] for job in scored}
+        self.assertNotIn("Washed", companies)
+        self.assertIn("BillCo", companies)
+        # The transient downgrade mark never leaks onto a saved record.
+        for job in scored:
+            self.assertNotIn("_ai_downgraded", job)
+
 
 class FunnelTrackingTest(unittest.TestCase):
     """The pipeline records a per-stage funnel so the UI can show drop counts."""

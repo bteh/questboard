@@ -36,6 +36,14 @@ Current repairs:
   'fuzzy', converts bare 10-13 digit epochs to the ISO instant they encode
   (confidence kept), and leaves rows with no usable date_found untouched.
 
+  salary_backfill v1 -- career rows saved before the parser learned single
+  stated figures ("$130,000/year", "the base salary range ... is $180,000")
+  and the 'USD'/'US$' ISO forms show "reward not stated" though the pay sits
+  in the description. The repair re-runs the same extractor a fresh pull uses
+  over rows with no pay at all, fills salary_min/max (+ currency, period,
+  annualized) with salary_source='parsed_from_description', and never
+  overwrites a value the scraper already reported.
+
 Runnable directly against a DB file:
 
     python -m job_finder.models.maintenance --db data/job_tracker.db
@@ -54,7 +62,11 @@ from html import unescape
 from sqlalchemy import create_engine, inspect, text
 
 from job_finder.dedup import cluster_jobs, is_protected_status, richness_key
-from job_finder.tools.scrapers._utils import _strip_html
+from job_finder.tools.scrapers._utils import (
+    _annualized_or_none,
+    _strip_html,
+    extract_salary_range,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -548,6 +560,92 @@ def repair_dates(engine, *, force: bool = False) -> int:
         return changed
 
 
+SALARY_REPAIR_NAME = "salary_backfill"
+SALARY_REPAIR_VERSION = 1
+
+# Columns the salary repair writes. All exist after _migrate_db; the guard in
+# repair_salaries skips the scan on a legacy DB reached before migration.
+_SALARY_WRITE_COLS = (
+    "salary_min", "salary_max", "salary_currency", "salary_period",
+    "salary_min_annualized", "salary_max_annualized", "salary_source",
+)
+
+
+def _scan_and_repair_salaries(conn) -> int:
+    """Backfill pay for career rows the improved parser can now read.
+
+    Only rows with no pay at all are touched (both salary_min and salary_max
+    null), so a value the scraper already reported is never overwritten. The
+    parser is the same one finalize_scraper_jobs runs, so backfilled rows match
+    what a fresh pull would store. Per-row failures are logged and skipped, one
+    weird description must never abort the repair.
+    """
+    rows = conn.execute(text(
+        "SELECT id, description FROM applications "
+        "WHERE (vertical IS NULL OR vertical = 'career') "
+        "AND salary_min IS NULL AND salary_max IS NULL "
+        "AND description IS NOT NULL AND description != ''"
+    )).fetchall()
+    changed = 0
+    for row_id, description in rows:
+        if not isinstance(description, str):
+            continue
+        try:
+            found = extract_salary_range(description)
+            if found.salary_min is None and found.salary_max is None:
+                continue
+            conn.execute(
+                text(
+                    "UPDATE applications SET "
+                    "salary_min = :mn, salary_max = :mx, "
+                    "salary_currency = :cur, salary_period = :per, "
+                    "salary_min_annualized = :mna, salary_max_annualized = :mxa, "
+                    "salary_source = 'parsed_from_description' WHERE id = :i"
+                ),
+                {
+                    "mn": found.salary_min,
+                    "mx": found.salary_max,
+                    "cur": found.currency or "",
+                    "per": found.period or "",
+                    "mna": _annualized_or_none(found.salary_min, found.period),
+                    "mxa": _annualized_or_none(found.salary_max, found.period),
+                    "i": row_id,
+                },
+            )
+            changed += 1
+        except Exception:
+            logger.warning(
+                "salary repair: row %s failed, skipping", row_id, exc_info=True,
+            )
+    return changed
+
+
+def repair_salaries(engine, *, force: bool = False) -> int:
+    """Run the salary backfill repair once; returns rows filled.
+
+    Same idempotency contract as the other repairs: the version marker skips
+    the scan on later calls (``force=True`` scans anyway), and a forced re-run
+    fills nothing new because parsed rows no longer match the both-null filter.
+    Scan, updates, and the marker share one transaction. Guarded on the salary
+    columns so a pre-migration DB reached through the CLI is a no-op.
+    """
+    inspector = inspect(engine)
+    has_applications = "applications" in inspector.get_table_names()
+    has_cols = False
+    if has_applications:
+        cols = {c["name"] for c in inspector.get_columns("applications")}
+        has_cols = set(_SALARY_WRITE_COLS).issubset(cols)
+    with engine.begin() as conn:
+        if (
+            _applied_version(conn, SALARY_REPAIR_NAME) >= SALARY_REPAIR_VERSION
+            and not force
+        ):
+            return 0
+        changed = _scan_and_repair_salaries(conn) if has_cols else 0
+        _record_version(conn, SALARY_REPAIR_NAME, SALARY_REPAIR_VERSION)
+        return changed
+
+
 def run_startup_repairs(engine) -> None:
     """Startup hook, called from ``database._migrate_db``. Never raises."""
     try:
@@ -583,14 +681,25 @@ def run_startup_repairs(engine) -> None:
         logger.warning(
             "date repair failed; will retry next launch", exc_info=True
         )
+    try:
+        filled = repair_salaries(engine)
+        if filled:
+            logger.info(
+                "salary repair v%d: backfilled %d row(s)",
+                SALARY_REPAIR_VERSION, filled,
+            )
+    except Exception:
+        logger.warning(
+            "salary repair failed; will retry next launch", exc_info=True
+        )
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
             "Run the one-time data repairs (description re-clean, cross-source "
-            "duplicate collapse, date re-clean) against a local DB. Safe to "
-            "re-run; version markers make later runs no-ops."
+            "duplicate collapse, date re-clean, salary backfill) against a "
+            "local DB. Safe to re-run; version markers make later runs no-ops."
         ),
     )
     parser.add_argument(
@@ -618,6 +727,7 @@ def main(argv: list[str] | None = None) -> int:
         changed = repair_descriptions(engine, force=args.force)
         collapsed = repair_duplicates(engine, force=args.force)
         converted = repair_dates(engine, force=args.force)
+        filled = repair_salaries(engine, force=args.force)
     finally:
         engine.dispose()
     print(
@@ -631,6 +741,10 @@ def main(argv: list[str] | None = None) -> int:
     print(
         f"date repair v{DATE_REPAIR_VERSION}: "
         f"{converted} date_posted row(s) converted in {db_path}"
+    )
+    print(
+        f"salary repair v{SALARY_REPAIR_VERSION}: "
+        f"{filled} row(s) backfilled in {db_path}"
     )
     return 0
 
