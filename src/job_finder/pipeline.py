@@ -1038,7 +1038,12 @@ def _backfill_linkedin_descriptions(
                     or soup.select_one("[class*='description']")
                 )
                 if desc_el:
-                    job["description"] = desc_el.get_text(separator="\n", strip=True)[:3000]
+                    # Parse the whole body, store an excerpt. LinkedIn puts the
+                    # hiring range last, so truncating first hides the pay from
+                    # the salary extraction that runs right after this.
+                    full = desc_el.get_text(separator="\n", strip=True)
+                    job["description"] = full[:3000]
+                    job["description_full"] = full
                 return  # success — no retry needed
             except Exception as e:
                 if attempt < max_retries:
@@ -1527,46 +1532,6 @@ class JobFinderPipeline:
             msg = f"Found {len(deduped)} unique jobs (from {raw_count} raw, {cross_source} cross-source duplicates merged)"
             progress(msg)
 
-        # Backfill descriptions for LinkedIn-only jobs that lack them.
-        # We skipped linkedin_fetch_description during search for speed.
-        # Jobs that appeared on multiple boards already have descriptions
-        # from Indeed/Glassdoor via dedup.  Only LinkedIn-exclusive jobs
-        # (no description at all) need backfilling.
-        no_desc = [
-            j for j in deduped
-            if not j.get("description")
-            and j.get("url")
-            and "linkedin.com" in j.get("url", "")
-        ]
-        if no_desc:
-            # Cap backfill aggressively. Each LinkedIn description fetch
-            # round-trips through their job-detail page; under rate limiting
-            # it lands at ~3-5s per request, not the optimistic ~1s the
-            # original limit assumed. With 16 workers and a cap of 25 we
-            # bound the worst-case at ~10-15s instead of ~100s.
-            # Jobs that get filtered out by the location/role gates below
-            # never needed their description anyway; AI scoring only sees
-            # the top-60 shortlist and can request fuller text on-demand
-            # for those if needed.
-            # Tunable per profile via search_settings.max_description_backfill.
-            try:
-                max_backfill = max(0, int(settings.get("max_description_backfill", 25)))
-            except (TypeError, ValueError):
-                max_backfill = 25
-            if len(no_desc) > max_backfill:
-                logger.info(
-                    "Capping LinkedIn backfill from %d to %d jobs",
-                    len(no_desc), max_backfill,
-                )
-                no_desc = no_desc[:max_backfill]
-        if no_desc:
-            if progress:
-                progress(f"Fetching descriptions for {len(no_desc)} LinkedIn-only jobs...")
-            _backfill_linkedin_descriptions(no_desc, max_workers=16)
-            # Re-run salary extraction on the freshly fetched descriptions:
-            # these jobs had salary_source=None at finalize time.
-            finalize_scraper_jobs(no_desc)
-
         # Classify work type and fix is_remote for every job
         if progress:
             progress("Classifying remote/hybrid/onsite...")
@@ -1652,6 +1617,49 @@ class JobFinderPipeline:
                 "location", "Location filter", len(deduped), len(deduped), active=False,
             )
             logger.warning("Location filter SKIPPED — no preferences configured")
+
+        # Backfill descriptions for LinkedIn-only jobs that lack them.
+        # We skipped linkedin_fetch_description during search for speed. Jobs
+        # that appeared on multiple boards already have descriptions from
+        # Indeed/Glassdoor via dedup. Only LinkedIn-exclusive jobs (no
+        # description at all) need backfilling.
+        #
+        # This sits AFTER the location gate and BEFORE the salary filter, and
+        # both halves of that matter. It used to run before every gate, so a
+        # capped budget was spent on jobs the next few filters threw away and
+        # the survivors reached the board empty: a real Disney posting showed
+        # "REWARD not stated" while its page stated $171,600-$252,000, and the
+        # assistant ranked it on title and company alone. It cannot move any
+        # later either, or pay that exists only in the description would never
+        # reach the floor check below.
+        no_desc = [
+            j for j in deduped
+            if not j.get("description")
+            and j.get("url")
+            and "linkedin.com" in j.get("url", "")
+        ]
+        if no_desc:
+            # Each LinkedIn description fetch round-trips through their
+            # job-detail page; under rate limiting it lands at ~3-5s per
+            # request. With 16 workers and a cap of 25 the worst case is
+            # ~10-15s. Tunable via search_settings.max_description_backfill.
+            try:
+                max_backfill = max(0, int(settings.get("max_description_backfill", 25)))
+            except (TypeError, ValueError):
+                max_backfill = 25
+            if len(no_desc) > max_backfill:
+                logger.info(
+                    "Capping LinkedIn backfill from %d to %d jobs",
+                    len(no_desc), max_backfill,
+                )
+                no_desc = no_desc[:max_backfill]
+        if no_desc:
+            if progress:
+                progress(f"Fetching descriptions for {len(no_desc)} LinkedIn-only jobs...")
+            _backfill_linkedin_descriptions(no_desc, max_workers=16)
+            # Re-run salary extraction on the freshly fetched descriptions:
+            # these jobs had salary_source=None at finalize time.
+            finalize_scraper_jobs(no_desc)
 
         # --- Salary filter: remove jobs with known salary below minimum ---
         # Use min_acceptable_tc if set (the user's real floor), otherwise

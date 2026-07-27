@@ -646,6 +646,145 @@ def repair_salaries(engine, *, force: bool = False) -> int:
         return changed
 
 
+DESCRIPTION_REFETCH_LIMIT = 50
+
+# Only sources whose detail page we know how to read. A source missing from
+# here is left alone rather than guessed at.
+_REFETCH_SOURCES = ("linkedin", "builtin")
+
+
+# What we store per row. The parser reads the FULL page first: LinkedIn puts
+# the hiring range last, after the duties, so a cap applied before extraction
+# silently decides which jobs have pay. The real Disney row stored 3,000
+# characters of responsibilities and not one dollar figure that way.
+DESCRIPTION_STORE_CHARS = 3000
+
+
+def _fetch_linkedin_description(url: str) -> str:
+    """The job body from a LinkedIn posting page, or "" if it isn't there.
+
+    Returns the WHOLE body. Truncation is the caller's, after parsing."""
+    import requests
+    from bs4 import BeautifulSoup
+
+    resp = requests.get(
+        url,
+        headers={
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/120.0.0.0 Safari/537.36"
+            ),
+        },
+        timeout=10,
+        allow_redirects=True,
+    )
+    if resp.status_code != 200:
+        return ""
+    soup = BeautifulSoup(resp.text, "html.parser")
+    element = (
+        soup.select_one(".description__text")
+        or soup.select_one(".show-more-less-html__markup")
+        or soup.select_one("[class*='description']")
+    )
+    return element.get_text(separator="\n", strip=True) if element else ""
+
+
+def _fetch_description(source: str, url: str) -> str:
+    """One place that knows how to recover a missing body, per source."""
+    name = (source or "").strip().lower()
+    if name == "linkedin":
+        return _fetch_linkedin_description(url)
+    if name == "builtin":
+        from job_finder.tools.scrapers.builtin import fetch_builtin_detail
+
+        return str((fetch_builtin_detail(url) or {}).get("description") or "")
+    return ""
+
+
+def refetch_missing_descriptions(engine, *, limit: int = DESCRIPTION_REFETCH_LIMIT) -> int:
+    """Refetch bodies for stored rows saved without one; returns rows filled.
+
+    The pull's own backfill only sees jobs in the current run, and a row
+    already on the board is deduped away long before it gets there. So a row
+    saved empty stays empty forever: 35 of 53 LinkedIn rows and 18 of 28
+    BuiltIn rows were, and one of them was the Disney posting that read
+    "REWARD not stated" while its page stated $171,600-$252,000.
+
+    Deliberately NOT part of ``run_startup_repairs``. Every other repair here
+    is pure SQL; this one makes network calls, and launching the app must never
+    depend on LinkedIn answering. Run it from the CLI, bounded by ``limit``.
+
+    A row is only ever improved. A fetch that comes back empty writes nothing,
+    and pay the scraper reported is never replaced by pay parsed from prose.
+    """
+    inspector = inspect(engine)
+    if "applications" not in inspector.get_table_names():
+        return 0
+    cols = {c["name"] for c in inspector.get_columns("applications")}
+    if not {"description", "job_url", "source"}.issubset(cols):
+        return 0
+    can_write_pay = set(_SALARY_WRITE_COLS).issubset(cols)
+
+    placeholders = ", ".join(f":s{i}" for i in range(len(_REFETCH_SOURCES)))
+    params: dict = {f"s{i}": name for i, name in enumerate(_REFETCH_SOURCES)}
+    params["lim"] = max(0, int(limit))
+    with engine.begin() as conn:
+        rows = conn.execute(text(
+            "SELECT id, source, job_url, salary_min, salary_max FROM applications "
+            "WHERE (vertical IS NULL OR vertical IN ('career', 'work')) "
+            "AND (description IS NULL OR description = '') "
+            "AND job_url IS NOT NULL AND job_url != '' "
+            f"AND LOWER(source) IN ({placeholders}) "
+            "AND (url_status IS NULL OR url_status NOT IN ('dead', 'expired')) "
+            "ORDER BY id DESC LIMIT :lim"
+        ), params).fetchall()
+
+    filled = 0
+    for row_id, source, url, salary_min, salary_max in rows:
+        try:
+            description = _fetch_description(source, url)
+        except Exception:
+            logger.warning(
+                "description refetch: row %s failed, skipping", row_id, exc_info=True,
+            )
+            continue
+        if not description:
+            continue
+        with engine.begin() as conn:
+            conn.execute(
+                text("UPDATE applications SET description = :d WHERE id = :i"),
+                {"d": description[:DESCRIPTION_STORE_CHARS], "i": row_id},
+            )
+            # Parse the full page, not the stored excerpt. Reported pay still
+            # wins over anything read out of prose.
+            if can_write_pay and salary_min is None and salary_max is None:
+                found = extract_salary_range(description)
+                if found.salary_min is not None or found.salary_max is not None:
+                    conn.execute(
+                        text(
+                            "UPDATE applications SET "
+                            "salary_min = :mn, salary_max = :mx, "
+                            "salary_currency = :cur, salary_period = :per, "
+                            "salary_min_annualized = :mna, "
+                            "salary_max_annualized = :mxa, "
+                            "salary_source = 'parsed_from_description' "
+                            "WHERE id = :i"
+                        ),
+                        {
+                            "mn": found.salary_min,
+                            "mx": found.salary_max,
+                            "cur": found.currency or "",
+                            "per": found.period or "",
+                            "mna": _annualized_or_none(found.salary_min, found.period),
+                            "mxa": _annualized_or_none(found.salary_max, found.period),
+                            "i": row_id,
+                        },
+                    )
+        filled += 1
+    return filled
+
+
 def run_startup_repairs(engine) -> None:
     """Startup hook, called from ``database._migrate_db``. Never raises."""
     try:
@@ -712,6 +851,19 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Scan even if the version markers say these repairs already ran",
     )
+    parser.add_argument(
+        "--refetch-descriptions",
+        nargs="?",
+        type=int,
+        const=DESCRIPTION_REFETCH_LIMIT,
+        default=0,
+        metavar="N",
+        help=(
+            "Also refetch up to N stored rows saved with no description "
+            f"(default {DESCRIPTION_REFETCH_LIMIT}). Off unless asked for: "
+            "unlike the other repairs this one makes network calls."
+        ),
+    )
     args = parser.parse_args(argv)
 
     from job_finder.models.database import DB_PATH
@@ -728,6 +880,11 @@ def main(argv: list[str] | None = None) -> int:
         collapsed = repair_duplicates(engine, force=args.force)
         converted = repair_dates(engine, force=args.force)
         filled = repair_salaries(engine, force=args.force)
+        refetched = (
+            refetch_missing_descriptions(engine, limit=args.refetch_descriptions)
+            if args.refetch_descriptions
+            else 0
+        )
     finally:
         engine.dispose()
     print(
@@ -746,6 +903,11 @@ def main(argv: list[str] | None = None) -> int:
         f"salary repair v{SALARY_REPAIR_VERSION}: "
         f"{filled} row(s) backfilled in {db_path}"
     )
+    if args.refetch_descriptions:
+        print(
+            f"description refetch: {refetched} row(s) filled from their "
+            f"posting page in {db_path}"
+        )
     return 0
 
 
