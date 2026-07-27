@@ -27,6 +27,12 @@ class SourceHealthEntry(BaseModel):
     median_rows: int
     runs_seen: int
     error_sample: str = ""
+    # What the source cost and what it delivered. `last_rows` is what it found;
+    # `kept_rows` is what survived THIS person's roles, place, and pay and is
+    # still on their board. The gap between them is a matter of fit, not
+    # health, so the two are reported side by side and neither is a verdict.
+    last_seconds: float = 0.0
+    kept_rows: int = 0
 
 
 class SourceHealthResponse(BaseModel):

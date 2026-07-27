@@ -28,6 +28,11 @@ export interface SourceHealthEntry {
   median_rows: number;
   runs_seen: number;
   error_sample: string;
+  /** wall-clock of the latest run; the slowest source gates the whole pull */
+  last_seconds: number;
+  /** rows from this source still on YOUR board. The gap against last_rows is
+      about fit with your own search, not the source's health. */
+  kept_rows: number;
 }
 
 export interface SourceHealthResponse {

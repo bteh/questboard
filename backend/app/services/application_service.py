@@ -632,6 +632,36 @@ def get_applications(
     return items, total
 
 
+def live_rows_by_source(db: Session) -> dict[str, int]:
+    """How many rows each source currently keeps on the board, keyed lowercase.
+
+    The run log answers "did this source work". It cannot answer "is this
+    source worth its time to me", because whether a found job survives is
+    entirely about one person's roles, place, and pay. On one real board
+    Workday found 266 jobs and 4 survived, while Himalayas found 59 and kept
+    444 across runs. Neither number means Workday is broken; it means Workday
+    suits a different search. Pairing the two is what lets a person judge
+    their own sources instead of inheriting someone else's verdict.
+
+    Dead and expired rows stay out, matching what the board counts.
+    """
+    from sqlalchemy import func
+
+    rows = (
+        db.query(ApplicationRecord.source, func.count(ApplicationRecord.id))
+        .filter(ApplicationRecord.vertical.in_(("career", "work")))
+        .filter(ApplicationRecord.url_status.notin_(("dead", "expired")))
+        .group_by(ApplicationRecord.source)
+        .all()
+    )
+    counts: dict[str, int] = {}
+    for source, count in rows:
+        key = (source or "").strip().lower()
+        if key:
+            counts[key] = counts.get(key, 0) + count
+    return counts
+
+
 def get_application(db: Session, app_id: int, workspace_id: str | None = None) -> ApplicationRecord | None:
     query = db.query(ApplicationRecord).filter(ApplicationRecord.id == app_id)
     if workspace_id:
