@@ -203,3 +203,52 @@ def test_finalize_parses_single_annual_figure():
     assert out["salary_min"] == 180000.0
     assert out["salary_max"] is None
     assert out["salary_source"] == "parsed_from_description"
+
+
+# ── pay at the BOTTOM of a long posting ─────────────────────────────────────
+
+def test_pay_below_the_scan_cap_is_still_found():
+    """Real Disney posting, 2026-07-27: 8,006 characters with the hiring range
+    at 7,391. The scan capped at the first 6,000 and returned nothing, so the
+    board showed "REWARD not stated" for a job that states its band.
+
+    The docstring already said salary lines live near the top OR BOTTOM; only
+    the top was ever read.
+    """
+    filler = "We build industry-leading ad technology and products. " * 140
+    text = filler + (
+        "The hiring range for this position in Los Angeles, CA is between "
+        "$171,600 – $230,100, Seattle, WA is between $179,700 - $241,000."
+    )
+    assert len(filler) > 6000, "the pay line has to fall past the old cap"
+
+    result = extract_salary_range(text)
+    assert (result.salary_min, result.salary_max) == (171600.0, 230100.0)
+    assert result.period == "annual"
+
+
+def test_the_head_still_wins_when_both_ends_state_the_same_form():
+    """Reading both ends must not quietly promote the bottom of a posting over
+    a comp block at the top.
+
+    Precedence is by range FORM, not position: 'between X and Y' is matched
+    before 'X to Y' wherever either sits, and that predates reading the tail.
+    So this pins the like-for-like case, the one this change could have moved.
+    """
+    text = (
+        "Compensation: $140,000 to $170,000 per year. "
+        + ("Filler about the team and the mission. " * 200)
+        + "The hiring range for this position is $200,000 to $250,000."
+    )
+    result = extract_salary_range(text)
+    assert (result.salary_min, result.salary_max) == (140000.0, 170000.0)
+
+
+def test_the_seam_between_head_and_tail_invents_nothing():
+    """Stitching two slices must not let a number from the top pair with one
+    from the bottom into a range that appears nowhere in the posting."""
+    text = (
+        "Our team of $150,000 " + ("filler text goes here. " * 300) + " to $900,000 ARR."
+    )
+    result = extract_salary_range(text)
+    assert (result.salary_min, result.salary_max) == (None, None)

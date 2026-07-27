@@ -388,6 +388,13 @@ _SAL_ANNUAL_MAX = 2_000_000.0
 _SAL_HOURLY_MIN = 7.0
 _SAL_HOURLY_MAX = 500.0
 
+# How much of a posting the salary scan reads, split across both ends. A stated
+# band sits either in a comp block up top or in the legally-required paragraph
+# at the bottom; the middle is duties. The head keeps the larger share so a
+# posting that leads with its range still wins.
+_SAL_SCAN_CHARS = 6000
+_SAL_SCAN_HEAD_CHARS = 4000
+
 
 def _sal_value(num_str: str, has_k: bool, *, other_has_k: bool = False) -> float:
     """Normalize one captured amount to dollars ('140'+k -> 140000).
@@ -519,9 +526,18 @@ def extract_salary_range(text: str | None) -> ExtractedSalary:
     """
     if not text:
         return _EMPTY_SALARY
-    # Cap the scan — salary lines live near the top or bottom of postings and
-    # descriptions are already truncated by the scrapers.
-    text = text[:6000]
+    # Cap the scan for cost, but read BOTH ends. Salary lines live near the top
+    # or the bottom, and only the top was ever read: a real Disney posting ran
+    # 8,006 characters with its hiring range at 7,391, so the board said
+    # "REWARD not stated" for a job that states its band. The middle is duties
+    # and mission copy, which is where the false positives live anyway.
+    if len(text) > _SAL_SCAN_CHARS:
+        head = text[:_SAL_SCAN_HEAD_CHARS]
+        tail = text[-(_SAL_SCAN_CHARS - _SAL_SCAN_HEAD_CHARS):]
+        # A blank line between them: every context guard works within a clause,
+        # so this stops a figure up top pairing with one down the bottom into a
+        # range that appears nowhere in the posting.
+        text = f"{head}\n\n{tail}"
 
     # Hourly range first, so '$40 - $50 per hour' isn't read as an annual range.
     for m in _SAL_HOURLY_RANGE_RE.finditer(text):
@@ -633,7 +649,13 @@ def finalize_scraper_jobs(jobs: list[dict]) -> list[dict]:
                 # become a promised pay figure.
                 job["salary_source"] = None
             else:
-                extracted = extract_salary_range(job.get("description") or "")
+                # `description_full` is set by callers that had to truncate the
+                # stored text (the LinkedIn backfill). Pay usually sits at the
+                # bottom of a long posting, so parsing the excerpt would let a
+                # storage cap decide which jobs have pay.
+                extracted = extract_salary_range(
+                    job.get("description_full") or job.get("description") or ""
+                )
                 if extracted.salary_min is not None or extracted.salary_max is not None:
                     # RAW values + period; annualized figures go in the
                     # dedicated fields (never fabricated into salary_min/max).
