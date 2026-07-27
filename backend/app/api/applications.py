@@ -444,6 +444,11 @@ def list_profile_work(
         # configured roles. Honors the board's place / pay / remote filters,
         # and hides confirmed-dead links exactly like My roles does.
         # workspace_id stays None: local career rows live in the unscoped pool.
+        #
+        # Ask for exactly as many rows as the chip just promised. A fixed cap
+        # here (it was 400) silently truncated any category above it: the real
+        # board showed "Remote 632" and returned 400, hiding 232 rows with no
+        # sign in the UI. Deriving the size from the count cannot drift.
         records, _ = application_service.get_applications(
             db,
             source_category=source_category,
@@ -457,7 +462,7 @@ def list_profile_work(
             sort_by="date_found",
             sort_dir="desc",
             page=1,
-            page_size=400,
+            page_size=max(category_counts.get(source_category, 0), 1),
             verticals=["career", "work"],
         )
         ordered = list(records)

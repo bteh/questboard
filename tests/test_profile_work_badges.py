@@ -198,3 +198,52 @@ def test_roles_view_honors_the_pay_ceiling(work_db) -> None:
     companies = [item.company for item in capped.items]
     assert "Paying Co" not in companies
     assert capped.total == len(companies)
+
+
+# ── a chip must never promise more rows than clicking it delivers ────────────
+
+@pytest.fixture()
+def crowded_work_db(work_db):
+    """One category holding more rows than the browse query used to fetch.
+
+    Real board, 2026-07-27: the Remote chip read 632 while clicking it showed
+    400, because the count query was uncapped and the browse query asked for
+    page_size=400. 232 rows were unreachable from the UI.
+    """
+    from job_finder.models.database import ApplicationRecord
+
+    now = datetime.now(timezone.utc)
+    work_db.add_all([
+        ApplicationRecord(
+            job_title="Data Engineering Manager",
+            company=f"Remote Co {i:04d}",
+            job_url=f"https://remote.example/jobs/{i}",
+            source="Himalayas",
+            vertical="career",
+            remote_scope="us",
+            date_posted=now.isoformat(),
+            date_confidence="exact",
+            date_found=now - timedelta(minutes=i),
+        )
+        for i in range(450)
+    ])
+    work_db.commit()
+    return work_db
+
+
+def test_chip_count_matches_the_rows_clicking_it_returns(crowded_work_db) -> None:
+    response = _list_profile_work(crowded_work_db, source_category="remote")
+    assert response.total == response.source_categories["remote"], (
+        f"the Remote chip promises {response.source_categories['remote']} rows "
+        f"but clicking it returns {response.total}"
+    )
+
+
+def test_every_chip_agrees_with_its_own_browse_view(crowded_work_db) -> None:
+    """The invariant, for each category, not just the crowded one."""
+    counts = _list_profile_work(crowded_work_db).source_categories
+    for category, promised in counts.items():
+        delivered = _list_profile_work(crowded_work_db, source_category=category).total
+        assert delivered == promised, (
+            f"{category}: chip says {promised}, browse returns {delivered}"
+        )

@@ -171,3 +171,36 @@ describe('primaryRunKind', () => {
     expect(primaryRunKind(false)).toBe('pull');
   });
 });
+
+describe('filterStatusText scope note', () => {
+  it('carries the pay scope next to the counts it explains', () => {
+    expect(
+      filterStatusText({
+        shown: 632,
+        laneTotal: 632,
+        filtered: false,
+        checkedAgo: 'sources checked minutes ago',
+        scopeNote: 'your $190K floor is off while browsing',
+      }),
+    ).toBe('632 jobs · sources checked minutes ago · your $190K floor is off while browsing');
+  });
+
+  it('keeps the posted confession last when both notes are set', () => {
+    expect(
+      filterStatusText({
+        shown: 10,
+        laneTotal: 40,
+        filtered: true,
+        checkedAgo: null,
+        scopeNote: '$190K+ base from your search',
+        hiddenNote: '3 without a date hidden',
+      }),
+    ).toBe('Showing 10 of 40 jobs · $190K+ base from your search · 3 without a date hidden');
+  });
+
+  it('reads exactly as before when no scope note applies', () => {
+    expect(
+      filterStatusText({ shown: 27, laneTotal: 27, filtered: false, checkedAgo: null }),
+    ).toBe('27 jobs');
+  });
+});

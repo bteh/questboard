@@ -263,3 +263,37 @@
 /* the house card sits after the last wall block now, so it needs its own
    column width instead of inheriting one from the multicol flow */
 .qb-felt > .qb-house { max-width: 322px; }
+
+/* The pull's source scoreboard: one row per source as it answers. Sized to sit
+   under the run line without pushing the board off screen, and it scrolls
+   rather than growing past ~9 rows. */
+.qb-runblock { display: flex; flex-direction: column; gap: 4px; }
+.qb-scoreboard {
+  font-family: var(--mono); font-size: 11.5px; color: var(--soft);
+  max-height: 168px; overflow-y: auto; padding-left: 130px;
+}
+.qb-scoreboard-head { margin: 2px 0 4px; color: var(--mute); }
+.qb-scoreboard ul { list-style: none; margin: 0; padding: 0; }
+.qb-score-row {
+  display: grid; grid-template-columns: 108px 58px 1fr;
+  align-items: center; gap: 8px; padding: 1.5px 0;
+  animation: qb-score-in .28s ease-out;
+}
+.qb-score-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qb-score-count { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink); }
+.qb-score-bar { height: 3px; border-radius: 2px; background: var(--step4); overflow: hidden; }
+.qb-score-bar > span {
+  display: block; height: 100%; background: var(--sage);
+  transition: width .4s ease-out;
+}
+.qb-score-empty .qb-score-count,
+.qb-score-timeout .qb-score-count { color: var(--soft); font-size: 10.5px; }
+.qb-score-timeout .qb-score-name { text-decoration: line-through; }
+@keyframes qb-score-in {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: none; }
+}
+@media (max-width: 720px) {
+  .qb-scoreboard { padding-left: 0; }
+  .qb-score-row { grid-template-columns: 92px 50px 1fr; }
+}

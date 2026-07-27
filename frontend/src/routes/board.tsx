@@ -790,6 +790,7 @@ function BoardPage() {
               onPayTo={setPayToRaw}
               postedDays={postedDays}
               onPostedDays={setPostedDays}
+              sourceCategory={sourceCategory}
             />
             <SourceCategoryChips
               counts={workMeta?.source_categories}

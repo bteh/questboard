@@ -25,6 +25,8 @@ import {
   postedChipLabel,
   type PostedDaysKey,
 } from '@/features/board/posted-filter';
+import { payScopeNote } from '@/features/board/pay-scope';
+import { SourceScoreboard } from '@/features/board/source-scoreboard.tsx';
 import { useRunWorkSearch } from '@/features/board/use-run-work-search';
 import { useAssistantReady } from '@/features/board/use-assistant-ready';
 import { useRunAssistant } from '@/features/board/use-run-assistant';
@@ -59,6 +61,9 @@ interface WorkToolbarProps {
       max_days_old in Settings stays the PULL window and is untouched */
   postedDays: PostedDaysKey | undefined;
   onPostedDays: (value: PostedDaysKey | undefined) => void;
+  /** which source chip is open, if any. A chip browses past the saved search,
+      so the saved pay floor stops applying and the status line says so. */
+  sourceCategory?: string | null;
 }
 
 interface FilterChip {
@@ -132,12 +137,14 @@ export function filterStatusText({
   filtered,
   checkedAgo,
   hiddenNote,
+  scopeNote,
 }: {
   shown: number | undefined;
   laneTotal: number | undefined;
   filtered: boolean;
   checkedAgo: string | null;
   hiddenNote?: string | null;
+  scopeNote?: string | null;
 }): string {
   if (shown === undefined) return checkedAgo ?? '';
   const jobs = (n: number) => `${n} job${n === 1 ? '' : 's'}`;
@@ -146,8 +153,8 @@ export function filterStatusText({
       ? `Showing ${shown} of ${jobs(laneTotal)}`
       : `Showing ${jobs(shown)}`
     : jobs(shown);
-  const line = checkedAgo ? `${lead} · ${checkedAgo}` : lead;
-  return hiddenNote ? `${line} · ${hiddenNote}` : line;
+  // The scope note rides next to the counts because it explains them.
+  return [lead, checkedAgo, scopeNote, hiddenNote].filter(Boolean).join(' · ');
 }
 
 /* The pull's own report, under the actions row it belongs to: a running
@@ -192,15 +199,18 @@ function RunStatusLine() {
         : 'Checking the sources';
     const clock = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
     return (
-      <p className="qb-workline" role="status">
-        <span className="qb-workline-track" aria-hidden="true">
-          <span
-            className={pct === null ? 'qb-workline-fill qb-indet' : 'qb-workline-fill'}
-            style={pct === null ? undefined : { width: `${pct}%` }}
-          />
-        </span>
-        {text} · <span className="qb-num">{clock}</span>. Keep browsing while it runs.
-      </p>
+      <div className="qb-runblock" role="status">
+        <p className="qb-workline">
+          <span className="qb-workline-track" aria-hidden="true">
+            <span
+              className={pct === null ? 'qb-workline-fill qb-indet' : 'qb-workline-fill'}
+              style={pct === null ? undefined : { width: `${pct}%` }}
+            />
+          </span>
+          {text} · <span className="qb-num">{clock}</span>. Keep browsing while it runs.
+        </p>
+        <SourceScoreboard messages={messages} />
+      </div>
     );
   }
 
@@ -262,6 +272,7 @@ export function WorkToolbar({
   onPayTo,
   postedDays,
   onPostedDays,
+  sourceCategory = null,
 }: WorkToolbarProps) {
   const { run, ready, running } = useRunWorkSearch();
   const { ready: assistantReady, isDesktop, loading: assistantLoading } = useAssistantReady();
@@ -400,7 +411,10 @@ export function WorkToolbar({
           <span className="qb-tray-label">min listed pay</span>
           <input
             inputMode="numeric"
-            placeholder="150k"
+            /* "any", never a number. A sample amount here reads as a filter
+               that is switched on, and sat next to the receipt's real saved
+               floor as a second, contradicting figure. */
+            placeholder="any"
             aria-label="Minimum listed pay, a year"
             value={payFrom}
             onChange={(e) => onPayFrom(e.target.value)}
@@ -459,6 +473,11 @@ export function WorkToolbar({
             days: postedDays,
             shown: shownCount,
             baseline: laneTotal,
+          }),
+          scopeNote: payScopeNote({
+            browsingCategory: Boolean(sourceCategory),
+            savedFloor: prefs?.compensation?.min_base,
+            typedFloor: payFloor,
           }),
         })}
       </p>
