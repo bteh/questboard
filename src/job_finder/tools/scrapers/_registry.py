@@ -295,9 +295,15 @@ def run_scrapers(
     all_jobs: list[dict] = []
     outcomes: list[dict] = []
     seen_sources: set[str] = set()
-    workers = min(len(runnable), 8)
-    # Per-scraper timeout prevents a single slow/hung scraper from blocking
-    # the entire pipeline.  Scrapers that exceed this are logged and skipped.
+    # Every source gets its own thread. Each one talks to a different host and
+    # spends its time waiting on that host, so queueing them behind 8 slots only
+    # added wall-clock: a 17-source run had ~9 sources waiting for a slot while
+    # the pool sat idle on I/O.
+    workers = min(len(runnable), 32)
+    # Ceiling for the whole pool, not per scraper. `future.result(timeout=...)`
+    # below cannot bound an individual scraper, because `as_completed` only ever
+    # yields futures that already finished, so that call returns immediately.
+    # The real bound is the `as_completed` timeout on the loop.
     scraper_timeout = 60  # seconds
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
