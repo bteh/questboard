@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 import pytest
 
+from app.api.watchlist import router
 from app.services import watchlist_service
 from app.services.watchlist_service import (
     BoardLookupError,
@@ -222,7 +223,10 @@ def client(tmp_path, monkeypatch):
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 
-    from app.api.watchlist import router
+    # `router` is imported at module scope on purpose. Earlier API tests swap
+    # `app.*` out of sys.modules to bind their own temp DB, so importing it
+    # here would give the router a NEW watchlist_service while the stubs below
+    # patch the old one. The stub then misses and the test calls out for real.
 
     # Keep profile YAML writes inside the test sandbox.
     monkeypatch.setattr(watchlist_service, "_PROJECT_ROOT", str(tmp_path))

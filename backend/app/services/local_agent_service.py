@@ -27,7 +27,15 @@ from job_finder.tools.scrapers._utils import _strip_html
 
 _WORK_KIND = "work"
 _EXCERPT_CHARS = 1200
+# A list row carries only enough body text to decide whether a posting is worth
+# opening; `get_opportunity` serves the long excerpt for finalists. A full page
+# of 1,200-char excerpts blew past the agent CLI's tool-result cap and cost a
+# whole run (see tests/test_mcp_result_size.py).
+_LIST_EXCERPT_CHARS = 260
 _MAX_RESULTS = 50
+# Agent CLIs reject an oversized tool result outright rather than truncating it.
+# Claude Code's ceiling lands near 82k characters; hold a page well under that.
+_MCP_RESULT_CHAR_BUDGET = 60_000
 _ALLOWED_STATUSES = frozenset(
     {
         "found",
@@ -374,7 +382,10 @@ def _candidate_payload(record: ApplicationRecord, *, detail: bool = False) -> di
             "is_fit_assessment": False,
         },
         "status": record.status or "found",
-        "description_excerpt": _clean_excerpt(record.description),
+        "description_excerpt": _clean_excerpt(
+            record.description,
+            _EXCERPT_CHARS if detail else _LIST_EXCERPT_CHARS,
+        ),
     }
     if detail:
         payload.update(
