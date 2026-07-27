@@ -16,8 +16,10 @@ from __future__ import annotations
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from job_finder.tools.scrapers._ats_discovery import DeadBoards
 from job_finder.tools.scrapers._registry import register_scraper
 from job_finder.tools.scrapers._utils import (
+    ATS_FETCH_WORKERS,
     _clean_company_name,
     _get_json,
     _load_seed_slugs,
@@ -59,6 +61,7 @@ def _fetch_company_jobs(
     *,
     match_mode: str = "all_significant",
     include_founding: bool = True,
+    on_status=None,
 ) -> list[dict]:
     """Fetch matching jobs for a single Workable account board."""
     # Tight per-board timeout — see ashby.py for rationale. A single slow
@@ -68,6 +71,7 @@ def _fetch_company_jobs(
         params={"details": "true"},
         quiet_statuses={404},
         timeout=6,
+        on_status=on_status,
     )
     if not isinstance(data, dict) or "jobs" not in data:
         return []
@@ -146,13 +150,15 @@ def search_workable(
     logger.info("Fetching from Workable API for %d companies...", len(company_list))
 
     results: list[dict] = []
-    workers = min(len(company_list), 10)
+    workers = min(len(company_list), ATS_FETCH_WORKERS)
+    dead = DeadBoards("workable")
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {
             pool.submit(
                 _fetch_company_jobs, slug, roles,
                 match_mode=match_mode, include_founding=include_founding,
+                on_status=dead.watch(slug),
             ): slug
             for slug in company_list
         }
@@ -164,6 +170,7 @@ def search_workable(
                 slug = futures[future]
                 logger.warning("Workable/%s failed: %s", slug, e)
 
+    dead.prune()
     results = rank_by_relevance(results, roles)[:max_results]
     logger.info("Workable: found %d matching jobs across %d companies",
                 len(results), len(company_list))

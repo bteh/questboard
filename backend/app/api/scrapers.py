@@ -8,8 +8,11 @@ require_ops_access.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query, Request
+from sqlalchemy.orm import Session
 
 from app.dependencies import require_ops_access
+from app.models.database import get_db
+from app.services import application_service
 
 from app.schemas.scrapers import (
     BoardScheduleResponse,
@@ -56,6 +59,7 @@ async def list_sources(
 @router.get("/health", response_model=SourceHealthResponse, dependencies=[Depends(require_ops_access)])
 async def sources_health(
     days: int = Query(14, ge=1, le=90, description="Run-log window in days"),
+    db: Session = Depends(get_db),
 ) -> SourceHealthResponse:
     """Per-source health from the scrape run log, worst verdicts first.
 
@@ -67,6 +71,9 @@ async def sources_health(
     from job_finder.tools.scrapers import get_all_metadata
 
     display = {m.name: m.display_name for m in get_all_metadata()}
+    # Health comes from the run log; what a source is worth comes from this
+    # person's own board. Joined here so neither side has to know the other.
+    kept = application_service.live_rows_by_source(db)
     entries = [
         SourceHealthEntry(
             source=h.source,
@@ -79,6 +86,8 @@ async def sources_health(
             median_rows=h.median_rows,
             runs_seen=h.runs_seen,
             error_sample=h.error_sample,
+            last_seconds=h.last_seconds,
+            kept_rows=kept.get(h.source.strip().lower(), 0),
         )
         for h in source_health(days=days)
     ]

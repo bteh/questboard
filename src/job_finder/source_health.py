@@ -40,6 +40,10 @@ class SourceHealth:
     median_rows: int
     runs_seen: int
     error_sample: str
+    # What the latest run cost in wall-clock. Sources run concurrently, so the
+    # slowest one sets the floor for the whole pull: worth seeing next to what
+    # the source actually delivered.
+    last_seconds: float = 0.0
 
 
 def verdict_for(last_finish_reason: str, last_rows: int, median_rows: int) -> str:
@@ -78,6 +82,7 @@ def source_health(days: int = 14) -> list[SourceHealth]:
                 median_rows=med,
                 runs_seen=len(rows),
                 error_sample=latest.error_sample or "",
+                last_seconds=round(float(latest.duration_s or 0.0), 1),
             )
         )
 

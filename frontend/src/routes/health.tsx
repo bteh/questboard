@@ -65,6 +65,8 @@ function HealthRow({ entry, onDrill }: { entry: SourceHealthEntry; onDrill: (sou
           <span className="qb-health-median"> / {entry.median_rows} usual</span>
         )}
       </td>
+      <td className="qb-health-num">{durationLabel(entry.last_seconds)}</td>
+      <td className="qb-health-num">{entry.kept_rows}</td>
       <td className="qb-health-num">{entry.runs_seen}</td>
       <td className="qb-health-err" title={entry.error_sample || undefined}>
         {entry.error_sample}
@@ -202,6 +204,11 @@ function HealthPage() {
                     <th>Verdict</th>
                     <th>Last run</th>
                     <th>Rows</th>
+                    {/* what it costs against what survives YOUR search. A big
+                        gap is a matter of fit, never a health verdict: the
+                        same source can be someone else's best one. */}
+                    <th title="Wall-clock for the latest run">Took</th>
+                    <th title="Rows from this source still on your board">Kept for you</th>
                     <th>Runs</th>
                     <th>What broke</th>
                   </tr>

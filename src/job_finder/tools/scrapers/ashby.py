@@ -5,8 +5,10 @@ from __future__ import annotations
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from job_finder.tools.scrapers._ats_discovery import DeadBoards
 from job_finder.tools.scrapers._registry import register_scraper
 from job_finder.tools.scrapers._utils import (
+    ATS_FETCH_WORKERS,
     _clean_company_name,
     _get_json,
     _load_seed_slugs,
@@ -46,6 +48,7 @@ def _fetch_company_jobs(
     *,
     match_mode: str = "all_significant",
     include_founding: bool = True,
+    on_status=None,
 ) -> list[dict]:
     """Fetch matching jobs for a single Ashby company board."""
     # Tight per-board timeout: with 100+ seeded + discovered companies, a
@@ -57,6 +60,7 @@ def _fetch_company_jobs(
         f"https://api.ashbyhq.com/posting-api/job-board/{slug}?includeCompensation=true",
         quiet_statuses={404},
         timeout=5,
+        on_status=on_status,
     )
     if not data or "jobs" not in data:
         return []
@@ -165,13 +169,15 @@ def search_ashby(
     logger.info("Fetching from Ashby API for %d companies...", len(company_list))
 
     results: list[dict] = []
-    workers = min(len(company_list), 8)
+    workers = min(len(company_list), ATS_FETCH_WORKERS)
+    dead = DeadBoards("ashby")
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {
             pool.submit(
                 _fetch_company_jobs, slug, roles,
                 match_mode=match_mode, include_founding=include_founding,
+                on_status=dead.watch(slug),
             ): slug
             for slug in company_list
         }
@@ -183,6 +189,7 @@ def search_ashby(
                 slug = futures[future]
                 logger.debug("Ashby/%s failed: %s", slug, e)
 
+    dead.prune()
     results = rank_by_relevance(results, roles)[:max_results]
     logger.info("Ashby: found %d matching jobs across %d companies",
                 len(results), len(company_list))

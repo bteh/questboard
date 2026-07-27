@@ -30,6 +30,7 @@ import logging
 import os
 import re
 import tempfile
+import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -187,6 +188,70 @@ def save_discovered_slugs(host: str, slugs: set[str]) -> None:
         json.dump(payload, tmp, indent=2)
         tmp_path = Path(tmp.name)
     tmp_path.replace(path)
+
+
+def drop_slugs(host: str, dead: set[str]) -> int:
+    """Forget cached slugs whose board answered 404, and report how many went.
+
+    Slug discovery reads company names out of DuckDuckGo results, so a share of
+    what it harvests never had a board on that host. Those entries were
+    re-fetched on every pull forever: ~40 of Lever's and ~33 of Ashby's cached
+    slugs were dead weight, each costing a request and a slow failure.
+
+    Only a definite 404 prunes. A refused or timed-out board keeps its entry,
+    because a host having a bad minute must not erase real companies. The
+    cache's ``discovered_at`` is preserved, so pruning never passes for a
+    refresh and re-triggers a DuckDuckGo sweep.
+    """
+    dead = {str(s).strip().lower() for s in dead if s}
+    if not dead:
+        return 0
+    path = _cache_path(host)
+    if not path.exists():
+        return 0
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return 0
+
+    existing = {str(s).strip().lower() for s in (payload.get("slugs") or []) if s}
+    kept = sorted(existing - dead)
+    removed = len(existing) - len(kept)
+    if removed <= 0:
+        return 0
+    payload["slugs"] = kept
+    with tempfile.NamedTemporaryFile(
+        "w", encoding="utf-8", dir=path.parent, delete=False, suffix=".tmp",
+    ) as tmp:
+        json.dump(payload, tmp, indent=2)
+        tmp_path = Path(tmp.name)
+    tmp_path.replace(path)
+    logger.info("ATS discovery: dropped %d dead %s slug(s)", removed, host)
+    return removed
+
+
+class DeadBoards:
+    """Collects the slugs a run found missing, then prunes them in one write.
+
+    One per ATS scraper run. ``watch(slug)`` hands back the ``on_status``
+    callback ``_get_json`` expects, so the four scrapers share this bookkeeping
+    instead of each keeping its own set and its own lock.
+    """
+
+    def __init__(self, host: str) -> None:
+        self.host = host
+        self._dead: set[str] = set()
+        self._lock = threading.Lock()
+
+    def watch(self, slug: str):
+        def record(status: int | None) -> None:
+            if status == 404:
+                with self._lock:
+                    self._dead.add(slug.strip().lower())
+        return record
+
+    def prune(self) -> int:
+        return drop_slugs(self.host, self._dead)
 
 
 # Cap how many roles each host fans out to DuckDuckGo. The AI role expansion

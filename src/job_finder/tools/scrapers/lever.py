@@ -5,8 +5,10 @@ from __future__ import annotations
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from job_finder.tools.scrapers._ats_discovery import DeadBoards
 from job_finder.tools.scrapers._registry import register_scraper
 from job_finder.tools.scrapers._utils import (
+    ATS_FETCH_WORKERS,
     _clean_company_name,
     _get_json,
     _load_seed_slugs,
@@ -31,6 +33,7 @@ def _fetch_company_postings(
     *,
     match_mode: str = "all_significant",
     include_founding: bool = True,
+    on_status=None,
 ) -> list[dict]:
     """Fetch matching postings for a single Lever company."""
     # Tight per-board timeout — see ashby.py for rationale.
@@ -38,6 +41,7 @@ def _fetch_company_postings(
         f"https://api.lever.co/v0/postings/{slug}",
         quiet_statuses={404},
         timeout=5,
+        on_status=on_status,
     )
     if not data or not isinstance(data, list):
         return []
@@ -125,13 +129,15 @@ def search_lever(
     logger.info("Fetching from Lever API for %d companies...", len(company_list))
 
     results: list[dict] = []
-    workers = min(len(company_list), 8)
+    workers = min(len(company_list), ATS_FETCH_WORKERS)
+    dead = DeadBoards("lever")
 
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {
             pool.submit(
                 _fetch_company_postings, slug, roles,
                 match_mode=match_mode, include_founding=include_founding,
+                on_status=dead.watch(slug),
             ): slug
             for slug in company_list
         }
@@ -143,6 +149,7 @@ def search_lever(
                 slug = futures[future]
                 logger.warning("Lever/%s failed: %s", slug, e)
 
+    dead.prune()
     results = rank_by_relevance(results, roles)[:max_results]
     logger.info("Lever: found %d matching jobs across %d companies",
                 len(results), len(company_list))

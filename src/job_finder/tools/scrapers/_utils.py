@@ -4,15 +4,34 @@ from __future__ import annotations
 
 import logging
 import re
+import threading
+import time
+from collections.abc import Callable
 from datetime import datetime, timezone
 from html import unescape
 from pathlib import Path
 from typing import NamedTuple
 
 import requests
+from requests.adapters import HTTPAdapter
 
 logger = logging.getLogger(__name__)
 
+# How many company boards an ATS scraper fetches at once. These are one-shot
+# HTTP GETs against a public JSON API, so the work is almost all waiting on the
+# network and this width sets the source's wall-clock time directly. Lever and
+# Ashby ran at 8 while Greenhouse and Workable ran at 10, which left Lever the
+# long pole of the whole pull (77s of a 97s run) with ~470 companies to visit.
+# One number here so the four cannot drift apart again.
+#
+# 12 is measured, not guessed. Lever over its real ~470-company list:
+#   8 -> 28.4s, 500 rows, 3 timeouts
+#  12 -> 20.2s, 500 rows, 4 timeouts
+#  16 -> 19.3s, 500 rows, 21 timeouts
+#  24 ->  8.0s, 287 rows, 130 connection errors
+# Past 12 the host starts refusing, and at 24 it drops 40% of the jobs to buy
+# speed. Raise this only with the same before/after row counts in hand.
+ATS_FETCH_WORKERS = 12
 
 _SEED_DIR = Path(__file__).parent / "data"
 
@@ -76,6 +95,60 @@ _HEADERS = {
 
 _TIMEOUT = 15
 
+# How many times to honor a 429 before giving the board up. Two is enough to
+# ride out a burst without turning a throttled host into a stalled run.
+_RATE_LIMIT_RETRIES = 2
+_RATE_LIMIT_MAX_WAIT = 8.0
+
+
+def _retry_after_seconds(resp: requests.Response, attempt: int) -> float:
+    """How long to wait after a 429: the host's Retry-After if it sent one,
+    otherwise a short backoff. Capped so one rude header can't stall a run."""
+    raw = (resp.headers.get("Retry-After") or "").strip()
+    if raw.isdigit():
+        return min(float(raw), _RATE_LIMIT_MAX_WAIT)
+    return min(0.5 * (2 ** attempt), _RATE_LIMIT_MAX_WAIT)
+
+
+_SESSION: requests.Session | None = None
+_SESSION_LOCK = threading.Lock()
+
+
+def _session() -> requests.Session:
+    """One pooled session for every scraper fetch.
+
+    Ashby fans out to ~816 company boards on a single host. Opening a fresh
+    TCP+TLS connection per board made that host refuse connections outright
+    ([Errno 61]), which cost 386 of those boards and made Ashby's row count
+    swing by hundreds between runs. Keep-alive turns those 816 connections
+    into roughly ``ATS_FETCH_WORKERS`` of them.
+
+    The pool must be at least as wide as the fan-out. urllib3 silently drops
+    the overflow connection when a pool is full, so a narrow pool reopens
+    connections under load and reintroduces the same failure more quietly.
+    """
+    global _SESSION
+    if _SESSION is not None:
+        return _SESSION
+    with _SESSION_LOCK:
+        if _SESSION is None:
+            session = requests.Session()
+            session.headers.update(_HEADERS)
+            adapter = HTTPAdapter(
+                # One pool per host, so concurrent ATS scrapers don't evict
+                # each other's connections.
+                pool_connections=8,
+                pool_maxsize=max(ATS_FETCH_WORKERS, 16),
+                # Retries stay off: a caller treats None as "this board is
+                # unavailable" and a silent retry would multiply the load that
+                # caused the refusals.
+                max_retries=0,
+            )
+            session.mount("https://", adapter)
+            session.mount("http://", adapter)
+            _SESSION = session
+    return _SESSION
+
 
 def _get_json(
     url: str,
@@ -83,6 +156,7 @@ def _get_json(
     *,
     quiet_statuses: set[int] | None = None,
     timeout: int | float | None = None,
+    on_status: Callable[[int | None], None] | None = None,
 ) -> dict | list | None:
     """GET a JSON endpoint with error handling.
 
@@ -92,25 +166,41 @@ def _get_json(
     a worker for far too long when most companies respond in <1s. Those
     callers pass a tighter timeout (e.g. 5s) so the pipeline fails fast
     on unreachable boards instead of stalling the whole search.
+
+    ``on_status`` receives the HTTP status, or None when the request never got
+    an answer. ATS callers use it to tell a board that does not exist (404,
+    worth forgetting) from one that refused this time (worth keeping).
     """
     quiet_statuses = quiet_statuses or set()
-    try:
-        resp = requests.get(
-            url,
-            headers=_HEADERS,
-            params=params,
-            timeout=timeout if timeout is not None else _TIMEOUT,
-        )
-        resp.raise_for_status()
-        return resp.json()
-    except requests.RequestException as e:
-        status = getattr(getattr(e, "response", None), "status_code", None)
-        log_fn = logger.debug if status in quiet_statuses else logger.warning
-        log_fn("Failed to fetch %s: %s", url, e)
-        return None
-    except ValueError as e:
-        logger.warning("Invalid JSON from %s: %s", url, e)
-        return None
+    attempt = 0
+    while True:
+        try:
+            resp = _session().get(
+                url,
+                params=params,
+                timeout=timeout if timeout is not None else _TIMEOUT,
+            )
+            # Rate limits are the host asking for a pause, not a dead board.
+            # Workable returns 429 in bulk under a wide fan-out and dropped
+            # every company that got one; one honored wait recovers them.
+            if resp.status_code == 429 and attempt < _RATE_LIMIT_RETRIES:
+                attempt += 1
+                time.sleep(_retry_after_seconds(resp, attempt))
+                continue
+            if on_status is not None:
+                on_status(resp.status_code)
+            resp.raise_for_status()
+            return resp.json()
+        except requests.RequestException as e:
+            status = getattr(getattr(e, "response", None), "status_code", None)
+            if on_status is not None and status is None:
+                on_status(None)
+            log_fn = logger.debug if status in quiet_statuses else logger.warning
+            log_fn("Failed to fetch %s: %s", url, e)
+            return None
+        except ValueError as e:
+            logger.warning("Invalid JSON from %s: %s", url, e)
+            return None
 
 
 def _parse_salary(text: str | None) -> tuple[float | None, float | None]:
