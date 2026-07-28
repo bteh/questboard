@@ -80,3 +80,19 @@ class ResumeUploadResponse(BaseModel):
     parse_code: str | None = None  # "SCANNED_PDF" | None
     analysis_status: str = "skipped_no_llm"  # "completed" | "skipped_no_llm" | "analysis_error" | "failed"
     analysis: ResumeAnalysisSummary | None = None
+
+
+class AgentProgressStep(BaseModel):
+    """One MCP tool call the running assistant has made."""
+
+    tool: str
+    at: str = ""
+    # The run polls get_refresh_status on a loop; repeats collapse into a count
+    # rather than filling the trail with identical rows.
+    count: int = 1
+
+
+class AgentProgressResponse(BaseModel):
+    steps: list[AgentProgressStep] = Field(default_factory=list)
+    # Plain words for the last real step, so the board never has to guess.
+    phase: str = "Starting up"

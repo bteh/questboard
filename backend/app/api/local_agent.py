@@ -14,6 +14,8 @@ from sqlalchemy.orm import Session
 from app.config import get_settings
 from app.models.database import get_db
 from app.schemas.resume import (
+    AgentProgressResponse,
+    AgentProgressStep,
     AgentClientsResponse,
     AgentClientStatus,
     AgentConnectRequest,
@@ -22,7 +24,12 @@ from app.schemas.resume import (
     AgentRunRequest,
     AgentRunResponse,
 )
-from app.services import agent_integration_service, local_agent_service, resume_consent
+from app.services import (
+    agent_integration_service,
+    agent_run_progress,
+    local_agent_service,
+    resume_consent,
+)
 
 router = APIRouter(prefix="/agent", tags=["agent"])
 
@@ -43,8 +50,11 @@ _AGENT_TASKS: dict[str, dict[str, object]] = {
             "to 90 seconds, and if it is still running continue anyway, new rows land on the "
             "board when it finishes. Then call search_work to find matching jobs. Retrieval order is "
             "not a fit verdict, so map each candidate against my actual background. "
-            "Then call set_work_fit ONCE and give EVERY candidate search_work returned its own "
-            "verdict, so my whole board is scored, not just the top few. Verdict scale: "
+            "Then call set_work_fit IN BATCHES of about 15, best candidates first, until "
+            "EVERY candidate search_work returned has its own verdict, so my whole board is "
+            "scored, not just the top few. Batches of one run add up; each batch lands on my "
+            "board as soon as you send it, so if the run is cut short I keep what you already "
+            "decided. Do NOT wait and send them all at the end. Verdict scale: "
             "strong / good / reach for ones worth my time, skip for ones that don't fit "
             "(wrong role, staffing agency, junk). Rank the non-skips 1..N best-first; skips "
             "need no rank. Keep it FAST: each 'why' is a short phrase (a few words, <=12), and "
@@ -121,6 +131,9 @@ def run_agent(payload: AgentRunRequest, db: Session = Depends(get_db)) -> AgentR
                 detail="Turn on resume access first so your assistant can read your resume.",
             )
 
+    # Drop the previous run's trail so a poll during THIS run can't read the
+    # last one's steps and report progress that already happened.
+    agent_run_progress.clear()
     try:
         outcome = agent_integration_service.run_headless(payload.client, str(task["prompt"]))
     except ValueError as exc:
@@ -128,6 +141,21 @@ def run_agent(payload: AgentRunRequest, db: Session = Depends(get_db)) -> AgentR
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc))
     return AgentRunResponse(**outcome)
+
+
+@router.get("/progress", response_model=AgentProgressResponse)
+def get_agent_progress() -> AgentProgressResponse:
+    """Where the running assistant has actually got to.
+
+    The run is a separate process, so the board polls this instead of guessing
+    from a stopwatch. Steps are the MCP tool calls the run has made.
+    """
+    _require_local()
+    steps = agent_run_progress.read()["steps"]
+    return AgentProgressResponse(
+        steps=[AgentProgressStep(**s) for s in steps],
+        phase=agent_run_progress.phase_label(steps),
+    )
 
 
 @router.get("/resume-consent", response_model=AgentConsentStatus)

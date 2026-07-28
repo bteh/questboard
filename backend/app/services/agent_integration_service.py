@@ -240,7 +240,12 @@ def run_headless(
     prompt: str,
     allowed_tools: list[str] | None = None,
     *,
-    timeout: int = 300,
+    # 300s was enough and stopped being: a run scoring ~29 candidates finished
+    # inside it, and one scoring ~50 was killed mid-write with nothing on the
+    # board at all. Rankings land in batches now, so an overrun costs the tail
+    # of a run instead of all of it, but the ceiling still has to clear a real
+    # run. Too generous costs a slow run; too tight cost completed work.
+    timeout: int = 900,
 ) -> dict[str, Any]:
     """Run the user's own agent once, non-interactively, driving the Questboard
     MCP tools, and return its final answer.

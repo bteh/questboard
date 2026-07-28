@@ -1,6 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { connectAgent, disconnectAgent, getAgentClients, runAgent } from '@/api/agent';
+import {
+  connectAgent,
+  disconnectAgent,
+  getAgentClients,
+  getAgentProgress,
+  runAgent,
+} from '@/api/agent';
 
 const AGENT_CLIENTS_KEY = ['agent-clients'] as const;
 
@@ -35,5 +41,17 @@ export function useDisconnectAgent() {
 export function useRunAgent() {
   return useMutation({
     mutationFn: ({ task, client }: { task?: string; client?: string } = {}) => runAgent(task, client),
+  });
+}
+
+/** Poll the running assistant's real progress. Enabled only while a run is in
+ *  flight, so an idle board makes no requests. */
+export function useAgentProgress(running: boolean) {
+  return useQuery({
+    queryKey: ['agent-progress'],
+    queryFn: getAgentProgress,
+    enabled: running,
+    refetchInterval: running ? 2000 : false,
+    gcTime: 0,
   });
 }
