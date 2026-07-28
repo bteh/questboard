@@ -15,11 +15,16 @@ describe('stepLines', () => {
     expect(lines.map((l) => l.done)).toEqual([true, false]);
   });
 
-  it('shows how long the run has been waiting on the sources', () => {
-    // The run polls get_refresh_status every ~10s; six polls is a minute of
-    // waiting, and saying so is the difference between slow and stuck.
+  it('collapses repeated pull checks into one line with a count', () => {
+    // The run checks the pull once at the end now; a repeat count still
+    // renders honestly if a model checks more than once.
     const lines = stepLines([step('refresh_work'), step('get_refresh_status', 6)]);
-    expect(lines[1]).toMatchObject({ label: 'Waiting on the sources', repeat: 6 });
+    expect(lines[1]).toMatchObject({ label: 'Checked on the source pull', repeat: 6 });
+  });
+
+  it('names a role proposal as its own step', () => {
+    const lines = stepLines([step('propose_career_preferences')]);
+    expect(lines[0].label).toBe('Proposed role updates');
   });
 
   it('does not label a single call as a repeat', () => {

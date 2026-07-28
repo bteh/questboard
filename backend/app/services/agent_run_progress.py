@@ -34,7 +34,9 @@ _PHASES: dict[str, str] = {
     "get_career_preferences": "Reading your saved search",
     "propose_career_preferences": "Proposing role updates",
     "refresh_work": "Pulling fresh postings",
-    "get_refresh_status": "Pulling fresh postings",
+    # A single end-of-run check now, not a polling loop; the label has to
+    # read sensibly after ranking, not just during a wait.
+    "get_refresh_status": "Checking the source pull",
     "search_work": "Reading the shortlist",
     "set_work_fit": "Writing your rankings",
 }

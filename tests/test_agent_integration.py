@@ -239,3 +239,39 @@ def test_role_proposal_has_progress_label_without_preference_save_label() -> Non
         agent_run_progress.phase_label([{"tool": "set_career_preferences"}])
         == "Working"
     )
+
+
+# The pipeline shape: rank while the pull runs, never wait on it.
+#
+# A real run spent ~60 seconds calling get_refresh_status on a loop with
+# nothing to do (the trail showed "Waiting on the sources x6"), while 1,186
+# rows already on the board sat unranked. The pull runs server-side; the
+# assistant's only job during it is ranking what already exists. One status
+# check at the end sweeps in whatever arrived.
+
+def test_the_prompt_does_not_instruct_a_polling_wait() -> None:
+    prompt = _find_and_rank_prompt()
+    assert "every 10 seconds" not in prompt
+    assert "poll" not in prompt.lower()
+
+
+def test_the_prompt_ranks_the_existing_board_while_the_pull_runs() -> None:
+    prompt = _find_and_rank_prompt()
+    assert "while" in prompt.lower() and "search_work(queries=" in prompt
+    # The ranking instruction must come BEFORE the status check in reading
+    # order, since the model follows the prompt's sequence.
+    assert prompt.index("set_work_fit") < prompt.index("get_refresh_status")
+
+
+def test_the_prompt_checks_the_pull_exactly_once_at_the_end() -> None:
+    prompt = _find_and_rank_prompt()
+    assert prompt.count("get_refresh_status") == 1
+    assert "once" in prompt.lower()
+
+
+def test_the_pipeline_rewrite_keeps_the_proposal_contract() -> None:
+    """Speed must not quietly reopen the silent-rewrite hole."""
+    prompt = _find_and_rank_prompt()
+    assert "set_career_preferences" not in prompt
+    assert "propose_career_preferences" in prompt
+    assert "BATCHES of about 15" in prompt
