@@ -175,6 +175,81 @@
   .qb-workchips .qb-pchip { min-height: 44px; }
 }
 
+/* An assistant role suggestion sits with the run that produced it. */
+.qb-proposal {
+  max-width: 720px;
+  margin-top: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--hair);
+  border-bottom-color: var(--edge);
+  border-radius: 7px;
+  background: var(--paper);
+  box-shadow: 0 5px 14px -13px rgba(40, 30, 12, .55);
+}
+.qb-proposal-title {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.qb-proposal-diff { display: grid; gap: 7px; margin-top: 10px; }
+.qb-proposal-change { display: flex; align-items: flex-start; gap: 10px; }
+.qb-proposal-label {
+  flex: 0 0 38px;
+  padding-top: 4px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--mute);
+}
+.qb-proposal-roles { display: flex; flex-wrap: wrap; gap: 5px; }
+.qb-proposal-role {
+  padding: 3px 7px;
+  border: 1px solid var(--hair);
+  border-radius: 999px;
+  background: var(--ground);
+  font-size: 12px;
+  color: var(--soft);
+}
+.qb-proposal-more {
+  padding: 4px 2px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--mute);
+}
+.qb-proposal-rationale {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--soft);
+}
+.qb-proposal-error {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--clay);
+}
+.qb-proposal-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.qb-proposal-actions .qb-btn-sage,
+.qb-proposal-keep { font-size: 12.5px; padding: 7px 11px; }
+.qb-proposal-keep {
+  border: 1px solid var(--hair);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--soft);
+  font-family: inherit;
+  cursor: pointer;
+}
+.qb-proposal-keep:hover { border-color: var(--step4); color: var(--ink); }
+.qb-proposal-keep:disabled { opacity: .55; cursor: default; }
+@media (max-width: 700px) {
+  .qb-proposal { padding: 14px; }
+  .qb-proposal-actions .qb-btn-sage,
+  .qb-proposal-keep { min-height: 44px; }
+}
+
 /* the job detail sheet: stated facts, then the full stored description */
 .qb-jd-facts {
   border: 1px solid var(--hair); border-bottom-color: var(--edge);

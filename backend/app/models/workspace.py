@@ -136,6 +136,28 @@ class WorkspacePreferences(Base):
     updated_at = Column(DateTime, default=_utcnow, onupdate=_utcnow)
 
 
+class AgentRoleProposal(Base):
+    """A role change the connected assistant would suggest, not yet applied.
+
+    propose_career_preferences never writes workspace_preferences; it only
+    ever writes here. base_roles_json freezes the saved roles at proposal
+    time, so decide_role_proposal can detect drift (a save or a later
+    proposal changed roles since) and refuse a stale accept instead of
+    silently blending old and new intent.
+    """
+
+    __tablename__ = "agent_role_proposals"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    workspace_id = Column(String(64), ForeignKey("workspaces.id"), nullable=True, index=True)
+    base_roles_json = Column(Text, default="[]")
+    proposed_roles_json = Column(Text, default="[]")
+    rationale = Column(String(500), default="")
+    status = Column(String(16), default="pending")
+    created_at = Column(DateTime, default=_utcnow)
+    decided_at = Column(DateTime, nullable=True)
+
+
 class WorkspaceSearchRun(Base):
     __tablename__ = "workspace_search_runs"
 

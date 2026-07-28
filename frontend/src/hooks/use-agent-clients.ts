@@ -2,13 +2,16 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
   connectAgent,
+  decideRoleProposal,
   disconnectAgent,
   getAgentClients,
   getAgentProgress,
+  getRoleProposals,
   runAgent,
 } from '@/api/agent';
 
 const AGENT_CLIENTS_KEY = ['agent-clients'] as const;
+const ROLE_PROPOSALS_KEY = ['role-proposals'] as const;
 
 /** Read which MCP assistants are installed and connected. */
 export function useAgentClients() {
@@ -39,8 +42,12 @@ export function useDisconnectAgent() {
 /** Run the connected assistant headlessly (app drives it; user never opens it).
  *  Long-running (~1 min); the caller shows progress and renders the result. */
 export function useRunAgent() {
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ task, client }: { task?: string; client?: string } = {}) => runAgent(task, client),
+    onSettled: () => {
+      void queryClient.refetchQueries({ queryKey: ROLE_PROPOSALS_KEY, type: 'active' });
+    },
   });
 }
 
@@ -53,5 +60,27 @@ export function useAgentProgress(running: boolean) {
     enabled: running,
     refetchInterval: running ? 2000 : false,
     gcTime: 0,
+  });
+}
+
+export function useRoleProposals(enabled = true) {
+  return useQuery({
+    queryKey: ROLE_PROPOSALS_KEY,
+    queryFn: getRoleProposals,
+    enabled,
+  });
+}
+
+export function useDecideRoleProposal() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, accept }: { id: number; accept: boolean }) =>
+      decideRoleProposal(id, accept),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ROLE_PROPOSALS_KEY }),
+        queryClient.invalidateQueries({ queryKey: AGENT_CLIENTS_KEY }),
+      ]);
+    },
   });
 }

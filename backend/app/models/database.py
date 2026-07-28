@@ -165,6 +165,7 @@ def init_db(db_path: str | None = None) -> None:
     from app.models.application import ApplicationRecord  # noqa: F401
     from app.models.rate_limit import RateLimitEvent  # noqa: F401
     from app.models.workspace import (  # noqa: F401
+        AgentRoleProposal,
         FileAsset,
         Profile,
         UsageCounter,

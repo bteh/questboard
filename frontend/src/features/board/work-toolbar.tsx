@@ -27,6 +27,7 @@ import {
 } from '@/features/board/posted-filter';
 import { payScopeNote } from '@/features/board/pay-scope';
 import { AssistantSteps } from '@/features/board/assistant-steps.tsx';
+import { RoleProposalCard } from '@/features/board/role-proposal-card';
 import { SourceScoreboard } from '@/features/board/source-scoreboard.tsx';
 import { useRunWorkSearch } from '@/features/board/use-run-work-search';
 import { useAssistantReady } from '@/features/board/use-assistant-ready';
@@ -396,6 +397,7 @@ export function WorkToolbar({
       ) : (
         <RunStatusLine />
       )}
+      <RoleProposalCard enabled={isDesktop} />
       <p className="qb-tray-caption">Narrow what's on the board</p>
       <div className="qb-tray" role="search">
         <label className="qb-tray-field qb-tray-grow">

@@ -34,12 +34,20 @@ SERVER_NAME = "questboard"
 RUN_ALLOWED_TOOLS: tuple[str, ...] = (
     "read_resume_for_matching",
     "get_career_preferences",
-    "set_career_preferences",
     "search_work",
     "search_side_quests",
     "get_opportunity",
     "set_work_fit",
+    "refresh_work",
+    "get_refresh_status",
+    "propose_career_preferences",
 )
+
+# Tools a headless run must never reach, even if a prompt asked for them. The
+# saved search is user-owned; a run proposes role changes, it does not rewrite
+# them. --disallowedTools hard-removes the tool from the model's view, unlike
+# --allowedTools alone, which does not deny.
+RUN_DISALLOWED_TOOLS: tuple[str, ...] = ("set_career_preferences",)
 
 # id -> display name, in the order we show them.
 CLIENTS: dict[str, str] = {"claude": "Claude Code", "codex": "Codex"}
@@ -221,11 +229,13 @@ def _mcp_config_json() -> str:
 
 def _run_command(client: str, binary: str, prompt: str, config_path: str, allowed: list[str]) -> list[str]:
     qualified = [f"mcp__{SERVER_NAME}__{tool}" for tool in allowed]
+    disallowed = [f"mcp__{SERVER_NAME}__{tool}" for tool in RUN_DISALLOWED_TOOLS]
     if client == "claude":
         return [
             binary, "-p", prompt,
             "--mcp-config", config_path,
             "--allowedTools", ",".join(qualified),
+            "--disallowedTools", ",".join(disallowed),
             # Sonnet is much faster than Opus and plenty for mapping postings to
             # a resume; the run is a ranking task, not open-ended reasoning.
             "--model", "sonnet",

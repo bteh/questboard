@@ -917,7 +917,10 @@ def save_workspace_preferences(
     db: Session,
     workspace_id: str,
     preferences: WorkspacePreferencesSchema,
+    *,
+    commit: bool = True,
 ) -> WorkspacePreferencesSchema:
+    """Persist preferences, optionally joining a caller-owned transaction."""
     record = db.query(WorkspacePreferences).filter(WorkspacePreferences.workspace_id == workspace_id).first()
     if not record:
         record = WorkspacePreferences(workspace_id=workspace_id)
@@ -950,7 +953,8 @@ def save_workspace_preferences(
     record.exclude_staffing_agencies = bool(preferences.exclude_staffing_agencies)
     record.include_remote = preferences.workplace_preference != "location_only"
     record.match_strictness = _clean_strictness(preferences.match_strictness)
-    db.commit()
+    if commit:
+        db.commit()
     return _prefs_to_schema(record)
 
 

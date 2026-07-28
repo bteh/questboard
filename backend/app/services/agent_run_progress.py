@@ -32,7 +32,7 @@ _FILENAME = "agent_run_progress.json"
 _PHASES: dict[str, str] = {
     "read_resume_for_matching": "Reading your resume",
     "get_career_preferences": "Reading your saved search",
-    "set_career_preferences": "Sharpening your target roles",
+    "propose_career_preferences": "Proposing role updates",
     "refresh_work": "Pulling fresh postings",
     "get_refresh_status": "Pulling fresh postings",
     "search_work": "Reading the shortlist",
