@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.models.application import ApplicationRecord
 from app.models.workspace import Workspace, WorkspacePreferences, WorkspaceResume
-from app.services import application_service, workspace_service
+from app.services import agent_run_progress, application_service, workspace_service
 from job_finder.job_trust import is_direct_source
 from job_finder.kinds import get_kinds, kind_for_vertical, vertical_values_for
 from job_finder.models.database import ScrapeRunRecord
@@ -958,16 +958,28 @@ def set_work_fit(db: Session, rankings: list[dict[str, Any]]) -> dict[str, Any]:
             "external_action_performed": False,
         }
 
-    run_id = uuid.uuid4().hex[:12]
+    # Batches of one run share its id and only the FIRST clears.
+    #
+    # Scoring ~50 jobs in a single write took longer than the run's own
+    # timeout and the whole run was thrown away: the pull had finished, the
+    # shortlist was in hand, and not one verdict reached the board. Writing in
+    # batches means a run that dies late keeps what it already decided.
+    #
+    # Clearing per batch would leave only the last one, so the run boundary
+    # decides instead. The app clears the progress trail when it launches the
+    # assistant, so a run's first write is the one with no set_work_fit behind
+    # it. The assistant needs no flag it could get wrong.
+    prior = agent_run_progress.work_fit_run_id()
+    run_id = prior or uuid.uuid4().hex[:12]
     stamped_at = _iso(datetime.now(timezone.utc))
 
-    # Clear the previous run's verdicts (career/work only) so the board shows
-    # only the latest run, then write this run's.
-    db.query(ApplicationRecord).filter(
-        ApplicationRecord.vertical.in_(("career", "work")),
-        ApplicationRecord.agent_fit_json.isnot(None),
-        ApplicationRecord.agent_fit_json != "",
-    ).update({ApplicationRecord.agent_fit_json: ""}, synchronize_session=False)
+    if not prior:
+        agent_run_progress.set_work_fit_run_id(run_id)
+        db.query(ApplicationRecord).filter(
+            ApplicationRecord.vertical.in_(("career", "work")),
+            ApplicationRecord.agent_fit_json.isnot(None),
+            ApplicationRecord.agent_fit_json != "",
+        ).update({ApplicationRecord.agent_fit_json: ""}, synchronize_session=False)
 
     for record, item in matched:
         record.agent_fit_json = json.dumps({

@@ -26,17 +26,16 @@ import {
   type PostedDaysKey,
 } from '@/features/board/posted-filter';
 import { payScopeNote } from '@/features/board/pay-scope';
+import { AssistantSteps } from '@/features/board/assistant-steps.tsx';
 import { SourceScoreboard } from '@/features/board/source-scoreboard.tsx';
 import { useRunWorkSearch } from '@/features/board/use-run-work-search';
 import { useAssistantReady } from '@/features/board/use-assistant-ready';
 import { useRunAssistant } from '@/features/board/use-run-assistant';
+import { useAgentProgress } from '@/hooks/use-agent-clients';
 import { consumeFirstRunPending } from '@/components/onboarding/first-run';
 import { useOnboardingState } from '@/hooks/use-workspace';
 import { formatStatedPay, parseAmount } from '@/utils/board-card';
 
-/* The assistant run's three phases, gated by elapsed seconds so the status
-   line moves while the local Claude works. */
-const PHASES = ['Reading your resume', 'Pulling fresh postings', 'Ranking against your experience'];
 
 interface WorkToolbarProps {
   /** the board summary's honest "sources checked Xh ago", or null */
@@ -237,22 +236,30 @@ function RunStatusLine() {
   return null;
 }
 
-/* The assistant run's own report, in the same slot as the pull's line but
-   driven by a plain elapsed clock (the local agent has no SSE feed). Phases
-   advance by seconds; only one of the two lines mounts at a time. */
+/* The assistant run's own report, in the same slot as the pull's line. The
+   phase comes from the MCP tool calls the run has actually made, polled from
+   the app. It used to be a stopwatch dressed as progress: past 100 seconds it
+   read "Ranking against your experience" whether or not ranking had started,
+   and on one run it claimed that at 2:36 with set_work_fit never called.
+   Only one of the two lines mounts at a time. */
 function AssistantRunLine() {
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
     const id = setInterval(() => setElapsed((s) => s + 1), 1000);
     return () => clearInterval(id);
   }, []);
-  const phase = elapsed < 8 ? PHASES[0] : elapsed < 100 ? PHASES[1] : PHASES[2];
+  const { data } = useAgentProgress(true);
+  const steps = data?.steps ?? [];
   const clock = `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, '0')}`;
   return (
-    <p className="qb-workline" role="status">
-      <Loader2 className="h-4 w-4 animate-spin text-brand" aria-hidden="true" />
-      {phase} · <span className="qb-num">{clock}</span>. Keep browsing while it runs.
-    </p>
+    <div className="qb-runblock" role="status">
+      <p className="qb-workline">
+        <Loader2 className="h-4 w-4 animate-spin text-brand" aria-hidden="true" />
+        {data?.phase ?? 'Starting up'} · <span className="qb-num">{clock}</span>. Keep browsing
+        while it runs.
+      </p>
+      <AssistantSteps steps={steps} />
+    </div>
   );
 }
 

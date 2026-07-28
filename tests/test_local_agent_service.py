@@ -648,7 +648,13 @@ def test_set_work_fit_writes_verdicts_and_replaces_prior(local_agent_db) -> None
     fit0 = json.loads(db.query(ApplicationRecord).get(ids[0]).agent_fit_json)
     assert fit0["verdict"] == "strong" and fit0["rank"] == 1 and "Exact" in fit0["why"]
 
-    # A second run replaces the prior verdicts (latest-run-only on the board).
+    # A second RUN replaces the prior verdicts (latest-run-only on the board).
+    # Runs write in batches now, so a bare second call joins this run rather
+    # than clearing it. What marks a new run is the app resetting the progress
+    # trail, exactly as POST /agent/run does before launching the assistant.
+    from app.services import agent_run_progress
+
+    agent_run_progress.clear()
     out2 = local_agent_service.set_work_fit(
         db, [{"opportunity_id": ids[2], "rank": 1, "verdict": "good", "why": "Now this one."}]
     )

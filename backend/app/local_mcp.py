@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import functools
 import os
 from contextlib import contextmanager
 from pathlib import Path
@@ -20,7 +21,12 @@ from mcp.types import ToolAnnotations
 from sqlalchemy.orm import Session
 
 from app.models.database import get_db, init_db
-from app.services import local_agent_service, pipeline_service, workspace_service
+from app.services import (
+    agent_run_progress,
+    local_agent_service,
+    pipeline_service,
+    workspace_service,
+)
 
 
 INSTRUCTIONS = (
@@ -71,6 +77,24 @@ RESUME_PII = ToolAnnotations(
 )
 
 
+# How large a retrieval result may legitimately be, declared per tool in its
+# tools/list entry.
+#
+# Claude Code caps an MCP tool result at 25,000 tokens by default (warning past
+# 10,000) and writes anything larger to a file, handing the model a reference
+# instead of the data. A full page of search results crossed that line at
+# 84,647 characters and cost a whole ranking run: the CLI refused the result
+# four times and the assistant spent the rest of its budget shelling out to jq.
+#
+# The payload is also much smaller now (see local_agent_service), which is
+# worth having on its own. This is the other half: a board that keeps growing
+# would eventually walk back into the same cliff. Applies to this tool alone,
+# needs no MAX_MCP_OUTPUT_TOKENS from the user, and is clamped at 500,000.
+# Only the retrieval tools carry it — a tool returning one row has no business
+# claiming it needs the room.
+_LARGE_RESULT = {"anthropic/maxResultSizeChars": 200_000}
+
+
 @contextmanager
 def _database_session() -> Iterator[Session]:
     generator = get_db()
@@ -91,7 +115,40 @@ def _tool_error(callable_, *args, **kwargs):
         raise ToolError(str(exc)) from exc
 
 
+def _step(func):
+    """Note which tool a headless run just reached, by the tool's own name.
+
+    The assistant runs as a separate process with no feed of its own, so the
+    board could only guess its progress from a stopwatch, and it guessed wrong:
+    it read "Ranking against your experience" at 2:36 of a run that had not
+    started ranking. Each tool call is the run's real checkpoint.
+
+    Sits under @mcp.tool so the schema FastMCP builds still comes from the
+    wrapped signature. Recording never raises; progress must not be able to
+    fail a tool.
+    """
+    # refresh_work is async. A sync wrapper would still work by handing back
+    # the coroutine, but it would stop looking like a coroutine function to
+    # anything that inspects it, so each kind keeps its own shape.
+    if asyncio.iscoroutinefunction(func):
+
+        @functools.wraps(func)
+        async def async_wrapper(*args, **kwargs):
+            agent_run_progress.record(func.__name__)
+            return await func(*args, **kwargs)
+
+        return async_wrapper
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        agent_run_progress.record(func.__name__)
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
 @mcp.tool(annotations=READ_ONLY, structured_output=True)
+@_step
 def server_info() -> dict[str, Any]:
     """Explain this local server's privacy, cost, and capability boundaries."""
 
@@ -116,6 +173,7 @@ def server_info() -> dict[str, Any]:
 
 
 @mcp.tool(annotations=READ_ONLY, structured_output=True)
+@_step
 def get_career_preferences() -> dict[str, Any]:
     """Read saved roles and hard constraints without returning resume text."""
 
@@ -124,6 +182,7 @@ def get_career_preferences() -> dict[str, Any]:
 
 
 @mcp.tool(annotations=WRITE, structured_output=True)
+@_step
 def set_career_preferences(
     roles: list[str] | None = None,
     keywords: list[str] | None = None,
@@ -147,6 +206,7 @@ def set_career_preferences(
 
 
 @mcp.tool(annotations=RESUME_PII, structured_output=True)
+@_step
 def read_resume_for_matching() -> dict[str, Any]:
     """Return the local resume (PII) only after a human granted consent.
 
@@ -159,7 +219,8 @@ def read_resume_for_matching() -> dict[str, Any]:
         return local_agent_service.resume_for_matching(db)
 
 
-@mcp.tool(annotations=READ_ONLY, structured_output=True)
+@mcp.tool(annotations=READ_ONLY, structured_output=True, meta=_LARGE_RESULT)
+@_step
 def search_work(
     queries: list[str] | None = None,
     location: str = "",
@@ -187,7 +248,8 @@ def search_work(
         )
 
 
-@mcp.tool(annotations=READ_ONLY, structured_output=True)
+@mcp.tool(annotations=READ_ONLY, structured_output=True, meta=_LARGE_RESULT)
+@_step
 def search_side_quests(
     kinds: list[str] | None = None,
     query: str = "",
@@ -212,6 +274,7 @@ def search_side_quests(
 
 
 @mcp.tool(annotations=SOURCE_READ, structured_output=True)
+@_step
 def get_opportunity(opportunity_id: int) -> dict[str, Any]:
     """Fetch finalist details and its stored source receipt; may hydrate the source page."""
 
@@ -220,6 +283,7 @@ def get_opportunity(opportunity_id: int) -> dict[str, Any]:
 
 
 @mcp.tool(annotations=READ_ONLY, structured_output=True)
+@_step
 def get_source_status(limit: int = 50) -> dict[str, Any]:
     """Show when each source last ran and whether it returned valid rows."""
 
@@ -228,6 +292,7 @@ def get_source_status(limit: int = 50) -> dict[str, Any]:
 
 
 @mcp.tool(annotations=REFRESH, structured_output=True)
+@_step
 async def refresh_work(
     roles: list[str] | None = None,
     keywords: list[str] | None = None,
@@ -306,6 +371,7 @@ async def refresh_work(
 
 
 @mcp.tool(annotations=READ_ONLY, structured_output=True)
+@_step
 def get_refresh_status(run_id: str) -> dict[str, Any]:
     """Poll a local career refresh started by refresh_work."""
 
@@ -326,6 +392,7 @@ def get_refresh_status(run_id: str) -> dict[str, Any]:
 
 
 @mcp.tool(annotations=WRITE, structured_output=True)
+@_step
 def set_opportunity_status(
     opportunity_id: int,
     status: Literal[
@@ -359,6 +426,7 @@ def set_opportunity_status(
 
 
 @mcp.tool(annotations=WRITE, structured_output=True)
+@_step
 def set_work_fit(rankings: list[dict[str, Any]]) -> dict[str, Any]:
     """Record your own fit verdict for the work rows you just judged, so the
     user's board and results panel show your ranking and reasons.
