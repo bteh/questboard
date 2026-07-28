@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { roleProposalChanges } from './role-proposal';
+import { rationaleIsLong, roleProposalChanges } from './role-proposal';
 
 describe('roleProposalChanges', () => {
   it('returns no card data when the role lists are identical', () => {
@@ -47,5 +47,17 @@ describe('roleProposalChanges', () => {
         moreLabel: '+2 more',
       },
     });
+  });
+});
+
+describe('rationaleIsLong', () => {
+  // The card clamps a long rationale to a couple of lines with a toggle; a
+  // short one renders whole with no toggle taking up space.
+  it('leaves a sentence alone', () => {
+    expect(rationaleIsLong('Kept every saved role; added two level-up alternates.')).toBe(false);
+  });
+
+  it('clamps a wall of text', () => {
+    expect(rationaleIsLong('word '.repeat(60).trim())).toBe(true);
   });
 });
