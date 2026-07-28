@@ -95,13 +95,34 @@ export function countNewSince<T extends Found>(
   return { count, exact: !opts.hasMore || flipLoaded };
 }
 
-/** "14 found since your last visit, Jul 13"; null when nothing is new. */
+/** "14 found since your last visit, Jul 13", or an explicit zero.
+
+    Zero used to return null and the board fell silent, which reads exactly
+    like a stale cache or a broken signal. "Nothing new" is an answer; only a
+    missing cutoff (first ever visit) has nothing to say. */
 export function newSinceLine(res: NewSinceCount, cutoff: string | null): string | null {
-  if (!cutoff || res.count === 0) return null;
+  if (!cutoff) return null;
   const t = parseUtc(cutoff);
   const date =
     t === null
       ? ''
       : new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  if (res.count === 0) return `Nothing new since your last visit${date ? `, ${date}` : ''}`;
   return `${res.count}${res.exact ? '' : '+'} found since your last visit${date ? `, ${date}` : ''}`;
+}
+
+/** Where "new" starts after a completed pull: the later of the current
+    cutoff and the pull's start.
+
+    The cutoff otherwise advances only when the board page mounts, and a
+    desktop app stays open for days, so "new here" drifted into meaning "new
+    this week". Pressing Get new jobs is the moment the reader starts caring
+    what changed, so a finished pull re-anchors "new" at its own start. Never
+    moves backward: clock skew must not resurrect week-old rows as new. */
+export function cutoffAfterPull(cutoff: string | null, pullStartedAt: string): string | null {
+  const pullT = parseUtc(pullStartedAt);
+  if (pullT === null) return cutoff;
+  const cutoffT = parseUtc(cutoff);
+  if (cutoffT !== null && cutoffT >= pullT) return cutoff;
+  return pullStartedAt;
 }

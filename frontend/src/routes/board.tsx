@@ -59,10 +59,12 @@ import { PlacePicker } from '@/features/board/place-picker';
 import { JobsSetupStrip } from '@/features/board/jobs-callout';
 import { showBankBonusBridge } from '@/features/board/bridge-line';
 import { WorkToolbar } from '@/features/board/work-toolbar';
+import { useSearchContext } from '@/contexts/search-context';
 import { SourceCategoryChips } from '@/features/board/source-category-chips';
 import {
   advanceWorkCutoff,
   countNewSince,
+  cutoffAfterPull,
   newSinceLine,
   readWorkCutoff,
 } from '@/features/board/new-since';
@@ -565,8 +567,9 @@ function BoardPage() {
     : PRESETS.filter((p) => !p.careerOnly);
 
   /* the Jobs lane's last-visit cutoff: frozen at page load, advanced once
-     after the lane's first successful render, so labels hold still */
-  const [workCutoff] = useState(() => readWorkCutoff());
+     after the lane's first successful render, so labels hold still. One
+     deliberate exception below: a completed pull re-anchors it. */
+  const [workCutoff, setWorkCutoff] = useState(() => readWorkCutoff());
   const cutoffAdvanced = useRef(false);
   const laneLoaded = firstPage.isSuccess;
   useEffect(() => {
@@ -574,6 +577,28 @@ function BoardPage() {
     cutoffAdvanced.current = true;
     advanceWorkCutoff();
   }, [careerLane, laneLoaded]);
+
+  /* A desktop app stays open for days, so a mount-time cutoff drifts into
+     "new this week". Pressing Get new jobs is when the reader starts caring
+     what changed: when the pull completes, "new" re-anchors at the pull's
+     start, and the stored cutoff advances so the next visit agrees. */
+  const { state: searchState } = useSearchContext();
+  const pullStartedAt = useRef<string | null>(null);
+  useEffect(() => {
+    if (searchState === 'running' && pullStartedAt.current === null) {
+      pullStartedAt.current = new Date().toISOString();
+      return;
+    }
+    if (searchState === 'completed' && pullStartedAt.current !== null) {
+      const startedAt = pullStartedAt.current;
+      pullStartedAt.current = null;
+      if (careerLane) {
+        setWorkCutoff((prev) => cutoffAfterPull(prev, startedAt));
+        advanceWorkCutoff();
+      }
+    }
+    if (searchState === 'failed') pullStartedAt.current = null;
+  }, [searchState, careerLane]);
 
   /* which empty board is this: the filters cut everything, or nothing has
      been fetched yet? The message must match the cause. */
@@ -935,7 +960,7 @@ function BoardPage() {
         {careerLane && sinceLine && (
           <p className="qb-sinceline">
             {sinceLine}
-            {sortShowsBest && (
+            {sortShowsBest && (newSince?.count ?? 0) > 0 && (
               <>
                 {' '}
                 <button
