@@ -34,3 +34,12 @@ export function roleProposalChanges(
     dropped: capRoles(dropped),
   };
 }
+
+/* Past this, the card clamps the rationale to two lines with a toggle; a
+   sentence or two renders whole so the toggle never wastes a tap. Roughly
+   two lines of the card's 12.5px text at its 720px max width. */
+const RATIONALE_CLAMP_CHARS = 180;
+
+export function rationaleIsLong(text: string): boolean {
+  return text.trim().length > RATIONALE_CLAMP_CHARS;
+}

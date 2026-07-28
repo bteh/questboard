@@ -176,15 +176,27 @@
 }
 
 /* An assistant role suggestion sits with the run that produced it. */
+/* The proposal reads as a note pinned above the felt, in the posters' own
+   paper grammar: sage spine, serif title, mono kicker. Tinted +/− chips make
+   the diff scannable without reading the note. */
 .qb-proposal {
   max-width: 720px;
   margin-top: 12px;
-  padding: 14px 16px;
+  padding: 12px 16px 13px;
   border: 1px solid var(--hair);
+  border-left: 3px solid var(--sage);
   border-bottom-color: var(--edge);
   border-radius: 7px;
   background: var(--paper);
   box-shadow: 0 5px 14px -13px rgba(40, 30, 12, .55);
+}
+.qb-proposal-kicker {
+  margin: 0 0 1px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--sage);
 }
 .qb-proposal-title {
   margin: 0;
@@ -193,10 +205,10 @@
   font-weight: 600;
   color: var(--ink);
 }
-.qb-proposal-diff { display: grid; gap: 7px; margin-top: 10px; }
+.qb-proposal-diff { display: grid; gap: 6px; margin-top: 9px; }
 .qb-proposal-change { display: flex; align-items: flex-start; gap: 10px; }
 .qb-proposal-label {
-  flex: 0 0 38px;
+  flex: 0 0 34px;
   padding-top: 4px;
   font-family: var(--mono);
   font-size: 10.5px;
@@ -206,25 +218,48 @@
 }
 .qb-proposal-roles { display: flex; flex-wrap: wrap; gap: 5px; }
 .qb-proposal-role {
-  padding: 3px 7px;
+  padding: 3px 8px;
   border: 1px solid var(--hair);
   border-radius: 999px;
   background: var(--ground);
   font-size: 12px;
   color: var(--soft);
 }
+.qb-proposal-role > span { font-family: var(--mono); font-weight: 600; }
+.qb-proposal-add {
+  border-color: color-mix(in srgb, var(--sage) 45%, var(--hair));
+  background: color-mix(in srgb, var(--sage) 9%, var(--paper));
+  color: var(--ink);
+}
+.qb-proposal-add > span { color: var(--sage); }
+.qb-proposal-drop {
+  border-color: color-mix(in srgb, var(--clay) 40%, var(--hair));
+  background: color-mix(in srgb, var(--clay) 8%, var(--paper));
+  color: var(--soft);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--clay) 55%, transparent);
+}
+.qb-proposal-drop > span { color: var(--clay); text-decoration: none; }
 .qb-proposal-more {
   padding: 4px 2px;
   font-family: var(--mono);
   font-size: 11px;
   color: var(--mute);
 }
+.qb-proposal-why { margin-top: 9px; }
 .qb-proposal-rationale {
-  margin: 10px 0 0;
+  margin: 0;
   font-size: 12.5px;
   line-height: 1.5;
   color: var(--soft);
 }
+.qb-proposal-rationale.qb-clamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.qb-proposal-why .qb-textlink { margin-top: 2px; font-size: 12px; }
 .qb-proposal-error {
   margin: 10px 0 0;
   font-size: 12.5px;

@@ -237,6 +237,20 @@ class RoleProposalConflict(ValueError):
     """
 
 
+def _clean_rationale(raw: str, limit: int = 500) -> str:
+    """Whitespace-collapse and trim at a word boundary, never mid-letter.
+
+    A hard [:500] slice shipped "as a common phrasi" to the board. The trim is
+    reader-visible text, so it ends at a whole word with an ellipsis.
+    """
+    text = " ".join(str(raw).split())
+    if len(text) <= limit:
+        return text
+    cut = text[: limit - 1]
+    at_space = cut.rsplit(" ", 1)[0].rstrip()
+    return f"{at_space or cut}…"
+
+
 def _proposal_payload(proposal: AgentRoleProposal) -> dict[str, Any]:
     return {
         "id": proposal.id,
@@ -288,7 +302,7 @@ def propose_career_preferences(
         workspace_id=workspace.id,
         base_roles_json=json.dumps(current.roles),
         proposed_roles_json=json.dumps(cleaned_roles),
-        rationale=" ".join(str(rationale).split())[:500],
+        rationale=_clean_rationale(rationale),
         status="pending",
         created_at=now,
     )

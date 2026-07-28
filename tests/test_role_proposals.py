@@ -347,3 +347,30 @@ def test_accept_refuses_a_proposal_superseded_after_it_was_read(
     assert prefs["roles"] == ["Data Engineering Manager"], "roles must not change"
     stored = role_proposal_db.get(AgentRoleProposal, proposal["id"])
     assert stored.status == "superseded", "the newer run's verdict must survive"
+
+
+def test_a_long_rationale_is_trimmed_at_a_word_not_mid_letter(role_proposal_db) -> None:
+    """The board showed a proposal ending "as a common phrasi": the rationale
+    was hard-cut at 500 characters mid-word and stored that way. A trim the
+    reader can see must end at a word with an ellipsis."""
+    from app.services import local_agent_service as svc
+
+    long_rationale = ("alignment with your platform background " * 20).strip()
+    proposal = svc.propose_career_preferences(
+        role_proposal_db, roles=["Head of Data Platform"], rationale=long_rationale
+    )
+    stored = proposal["rationale"]
+    assert len(stored) <= 500
+    assert stored.endswith("…")
+    # The character before the ellipsis ends a whole word from the source.
+    last_word = stored[:-1].rstrip().split()[-1]
+    assert last_word in long_rationale.split()
+
+
+def test_a_short_rationale_is_stored_untouched(role_proposal_db) -> None:
+    from app.services import local_agent_service as svc
+
+    proposal = svc.propose_career_preferences(
+        role_proposal_db, roles=["Head of Data Platform"], rationale="wider net"
+    )
+    assert proposal["rationale"] == "wider net"
