@@ -23,6 +23,9 @@ from app.schemas.resume import (
     AgentConsentStatus,
     AgentRunRequest,
     AgentRunResponse,
+    RoleProposalDecisionRequest,
+    RoleProposalDecisionResponse,
+    RoleProposalsResponse,
 )
 from app.services import (
     agent_integration_service,
@@ -44,15 +47,20 @@ _AGENT_TASKS: dict[str, dict[str, object]] = {
             "resume, then get_career_preferences for my saved target roles. Always judge the "
             "role list against my resume: sharpen it AND broaden it with adjacent titles and "
             "variants I might not think to search for (related functions, level-appropriate "
-            "alternates), keep it focused at 6 to 10 roles, and save the result with "
-            "set_career_preferences. Then call refresh_work with those roles to pull fresh "
-            "postings from the sources; poll get_refresh_status about every 10 seconds for up "
-            "to 90 seconds, and if it is still running continue anyway, new rows land on the "
-            "board when it finishes. Then call search_work to find matching jobs. Retrieval order is "
-            "not a fit verdict, so map each candidate against my actual background. "
-            "Then call set_work_fit IN BATCHES of about 15, best candidates first, until "
-            "EVERY candidate search_work returned has its own verdict, so my whole board is "
-            "scored, not just the top few. Batches of one run add up; each batch lands on my "
+            "alternates), keep it focused at 6 to 10 roles. Your saved search stays mine to "
+            "change: do NOT save this judged list. Instead pass it per-run to "
+            "refresh_work(roles=judged_roles) and search_work(queries=judged_roles), so this "
+            "run casts the wider net without rewriting what I saved. If the judged list differs "
+            "from my saved roles, call propose_career_preferences with the roles you'd suggest "
+            "and why; that records a proposal for me to accept later, it does not change my "
+            "saved search. First call refresh_work(roles=judged_roles) to pull fresh postings "
+            "from the sources; poll get_refresh_status about every 10 seconds for up to 90 "
+            "seconds, and if it is still running continue anyway, new rows land on the board "
+            "when it finishes. Then call search_work(queries=judged_roles) to find matching jobs. "
+            "Retrieval order is not a fit verdict, so map each candidate against my actual "
+            "background. Then call set_work_fit IN BATCHES of about 15, best candidates first, "
+            "until EVERY candidate search_work returned has its own verdict, so my whole board "
+            "is scored, not just the top few. Batches of one run add up; each batch lands on my "
             "board as soon as you send it, so if the run is cut short I keep what you already "
             "decided. Do NOT wait and send them all at the end. Verdict scale: "
             "strong / good / reach for ones worth my time, skip for ones that don't fit "
@@ -61,8 +69,9 @@ _AGENT_TASKS: dict[str, dict[str, object]] = {
             "add a 'caveat' only when there's a real risk (wrong level, comp floor, remote "
             "unclear). Each needs its opportunity_id. set_work_fit is what puts your verdicts "
             "on my board. After that, reply with just a one-line summary that also names any "
-            "roles you added (e.g. 'Added Analytics Engineering Manager; scored 28: 6 "
-            "strong/good, rest reach or skip; GitLab EM is #1.'). Be honest; don't invent postings."
+            "roles you proposed, not added (e.g. 'Proposed adding Analytics Engineering "
+            "Manager; scored 28: 6 strong/good, rest reach or skip; GitLab EM is #1.'). Be "
+            "honest; don't invent postings."
         ),
     },
 }
@@ -180,3 +189,38 @@ def set_agent_consent(
     else:
         resume_consent.revoke(workspace.id)
     return AgentConsentStatus(**resume_consent.status(workspace.id))
+
+
+@router.get("/role-proposals", response_model=RoleProposalsResponse)
+def get_role_proposals(db: Session = Depends(get_db)) -> RoleProposalsResponse:
+    """Pending role proposals the connected assistant has recorded."""
+    _require_local()
+    return RoleProposalsResponse(
+        **local_agent_service.list_role_proposals(db, status="pending")
+    )
+
+
+@router.post(
+    "/role-proposals/{proposal_id}/decide", response_model=RoleProposalDecisionResponse
+)
+def decide_role_proposal(
+    proposal_id: int,
+    payload: RoleProposalDecisionRequest,
+    db: Session = Depends(get_db),
+) -> RoleProposalDecisionResponse:
+    """Accept or reject a pending role proposal.
+
+    Accepting patches only the saved roles, and refuses with a 409 if the
+    saved roles changed since the proposal was made (the proposal's base
+    went stale) rather than overwriting that change.
+    """
+    _require_local()
+    try:
+        result = local_agent_service.decide_role_proposal(
+            db, proposal_id, accept=payload.accept
+        )
+    except local_agent_service.RoleProposalConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return RoleProposalDecisionResponse(**result)

@@ -831,6 +831,22 @@ def run_startup_repairs(engine) -> None:
         logger.warning(
             "salary repair failed; will retry next launch", exc_info=True
         )
+    try:
+        from job_finder.models.remote_flag_repair import (
+            REMOTE_FLAG_REPAIR_VERSION,
+            repair_remote_flags,
+        )
+
+        rejudged = repair_remote_flags(engine)
+        if rejudged:
+            logger.info(
+                "remote flag repair v%d: re-judged %d row(s)",
+                REMOTE_FLAG_REPAIR_VERSION, rejudged,
+            )
+    except Exception:
+        logger.warning(
+            "remote flag repair failed; will retry next launch", exc_info=True
+        )
 
 
 def main(argv: list[str] | None = None) -> int:

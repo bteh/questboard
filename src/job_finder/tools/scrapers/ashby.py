@@ -91,9 +91,20 @@ def _fetch_company_jobs(
         # and null on a large share of postings, and a default only applies to
         # an absent key. None.lower() took the whole company's board down.
         location = job.get("location") or ""
-        is_remote = job.get("isRemote", False) or (
-            job.get("workplaceType") or ""
-        ).lower() == "remote"
+
+        # workplaceType wins wherever it disagrees with isRemote. Ashby's
+        # isRemote means "not strictly onsite": it is true on every hybrid
+        # posting and never true alongside onsite, so on its own it cannot
+        # answer whether a job is remote. Airwallex's "Manager, Data
+        # Engineering" is US - San Francisco, isRemote true, workplaceType
+        # Hybrid, and reading isRemote first put it on a Los Angeles + remote
+        # board. 995 of 4954 postings sampled across 80 boards say hybrid this
+        # way. isRemote is the fallback only when workplaceType is absent.
+        workplace = (job.get("workplaceType") or "").strip().lower()
+        if workplace:
+            is_remote = workplace == "remote"
+        else:
+            is_remote = bool(job.get("isRemote", False))
 
         # Parse compensation: raw values + the currency and interval Ashby
         # states alongside them. An hourly component stays a raw hourly rate

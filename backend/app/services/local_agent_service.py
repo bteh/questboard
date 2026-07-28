@@ -18,7 +18,12 @@ from sqlalchemy import case
 from sqlalchemy.orm import Session
 
 from app.models.application import ApplicationRecord
-from app.models.workspace import Workspace, WorkspacePreferences, WorkspaceResume
+from app.models.workspace import (
+    AgentRoleProposal,
+    Workspace,
+    WorkspacePreferences,
+    WorkspaceResume,
+)
 from app.services import agent_run_progress, application_service, workspace_service
 from job_finder.job_trust import is_direct_source
 from job_finder.kinds import get_kinds, kind_for_vertical, vertical_values_for
@@ -219,6 +224,169 @@ def set_career_preferences(
 
     result = career_preferences(db, workspace.id)
     result["saved"] = True
+    result["external_action_performed"] = False
+    return result
+
+
+class RoleProposalConflict(ValueError):
+    """Raised when a proposal's base roles no longer match the saved roles.
+
+    Someone (or another accepted proposal) changed roles after this proposal
+    was made, so accepting it now would blend a stale suggestion into the
+    live save. The caller must reject it and ask for a fresh proposal.
+    """
+
+
+def _proposal_payload(proposal: AgentRoleProposal) -> dict[str, Any]:
+    return {
+        "id": proposal.id,
+        "workspace_id": proposal.workspace_id,
+        "base_roles": _json_list(proposal.base_roles_json, limit=15),
+        "proposed_roles": _json_list(proposal.proposed_roles_json, limit=15),
+        "rationale": proposal.rationale or "",
+        "status": proposal.status,
+        "created_at": _iso(proposal.created_at),
+        "decided_at": _iso(proposal.decided_at),
+    }
+
+
+def propose_career_preferences(
+    db: Session,
+    roles: list[str],
+    rationale: str = "",
+    *,
+    workspace_id: str | None = None,
+) -> dict[str, Any]:
+    """Record a pending role proposal; never writes workspace_preferences.
+
+    Captures the currently saved roles as the proposal's base, so a later
+    accept can detect drift. Any prior pending proposal for this workspace is
+    marked superseded, since only the latest suggestion should be actionable.
+    """
+    workspace = resolve_local_workspace(db, workspace_id)
+    if workspace is None:
+        raise ValueError("No local workspace found to record a proposal for.")
+    cleaned_roles = clean_terms(roles, limit=15)
+    if not cleaned_roles:
+        raise ValueError("Provide at least one role to propose.")
+
+    current = workspace_service.get_workspace_preferences(db, workspace.id)
+
+    now = datetime.now(timezone.utc)
+    # A guarded UPDATE, not loaded objects: a row this session read as pending
+    # may have been accepted by the user mid-run, and writing "superseded"
+    # over "accepted" by primary key would erase their decision.
+    db.query(AgentRoleProposal).filter(
+        AgentRoleProposal.workspace_id == workspace.id,
+        AgentRoleProposal.status == "pending",
+    ).update(
+        {AgentRoleProposal.status: "superseded", AgentRoleProposal.decided_at: now},
+        synchronize_session=False,
+    )
+
+    proposal = AgentRoleProposal(
+        workspace_id=workspace.id,
+        base_roles_json=json.dumps(current.roles),
+        proposed_roles_json=json.dumps(cleaned_roles),
+        rationale=" ".join(str(rationale).split())[:500],
+        status="pending",
+        created_at=now,
+    )
+    db.add(proposal)
+    db.commit()
+    db.refresh(proposal)
+    return _proposal_payload(proposal)
+
+
+def list_role_proposals(
+    db: Session, status: str = "pending", *, workspace_id: str | None = None
+) -> dict[str, Any]:
+    """List role proposals for the local workspace, newest first."""
+    workspace = resolve_local_workspace(db, workspace_id)
+    if workspace is None:
+        return {"proposals": []}
+
+    query = db.query(AgentRoleProposal).filter(
+        AgentRoleProposal.workspace_id == workspace.id
+    )
+    if status:
+        query = query.filter(AgentRoleProposal.status == status)
+    proposals = query.order_by(AgentRoleProposal.created_at.desc()).all()
+    return {"proposals": [_proposal_payload(p) for p in proposals]}
+
+
+def decide_role_proposal(
+    db: Session, proposal_id: int, accept: bool
+) -> dict[str, Any]:
+    """Accept or reject a pending role proposal.
+
+    Rejecting only marks the row rejected. Accepting re-reads the currently
+    saved preferences and patches ONLY roles through save_workspace_preferences
+    (a read-modify-write, same as set_career_preferences), but first checks
+    that the current roles still match the proposal's base_roles_json; a
+    mismatch means the base went stale and raises RoleProposalConflict
+    instead of writing anything.
+    """
+    proposal = db.get(AgentRoleProposal, proposal_id)
+    if proposal is None:
+        raise ValueError(f"No role proposal found with id {proposal_id}.")
+    if proposal.status != "pending":
+        raise ValueError(f"Proposal {proposal_id} is already {proposal.status}.")
+
+    now = datetime.now(timezone.utc)
+    if not accept:
+        proposal.status = "rejected"
+        proposal.decided_at = now
+        db.commit()
+        return _proposal_payload(proposal)
+
+    current = workspace_service.get_workspace_preferences(db, proposal.workspace_id)
+    base_roles = _json_list(proposal.base_roles_json, limit=15)
+    if current.roles != base_roles:
+        raise RoleProposalConflict(
+            "Your saved roles changed since this proposal was made; accepting it "
+            "now would overwrite that change. Reject it and ask for a fresh "
+            "proposal instead."
+        )
+
+    # Claim the row first with a guarded UPDATE. The status read above came
+    # from the identity map and can be stale: a run may have superseded this
+    # proposal between that read and now, and an unguarded accept would write
+    # "accepted" over the newer run's verdict, then save roles a fresher
+    # proposal already replaced. Zero rows claimed means someone else decided
+    # first; their decision wins.
+    claimed = (
+        db.query(AgentRoleProposal)
+        .filter(
+            AgentRoleProposal.id == proposal.id,
+            AgentRoleProposal.status == "pending",
+        )
+        .update(
+            {AgentRoleProposal.status: "accepted", AgentRoleProposal.decided_at: now},
+            synchronize_session=False,
+        )
+    )
+    if not claimed:
+        db.rollback()
+        raise RoleProposalConflict(
+            "This proposal was superseded while you decided; a newer suggestion "
+            "exists. Review the latest one instead."
+        )
+
+    try:
+        proposed_roles = _json_list(proposal.proposed_roles_json, limit=15)
+        updated = current.model_copy(update={"roles": proposed_roles})
+        workspace_service.save_workspace_preferences(
+            db, proposal.workspace_id, updated, commit=False
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+    db.refresh(proposal)
+
+    result = _proposal_payload(proposal)
     result["external_action_performed"] = False
     return result
 

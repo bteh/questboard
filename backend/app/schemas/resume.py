@@ -96,3 +96,31 @@ class AgentProgressResponse(BaseModel):
     steps: list[AgentProgressStep] = Field(default_factory=list)
     # Plain words for the last real step, so the board never has to guess.
     phase: str = "Starting up"
+
+
+class RoleProposal(BaseModel):
+    """A role change the connected assistant suggested; not yet applied."""
+
+    id: int
+    workspace_id: str | None = None
+    base_roles: list[str] = Field(default_factory=list)
+    proposed_roles: list[str] = Field(default_factory=list)
+    rationale: str = ""
+    status: str = "pending"
+    created_at: str | None = None
+    decided_at: str | None = None
+
+
+class RoleProposalsResponse(BaseModel):
+    proposals: list[RoleProposal] = Field(default_factory=list)
+
+
+class RoleProposalDecisionRequest(BaseModel):
+    accept: bool
+
+
+class RoleProposalDecisionResponse(BaseModel):
+    id: int
+    status: str
+    proposed_roles: list[str] = Field(default_factory=list)
+    decided_at: str | None = None

@@ -14,6 +14,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 
 from app.services import agent_integration_service as svc  # noqa: E402
+from app.services import agent_run_progress  # noqa: E402
 
 
 def test_list_clients_shape() -> None:
@@ -125,3 +126,116 @@ def test_run_headless_refuses_in_hosted_mode(monkeypatch) -> None:
     monkeypatch.setattr(svc, "get_settings_hosted", lambda: True)
     with pytest.raises(RuntimeError):
         svc.run_headless("claude", "find and rank")
+
+
+# Define Gate: find_and_rank must not silently rewrite saved preferences.
+
+def test_run_disallowed_tools_blocks_set_career_preferences() -> None:
+    assert svc.RUN_DISALLOWED_TOOLS == ("set_career_preferences",)
+
+
+def test_run_allowed_tools_includes_refresh_and_status() -> None:
+    assert "refresh_work" in svc.RUN_ALLOWED_TOOLS
+    assert "get_refresh_status" in svc.RUN_ALLOWED_TOOLS
+
+
+def test_run_allowed_tools_excludes_set_career_preferences() -> None:
+    assert "set_career_preferences" not in svc.RUN_ALLOWED_TOOLS
+
+
+def test_claude_command_passes_disallowed_tools() -> None:
+    command = svc._run_command(
+        "claude",
+        "/fake/bin/claude",
+        "prompt",
+        "/tmp/qb-mcp-config.json",
+        list(svc.RUN_ALLOWED_TOOLS),
+    )
+    assert "--disallowedTools" in command
+    disallowed_arg = command[command.index("--disallowedTools") + 1]
+    assert disallowed_arg == f"mcp__{svc.SERVER_NAME}__set_career_preferences"
+
+
+def test_run_headless_mocked_claude_run_carries_disallowed_tools(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(svc, "get_settings_hosted", lambda: False)
+    monkeypatch.setattr(svc, "resolve_binary", lambda client: "/fake/bin/claude")
+
+    captured: dict[str, object] = {}
+
+    def fake_run(command, **kwargs):
+        captured["command"] = command
+        return SimpleNamespace(
+            returncode=0,
+            stdout='{"is_error": false, "result": "ok", "total_cost_usd": 0.1, "num_turns": 3}',
+            stderr="",
+        )
+
+    monkeypatch.setattr(svc.subprocess, "run", fake_run)
+    svc.run_headless("claude", "find and rank")
+
+    command = captured["command"]
+    assert "--disallowedTools" in command
+    disallowed_arg = command[command.index("--disallowedTools") + 1]
+    assert f"mcp__{svc.SERVER_NAME}__set_career_preferences" in disallowed_arg
+
+
+# Real, currently-wired Questboard MCP tool ids (see backend/app/local_mcp.py).
+_KNOWN_MCP_TOOLS = {
+    "read_resume_for_matching",
+    "get_career_preferences",
+    "set_career_preferences",
+    "propose_career_preferences",
+    "search_work",
+    "search_side_quests",
+    "get_opportunity",
+    "set_work_fit",
+    "refresh_work",
+    "get_refresh_status",
+}
+
+
+def _find_and_rank_prompt() -> str:
+    from app.api.local_agent import _AGENT_TASKS
+
+    return str(_AGENT_TASKS["find_and_rank"]["prompt"])
+
+
+def test_run_allowed_tools_is_a_superset_of_tools_the_prompt_names() -> None:
+    prompt = _find_and_rank_prompt()
+    named = {tool for tool in _KNOWN_MCP_TOOLS if tool in prompt}
+    assert named, "expected the prompt to name at least one known Questboard tool"
+    assert named <= set(svc.RUN_ALLOWED_TOOLS)
+    assert "set_career_preferences" not in svc.RUN_ALLOWED_TOOLS
+
+
+def test_find_and_rank_prompt_does_not_instruct_saving_preferences() -> None:
+    prompt = _find_and_rank_prompt()
+    assert "set_career_preferences" not in prompt
+    assert "save the result" not in prompt
+    assert "roles you added" not in prompt
+    assert "propose_career_preferences" in prompt
+
+
+def test_find_and_rank_prompt_passes_roles_per_run() -> None:
+    prompt = _find_and_rank_prompt()
+    assert "refresh_work(roles=" in prompt
+    assert "search_work(queries=" in prompt
+    assert "per-run" in prompt
+
+
+def test_find_and_rank_summary_says_roles_are_proposed_not_added() -> None:
+    prompt = _find_and_rank_prompt()
+    assert "roles you proposed, not added" in prompt
+
+
+def test_role_proposal_has_progress_label_without_preference_save_label() -> None:
+    assert (
+        agent_run_progress.phase_label([{"tool": "propose_career_preferences"}])
+        == "Proposing role updates"
+    )
+    assert (
+        agent_run_progress.phase_label([{"tool": "set_career_preferences"}])
+        == "Working"
+    )

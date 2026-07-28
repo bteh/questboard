@@ -34,3 +34,32 @@ export interface AgentProgressStep {
 export function getAgentProgress(): Promise<{ steps: AgentProgressStep[]; phase: string }> {
   return apiGet<{ steps: AgentProgressStep[]; phase: string }>('/agent/progress');
 }
+
+export interface RoleProposal {
+  id: number;
+  workspace_id: string | null;
+  base_roles: string[];
+  proposed_roles: string[];
+  rationale: string;
+  status: string;
+  created_at: string | null;
+  decided_at: string | null;
+}
+
+export interface RoleProposalDecision {
+  id: number;
+  status: string;
+  proposed_roles: string[];
+  decided_at: string | null;
+}
+
+export function getRoleProposals(): Promise<{ proposals: RoleProposal[] }> {
+  return apiGet<{ proposals: RoleProposal[] }>('/agent/role-proposals');
+}
+
+export function decideRoleProposal(
+  id: number,
+  accept: boolean,
+): Promise<RoleProposalDecision> {
+  return apiPost<RoleProposalDecision>(`/agent/role-proposals/${id}/decide`, { accept });
+}

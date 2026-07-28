@@ -87,6 +87,73 @@ class AshbyNullFieldTest(unittest.TestCase):
         self.assertTrue(rows[0]["is_remote"])
 
 
+class AshbyWorkplaceTypeTest(unittest.TestCase):
+    """`workplaceType` is the precise field; `isRemote` is not.
+
+    Airwallex's "Manager, Data Engineering" is served by Ashby as:
+        location:      "US - San Francisco"
+        isRemote:      true
+        workplaceType: "Hybrid"
+    and Airwallex's own page states Location Type: Hybrid. Reading isRemote
+    first put a hybrid San Francisco role on a Los Angeles + remote board.
+
+    Measured 2026-07-27 across 80 cached boards: 995 of 4954 postings carry
+    isRemote=true with workplaceType=hybrid, and isRemote is never true
+    alongside onsite. Ashby's isRemote means "not strictly onsite", so it
+    cannot answer "is this remote" on its own.
+
+    This compounds: the scraper stamps remote_flag_reported, which
+    company_classifier treats as definitive, skipping both its description
+    scan for hybrid wording and its own rule that a board-reported remote flag
+    on a job with a physical address deserves skepticism.
+    """
+
+    def setUp(self) -> None:
+        from job_finder.tools.scrapers import ashby as mod
+        self.mod = mod
+
+    def _row(self, **overrides):
+        with patch.object(self.mod, "_get_json", return_value={"jobs": [_job(**overrides)]}):
+            rows = self.mod._fetch_company_jobs("acme", ["data engineer"])
+        return rows[0]
+
+    def test_a_hybrid_posting_is_not_remote_even_when_is_remote_is_set(self):
+        row = self._row(
+            location="US - San Francisco", isRemote=True, workplaceType="Hybrid"
+        )
+        self.assertFalse(row["is_remote"])
+
+    def test_a_hybrid_posting_does_not_claim_a_definitive_remote_flag(self):
+        """Leaving this set tells the classifier to stop asking questions."""
+        row = self._row(
+            location="US - San Francisco", isRemote=True, workplaceType="Hybrid"
+        )
+        self.assertFalse(row["remote_flag_reported"])
+
+    def test_a_remote_posting_is_still_remote(self):
+        row = self._row(location="Remote", isRemote=True, workplaceType="Remote")
+        self.assertTrue(row["is_remote"])
+        self.assertTrue(row["remote_flag_reported"])
+
+    def test_an_onsite_posting_is_not_remote(self):
+        row = self._row(location="SG - Singapore", isRemote=False, workplaceType="OnSite")
+        self.assertFalse(row["is_remote"])
+
+    def test_workplace_type_outranks_is_remote_whichever_way_they_disagree(self):
+        self.assertTrue(
+            self._row(isRemote=False, workplaceType="Remote")["is_remote"]
+        )
+
+    def test_a_missing_workplace_type_falls_back_to_is_remote(self):
+        """454 of that same sample state no workplaceType at all."""
+        self.assertTrue(self._row(isRemote=True, workplaceType=None)["is_remote"])
+        self.assertFalse(self._row(isRemote=False, workplaceType=None)["is_remote"])
+
+    def test_the_workplace_type_match_ignores_case_and_padding(self):
+        self.assertTrue(self._row(isRemote=False, workplaceType=" REMOTE ")["is_remote"])
+        self.assertFalse(self._row(isRemote=True, workplaceType="hybrid")["is_remote"])
+
+
 class AshbyBoardSurvivalTest(unittest.TestCase):
     """The user-visible half: the company reaches the board at all."""
 

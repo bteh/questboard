@@ -205,6 +205,29 @@ def set_career_preferences(
         )
 
 
+@mcp.tool(annotations=WRITE, structured_output=True)
+@_step
+def propose_career_preferences(
+    roles: list[str], rationale: str = ""
+) -> dict[str, Any]:
+    """Record a proposed change to target roles; never changes saved preferences.
+
+    Use this instead of set_career_preferences when a run's judged roles
+    differ from the saved ones. It writes a pending proposal the person can
+    accept or reject later; the saved search stays exactly what they set
+    until they act on it. Supersedes any prior pending proposal for this
+    workspace.
+    """
+
+    with _database_session() as db:
+        return _tool_error(
+            local_agent_service.propose_career_preferences,
+            db,
+            roles=roles,
+            rationale=rationale,
+        )
+
+
 @mcp.tool(annotations=RESUME_PII, structured_output=True)
 @_step
 def read_resume_for_matching() -> dict[str, Any]:
