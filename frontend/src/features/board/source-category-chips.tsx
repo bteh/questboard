@@ -10,10 +10,14 @@ const CATEGORY_LABELS: Record<string, string> = {
   remote: 'Remote',
   ats: 'Company',
   jobspy: 'Big boards',
+  /* BuiltIn and The Muse: broad tech boards that list everyone from seed
+     startups to Netflix. Kept out of Startup & founder so that chip keeps
+     its promise. */
+  general: 'Tech boards',
   community: 'Community',
 };
 /* Founder + crypto first: the lanes people most often want to browse wide. */
-const CATEGORY_ORDER = ['startup', 'crypto', 'remote', 'ats', 'jobspy', 'community'];
+const CATEGORY_ORDER = ['startup', 'crypto', 'remote', 'ats', 'jobspy', 'general', 'community'];
 
 interface SourceCategoryChipsProps {
   counts: Record<string, number> | undefined;

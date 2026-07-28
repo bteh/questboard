@@ -231,7 +231,7 @@ def list_applications(
     source: str | None = None,
     source_category: str | None = Query(
         None,
-        description="Browse by source kind: remote | ats | startup | crypto | community | jobspy",
+        description="Browse by source kind: remote | ats | startup | crypto | community | jobspy | general",
     ),
     search: str | None = None,
     company_type: str | None = None,
@@ -376,7 +376,7 @@ def list_profile_work(
     posted_within_days: int | None = Query(None, ge=1, le=365),
     source_category: str | None = Query(
         None,
-        description="Browse by source kind: remote | ats | startup | crypto | community | jobspy",
+        description="Browse by source kind: remote | ats | startup | crypto | community | jobspy | general",
     ),
     page: int = Query(1, ge=1),
     page_size: int = Query(24, ge=1, le=50),
