@@ -61,7 +61,10 @@ def test_registry_categories_match_mapped_sources():
     from job_finder.tools.scrapers._registry import get_registry
 
     cats = {name: meta.category for name, meta in get_registry().items()}
-    assert cats.get("builtin") == "startup"
+    # builtin moved to general on 2026-07-28: it lists Netflix, Disney and
+    # GitLab, so "almost certainly a startup" turned out to be false for it.
+    # tests/test_source_categories.py pins the move by the Netflix case.
+    assert cats.get("builtin") == "general"
     assert cats.get("workatastartup") == "startup"
     assert cats.get("greenhouse") == "ats"
     assert cats.get("lever") == "ats"

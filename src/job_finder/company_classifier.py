@@ -171,7 +171,7 @@ COMPANY_TYPES = [
 # signal has been exhausted. Remote/general/jobspy boards are intentionally
 # absent — they're not startup-specific.
 _SOURCE_CATEGORY_TIER: dict[str, str] = {
-    "startup": "Early Startup",    # BuiltIn, YC / WorkAtAStartup
+    "startup": "Early Startup",    # YC / WorkAtAStartup
     "crypto": "Early Startup",     # CryptoJobsList
     "community": "Early Startup",  # Hacker News "Who is hiring"
     "ats": "Growth Stage",         # Greenhouse, Lever, Ashby, Workday

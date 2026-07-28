@@ -847,6 +847,22 @@ def run_startup_repairs(engine) -> None:
         logger.warning(
             "remote flag repair failed; will retry next launch", exc_info=True
         )
+    try:
+        from job_finder.models.company_tier_repair import (
+            COMPANY_TIER_REPAIR_VERSION,
+            repair_company_tiers,
+        )
+
+        retiered = repair_company_tiers(engine)
+        if retiered:
+            logger.info(
+                "company tier repair v%d: re-judged %d row(s)",
+                COMPANY_TIER_REPAIR_VERSION, retiered,
+            )
+    except Exception:
+        logger.warning(
+            "company tier repair failed; will retry next launch", exc_info=True
+        )
 
 
 def main(argv: list[str] | None = None) -> int:

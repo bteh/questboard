@@ -397,8 +397,11 @@ def _build_search_url(
     name="builtin",
     display_name="BuiltIn",
     url="https://builtin.com",
-    description="Startup and growth-stage company jobs across 20+ categories",
-    category="startup",
+    description="Tech jobs across 20+ hub cities, from startups to Netflix",
+    # general, not startup: BuiltIn lists enterprises (Netflix, Disney,
+    # GitLab). The startup category is a chip promise AND a company-tier
+    # fallback signal, and this board keeps neither.
+    category="general",
     enabled_by_default=True,
 )
 def search_builtin(
