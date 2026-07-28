@@ -87,8 +87,13 @@ def _fetch_company_jobs(
             continue
 
         description = (job.get("descriptionPlain", "") or "")[:3000]
-        location = job.get("location", "")
-        is_remote = job.get("isRemote", False) or job.get("workplaceType", "").lower() == "remote"
+        # `or ""` rather than a get() default: Ashby sends these keys present
+        # and null on a large share of postings, and a default only applies to
+        # an absent key. None.lower() took the whole company's board down.
+        location = job.get("location") or ""
+        is_remote = job.get("isRemote", False) or (
+            job.get("workplaceType") or ""
+        ).lower() == "remote"
 
         # Parse compensation: raw values + the currency and interval Ashby
         # states alongside them. An hourly component stays a raw hourly rate
@@ -187,7 +192,11 @@ def search_ashby(
                 results.extend(jobs)
             except Exception as e:
                 slug = futures[future]
-                logger.debug("Ashby/%s failed: %s", slug, e)
+                # warning, not debug, matching the other three ATS scrapers.
+                # A null workplaceType crashed ~40% of boards here and the
+                # debug level is the reason nobody saw it: the source kept
+                # reporting healthy while contributing nothing.
+                logger.warning("Ashby/%s failed: %s", slug, e)
 
     dead.prune()
     results = rank_by_relevance(results, roles)[:max_results]
