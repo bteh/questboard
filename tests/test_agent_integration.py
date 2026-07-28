@@ -219,10 +219,11 @@ def test_find_and_rank_prompt_does_not_instruct_saving_preferences() -> None:
 
 
 def test_find_and_rank_prompt_passes_roles_per_run() -> None:
+    """Roles reach the tools as this run's arguments, never as saved state."""
     prompt = _find_and_rank_prompt()
     assert "refresh_work(roles=" in prompt
     assert "search_work(queries=" in prompt
-    assert "per-run" in prompt
+    assert "this run" in prompt
 
 
 def test_find_and_rank_summary_says_roles_are_proposed_not_added() -> None:
@@ -275,3 +276,22 @@ def test_the_pipeline_rewrite_keeps_the_proposal_contract() -> None:
     assert "set_career_preferences" not in prompt
     assert "propose_career_preferences" in prompt
     assert "BATCHES of about 15" in prompt
+
+
+# The retrieval floor: every saved role gets searched, every run.
+#
+# Observed 2026-07-28: a run's judged list silently dropped "Director, Data
+# Engineering" and "Head of Data Platform" from the search. The user's saved
+# list survived on disk (the proposal contract held), but the run still
+# decided which of their roles deserved retrieval. Sharpening is for
+# proposals; the search itself may only broaden.
+
+def test_the_prompt_makes_saved_roles_the_retrieval_floor() -> None:
+    prompt = _find_and_rank_prompt()
+    assert "every saved role" in prompt.lower()
+    assert "only add" in prompt.lower() or "never remove" in prompt.lower()
+
+
+def test_the_prompt_routes_drops_through_proposals_not_the_search() -> None:
+    prompt = _find_and_rank_prompt()
+    assert "search it anyway" in prompt.lower()
