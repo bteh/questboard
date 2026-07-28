@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   advanceWorkCutoff,
   countNewSince,
+  cutoffAfterPull,
   isNewSince,
   newSinceLine,
   readWorkCutoff,
@@ -124,8 +125,51 @@ describe('countNewSince and the summary line', () => {
       .toMatch(/^24\+ found since your last visit, /);
   });
 
-  it('says nothing when nothing is new or there is no cutoff', () => {
-    expect(newSinceLine({ count: 0, exact: true }, LAST_VISIT)).toBeNull();
+  it('says nothing only when there is no cutoff', () => {
     expect(newSinceLine({ count: 3, exact: true }, null)).toBeNull();
+  });
+});
+
+describe('the honest zero', () => {
+  // "No new postings" and "the signal is broken" used to look identical:
+  // newSinceLine returned null at zero and the board fell silent. The reader
+  // pressed Get new jobs on a new day and concluded they were looking at a
+  // stale cache, because nothing said otherwise.
+  it('says plainly when nothing is new', () => {
+    expect(newSinceLine({ count: 0, exact: true }, LAST_VISIT))
+      .toMatch(/^Nothing new since your last visit, \w{3} \d{1,2}$/);
+  });
+
+  it('stays silent only when there is no cutoff to compare against', () => {
+    expect(newSinceLine({ count: 0, exact: true }, null)).toBeNull();
+    expect(newSinceLine({ count: 3, exact: true }, null)).toBeNull();
+  });
+});
+
+describe('re-anchoring on a pull', () => {
+  // The cutoff only advanced when the board page mounted, and a desktop app
+  // stays open for days. After a week without a remount, "new here" meant
+  // "new this week", and what today's pull added was indistinguishable.
+  // Pressing Get new jobs is the moment the reader starts caring about the
+  // difference, so a completed pull re-anchors "new" at the pull's start.
+  it('moves the visible cutoff to the pull start', () => {
+    expect(cutoffAfterPull(LAST_VISIT, '2026-07-14T09:01:00Z'))
+      .toBe('2026-07-14T09:01:00Z');
+  });
+
+  it('never moves the cutoff backward', () => {
+    // A clock skew or stale run record must not resurrect week-old rows
+    // as "new here".
+    expect(cutoffAfterPull('2026-07-14T12:00:00Z', '2026-07-14T09:01:00Z'))
+      .toBe('2026-07-14T12:00:00Z');
+  });
+
+  it('adopts the pull start when there was no cutoff at all', () => {
+    expect(cutoffAfterPull(null, '2026-07-14T09:01:00Z'))
+      .toBe('2026-07-14T09:01:00Z');
+  });
+
+  it('keeps the old cutoff when the pull start is unparseable', () => {
+    expect(cutoffAfterPull(LAST_VISIT, 'not a date')).toBe(LAST_VISIT);
   });
 });
