@@ -31,9 +31,10 @@ import os
 import re
 import tempfile
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -252,6 +253,85 @@ class DeadBoards:
 
     def prune(self) -> int:
         return drop_slugs(self.host, self._dead)
+
+
+# A sweep that came back all-dead is a broken probe, not a mass extinction.
+# Below this share of live boards the result is refused outright: re-running
+# DuckDuckGo discovery for a whole host costs far more than carrying dead
+# slugs one more day, and a wrong URL or a captive portal answers 404 to
+# everything just as convincingly as a real absence.
+_SWEEP_MIN_LIVE_SHARE = 0.5
+
+
+def sweep_dead_slugs(
+    host: str,
+    probe: Callable[[str], int | None],
+    *,
+    workers: int = 8,
+    report: bool = False,
+    dry_run: bool = False,
+) -> Any:
+    """Probe every cached slug for ``host`` and forget the ones that 404.
+
+    ``DeadBoards`` only learns about boards a pull actually fetched, so dead
+    entries leave the cache at the rate runs happen to touch them. Ashby was
+    still carrying its ~33 days after they were identified. This is the direct
+    pass, run on demand.
+
+    ``probe`` takes a slug and returns the HTTP status its board answered, or
+    None if the request never got one. Injected rather than built here: the
+    board URL belongs to each scraper, and a probe that can be handed in is a
+    probe that can be tested without the network.
+
+    Returns the number dropped, or a ``{checked, dropped, unreachable}`` dict
+    when ``report`` is set.
+    """
+    cached, _fresh = load_cached_slugs(host)
+    slugs = sorted(cached)
+    if not slugs:
+        empty = {"checked": 0, "dropped": 0, "unreachable": 0, "dead": []}
+        return empty if report else 0
+
+    dead: set[str] = set()
+    unreachable = 0
+    lock = threading.Lock()
+
+    def check(slug: str) -> None:
+        nonlocal unreachable
+        try:
+            status = probe(slug)
+        except Exception:  # a probe that raises is a slug we could not reach
+            status = None
+        with lock:
+            if status == 404:
+                dead.add(slug)
+            elif status != 200:
+                unreachable += 1
+
+    with ThreadPoolExecutor(max_workers=max(1, min(workers, len(slugs)))) as pool:
+        list(pool.map(check, slugs))
+
+    live_share = 1.0 - (len(dead) / len(slugs))
+    if dead and live_share < _SWEEP_MIN_LIVE_SHARE:
+        logger.warning(
+            "ATS discovery: sweep of %s called %d/%d boards dead; refusing to "
+            "prune, the probe is more likely broken than the companies gone",
+            host, len(dead), len(slugs),
+        )
+        dead = set()
+
+    # A dry run stops one line short of the write. Everything above it, the
+    # 404 rule and the refuse-to-empty guard, has to be the same code, or the
+    # preview promises a prune the real run declines.
+    dropped = len(dead) if dry_run else drop_slugs(host, dead)
+    if report:
+        return {
+            "checked": len(slugs),
+            "dropped": dropped,
+            "unreachable": unreachable,
+            "dead": sorted(dead),
+        }
+    return dropped
 
 
 # Cap how many roles each host fans out to DuckDuckGo. The AI role expansion
