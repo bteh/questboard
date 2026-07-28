@@ -14,9 +14,9 @@ export interface AssistantStep {
 const STEP_WORDS: Record<string, string> = {
   read_resume_for_matching: 'Read your resume',
   get_career_preferences: 'Read your saved search',
-  set_career_preferences: 'Sharpened your target roles',
+  propose_career_preferences: 'Proposed role updates',
   refresh_work: 'Started the source pull',
-  get_refresh_status: 'Waiting on the sources',
+  get_refresh_status: 'Checked on the source pull',
   search_work: 'Pulled the shortlist',
   set_work_fit: 'Wrote your rankings',
 };
