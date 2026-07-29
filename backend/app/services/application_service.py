@@ -388,9 +388,17 @@ def board_filter_conditions(
         # is hidden for lacking a verifiable source date. isinstance, not a
         # None check: tests call the endpoint functions directly and the
         # FastAPI Query default object must read as "filter off".
+        now = datetime.now(timezone.utc)
         conditions.append(
-            model.date_found
-            >= datetime.now(timezone.utc) - timedelta(days=found_within_days)
+            model.date_found >= now - timedelta(days=found_within_days)
+        )
+        # A fresh FIND is not a stale POSTING the crawler just met: a Netflix
+        # row posted 19 days earlier arrived under "found today" and rightly
+        # read as wrong. Provably-old rows leave; the >= "2000-01-01" floor
+        # keeps free text and absent dates, which prove nothing.
+        stale_floor = (now - timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%S")
+        conditions.append(
+            ~and_(model.date_posted >= "2000-01-01", model.date_posted < stale_floor)
         )
     if search:
         pattern = f"%{search}%"

@@ -57,7 +57,8 @@ def test_no_window_means_no_condition():
 
     with_f = board_filter_conditions(ApplicationRecord, found_within_days=1)
     without = board_filter_conditions(ApplicationRecord)
-    assert len(with_f) == len(without) + 1
+    # Two conditions: the arrival window and the not-provably-stale guard.
+    assert len(with_f) == len(without) + 2
 
 
 def test_search_work_found_window_keeps_todays_row_and_drops_last_weeks(tmp_path, monkeypatch):
@@ -90,3 +91,36 @@ def test_search_work_found_window_keeps_todays_row_and_drops_last_weeks(tmp_path
     assert "Data Engineering Manager" in titles
     assert "Data Engineering Manager II" not in titles
     db.close()
+
+
+def _passes_with_posted(record_date_found, date_posted, days=1):
+    from app.services.application_service import board_filter_conditions
+    from job_finder.models.database import ApplicationRecord
+    from sqlalchemy import and_, create_engine
+    from sqlalchemy.orm import Session
+
+    engine = create_engine("sqlite://")
+    ApplicationRecord.metadata.create_all(engine)
+    with Session(engine) as db:
+        db.add(ApplicationRecord(
+            job_title="t", company="c", job_url="https://x.example/1",
+            vertical="career", date_found=record_date_found, date_posted=date_posted,
+        ))
+        db.commit()
+        conds = board_filter_conditions(ApplicationRecord, found_within_days=days)
+        return db.query(ApplicationRecord).filter(and_(*conds)).count() == 1
+
+
+def test_a_stale_posting_the_board_just_met_is_not_a_fresh_find():
+    """Netflix EM, posted 19 days ago, crawled today: found-today showed it
+    and the reader rightly objected. Found means fresh find: new to the board
+    AND not provably weeks old at the source."""
+    assert not _passes_with_posted(
+        datetime.now(timezone.utc) - timedelta(hours=2),
+        (datetime.now(timezone.utc) - timedelta(days=19)).strftime("%Y-%m-%dT00:00:00"),
+    )
+
+
+def test_an_undated_fresh_find_is_kept():
+    """No posted date proves nothing; arrival is still the board's own fact."""
+    assert _passes_with_posted(datetime.now(timezone.utc) - timedelta(hours=2), None)
