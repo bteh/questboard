@@ -310,3 +310,15 @@ def test_the_prompt_tells_the_sweep_to_continue_numbering() -> None:
     The server guard renumbers collisions; the prompt should stop them."""
     prompt = _find_and_rank_prompt()
     assert "continue" in prompt.lower() and "highest rank" in prompt.lower()
+
+
+def test_proposals_are_calibrated_to_the_users_actual_level() -> None:
+    """The card proposed VP, Data Engineering and Head of AI Platform to a
+    manager with a 7-report team since 2023, while dropping the IC titles the
+    user restored twice. "I'm nowhere near that level." Proposals anchor on
+    the resume's actual seniority, one adjacent step at most, and a role the
+    user added is theirs to keep."""
+    prompt = _find_and_rank_prompt()
+    assert "one level" in prompt.lower()
+    assert "vp" in prompt.lower() or "two levels" in prompt.lower()
+    assert "do not propose dropping" in prompt.lower()
