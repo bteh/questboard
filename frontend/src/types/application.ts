@@ -230,6 +230,7 @@ export interface ApplicationFilters {
   first_quest_ok?: boolean;
   /** Keep only rows provably posted in the last N days; unverifiable dates drop. */
   posted_within_days?: number;
+  found_within_days?: number;
   /** Keep only rows whose taping/session date falls in the next N days. */
   event_within_days?: number;
   status?: string;
