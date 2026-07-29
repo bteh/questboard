@@ -374,3 +374,52 @@ def test_a_short_rationale_is_stored_untouched(role_proposal_db) -> None:
         role_proposal_db, roles=["Head of Data Platform"], rationale="wider net"
     )
     assert proposal["rationale"] == "wider net"
+
+
+def test_reproposing_the_same_pending_list_does_not_spam(role_proposal_db) -> None:
+    """Every run proposed again, superseding and recreating an identical
+    proposal, so the card nagged on every pull. Proposing the list that is
+    already pending returns the pending proposal instead of a churned copy."""
+    from app.services import local_agent_service as svc
+
+    first = svc.propose_career_preferences(
+        role_proposal_db, roles=["Head of Data Platform"], rationale="wider net"
+    )
+    second = svc.propose_career_preferences(
+        role_proposal_db, roles=["Head of Data Platform"], rationale="same idea again"
+    )
+    assert second["id"] == first["id"]
+    assert second["status"] == "pending"
+
+
+def test_a_recently_rejected_list_is_not_reproposed(role_proposal_db) -> None:
+    """"Keep mine" means no. The same list coming back the next run turns the
+    card into a nag the user already answered."""
+    from app.services import local_agent_service as svc
+
+    first = svc.propose_career_preferences(
+        role_proposal_db, roles=["Head of Data Platform"], rationale="wider net"
+    )
+    svc.decide_role_proposal(role_proposal_db, first["id"], accept=False)
+
+    again = svc.propose_career_preferences(
+        role_proposal_db, roles=["Head of Data Platform"], rationale="try again"
+    )
+    assert again["status"] == "rejected", "the earlier answer stands"
+    pending = svc.list_role_proposals(role_proposal_db, status="pending")
+    assert pending["proposals"] == []
+
+
+def test_a_genuinely_new_list_still_proposes_after_a_rejection(role_proposal_db) -> None:
+    from app.services import local_agent_service as svc
+
+    first = svc.propose_career_preferences(
+        role_proposal_db, roles=["Head of Data Platform"], rationale="wider net"
+    )
+    svc.decide_role_proposal(role_proposal_db, first["id"], accept=False)
+
+    fresh = svc.propose_career_preferences(
+        role_proposal_db, roles=["VP, Data Engineering"], rationale="different idea"
+    )
+    assert fresh["status"] == "pending"
+    assert fresh["id"] != first["id"]

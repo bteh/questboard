@@ -153,3 +153,42 @@ def test_a_batch_matching_nothing_still_does_not_wipe_the_board(work_db, service
 
     assert out["applied"] == 0
     assert _verdicts(work_db) == {ids[0]: "strong"}
+
+
+def test_a_later_batch_cannot_reuse_an_earlier_batchs_rank(work_db, service):
+    """Two #1 strong fits reached the board: the end-of-run sweep restarted
+    numbering at 1, colliding with the main pass. Within one run a rank is an
+    order, so a colliding later-batch rank renumbers to continue after the
+    highest rank already written, keeping the batch's own order."""
+    from job_finder.models.database import ApplicationRecord
+
+    ids = _ids(work_db)
+    service.set_work_fit(work_db, [
+        {"opportunity_id": ids[0], "verdict": "strong", "rank": 1, "why": "a"},
+        {"opportunity_id": ids[1], "verdict": "good", "rank": 2, "why": "b"},
+    ])
+    service.set_work_fit(work_db, [
+        {"opportunity_id": ids[2], "verdict": "strong", "rank": 1, "why": "sweep"},
+    ])
+
+    ranks = {}
+    for i in ids[:3]:
+        raw = work_db.get(ApplicationRecord, i).agent_fit_json
+        ranks[i] = json.loads(raw)["rank"]
+    assert ranks[ids[0]] == 1
+    assert ranks[ids[2]] == 3, "colliding sweep rank continues after the max"
+    assert len(set(ranks.values())) == 3
+
+
+def test_a_later_batch_with_fresh_ranks_is_untouched(work_db, service):
+    from job_finder.models.database import ApplicationRecord
+
+    ids = _ids(work_db)
+    service.set_work_fit(work_db, [
+        {"opportunity_id": ids[0], "verdict": "strong", "rank": 1, "why": "a"},
+    ])
+    service.set_work_fit(work_db, [
+        {"opportunity_id": ids[1], "verdict": "good", "rank": 2, "why": "b"},
+    ])
+    raw = work_db.get(ApplicationRecord, ids[1]).agent_fit_json
+    assert json.loads(raw)["rank"] == 2
