@@ -261,12 +261,12 @@ def test_the_prompt_ranks_the_existing_board_while_the_pull_runs() -> None:
     assert "while" in prompt.lower() and "search_work(queries=" in prompt
     # The ranking instruction must come BEFORE the status check in reading
     # order, since the model follows the prompt's sequence.
-    assert prompt.index("set_work_fit") < prompt.index("get_refresh_status")
+    assert prompt.index("set_work_fit") < prompt.index("get_refresh_status(")
 
 
 def test_the_prompt_checks_the_pull_exactly_once_at_the_end() -> None:
     prompt = _find_and_rank_prompt()
-    assert prompt.count("get_refresh_status") == 1
+    assert prompt.count("get_refresh_status(") == 1
     assert "once" in prompt.lower()
 
 
@@ -295,3 +295,18 @@ def test_the_prompt_makes_saved_roles_the_retrieval_floor() -> None:
 def test_the_prompt_routes_drops_through_proposals_not_the_search() -> None:
     prompt = _find_and_rank_prompt()
     assert "search it anyway" in prompt.lower()
+
+
+def test_the_prompt_forbids_a_second_pull() -> None:
+    """A real run called refresh_work three times: it used a fresh pull as its
+    way of "checking" the first one, looping pull-shortlist-pull for five
+    minutes. One pull per run; checking is get_refresh_status's job."""
+    prompt = _find_and_rank_prompt()
+    assert "never start a second pull" in prompt.lower()
+
+
+def test_the_prompt_tells_the_sweep_to_continue_numbering() -> None:
+    """The sweep restarted ranks at 1 and the board showed two #1 strong fits.
+    The server guard renumbers collisions; the prompt should stop them."""
+    prompt = _find_and_rank_prompt()
+    assert "continue" in prompt.lower() and "highest rank" in prompt.lower()

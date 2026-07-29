@@ -237,6 +237,11 @@ class RoleProposalConflict(ValueError):
     """
 
 
+def _as_utc(value: datetime) -> datetime:
+    """SQLite hands naive datetimes back; pin them UTC for arithmetic."""
+    return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+
+
 def _clean_rationale(raw: str, limit: int = 500) -> str:
     """Whitespace-collapse and trim at a word boundary, never mid-letter.
 
@@ -287,6 +292,32 @@ def propose_career_preferences(
     current = workspace_service.get_workspace_preferences(db, workspace.id)
 
     now = datetime.now(timezone.utc)
+
+    # The same list again is an answer the user already has, not a new
+    # proposal. Every run used to supersede and recreate an identical row, so
+    # the card nagged on every pull; and a list the user rejected in the last
+    # week coming straight back turns "Keep mine" into a question that never
+    # stays answered. Order matters: check pending first, so an identical
+    # pending proposal is returned untouched rather than superseded.
+    proposed_set = {r.lower() for r in cleaned_roles}
+    recent = (
+        db.query(AgentRoleProposal)
+        .filter(
+            AgentRoleProposal.workspace_id == workspace.id,
+            AgentRoleProposal.status.in_(("pending", "rejected")),
+        )
+        .order_by(AgentRoleProposal.created_at.desc())
+        .limit(20)
+        .all()
+    )
+    for previous in recent:
+        if {r.lower() for r in _json_list(previous.proposed_roles_json, limit=15)} != proposed_set:
+            continue
+        if previous.status == "pending":
+            return _proposal_payload(previous)
+        if previous.decided_at and (now - _as_utc(previous.decided_at)).days < 7:
+            return _proposal_payload(previous)
+
     # A guarded UPDATE, not loaded objects: a row this session read as pending
     # may have been accepted by the user mid-run, and writing "superseded"
     # over "accepted" by primary key would erase their decision.
@@ -1162,6 +1193,36 @@ def set_work_fit(db: Session, rankings: list[dict[str, Any]]) -> dict[str, Any]:
             ApplicationRecord.agent_fit_json.isnot(None),
             ApplicationRecord.agent_fit_json != "",
         ).update({ApplicationRecord.agent_fit_json: ""}, synchronize_session=False)
+
+    if prior:
+        # A later batch of the same run (the end-of-run sweep) restarted its
+        # numbering at 1 and the board showed two #1 strong fits. Within one
+        # run a rank is an order, so a colliding rank renumbers to continue
+        # after the highest already written, preserving the batch's own order.
+        used: set[int] = set()
+        existing = db.query(ApplicationRecord.agent_fit_json).filter(
+            ApplicationRecord.vertical.in_(("career", "work")),
+            ApplicationRecord.agent_fit_json.isnot(None),
+            ApplicationRecord.agent_fit_json != "",
+        ).all()
+        for (raw,) in existing:
+            try:
+                rank = json.loads(raw).get("rank")
+            except (json.JSONDecodeError, TypeError):
+                continue
+            if isinstance(rank, int):
+                used.add(rank)
+        if used:
+            next_rank = max(used) + 1
+            in_rank_order = sorted(
+                (item for _, item in matched if isinstance(item["rank"], int)),
+                key=lambda item: item["rank"],
+            )
+            for item in in_rank_order:
+                if item["rank"] in used:
+                    item["rank"] = next_rank
+                used.add(item["rank"])
+                next_rank = max(next_rank, item["rank"] + 1)
 
     for record, item in matched:
         record.agent_fit_json = json.dumps({
