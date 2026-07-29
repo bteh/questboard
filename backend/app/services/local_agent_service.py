@@ -955,6 +955,19 @@ def search_work(
         if found_cutoff is not None:
             if row.date_found is None or row.date_found < found_cutoff:
                 continue
+            # Same rule as board_filter_conditions: a fresh find is not a
+            # stale posting the crawler just met. Only a parseable ISO date
+            # can prove staleness; free text keeps the row.
+            posted_raw = (row.date_posted or "")[:19]
+            if posted_raw.startswith("2"):
+                try:
+                    posted_at = datetime.fromisoformat(posted_raw)
+                except ValueError:
+                    posted_at = None
+                if posted_at is not None and posted_at < found_cutoff.replace(
+                    hour=0, minute=0, second=0, microsecond=0
+                ) - timedelta(days=6):
+                    continue
         age_days = _source_age_days(row.date_posted, row.date_found)
         if effective_freshness_window is not None and age_days is not None:
             if age_days > effective_freshness_window:
