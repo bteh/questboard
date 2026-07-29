@@ -10,6 +10,7 @@ import {
   normalizePostedDays,
   postedChipLabel,
   postedWithinDays,
+  foundWithinDays,
 } from './posted-filter';
 
 describe('normalizePostedDays', () => {
@@ -34,11 +35,12 @@ describe('normalizePostedDays', () => {
 });
 
 describe('the posted select options', () => {
-  it('offers the five windows in order, any time first', () => {
-    expect(POSTED_OPTIONS.map((o) => o.value)).toEqual(['', '1', '3', '7', '30']);
+  it('offers the six windows in order, any time first, found before posted', () => {
+    expect(POSTED_OPTIONS.map((o) => o.value)).toEqual(['', 'found-1', '1', '3', '7', '30']);
     expect(POSTED_OPTIONS.map((o) => o.label)).toEqual([
       'any time',
-      'today',
+      'found today',
+      'posted today',
       'last 3 days',
       'this week',
       'this month',
@@ -82,5 +84,28 @@ describe('the hidden-dates clause', () => {
   it('stays silent while either count is still loading', () => {
     expect(hiddenDatesClause({ days: '7', shown: undefined, baseline: 66 })).toBeNull();
     expect(hiddenDatesClause({ days: '7', shown: 12, baseline: undefined })).toBeNull();
+  });
+});
+
+describe('found today', () => {
+  // The reader reached for "posted today" twice expecting "what arrived
+  // today". Posted dates are the source's claim and often missing, so that
+  // filter hid today's arrivals; found is our own clock and always set.
+  it('is one of the options', () => {
+    expect(POSTED_OPTIONS.some((o) => o.value === 'found-1')).toBe(true);
+  });
+
+  it('round-trips through the URL', () => {
+    expect(normalizePostedDays('found-1')).toBe('found-1');
+  });
+
+  it('maps to the found window, not the posted one', () => {
+    expect(postedWithinDays('found-1')).toBeUndefined();
+    expect(foundWithinDays('found-1')).toBe(1);
+    expect(foundWithinDays('3')).toBeUndefined();
+  });
+
+  it('has its own chip words', () => {
+    expect(postedChipLabel('found-1')).toBe('found today');
   });
 });

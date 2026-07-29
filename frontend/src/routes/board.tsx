@@ -40,6 +40,7 @@ import {
   POSTED_OPTIONS,
   hiddenDatesClause,
   normalizePostedDays,
+  foundWithinDays,
   postedWithinDays,
   type PostedDaysKey,
 } from '@/features/board/posted-filter';
@@ -335,6 +336,7 @@ function BoardPage() {
      lane's saved max_days_old stays the pull window, untouched by this */
   const postedDays = params.days;
   const postedWithin = postedWithinDays(postedDays);
+  const foundWithin = foundWithinDays(postedDays);
 
   /* text inputs buffer locally, debounce into the URL with replace so
      typing never spams history */
@@ -449,6 +451,7 @@ function BoardPage() {
       salary_min: payFloor ?? undefined,
       salary_max: payCeiling ?? undefined,
       posted_within_days: postedWithin,
+      found_within_days: foundWithin,
       source_category: sourceCategory ?? undefined,
       /* quest rows have no rank_score, so only the work lane offers the
          best-score sort; quest lanes stay on the honest date sort */
@@ -471,6 +474,7 @@ function BoardPage() {
       salary_min: payFloor ?? undefined,
       salary_max: payCeiling ?? undefined,
       posted_within_days: postedWithin,
+      found_within_days: foundWithin,
     }),
     [activeKeys, search, place, nearParam, payFloor, payCeiling, postedWithin],
   );
@@ -717,6 +721,7 @@ function BoardPage() {
       salary_min: payFloor ?? undefined,
       salary_max: payCeiling ?? undefined,
       posted_within_days: postedWithin,
+      found_within_days: foundWithin,
       /* the probed chip's own params win: the fresh chip counts its 7-day
          window even while the select holds a different one */
       ...preset.params,

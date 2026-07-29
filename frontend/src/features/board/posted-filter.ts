@@ -5,7 +5,10 @@
    guessed in, matching the board's date honesty. The clause below is how
    the UI owns up to that. */
 
-export const POSTED_DAYS = ['1', '3', '7', '30'] as const;
+/* 'found-1' is our own clock (date_found), not the source's posted date:
+   arrivals today, always dated, never hidden by an unverifiable post date.
+   The reader reached for "posted today" twice expecting exactly this. */
+export const POSTED_DAYS = ['1', '3', '7', '30', 'found-1'] as const;
 export type PostedDaysKey = (typeof POSTED_DAYS)[number];
 
 /** ?days= however the router round-trips it: '7', 7, or junk. */
@@ -20,7 +23,8 @@ export function normalizePostedDays(value: unknown): PostedDaysKey | undefined {
 /** The select's five options, any time first; '' means no filter. */
 export const POSTED_OPTIONS: ReadonlyArray<{ value: '' | PostedDaysKey; label: string }> = [
   { value: '', label: 'any time' },
-  { value: '1', label: 'today' },
+  { value: 'found-1', label: 'found today' },
+  { value: '1', label: 'posted today' },
   { value: '3', label: 'last 3 days' },
   { value: '7', label: 'this week' },
   { value: '30', label: 'this month' },
@@ -28,6 +32,7 @@ export const POSTED_OPTIONS: ReadonlyArray<{ value: '' | PostedDaysKey; label: s
 
 const CHIP_WORDS: Record<PostedDaysKey, string> = {
   '1': 'posted today',
+  'found-1': 'found today',
   '3': 'posted in the last 3 days',
   '7': 'posted this week',
   '30': 'posted this month',
@@ -40,7 +45,14 @@ export function postedChipLabel(days: PostedDaysKey): string {
 
 /** The API's posted_within_days number, from the URL value. */
 export function postedWithinDays(days: PostedDaysKey | undefined): number | undefined {
-  return days ? Number(days) : undefined;
+  if (!days || days.startsWith('found-')) return undefined;
+  return Number(days);
+}
+
+/** The API's found_within_days number; only the found-* values map here. */
+export function foundWithinDays(days: PostedDaysKey | undefined): number | undefined {
+  if (!days || !days.startsWith('found-')) return undefined;
+  return Number(days.slice('found-'.length));
 }
 
 /* The one honest clause: the window drops rows whose post date cannot be

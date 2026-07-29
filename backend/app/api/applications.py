@@ -292,6 +292,12 @@ def list_applications(
             "rows with no verifiable post date are dropped, never guessed in"
         ),
     ),
+    found_within_days: int | None = Query(
+        None,
+        ge=1,
+        le=365,
+        description="Keep rows the board itself first saw in the last N days; date_found is always set",
+    ),
     event_within_days: int | None = Query(
         None,
         ge=1,
@@ -344,6 +350,7 @@ def list_applications(
             upcoming_only=upcoming_only,
             first_quest_ok=first_quest_ok,
             posted_within_days=posted_within_days,
+            found_within_days=found_within_days,
             event_within_days=event_within_days,
             sort_by=sort_by,
             sort_dir=sort_dir,
@@ -374,6 +381,7 @@ def list_profile_work(
     ),
     is_remote: bool | None = None,
     posted_within_days: int | None = Query(None, ge=1, le=365),
+    found_within_days: int | None = Query(None, ge=1, le=365, description="Keep rows the board itself first saw in the last N days; date_found is always set"),
     source_category: str | None = Query(
         None,
         description="Browse by source kind: remote | ats | startup | crypto | community | jobspy | general",
@@ -428,6 +436,7 @@ def list_profile_work(
         salary_max=salary_max,
         is_remote=is_remote,
         posted_within_days=posted_within_days,
+        found_within_days=found_within_days,
     ):
         badge_query = badge_query.filter(condition)
     for (src,) in badge_query.all():
@@ -458,6 +467,7 @@ def list_profile_work(
             salary_max=salary_max,
             is_remote=is_remote,
             posted_within_days=posted_within_days,
+            found_within_days=found_within_days,
             exclude_dead=True,
             sort_by="date_found",
             sort_dir="desc",
@@ -474,6 +484,7 @@ def list_profile_work(
             workplace_preference=workplace,
             compensation_floor=salary_min,
             posted_within_days=posted_within_days,
+            found_within_days=found_within_days,
             # The human board browses the full in-lane set, not the agent's ~50.
             page_size=300,
             result_limit=300,

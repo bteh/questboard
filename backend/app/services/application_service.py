@@ -331,6 +331,7 @@ def board_filter_conditions(
     is_remote: bool | None = None,
     first_quest_ok: bool | None = None,
     posted_within_days: int | None = None,
+    found_within_days: int | None = None,
 ) -> list:
     """The user-set board filters as reusable SQLAlchemy conditions.
 
@@ -381,6 +382,16 @@ def board_filter_conditions(
         conditions.append(
             func.lower(func.coalesce(model.date_confidence, "")) != "missing"
         )
+    if isinstance(found_within_days, int):
+        # "Arrived in the last N days", by OUR clock. date_found is stamped
+        # by the board on every insert, so unlike the posted window nothing
+        # is hidden for lacking a verifiable source date. isinstance, not a
+        # None check: tests call the endpoint functions directly and the
+        # FastAPI Query default object must read as "filter off".
+        conditions.append(
+            model.date_found
+            >= datetime.now(timezone.utc) - timedelta(days=found_within_days)
+        )
     if search:
         pattern = f"%{search}%"
         conditions.append(
@@ -423,6 +434,7 @@ def get_applications(
     upcoming_only: bool = False,
     first_quest_ok: bool | None = None,
     posted_within_days: int | None = None,
+    found_within_days: int | None = None,
     event_within_days: int | None = None,
     sort_by: str = "overall_score",
     sort_dir: str = "desc",
@@ -487,6 +499,7 @@ def get_applications(
         is_remote=is_remote,
         first_quest_ok=first_quest_ok,
         posted_within_days=posted_within_days,
+        found_within_days=found_within_days,
     ):
         query = query.filter(condition)
     if facet:

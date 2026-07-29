@@ -11,7 +11,7 @@ import hashlib
 import json
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import case
@@ -866,6 +866,9 @@ def search_work(
     workplace_preference: str = "saved",
     compensation_floor: float | None = None,
     posted_within_days: int | None = None,
+    # Arrived-in-the-last-N-days by the board's own date_found stamp; unlike
+    # the posted window it can never hide a row for lacking a source date.
+    found_within_days: int | None = None,
     page_size: int = 20,
     use_saved_preferences: bool = True,
     workspace_id: str | None = None,
@@ -938,11 +941,20 @@ def search_work(
     # Apply title + freshness BEFORE dedup. Deduping first let a stale-known
     # record win its key and then get freshness-excluded, silently evicting a
     # still-live unknown-date duplicate that shared the key.
+    found_cutoff = None
+    if isinstance(found_within_days, int):
+        found_cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(
+            days=max(1, min(found_within_days, 365))
+        )
+
     survivors: list[ApplicationRecord] = []
     for row in rows:
         if terms and not _title_is_in_lane(row.job_title, terms):
             title_mismatch_excluded += 1
             continue
+        if found_cutoff is not None:
+            if row.date_found is None or row.date_found < found_cutoff:
+                continue
         age_days = _source_age_days(row.date_posted, row.date_found)
         if effective_freshness_window is not None and age_days is not None:
             if age_days > effective_freshness_window:
