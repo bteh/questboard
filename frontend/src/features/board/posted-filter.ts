@@ -8,7 +8,7 @@
 /* 'found-1' is our own clock (date_found), not the source's posted date:
    arrivals today, always dated, never hidden by an unverifiable post date.
    The reader reached for "posted today" twice expecting exactly this. */
-export const POSTED_DAYS = ['1', '3', '7', '30', 'found-1'] as const;
+export const POSTED_DAYS = ['3', '7', '30', 'found-1'] as const;
 export type PostedDaysKey = (typeof POSTED_DAYS)[number];
 
 /** ?days= however the router round-trips it: '7', 7, or junk. */
@@ -23,16 +23,14 @@ export function normalizePostedDays(value: unknown): PostedDaysKey | undefined {
 /** The select's five options, any time first; '' means no filter. */
 export const POSTED_OPTIONS: ReadonlyArray<{ value: '' | PostedDaysKey; label: string }> = [
   { value: '', label: 'any time' },
-  { value: 'found-1', label: 'found today' },
-  { value: '1', label: 'posted today' },
+  { value: 'found-1', label: 'new today' },
   { value: '3', label: 'last 3 days' },
   { value: '7', label: 'this week' },
   { value: '30', label: 'this month' },
 ];
 
 const CHIP_WORDS: Record<PostedDaysKey, string> = {
-  '1': 'posted today',
-  'found-1': 'found today',
+  'found-1': 'new today',
   '3': 'posted in the last 3 days',
   '7': 'posted this week',
   '30': 'posted this month',

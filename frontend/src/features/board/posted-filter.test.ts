@@ -15,7 +15,8 @@ import {
 
 describe('normalizePostedDays', () => {
   it('accepts the four windows however the router round-trips them', () => {
-    expect(normalizePostedDays('1')).toBe('1');
+    // '1' left the vocabulary when posted-today merged into new-today.
+    expect(normalizePostedDays('1')).toBeUndefined();
     expect(normalizePostedDays('3')).toBe('3');
     expect(normalizePostedDays('7')).toBe('7');
     expect(normalizePostedDays('30')).toBe('30');
@@ -35,12 +36,11 @@ describe('normalizePostedDays', () => {
 });
 
 describe('the posted select options', () => {
-  it('offers the six windows in order, any time first, found before posted', () => {
-    expect(POSTED_OPTIONS.map((o) => o.value)).toEqual(['', 'found-1', '1', '3', '7', '30']);
+  it('offers the five windows in order, new today first', () => {
+    expect(POSTED_OPTIONS.map((o) => o.value)).toEqual(['', 'found-1', '3', '7', '30']);
     expect(POSTED_OPTIONS.map((o) => o.label)).toEqual([
       'any time',
-      'found today',
-      'posted today',
+      'new today',
       'last 3 days',
       'this week',
       'this month',
@@ -50,7 +50,7 @@ describe('the posted select options', () => {
 
 describe('postedChipLabel', () => {
   it('names the active window in plain words', () => {
-    expect(postedChipLabel('1')).toBe('posted today');
+    expect(postedChipLabel('found-1')).toBe('new today');
     expect(postedChipLabel('3')).toBe('posted in the last 3 days');
     expect(postedChipLabel('7')).toBe('posted this week');
     expect(postedChipLabel('30')).toBe('posted this month');
@@ -106,6 +106,6 @@ describe('found today', () => {
   });
 
   it('has its own chip words', () => {
-    expect(postedChipLabel('found-1')).toBe('found today');
+    expect(postedChipLabel('found-1')).toBe('new today');
   });
 });

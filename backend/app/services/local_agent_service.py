@@ -976,21 +976,24 @@ def search_work(
             title_mismatch_excluded += 1
             continue
         if found_cutoff is not None:
-            if row.date_found is None or row.date_found < found_cutoff:
-                continue
-            # Same rule as board_filter_conditions: a fresh find is not a
-            # stale posting the crawler just met. Only a parseable ISO date
-            # can prove staleness; free text keeps the row.
+            # Same rule as board_filter_conditions, both clocks: provably
+            # posted inside the window counts however long ago it arrived,
+            # and an arrival inside the window counts unless a parseable ISO
+            # date proves it a stale repost. Free text proves nothing.
+            posted_at = None
             posted_raw = (row.date_posted or "")[:19]
             if posted_raw.startswith("2"):
                 try:
                     posted_at = datetime.fromisoformat(posted_raw)
                 except ValueError:
                     posted_at = None
-                if posted_at is not None and posted_at < found_cutoff.replace(
-                    hour=0, minute=0, second=0, microsecond=0
-                ) - timedelta(days=6):
-                    continue
+            posted_fresh = posted_at is not None and posted_at >= found_cutoff
+            arrived = row.date_found is not None and row.date_found >= found_cutoff
+            provably_stale = posted_at is not None and posted_at < found_cutoff.replace(
+                hour=0, minute=0, second=0, microsecond=0
+            ) - timedelta(days=6)
+            if not (posted_fresh or (arrived and not provably_stale)):
+                continue
         age_days = _source_age_days(row.date_posted, row.date_found)
         if effective_freshness_window is not None and age_days is not None:
             if age_days > effective_freshness_window:
