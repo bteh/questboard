@@ -58,7 +58,7 @@ def test_no_window_means_no_condition():
     with_f = board_filter_conditions(ApplicationRecord, found_within_days=1)
     without = board_filter_conditions(ApplicationRecord)
     # Two conditions: the arrival window and the not-provably-stale guard.
-    assert len(with_f) == len(without) + 2
+    assert len(with_f) == len(without) + 1
 
 
 def test_search_work_found_window_keeps_todays_row_and_drops_last_weeks(tmp_path, monkeypatch):
@@ -124,3 +124,13 @@ def test_a_stale_posting_the_board_just_met_is_not_a_fresh_find():
 def test_an_undated_fresh_find_is_kept():
     """No posted date proves nothing; arrival is still the board's own fact."""
     assert _passes_with_posted(datetime.now(timezone.utc) - timedelta(hours=2), None)
+
+
+def test_a_provably_posted_today_row_found_last_week_is_new_today():
+    """The merge: "new today" covers both clocks. A posting the board met
+    days ago whose source stamps TODAY's date is news, whichever crawl
+    first met it."""
+    assert _passes_with_posted(
+        datetime.now(timezone.utc) - timedelta(days=5),
+        datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S"),
+    )
