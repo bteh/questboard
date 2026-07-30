@@ -332,7 +332,10 @@ async def refresh_work(
         if workspace is None:
             raise ToolError("Configure a local Questboard profile before refreshing work")
         preferences = workspace_service.get_workspace_preferences(db, workspace.id)
-        effective_roles = local_agent_service.clean_terms(roles)
+        # limit=15 matches the saved-roles cap. The default of 12 silently
+        # dropped the tail of a 15-role list, and the assistant noticed the
+        # pull never covered them; a run's own report is what caught this.
+        effective_roles = local_agent_service.clean_terms(roles, limit=15)
         effective_keywords = local_agent_service.clean_terms(keywords)
         if not effective_roles and not effective_keywords:
             effective_roles, effective_keywords = workspace_service.derive_search_terms_from_resume(

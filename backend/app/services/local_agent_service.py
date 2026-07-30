@@ -288,6 +288,15 @@ def propose_career_preferences(
     cleaned_roles = clean_terms(roles, limit=15)
     if not cleaned_roles:
         raise ValueError("Provide at least one role to propose.")
+    # Refuse, never truncate: a 17-title proposal silently capped to 15
+    # chopped off exactly the two additions being proposed, and the returned
+    # payload matched the saved list, which read as corruption to the caller.
+    submitted = len({str(r).strip().lower() for r in roles if str(r).strip()})
+    if submitted > len(cleaned_roles):
+        raise ValueError(
+            f"You proposed {submitted} titles but the list caps at 15. "
+            "Resubmit at most 15, dropping something to make room."
+        )
 
     current = workspace_service.get_workspace_preferences(db, workspace.id)
 
@@ -314,9 +323,19 @@ def propose_career_preferences(
         if {r.lower() for r in _json_list(previous.proposed_roles_json, limit=15)} != proposed_set:
             continue
         if previous.status == "pending":
-            return _proposal_payload(previous)
+            payload = _proposal_payload(previous)
+            payload["note"] = (
+                "An identical proposal is already pending; returning it "
+                "instead of creating a duplicate."
+            )
+            return payload
         if previous.decided_at and (now - _as_utc(previous.decided_at)).days < 7:
-            return _proposal_payload(previous)
+            payload = _proposal_payload(previous)
+            payload["note"] = (
+                "The user rejected this same list recently; that answer "
+                "stands, so no new proposal was recorded."
+            )
+            return payload
 
     # A guarded UPDATE, not loaded objects: a row this session read as pending
     # may have been accepted by the user mid-run, and writing "superseded"
