@@ -31,6 +31,10 @@ from job_finder.models.database import ScrapeRunRecord
 from job_finder.tools.scrapers._utils import _strip_html
 
 _WORK_KIND = "work"
+# One cap for every list the assistant hands us: saved roles, proposals, and
+# the pull. 15 blocked all additions once the saved list filled; 18 leaves
+# room to propose while keeping the pull fan-out bounded.
+ROLES_CAP = 18
 _EXCERPT_CHARS = 1200
 # A list row carries only enough body text to decide whether a posting is worth
 # opening; `get_opportunity` serves the long excerpt for finalists. A full page
@@ -208,7 +212,7 @@ def set_career_preferences(
         raise ValueError("Provide roles and/or keywords to save.")
 
     current = workspace_service.get_workspace_preferences(db, workspace.id)
-    new_roles = clean_terms(roles, limit=15) if roles is not None else current.roles
+    new_roles = clean_terms(roles, limit=ROLES_CAP) if roles is not None else current.roles
     new_keywords = clean_terms(keywords, limit=20) if keywords is not None else current.keywords
     # Never let this tool blank out all retrieval intent. Empty or
     # whitespace-only lists clean to [], and saving both would starve Find
@@ -260,8 +264,8 @@ def _proposal_payload(proposal: AgentRoleProposal) -> dict[str, Any]:
     return {
         "id": proposal.id,
         "workspace_id": proposal.workspace_id,
-        "base_roles": _json_list(proposal.base_roles_json, limit=15),
-        "proposed_roles": _json_list(proposal.proposed_roles_json, limit=15),
+        "base_roles": _json_list(proposal.base_roles_json, limit=ROLES_CAP),
+        "proposed_roles": _json_list(proposal.proposed_roles_json, limit=ROLES_CAP),
         "rationale": proposal.rationale or "",
         "status": proposal.status,
         "created_at": _iso(proposal.created_at),
@@ -285,7 +289,7 @@ def propose_career_preferences(
     workspace = resolve_local_workspace(db, workspace_id)
     if workspace is None:
         raise ValueError("No local workspace found to record a proposal for.")
-    cleaned_roles = clean_terms(roles, limit=15)
+    cleaned_roles = clean_terms(roles, limit=ROLES_CAP)
     if not cleaned_roles:
         raise ValueError("Provide at least one role to propose.")
     # Refuse, never truncate: a 17-title proposal silently capped to 15
@@ -294,8 +298,8 @@ def propose_career_preferences(
     submitted = len({str(r).strip().lower() for r in roles if str(r).strip()})
     if submitted > len(cleaned_roles):
         raise ValueError(
-            f"You proposed {submitted} titles but the list caps at 15. "
-            "Resubmit at most 15, dropping something to make room."
+            f"You proposed {submitted} titles but the list caps at {ROLES_CAP}. "
+            f"Resubmit at most {ROLES_CAP}, dropping something to make room."
         )
 
     current = workspace_service.get_workspace_preferences(db, workspace.id)
@@ -320,7 +324,7 @@ def propose_career_preferences(
         .all()
     )
     for previous in recent:
-        if {r.lower() for r in _json_list(previous.proposed_roles_json, limit=15)} != proposed_set:
+        if {r.lower() for r in _json_list(previous.proposed_roles_json, limit=ROLES_CAP)} != proposed_set:
             continue
         if previous.status == "pending":
             payload = _proposal_payload(previous)
@@ -405,7 +409,7 @@ def decide_role_proposal(
         return _proposal_payload(proposal)
 
     current = workspace_service.get_workspace_preferences(db, proposal.workspace_id)
-    base_roles = _json_list(proposal.base_roles_json, limit=15)
+    base_roles = _json_list(proposal.base_roles_json, limit=ROLES_CAP)
     if current.roles != base_roles:
         raise RoleProposalConflict(
             "Your saved roles changed since this proposal was made; accepting it "
@@ -438,7 +442,7 @@ def decide_role_proposal(
         )
 
     try:
-        proposed_roles = _json_list(proposal.proposed_roles_json, limit=15)
+        proposed_roles = _json_list(proposal.proposed_roles_json, limit=ROLES_CAP)
         updated = current.model_copy(update={"roles": proposed_roles})
         workspace_service.save_workspace_preferences(
             db, proposal.workspace_id, updated, commit=False
