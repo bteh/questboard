@@ -24,7 +24,12 @@ from app.models.workspace import (
     WorkspacePreferences,
     WorkspaceResume,
 )
-from app.services import agent_run_progress, application_service, workspace_service
+from app.services import (
+    agent_run_progress,
+    application_service,
+    lane_cache,
+    workspace_service,
+)
 from job_finder.job_trust import is_direct_source
 from job_finder.kinds import get_kinds, kind_for_vertical, vertical_values_for
 from job_finder.models.database import ScrapeRunRecord
@@ -1147,6 +1152,68 @@ def _source_age_days(
 
 
 def search_work(
+    db: Session,
+    *,
+    queries: list[str] | None = None,
+    location: str = "",
+    workplace_preference: str = "saved",
+    compensation_floor: float | None = None,
+    compensation_currency: str | None = None,
+    founding_only: bool = False,
+    posted_within_days: int | None = None,
+    found_within_days: int | None = None,
+    timezone_name: str = "UTC",
+    page_size: int = 20,
+    use_saved_preferences: bool = True,
+    workspace_id: str | None = None,
+    result_limit: int | None = None,
+    browse_all: bool = False,
+) -> dict[str, Any]:
+    kwargs: dict[str, Any] = dict(
+        queries=queries,
+        location=location,
+        workplace_preference=workplace_preference,
+        compensation_floor=compensation_floor,
+        compensation_currency=compensation_currency,
+        founding_only=founding_only,
+        posted_within_days=posted_within_days,
+        found_within_days=found_within_days,
+        timezone_name=timezone_name,
+        page_size=page_size,
+        use_saved_preferences=use_saved_preferences,
+        workspace_id=workspace_id,
+        result_limit=result_limit,
+        browse_all=browse_all,
+    )
+    if not browse_all:
+        return _search_work_uncached(db, **kwargs)
+    # The human board's lane build walks every candidate through both title
+    # gates for every saved role (~1s); the compact MCP path stays uncached
+    # because agent runs are minute-scale anyway. lane_cache owns the
+    # accuracy contract: any commit from any process invalidates.
+    key = (
+        "browse_all",
+        fit_profile_hash(db, workspace_id),
+        tuple(queries or ()),
+        location,
+        workplace_preference,
+        compensation_floor,
+        compensation_currency,
+        founding_only,
+        posted_within_days,
+        found_within_days,
+        timezone_name,
+        page_size,
+        use_saved_preferences,
+        workspace_id,
+        result_limit,
+    )
+    return lane_cache.get_or_build(
+        db, key, lambda: _search_work_uncached(db, **kwargs)
+    )
+
+
+def _search_work_uncached(
     db: Session,
     *,
     queries: list[str] | None = None,
