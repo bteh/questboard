@@ -224,6 +224,8 @@ def test_find_and_rank_prompt_passes_roles_per_run() -> None:
     assert "refresh_work(roles=" in prompt
     assert "search_work(queries=" in prompt
     assert "this run" in prompt
+    assert "saved keywords" in prompt
+    assert "staffing-agency preference" in prompt
 
 
 def test_find_and_rank_summary_says_roles_are_proposed_not_added() -> None:
@@ -305,11 +307,11 @@ def test_the_prompt_forbids_a_second_pull() -> None:
     assert "never start a second pull" in prompt.lower()
 
 
-def test_the_prompt_tells_the_sweep_to_continue_numbering() -> None:
-    """The sweep restarted ranks at 1 and the board showed two #1 strong fits.
-    The server guard renumbers collisions; the prompt should stop them."""
+def test_the_prompt_uses_current_rows_as_global_rank_anchors() -> None:
     prompt = _find_and_rank_prompt()
-    assert "continue" in prompt.lower() and "highest rank" in prompt.lower()
+    assert "global" in prompt.lower()
+    assert "rank anchors" in prompt.lower()
+    assert "shift the old #2" in prompt.lower()
 
 
 def test_proposals_are_calibrated_to_the_users_actual_level() -> None:

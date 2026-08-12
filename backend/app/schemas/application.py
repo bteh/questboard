@@ -12,6 +12,8 @@ class ApplicationBase(BaseModel):
     location: str = ""
     job_url: str = ""
     source: str = ""
+    industry_tags: list[str] = Field(default_factory=list)
+    ecosystem_tags: list[str] = Field(default_factory=list)
     description: str = ""
     is_remote: bool = False
     work_type: str = ""
@@ -22,7 +24,8 @@ class ApplicationBase(BaseModel):
     salary_min_annualized: float | None = None
     salary_max_annualized: float | None = None
     # Provenance/confidence contract fields (mirrored by the frontend types):
-    # salary_source: 'reported' | 'parsed_from_description' | None
+    # salary_source: 'reported' | 'parsed_from_description' |
+    # 'source_estimate' | None
     # date_confidence: 'exact' | 'fuzzy' | 'missing' | None
     # work_type_confidence: 'reported' | 'inferred' | None
     salary_source: str | None = None
@@ -145,6 +148,12 @@ class ProfileWorkListResponse(ApplicationListResponse):
     candidate_queries: list[str] = Field(default_factory=list)
     filters_applied: dict = Field(default_factory=dict)
     ranking_owner: str = "connected_agent"
+    # Coverage is computed across the filtered lane before pagination and only
+    # counts judgments whose posting/profile fingerprints are still current.
+    reviewed_count: int = 0
+    ranked_count: int = 0
+    skipped_count: int = 0
+    unreviewed_count: int = 0
     # source kind -> count across the full in-lane set, for the browse chips.
     source_categories: dict[str, int] = Field(default_factory=dict)
     retrieval_note: str = ""

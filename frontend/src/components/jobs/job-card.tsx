@@ -245,12 +245,14 @@ export function JobCard({ app, sourceLabels, latestRunId }: JobCardProps) {
                   <span className="text-sm font-semibold text-success tabular-nums whitespace-nowrap">
                     {salaryText}
                   </span>
-                  {app.salary_source === 'parsed_from_description' && (
+                  {(app.salary_source === 'parsed_from_description' || app.salary_source === 'source_estimate') && (
                     <span
-                      title="This range was parsed from the job description text, not reported by the employer."
+                      title={app.salary_source === 'source_estimate'
+                        ? 'Estimated by the listing source, not employer-reported.'
+                        : 'Parsed from the job description text, not structured employer-reported pay.'}
                       className="text-[10px] leading-tight text-text-muted whitespace-nowrap"
                     >
-                      estimated from description
+                      {app.salary_source === 'source_estimate' ? 'source estimate' : 'estimated from description'}
                     </span>
                   )}
                 </span>

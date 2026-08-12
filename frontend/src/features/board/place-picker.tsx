@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { Location01Icon } from '@hugeicons/core-free-icons';
 import { filterPlaces, type PlaceOption } from '@/features/board/places';
+import { getLocationSuggestions } from '@/lib/profile-preferences';
 import '@/features/board/place-picker.css';
 
 /* The board's place control: a plain-text field that suggests US states
@@ -16,18 +17,29 @@ export function PlacePicker({
   placeholder = 'your city or state',
   ariaLabel,
   className = '',
+  suggestionScope = 'board',
 }: {
   value: string;
   onChange: (next: string) => void;
   placeholder?: string;
   ariaLabel?: string;
   className?: string;
+  /** First run uses the global catalog; the board keeps its supply-aware list. */
+  suggestionScope?: 'board' | 'global';
 }) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const wrapRef = useRef<HTMLDivElement>(null);
   const listId = useId();
-  const matches = open ? filterPlaces(value) : [];
+  const matches: PlaceOption[] = open
+    ? suggestionScope === 'global'
+      ? getLocationSuggestions(value).map((suggestion) => ({
+          label: suggestion.label,
+          value: suggestion.label,
+          sub: suggestion.subtitle,
+        }))
+      : filterPlaces(value)
+    : [];
 
   useEffect(() => {
     if (!open) return;

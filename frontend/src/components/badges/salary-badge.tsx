@@ -5,7 +5,7 @@ import { formatSalary, toSalaryPeriod } from '@/utils/format';
 interface SalaryBadgeProps {
   min: number | null;
   max: number | null;
-  /** 'reported' | 'parsed_from_description' — parsed values are marked as estimates. */
+  /** Parsed/source-modeled values are marked as estimates. */
   source?: string | null;
   /** ISO code from salary_currency ('USD', 'EUR', ...); absent keeps "$". */
   currency?: string | null;
@@ -16,11 +16,14 @@ interface SalaryBadgeProps {
 export function SalaryBadge({ min, max, source, currency, period }: SalaryBadgeProps) {
   const text = formatSalary(min, max, currency, toSalaryPeriod(period));
   if (!text) return null;
-  const estimated = source === 'parsed_from_description';
+  const estimated = source === 'parsed_from_description' || source === 'source_estimate';
+  const estimateTitle = source === 'source_estimate'
+    ? 'Estimated by the listing source, not employer-reported.'
+    : 'Estimated from the job description text, not structured employer-reported pay.';
   return (
     <ColorBadge bg="#E3EDE7" text="#3F6B54" darkBg="#25382E" darkText="#8FC2A4">
       <DollarSign className="h-3 w-3" />
-      <span title={estimated ? 'Estimated from the job description text, not employer-reported.' : undefined}>
+      <span title={estimated ? estimateTitle : undefined}>
         {text}
         {estimated && <span className="ml-1 font-normal opacity-75">(est.)</span>}
       </span>

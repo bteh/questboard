@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_settings
 from app.models.workspace import (
+    AgentRoleProposal,
     FileAsset,
     Profile,
     UsageCounter,
@@ -472,7 +473,11 @@ def _deserialize_places(payload: str | None) -> list[PlaceSelection]:
 
 
 def _seed_preferences_from_default() -> WorkspacePreferencesSchema:
-    if _desktop_mode_enabled():
+    # Every user-facing workspace starts neutral. A server operator may keep an
+    # ignored editable default profile for legacy CLI runs, but that process-
+    # global file must never become another user's roles, places, companies, or
+    # compensation. Desktop already followed this rule; hosted now does too.
+    if _desktop_mode_enabled() or get_settings().hosted_mode:
         return WorkspacePreferencesSchema(
             roles=[],
             keywords=[],
@@ -483,7 +488,7 @@ def _seed_preferences_from_default() -> WorkspacePreferencesSchema:
             max_days_old=45,
             include_linkedin_jobs=False,
             current_title="",
-            current_level="mid",
+            current_level="",
             compensation=CompensationPreference(
                 currency="USD",
                 pay_period="annual",
@@ -555,6 +560,16 @@ def _prefs_to_schema(prefs: WorkspacePreferences | None) -> WorkspacePreferences
         for name in cleaned_companies
         if name.lower() in meta
     ]
+    current_title = (prefs.current_title or "").strip()
+    current_level = (prefs.current_level or "").strip()
+    # Older desktop workspaces were silently seeded as ``mid`` even when the
+    # user had never supplied a current title or chosen a level.  That stale
+    # default removed manager/director/staff targets from otherwise explicit
+    # role lists.  Treat only that unmistakable legacy combination as unset;
+    # a real title + level choice remains intact.
+    if not current_title and current_level.lower() == "mid":
+        current_level = ""
+
     return WorkspacePreferencesSchema(
         roles=_clean_string_list(roles, 15),
         keywords=_clean_string_list(keywords, 20),
@@ -564,11 +579,10 @@ def _prefs_to_schema(prefs: WorkspacePreferences | None) -> WorkspacePreferences
         workplace_preference=prefs.workplace_preference or "remote_friendly",
         max_days_old=int(prefs.max_days_old or 30),
         include_linkedin_jobs=bool(getattr(prefs, "include_linkedin_jobs", False)),
-        current_title=prefs.current_title or "",
-        # Empty current_level disables the level filter. Legacy rows that had
-        # a stored value still surface it; new users get "" which is the
-        # widest possible default.
-        current_level=prefs.current_level or "",
+        current_title=current_title,
+        # Empty current_level disables the level filter. New users and the
+        # unmistakable empty-title/legacy-mid combination get the widest net.
+        current_level=current_level,
         compensation=CompensationPreference(
             currency=prefs.compensation_currency or "USD",
             pay_period=prefs.compensation_period or "annual",
@@ -702,6 +716,186 @@ def cleanup_expired_workspaces(db: Session) -> int:
     if removed:
         db.commit()
     return removed
+
+
+def _remove_private_path(path: Path) -> int:
+    """Remove one trusted app-owned path and report whether it existed."""
+    if not path.exists() and not path.is_symlink():
+        return 0
+    if path.is_dir() and not path.is_symlink():
+        shutil.rmtree(path)
+    else:
+        path.unlink(missing_ok=True)
+    return 1
+
+
+def erase_workspace_data(
+    db: Session,
+    workspace_id: str,
+    *,
+    preserve_session_id: str | None = None,
+) -> dict[str, Any]:
+    """Erase user-owned Questboard content while keeping the app usable.
+
+    Hosted mode erases only the authenticated workspace and leaves the public
+    Side Quest pool intact. Desktop/local mode is one device-owned pool, so a
+    privacy reset clears every local workspace and board row, including stale
+    workspaces left by earlier local sessions. The current session and account
+    shell remain so the user lands on a blank first-run screen instead of an
+    authentication error.
+    """
+    from app.models.rate_limit import RateLimitEvent
+    from app.services import agent_run_progress, file_storage, resume_consent
+    from job_finder.models.database import ApplicationRecord, JobEmbedding
+
+    settings = get_settings()
+    local_device = not settings.hosted_mode
+    if local_device:
+        workspace_ids = [value for (value,) in db.query(Workspace.id).all()]
+        if workspace_id not in workspace_ids:
+            workspace_ids.append(workspace_id)
+    else:
+        workspace_ids = [workspace_id]
+
+    active = (
+        db.query(WorkspaceSearchRun.id)
+        .filter(
+            WorkspaceSearchRun.workspace_id.in_(workspace_ids),
+            WorkspaceSearchRun.status.in_(("pending", "running")),
+        )
+        .first()
+    )
+    if active:
+        raise HTTPException(
+            status_code=409,
+            detail="Wait for the current refresh to finish before erasing your data.",
+        )
+
+    assets = db.query(FileAsset).filter(FileAsset.workspace_id.in_(workspace_ids)).all()
+    resumes = db.query(WorkspaceResume).filter(WorkspaceResume.workspace_id.in_(workspace_ids)).all()
+
+    # Delete managed/local resume objects before dropping their metadata. A
+    # managed-storage failure aborts the database transaction so retrying the
+    # erase remains possible; remote 404 is treated as already erased.
+    files_deleted = 0
+    for asset in assets:
+        file_storage.delete_object(
+            bucket=asset.bucket or "",
+            storage_path=asset.storage_path or "",
+            local_path=asset.storage_path if asset.storage_provider == "local" else "",
+        )
+        files_deleted += 1
+    for resume in resumes:
+        for raw_path in (resume.file_path, resume.text_path):
+            if raw_path:
+                files_deleted += _remove_private_path(Path(raw_path))
+
+    if local_device:
+        app_query = db.query(ApplicationRecord)
+        embedding_query = db.query(JobEmbedding)
+    else:
+        app_ids = db.query(ApplicationRecord.id).filter(
+            ApplicationRecord.workspace_id == workspace_id
+        )
+        app_query = db.query(ApplicationRecord).filter(
+            ApplicationRecord.workspace_id == workspace_id
+        )
+        embedding_query = db.query(JobEmbedding).filter(
+            JobEmbedding.application_id.in_(app_ids)
+        )
+
+    records_deleted = 0
+    records_deleted += embedding_query.delete(synchronize_session=False)
+    records_deleted += app_query.delete(synchronize_session=False)
+    records_deleted += db.query(AgentRoleProposal).filter(
+        AgentRoleProposal.workspace_id.in_(workspace_ids)
+    ).delete(synchronize_session=False)
+    records_deleted += db.query(UsageCounter).filter(
+        UsageCounter.workspace_id.in_(workspace_ids)
+    ).delete(synchronize_session=False)
+    records_deleted += db.query(WorkspaceSearchEvent).filter(
+        WorkspaceSearchEvent.workspace_id.in_(workspace_ids)
+    ).delete(synchronize_session=False)
+    records_deleted += db.query(WorkspaceSearchRun).filter(
+        WorkspaceSearchRun.workspace_id.in_(workspace_ids)
+    ).delete(synchronize_session=False)
+    records_deleted += db.query(WorkspaceResume).filter(
+        WorkspaceResume.workspace_id.in_(workspace_ids)
+    ).delete(synchronize_session=False)
+    records_deleted += db.query(FileAsset).filter(
+        FileAsset.workspace_id.in_(workspace_ids)
+    ).delete(synchronize_session=False)
+    records_deleted += db.query(WorkspacePreferences).filter(
+        WorkspacePreferences.workspace_id.in_(workspace_ids)
+    ).delete(synchronize_session=False)
+    for erased_workspace_id in workspace_ids:
+        records_deleted += db.query(RateLimitEvent).filter(
+            RateLimitEvent.identity == f"ws:{erased_workspace_id}"
+        ).delete(synchronize_session=False)
+
+    if local_device:
+        sessions = db.query(WorkspaceSession).filter(
+            WorkspaceSession.workspace_id.in_(workspace_ids)
+        )
+        if preserve_session_id:
+            sessions = sessions.filter(WorkspaceSession.id != preserve_session_id)
+        records_deleted += sessions.delete(synchronize_session=False)
+        other_workspace_ids = [value for value in workspace_ids if value != workspace_id]
+        if other_workspace_ids:
+            records_deleted += db.query(WorkspaceMembership).filter(
+                WorkspaceMembership.workspace_id.in_(other_workspace_ids)
+            ).delete(synchronize_session=False)
+            records_deleted += db.query(Workspace).filter(
+                Workspace.id.in_(other_workspace_ids)
+            ).delete(synchronize_session=False)
+
+    db.commit()
+
+    if local_device:
+        resume_consent.erase_all()
+        agent_run_progress.erase()
+        data_dir = Path(settings.data_dir)
+        if _desktop_mode_enabled():
+            # These paths are dedicated app-data directories supplied by the
+            # Tauri shell. Never apply this broad directory reset to a source
+            # checkout, where settings.resume_dir may point at a developer's
+            # repository knowledge folder.
+            for directory in (
+                Path(settings.resolved_workspace_storage_dir),
+                Path(settings.resume_dir),
+                Path(settings.config_dir),
+            ):
+                files_deleted += _remove_private_path(directory)
+                directory.mkdir(parents=True, exist_ok=True)
+
+            for pattern in (
+                "expanded_roles_workspace_*.json",
+                "job_tracker.pre-*.db*",
+                "settings_audit.log",
+            ):
+                for path in data_dir.glob(pattern):
+                    files_deleted += _remove_private_path(path)
+            for path in (
+                data_dir / "backups",
+                data_dir / "runtime" / "files",
+                data_dir / "cache" / "ai_scores",
+            ):
+                files_deleted += _remove_private_path(path)
+        else:
+            for erased_workspace_id in workspace_ids:
+                files_deleted += _remove_private_path(_workspace_root(erased_workspace_id))
+    else:
+        for erased_workspace_id in workspace_ids:
+            resume_consent.revoke(erased_workspace_id)
+            root = _workspace_root(erased_workspace_id)
+            files_deleted += _remove_private_path(root)
+
+    return {
+        "complete": True,
+        "records_deleted": records_deleted,
+        "files_deleted": files_deleted,
+        "message": "Your Questboard data was erased. The app is ready for a fresh setup.",
+    }
 
 
 def _set_workspace_cookies(response: Response, session_token: str, csrf_token: str, expires_at: datetime) -> None:
@@ -1827,6 +2021,19 @@ def get_search_run(
     )
 
 
+def get_active_search_run(db: Session, workspace_id: str) -> WorkspaceSearchRun | None:
+    """Newest durable run that has not reached a terminal state."""
+    return (
+        db.query(WorkspaceSearchRun)
+        .filter(
+            WorkspaceSearchRun.workspace_id == workspace_id,
+            WorkspaceSearchRun.status.in_(("pending", "running")),
+        )
+        .order_by(WorkspaceSearchRun.created_at.desc())
+        .first()
+    )
+
+
 def list_search_runs(
     db: Session,
     workspace_id: str,
@@ -1848,6 +2055,7 @@ def append_search_event(
     run_id: str,
     event_type: str,
     payload: str,
+    worker_id: str = "",
 ) -> WorkspaceSearchEvent:
     record = WorkspaceSearchEvent(
         workspace_id=workspace_id,
@@ -1856,7 +2064,7 @@ def append_search_event(
         payload=payload,
     )
     db.add(record)
-    touch_search_run_heartbeat(db, run_id)
+    touch_search_run_heartbeat(db, run_id, worker_id=worker_id)
     db.commit()
     db.refresh(record)
     return record
@@ -1902,6 +2110,31 @@ def get_progress_messages(
         .all()
     )
     return [row.payload for row in reversed(rows)]
+
+
+def get_search_result(
+    db: Session,
+    workspace_id: str,
+    run_id: str,
+) -> dict[str, Any]:
+    """Return the newest structured completion payload for a persisted run."""
+    row = (
+        db.query(WorkspaceSearchEvent)
+        .filter(
+            WorkspaceSearchEvent.workspace_id == workspace_id,
+            WorkspaceSearchEvent.run_id == run_id,
+            WorkspaceSearchEvent.event_type == "complete",
+        )
+        .order_by(WorkspaceSearchEvent.id.desc())
+        .first()
+    )
+    if not row or not row.payload:
+        return {}
+    try:
+        payload = json.loads(row.payload)
+    except (json.JSONDecodeError, TypeError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
 
 
 def update_search_run_status(
@@ -2020,6 +2253,69 @@ def claim_next_search_run(db: Session, worker_id: str) -> WorkspaceSearchRun | N
     return record
 
 
+def recover_abandoned_local_search_runs(db: Session) -> dict[str, int]:
+    """Requeue desktop runs whose owning process disappeared.
+
+    The desktop has one persistent API process. If it is starting now, no
+    earlier in-process executor can still own a ``running`` row. Requeue runs
+    with attempts left so a refresh survives either an assistant subprocess
+    exiting or the app/backend restarting; terminally exhausted rows become
+    explicit failures instead of pretending to run forever.
+    """
+    now = _utcnow()
+    recovered = 0
+    failed = 0
+    records = (
+        db.query(WorkspaceSearchRun)
+        .filter(WorkspaceSearchRun.status.in_(("pending", "running")))
+        .order_by(
+            WorkspaceSearchRun.workspace_id.asc(),
+            WorkspaceSearchRun.created_at.desc(),
+        )
+        .all()
+    )
+    newest_seen: set[str] = set()
+    for record in records:
+        if record.workspace_id in newest_seen:
+            record.status = "failed"
+            record.error = "Superseded by a newer queued refresh after restart"
+            record.completed_at = now
+            record.claimed_by = ""
+            record.lease_expires_at = None
+            failed += 1
+            continue
+        newest_seen.add(record.workspace_id)
+        if record.status == "pending":
+            # It was durably queued but never claimed; the desktop worker can
+            # take it as-is. No recovery event is needed.
+            continue
+        if int(record.attempt_count or 0) < int(record.max_attempts or 1):
+            record.status = "pending"
+            record.available_at = now
+            record.error = "Previous refresh was interrupted; resumed by the desktop backend"
+            record.claimed_by = ""
+            record.claimed_at = None
+            record.lease_expires_at = None
+            record.heartbeat_at = None
+            db.add(WorkspaceSearchEvent(
+                workspace_id=record.workspace_id,
+                run_id=record.run_id,
+                event_type="progress",
+                payload="Recovered an interrupted refresh - queued to resume",
+            ))
+            recovered += 1
+        else:
+            record.status = "failed"
+            record.error = "Refresh was interrupted and exhausted its retry limit"
+            record.completed_at = now
+            record.claimed_by = ""
+            record.lease_expires_at = None
+            failed += 1
+    if records:
+        db.commit()
+    return {"recovered": recovered, "failed": failed}
+
+
 def release_search_run_for_retry(
     db: Session,
     run_id: str,
@@ -2032,6 +2328,7 @@ def release_search_run_for_retry(
         return
     record.status = "pending"
     record.error = error
+    record.completed_at = None
     record.available_at = _utcnow() + timedelta(seconds=retry_seconds)
     record.claimed_by = ""
     record.lease_expires_at = None
@@ -2131,12 +2428,26 @@ def build_pipeline_config_override(preferences: WorkspacePreferencesSchema, work
     labels = place_labels(preferences.preferred_places)
     preferred_states: list[str] = []
     preferred_cities: list[str] = []
-    for label in labels:
+    country_by_location: dict[str, str] = {}
+    preferred_countries: list[str] = []
+    for place, label in zip(preferences.preferred_places, labels, strict=False):
         parsed = parse_location(label)
         if parsed["state"] and parsed["state"] not in preferred_states:
             preferred_states.append(parsed["state"])
         if parsed["city"] and parsed["city"] not in preferred_cities:
             preferred_cities.append(parsed["city"])
+        country = (place.country or "").strip()
+        if not country and place.kind == "country":
+            country = label
+        if not country:
+            if parsed.get("country") == "US" or parsed.get("state"):
+                country = "United States"
+            elif parsed.get("country") == "non-us":
+                country = str(parsed.get("country_name") or "").strip()
+        if country:
+            country_by_location[label.casefold()] = country
+            if country.casefold() not in {item.casefold() for item in preferred_countries}:
+                preferred_countries.append(country)
     effective_preference = effective_workplace_preference(
         preferences.workplace_preference,
         preferences.preferred_places,
@@ -2202,6 +2513,13 @@ def build_pipeline_config_override(preferences: WorkspacePreferencesSchema, work
             "ai_company_discovery": not managed_ai,
             "ai_enhance_jobs": not managed_ai,
             "hybrid_ranking_enabled": hybrid_ranking_enabled,
+            # JobSpy's country setting controls the Indeed market. Derive it
+            # from the user's structured places instead of silently inheriting
+            # the repository's USA fallback. Local tasks use the per-location
+            # mapping; a remote task uses the first stated jurisdiction.
+            "country": preferred_countries[0] if preferred_countries else "USA",
+            "country_by_location": country_by_location,
+            "preferred_countries": preferred_countries,
         },
         "filters": {
             "strictness": preferences.match_strictness,

@@ -81,7 +81,23 @@ ATS_HOSTS: dict[str, dict[str, Any]] = {
 
 CACHE_TTL_DAYS = 7
 CACHE_VERSION = 1
-_CACHE_DIR = Path(__file__).parent / "data" / "cache"
+_DATA_DIR = Path(__file__).parent / "data"
+_RUNTIME_DATA_DIR = os.environ.get("JOB_FINDER_DATA_DIR") or os.environ.get("DATA_DIR")
+# Full verified catalogs ship with the app, while learned/promoted ATS boards
+# belong in persistent runtime storage so an app upgrade does not erase them.
+_CACHE_DIR = (
+    Path(_RUNTIME_DATA_DIR) / "cache"
+    if _RUNTIME_DATA_DIR
+    else _DATA_DIR / "cache"
+)
+_CACHE_LOCK = threading.RLock()
+
+# The full verified catalogs are the cold-coverage lane.  Search-derived and
+# ATS-link-promoted boards stay in the ordinary cache and run every refresh;
+# this rotating slice steadily checks everything else without making one pull
+# contact all ~5,700 boards.  Eighty per ATS adds bounded latency because the
+# board scrapers already fetch concurrently.
+VERIFIED_ROTATION_BATCH_SIZE = 80
 
 # Slug values that some result URLs legitimately have but aren't valid
 # ATS boards (e.g. the ATS's own marketing pages).
@@ -189,6 +205,100 @@ def save_discovered_slugs(host: str, slugs: set[str]) -> None:
         json.dump(payload, tmp, indent=2)
         tmp_path = Path(tmp.name)
     tmp_path.replace(path)
+
+
+def promote_slugs(host: str, slugs: set[str]) -> int:
+    """Promote official ATS URLs observed by any scraper into the hot cache.
+
+    Portfolio boards and aggregators frequently link to the employer's real
+    Ashby/Greenhouse/Lever/Workable posting.  Learning that slug makes the
+    next refresh query the company directly.  Preserve ``discovered_at`` so
+    promotion does not postpone the normal role-based DDG refresh.
+    """
+    if host not in ATS_HOSTS:
+        return 0
+    clean = {
+        str(slug).strip().lower()
+        for slug in slugs
+        if str(slug).strip() and str(slug).strip().lower() not in _SLUG_BLOCKLIST
+    }
+    if not clean:
+        return 0
+    with _CACHE_LOCK:
+        path = _cache_path(host)
+        payload: dict[str, Any] = {}
+        if path.exists():
+            try:
+                loaded = json.loads(path.read_text(encoding="utf-8"))
+                if isinstance(loaded, dict):
+                    payload = loaded
+            except (OSError, json.JSONDecodeError):
+                payload = {}
+        existing = {
+            str(slug).strip().lower()
+            for slug in (payload.get("slugs") or [])
+            if str(slug).strip()
+        }
+        added = clean - existing
+        if not added:
+            return 0
+        payload.update({
+            "version": CACHE_VERSION,
+            "host": host,
+            "discovered_at": payload.get("discovered_at")
+            or datetime.now(timezone.utc).isoformat(),
+            "slugs": sorted(existing | clean),
+        })
+        _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(
+            "w", encoding="utf-8", dir=path.parent, delete=False, suffix=".tmp",
+        ) as tmp:
+            json.dump(payload, tmp, indent=2)
+            tmp_path = Path(tmp.name)
+        tmp_path.replace(path)
+    logger.info("ATS discovery: promoted %d %s board(s) from observed job URLs", len(added), host)
+    return len(added)
+
+
+def verified_rotation_slugs(
+    host: str,
+    *,
+    batch_size: int = VERIFIED_ROTATION_BATCH_SIZE,
+    at: datetime | None = None,
+) -> set[str]:
+    """Return today's deterministic slice of an ATS's full verified catalog.
+
+    This is the cold lane in the hot/warm/cold coverage model.  The slice is
+    intentionally not unioned into the grow-only discovery cache: doing so
+    would eventually make every refresh contact every board and regress pull
+    speed.  Across successive UTC dates, every verified board is revisited.
+    """
+    if host not in ATS_HOSTS or batch_size <= 0:
+        return set()
+    if os.environ.get("QUESTBOARD_DISABLE_ATS_CATALOG_ROTATION", "").strip().lower() in {
+        "1", "true", "yes",
+    }:
+        return set()
+    path = _DATA_DIR / f"{host}_verified_full.txt"
+    try:
+        slugs = [
+            line.strip().lower()
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        ]
+    except OSError:
+        return set()
+    slugs = list(dict.fromkeys(slugs))
+    if not slugs:
+        return set()
+    size = min(int(batch_size), len(slugs))
+    now = at or datetime.now(timezone.utc)
+    day_index = now.date().toordinal()
+    start = (day_index * size) % len(slugs)
+    end = start + size
+    if end <= len(slugs):
+        return set(slugs[start:end])
+    return set(slugs[start:] + slugs[: end - len(slugs)])
 
 
 def drop_slugs(host: str, dead: set[str]) -> int:

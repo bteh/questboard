@@ -345,8 +345,8 @@ function ChapterTail({ profile }: { profile?: string }) {
 function LogPage() {
   const labels = useSourceLabels();
   const { profile } = useProfile();
-  const personal = useApplications(personalLogFilters(profile));
-  const board = useApplications(boardLogFilters(profile));
+  const personal = useApplications(personalLogFilters());
+  const board = useApplications(boardLogFilters());
 
   const loaded = personal.data !== undefined && board.data !== undefined;
   const split = splitLog(personal.data?.items ?? [], board.data?.items ?? []);

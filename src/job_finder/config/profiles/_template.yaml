@@ -117,7 +117,8 @@ search_settings:
   exclude_staffing_agencies: true
   country: "USA"
   max_parallel_searches: 6            # Concurrent search threads (6 × 5 boards = 30 requests)
-  max_unique_jobs: 600                # Stop searching after finding this many unique jobs
+  max_unique_jobs: 600                # Per-JobSpy-board cap; never cancels another source
+  min_queries_per_source: 15          # Minimum role coverage per board before its cap may stop extra locations
   max_search_tasks: 20                # Hard cap on total JobSpy queries (term × location combos)
   ai_score_top_n: 60                  # Keyword-score all jobs, then AI-score only the top N for speed
 
@@ -151,7 +152,7 @@ job_boards:
 #   - remotive, himalayas, weworkremotely, remoteok: Remote jobs (all industries)
 #   - workatastartup, hackernews: Tech startups
 #   - greenhouse, lever: Company career pages (all industries)
-#   - cryptojobslist: Crypto/Web3
+#   - cryptojobslist, web3career: Crypto/Web3
 additional_sources:
   - name: "workatastartup"
     enabled: true
@@ -171,6 +172,8 @@ additional_sources:
     enabled: true
   - name: "cryptojobslist"
     enabled: false           # Enable if targeting crypto/Web3
+  - name: "web3career"
+    enabled: false           # Official API when tokenized; public fallback otherwise
 
 # --- AUTO-APPLY ---
 applicant_info:

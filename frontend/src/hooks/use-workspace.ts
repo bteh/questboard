@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
   bootstrapWorkspaceSession,
+  eraseWorkspaceData,
   generateWorkspaceProfile,
   getOnboardingState,
   saveWorkspacePreferences,
@@ -56,6 +57,16 @@ export function useUploadWorkspaceResume() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['workspace', 'onboarding'] });
       queryClient.invalidateQueries({ queryKey: ['search', 'defaults'] });
+    },
+  });
+}
+
+export function useEraseWorkspaceData() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: eraseWorkspaceData,
+    onSuccess: () => {
+      queryClient.clear();
     },
   });
 }

@@ -14,6 +14,8 @@ export function verdictMeta(verdict: string): { label: string; tone: VerdictTone
       return { label: 'went dark', tone: 'bad' };
     case 'dropped':
       return { label: 'volume dropped', tone: 'warn' };
+    case 'degraded':
+      return { label: 'partial', tone: 'warn' };
     case 'quiet':
       return { label: 'quiet', tone: 'quiet' };
     default:
@@ -27,6 +29,8 @@ export function reasonMeta(reason: string): { label: string; tone: VerdictTone }
       return { label: 'error', tone: 'bad' };
     case 'timeout':
       return { label: 'timed out', tone: 'bad' };
+    case 'partial':
+      return { label: 'partial', tone: 'warn' };
     case 'zero_rows':
       return { label: 'no rows', tone: 'quiet' };
     default:

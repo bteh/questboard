@@ -133,4 +133,25 @@ describe('JobDetailSheet artifacts', () => {
     );
     expect(container.querySelectorAll('details').length).toBe(0);
   });
+
+  it('shows effort, criteria, basis, and deadline for a Side Quest', () => {
+    mockApp = makeApp({
+      vertical: 'scholarship',
+      is_rolling: false,
+      quest: {
+        application_effort: 'quick',
+        application_effort_note: 'The first round is a short form.',
+        criteria: ['Current high-school senior', 'At least a 3.0 GPA'],
+        apply_by: '2026-09-30',
+      },
+    });
+    render(<JobDetailSheet jobId={7} labels={{}} onClose={() => {}} />);
+    expect(screen.getByText('application effort')).toBeTruthy();
+    expect(screen.getByText('Quick')).toBeTruthy();
+    expect(screen.getByText('listed steps')).toBeTruthy();
+    expect(screen.getByText('Current high-school senior')).toBeTruthy();
+    expect(screen.getByText('At least a 3.0 GPA')).toBeTruthy();
+    expect(screen.getByText('Sep 30, 2026')).toBeTruthy();
+    expect(screen.getByText(/not your odds, approval time/)).toBeTruthy();
+  });
 });

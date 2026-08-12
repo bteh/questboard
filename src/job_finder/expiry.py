@@ -74,6 +74,18 @@ def _previous_healthy_run_started(session, source: str):
     return runs[1][0]
 
 
+def _latest_run(session, source: str):
+    """Latest recorded attempt, regardless of whether it was healthy."""
+    from job_finder.models.database import ScrapeRunRecord
+
+    return (
+        session.query(ScrapeRunRecord)
+        .filter(ScrapeRunRecord.source == source)
+        .order_by(ScrapeRunRecord.started_at.desc(), ScrapeRunRecord.id.desc())
+        .first()
+    )
+
+
 def expire_for_source(source: str, *, now: datetime | None = None) -> dict:
     """Apply the source's declared expiry rules. Returns a summary dict.
 
@@ -104,6 +116,21 @@ def expire_for_source(source: str, *, now: datetime | None = None) -> dict:
 
         if meta.full_snapshot:
             rule = "absence"
+            latest = _latest_run(session, source)
+            if latest is None:
+                return {
+                    "expired": 0,
+                    "rule": rule,
+                    "skipped": "needs a current healthy run",
+                }
+            if latest.finish_reason != "ok" or int(latest.rows_found or 0) <= 0:
+                return {
+                    "expired": 0,
+                    "rule": rule,
+                    "skipped": (
+                        f"latest run incomplete: {latest.finish_reason or 'unknown'}"
+                    ),
+                }
             prev_started = _previous_healthy_run_started(session, source)
             if prev_started is None:
                 return {"expired": 0, "rule": rule, "skipped": "needs two healthy runs of history"}

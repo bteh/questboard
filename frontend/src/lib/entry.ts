@@ -43,6 +43,28 @@ export function markOnboarded(): void {
   }
 }
 
+/** Clear user-owned browser state while preserving the active auth/session. */
+export function erasePersonalBrowserState(): void {
+  try {
+    const preservedPrefixes = [
+      'questboard-local-workspace-session:',
+      'questboard-dev-hosted-session',
+    ];
+    const keys = Array.from({ length: window.localStorage.length }, (_, index) =>
+      window.localStorage.key(index),
+    ).filter((key): key is string => Boolean(key));
+    for (const key of keys) {
+      const isQuestboardData = key.startsWith('questboard') || key.startsWith('qb-');
+      const preserve = preservedPrefixes.some((prefix) => key.startsWith(prefix));
+      if (isQuestboardData && !preserve) {
+        window.localStorage.removeItem(key);
+      }
+    }
+  } catch {
+    /* storage refused: server-side erase still completed */
+  }
+}
+
 /* Where / sends a returner: the masthead home, the subscriber's front page.
    The pitch never replays for a known reader. */
 export function entryRedirectTarget(): '/home' | null {

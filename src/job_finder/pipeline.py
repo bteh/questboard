@@ -56,6 +56,7 @@ from job_finder.scoring.helpers import annualize_amount
 from job_finder.scoring.score_cache import cache_key as ai_score_cache_key
 from job_finder.scoring.score_cache import load_cached as load_cached_ai_score
 from job_finder.scoring.score_cache import save_cached as save_cached_ai_score
+from job_finder.staffing import STAFFING_AGENCY_NAMES, is_staffing_agency
 from job_finder.tools.job_search_tool import search_jobs
 from job_finder.tools.resume_parser_tool import find_resume, parse_resume
 
@@ -335,6 +336,115 @@ def _search_query_priority(term: str, specialty_kw: set[str]) -> int:
     return 4  # everything else last
 
 
+def _build_jobspy_tasks(
+    search_tasks: list[tuple[str, str]],
+    boards: list[str] | None,
+) -> list[tuple[str, str, list[str] | None]]:
+    """Expand role/location searches into independently isolated board calls.
+
+    JobSpy already starts one worker per board internally, but it does not
+    return until *every* board in that call finishes. One slow board therefore
+    used to discard a healthy board's completed rows when the shared 45-second
+    deadline fired. Explicit board lists are split here so each board keeps the
+    same query coverage and concurrency while succeeding, timing out, and
+    tripping its circuit breaker independently.
+
+    ``None`` preserves JobSpy's default-board behavior for legacy callers. An
+    explicit empty list remains a real opt-out and creates no work.
+    """
+    if boards is None:
+        return [(term, location, None) for term, location in search_tasks]
+    return [
+        (term, location, [board])
+        for term, location in search_tasks
+        for board in boards
+    ]
+
+
+def _scaled_results_per_board(base: int, original_terms: int, consolidated_terms: int) -> int:
+    """Preserve approximate total recall after query consolidation.
+
+    Scale proportionally. The old ``max(2, int(ratio))`` doubled every query
+    after removing even one duplicate (18 titles -> 17 queries requested 100
+    LinkedIn rows each), which pushed an otherwise healthy board past its
+    timeout and rate limits.
+    """
+    if base <= 0:
+        return 1
+    if original_terms <= 0 or consolidated_terms <= 0:
+        return min(200, base)
+    scaled = (base * original_terms + consolidated_terms - 1) // consolidated_terms
+    return min(200, max(base, scaled))
+
+
+def _source_coverage_entry(
+    source: str,
+    display_name: str,
+    outcomes: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Collapse one source's attempts into the refresh receipt.
+
+    A source that returned useful rows but lost one query is ``partial``, not
+    ``failed``. A clean zero is a completed check and remains distinct from a
+    source that never answered. The UI uses these states to avoid turning an
+    incomplete refresh into a false "nothing new" claim.
+    """
+    rows_found = sum(max(0, int(item.get("rows_found") or 0)) for item in outcomes)
+    failed_attempts = sum(
+        1
+        for item in outcomes
+        if str(item.get("finish_reason") or "zero_rows") in {"timeout", "exception"}
+    )
+    attempted = len(outcomes)
+    errors = [
+        str(item.get("error_sample") or "").strip()
+        for item in outcomes
+        if item.get("error_sample")
+    ]
+
+    if attempted == 0:
+        state = "failed"
+        error = "source produced no outcome"
+    elif failed_attempts > 0 and rows_found > 0:
+        state = "partial"
+        error = errors[0] if errors else f"{failed_attempts} request(s) failed"
+    elif failed_attempts > 0:
+        state = "failed"
+        error = errors[0] if errors else f"{failed_attempts} request(s) failed"
+    elif rows_found == 0:
+        state = "zero"
+        error = ""
+    else:
+        state = "ok"
+        error = ""
+
+    return {
+        "source": source,
+        "display_name": display_name,
+        "state": state,
+        "rows_found": rows_found,
+        "attempts": attempted,
+        "failed_attempts": failed_attempts,
+        "error": error[:500],
+    }
+
+
+def _source_coverage_receipt(entries: list[dict[str, Any]]) -> dict[str, Any]:
+    """Summarize exact per-source outcomes for the API and board toolbar."""
+    counts = {state: 0 for state in ("ok", "zero", "partial", "failed")}
+    for entry in entries:
+        state = str(entry.get("state") or "failed")
+        counts[state if state in counts else "failed"] += 1
+    return {
+        "total": len(entries),
+        "ok": counts["ok"],
+        "zero": counts["zero"],
+        "partial": counts["partial"],
+        "failed": counts["failed"],
+        "sources": entries,
+    }
+
+
 def _get_specialty_keywords(config: dict | None = None) -> set[str]:
     """Build specialty keyword set from profile config + defaults.
 
@@ -531,17 +641,33 @@ def _pick_best_job(group: list[dict]) -> dict:
                     best["salary_source"] = j.get("salary_source")
                 break
 
-    # Likewise borrow a verifiable posting date so the strict freshness
-    # filter doesn't drop a merged job whose keeper-copy had no date.
-    if (best.get("date_confidence") or "missing") == "missing":
-        for j in group:
-            if (
-                j is not best
-                and j.get("date_posted")
-                and j.get("date_confidence") in ("exact", "fuzzy")
-            ):
-                best["date_posted"] = j.get("date_posted")
-                best["date_confidence"] = j.get("date_confidence")
+    # Preserve the newest verifiable cross-source date. A direct ATS often
+    # retains the original publication timestamp while an aggregator records
+    # a legitimate later repost. Keeping only the direct source's older date
+    # made active reposts look expired before ranking.
+    from job_finder.tools.scrapers._utils import _parse_posted_date
+
+    dated: list[tuple[datetime, dict]] = []
+    for candidate in group:
+        if candidate.get("date_confidence") not in ("exact", "fuzzy"):
+            continue
+        parsed = _parse_posted_date(candidate.get("date_posted"))
+        if parsed is None:
+            continue
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        dated.append((parsed, candidate))
+    if dated:
+        _posted_at, newest = max(dated, key=lambda item: item[0])
+        best["date_posted"] = newest.get("date_posted")
+        best["date_confidence"] = newest.get("date_confidence")
+
+    # Preserve a discovered official apply URL even when the richer/direct
+    # keeper came from a sibling source.
+    if not best.get("direct_application_url"):
+        for candidate in group:
+            if candidate.get("direct_application_url"):
+                best["direct_application_url"] = candidate["direct_application_url"]
                 break
 
     return best
@@ -826,15 +952,33 @@ def watchlist_tokens_by_ats(raw_watchlist: list, resolve) -> dict[str, list[str]
     return {ats: slugs for ats, slugs in by_ats.items() if slugs}
 
 
-def _job_salary_passes(job: dict, hard_floor: float) -> bool:
+def _job_salary_passes(
+    job: dict,
+    hard_floor: float,
+    target_currency: str | None = None,
+) -> bool:
     """Return True if the job's salary meets the hard floor, or is unknown.
 
     Uses the midpoint of the salary range when both min and max are known,
     otherwise uses salary_max. Jobs with no salary data always pass —
     filtering them out would remove most listings. Raw values are annualized
     first (via salary_period, or the obviously-hourly heuristic) so an
-    hourly role is never compared raw against the annual floor.
+    hourly role is never compared raw against the annual floor. When a user's
+    target currency is known, a missing or different listing currency is also
+    kept: unlike-currency numbers are not comparable without an explicit FX
+    policy, and silently treating them as dollars would make the filter lie.
     """
+    # Some aggregators publish modeled salary bands explicitly labeled as
+    # estimates. They are useful context on the card, but not strong enough to
+    # exclude an otherwise relevant job from a user's hard compensation floor.
+    if str(job.get("salary_source") or "").strip().lower() == "source_estimate":
+        return True
+
+    if target_currency:
+        listing_currency = str(job.get("salary_currency") or "").strip().upper()
+        if not listing_currency or listing_currency != target_currency.strip().upper():
+            return True
+
     # Use explicit None checks — 0 is a valid (if incorrect) salary value
     # and must not be treated as "no data"
     period = job.get("salary_period")
@@ -1235,7 +1379,10 @@ class JobFinderPipeline:
         JobSpy searches and additional scrapers run concurrently.
         Returns a deduplicated list of job dicts.
         """
-        locations = locations or self.config.get("locations", ["Los Angeles, CA"])
+        # A missing legacy config still needs a country-scale search location,
+        # but it must never inherit the maintainer's city. Normal workspace
+        # searches supply the person's own selected places before this point.
+        locations = locations or self.config.get("locations") or ["United States"]
         settings = self.config.get("search_settings") or {}
         results_per_board = max(1, settings.get("results_per_board", 50))
         # Per-source cap. The ATS scrapers scan hundreds of company boards; the
@@ -1251,7 +1398,15 @@ class JobFinderPipeline:
         results_per_additional = max(500, int(settings.get("results_per_additional_source", 500) or 500))
         max_days_old = max(1, settings.get("max_days_old", 30))
         search_distance = settings.get("search_radius_miles")  # None = JobSpy default (50 miles)
-        jobspy_boards = self.config.get("job_boards") or None  # None → default boards
+        configured_jobspy_boards = self.config.get("job_boards")
+        # Missing means legacy/default boards; an explicit [] is a real opt-out.
+        # Collapsing both through ``or None`` silently re-enabled blocked or
+        # deliberately disabled sources during targeted refreshes.
+        jobspy_boards = (
+            configured_jobspy_boards
+            if isinstance(configured_jobspy_boards, list)
+            else None
+        )
 
         # Build the consolidated query list: target_roles + title-shaped
         # keyword_searches + title-shaped resume skills (keywords.technical).
@@ -1263,9 +1418,11 @@ class JobFinderPipeline:
         # Broader queries → more results per query to compensate
         original_count = len(roles_raw) + len(keywords_raw)
         if consolidated and len(consolidated) < original_count:
-            ratio = original_count / len(consolidated)
-            boost = max(2, int(ratio))
-            results_per_board = min(200, results_per_board * boost)
+            results_per_board = _scaled_results_per_board(
+                results_per_board,
+                original_count,
+                len(consolidated),
+            )
             logger.info(
                 "Consolidated %d → %d search terms; bumped results_per_board to %d",
                 original_count, len(consolidated), results_per_board,
@@ -1288,8 +1445,12 @@ class JobFinderPipeline:
         specialty_kw = _get_specialty_keywords(self.config)
         prioritized = sorted(consolidated, key=lambda t: _search_query_priority(t, specialty_kw))
         search_tasks: list[tuple[str, str]] = []
-        for term in prioritized:
-            for loc in locations:
+        # Cover every role in the primary place before spending a second query
+        # on the same role elsewhere. The old role-major order could use the
+        # entire task budget on the first few titles (city + remote) and never
+        # ask a board about later saved roles at all.
+        for loc in locations:
+            for term in prioritized:
                 search_tasks.append((term, loc))
 
         # Hard cap on total search tasks to avoid 8+ minute searches.
@@ -1306,88 +1467,147 @@ class JobFinderPipeline:
             if progress:
                 progress(f"Capped to {max_tasks} search queries (dropped {trimmed} low-priority duplicates)")
 
-        total_tasks = len(search_tasks)
+        total_combos = len(search_tasks)
+        jobspy_tasks = _build_jobspy_tasks(search_tasks, jobspy_boards)
+        total_tasks = len(jobspy_tasks)
         counter = {"done": 0}
         lock = threading.Lock()
         all_jobs: list[dict] = []
-        # Track unique jobs for early stopping
-        seen_urls: set[str] = set()
-        unique_count = 0
+        # Early stopping is isolated PER BOARD. A prolific Indeed query must
+        # never cancel LinkedIn (or any other board) before it has answered.
+        # Each board also gets at least one planned query per consolidated role
+        # before its own volume cap may stop secondary-location work.
         max_unique = max(100, settings.get("max_unique_jobs", 500))
-        stop_early = threading.Event()
-
-        # Short-circuit the entire JobSpy phase when no boards are configured.
-        # Otherwise we'd call search_jobs() per role/location combo and the
-        # JobSpy library would silently fall back to its own _DEFAULT_BOARDS
-        # (Indeed/Glassdoor/ZipRecruiter/Google) — re-introducing the slow
-        # CAPTCHA-walled boards we just dropped, and burning minutes on
-        # retries that never succeed.
-        skip_jobspy = isinstance(jobspy_boards, list) and len(jobspy_boards) == 0
+        minimum_queries_per_board = min(
+            total_combos,
+            max(
+                1,
+                int(settings.get("min_queries_per_source", len(prioritized)) or len(prioritized)),
+            ),
+        ) if total_combos else 0
+        board_seen_urls: dict[str, set[str]] = {}
+        board_unique_counts: dict[str, int] = {}
+        board_done_counts: dict[str, int] = {}
+        board_stop_events: dict[str, threading.Event] = {}
+        jobspy_outcomes: dict[str, list[dict[str, Any]]] = {}
+        jobspy_started_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        jobspy_started_mono = time.monotonic()
 
         # Per-board scrape deadline (seconds). Generous enough for a healthy
         # board returning a full page, tight enough that a hung/CAPTCHA board
         # can't stall the search for minutes. Configurable via search_settings.
         jobspy_task_timeout = float(settings.get("jobspy_task_timeout_seconds", 45) or 45)
 
-        def _search_one(task: tuple[str, str]) -> list[dict]:
-            nonlocal unique_count
-            # Skip if we already have enough unique jobs
-            if stop_early.is_set():
-                return []
-            if skip_jobspy:
-                return []
-            term, loc = task
-            is_remote = True if loc.lower() == "remote" else None
-            jobs = search_jobs(
-                search_term=term,
-                location=loc if loc.lower() != "remote" else "United States",
-                results_wanted=results_per_board,
-                hours_old=max_days_old * 24,
-                is_remote=is_remote,
-                country=settings.get("country", "USA"),
-                boards=jobspy_boards,
-                # Skip fetching full LinkedIn page per result (~2-3s each).
-                # Descriptions still come from Indeed, Glassdoor, Google.
-                # LinkedIn results keep title/company/location/salary/URL.
-                linkedin_fetch_description=False,
-                distance=search_distance,
-                # Cap each board scrape so one hung/CAPTCHA-walled board can't
-                # stall a worker for minutes. After a few timeouts the per-board
-                # circuit breaker opens and the board is skipped outright.
-                scrape_timeout=jobspy_task_timeout,
-            )
+        def _search_one(task: tuple[str, str, list[str] | None]) -> list[dict]:
+            term, loc, task_boards = task
+            board_key = task_boards[0].strip().lower() if task_boards else "jobspy"
             with lock:
-                if stop_early.is_set():
-                    return jobs  # another thread hit the threshold while we were searching
+                stop_event = board_stop_events.setdefault(board_key, threading.Event())
+            # Skip only this board after it has satisfied its own coverage and
+            # volume budget; other boards continue independently.
+            if stop_event.is_set():
+                return []
+            telemetry: dict[str, Any] = {
+                "term": term,
+                "location": loc,
+            }
+            jobs: list[dict] = []
+            try:
+                is_remote = True if loc.lower() == "remote" else None
+                country_by_location = settings.get("country_by_location", {}) or {}
+                task_country = str(
+                    country_by_location.get(loc.casefold())
+                    or settings.get("country")
+                    or "USA"
+                )
+                telemetry["country"] = task_country
+                jobs = search_jobs(
+                    search_term=term,
+                    location=loc if loc.lower() != "remote" else task_country,
+                    results_wanted=results_per_board,
+                    hours_old=max_days_old * 24,
+                    is_remote=is_remote,
+                    country=task_country,
+                    boards=task_boards,
+                    # Skip fetching full LinkedIn page per result (~2-3s each).
+                    # Descriptions still come from Indeed, Glassdoor, Google.
+                    # LinkedIn results keep title/company/location/salary/URL.
+                    linkedin_fetch_description=False,
+                    distance=search_distance,
+                    # Cap each board scrape so one hung/CAPTCHA-walled board can't
+                    # stall a worker for minutes. After a few timeouts the per-board
+                    # circuit breaker opens and the board is skipped outright.
+                    scrape_timeout=jobspy_task_timeout,
+                    telemetry=telemetry,
+                )
+                # Protect the receipt contract even if a replacement wrapper
+                # forgets to fill telemetry.
+                telemetry.setdefault("finish_reason", "ok" if jobs else "zero_rows")
+                telemetry.setdefault("rows_found", len(jobs))
+                telemetry.setdefault("error_sample", "")
+            except Exception as exc:
+                error = f"{type(exc).__name__}: {exc}"
+                telemetry.update({
+                    "finish_reason": "exception",
+                    "rows_found": 0,
+                    "error_sample": error[:500],
+                })
+                logger.warning(
+                    "JobSpy %s search failed for %r in %r (non-fatal): %s",
+                    board_key,
+                    term,
+                    loc,
+                    error,
+                    exc_info=True,
+                )
+            with lock:
+                jobspy_outcomes.setdefault(board_key, []).append(telemetry)
                 counter["done"] += 1
                 n = counter["done"]
-                # Count truly new URLs for early stopping
+                board_done_counts[board_key] = board_done_counts.get(board_key, 0) + 1
+                seen_urls = board_seen_urls.setdefault(board_key, set())
                 new_count = 0
                 for j in jobs:
                     url = j.get("url", "")
                     if url and url not in seen_urls:
                         seen_urls.add(url)
                         new_count += 1
-                unique_count += new_count
-                if unique_count >= max_unique:
-                    stop_early.set()
+                board_unique_counts[board_key] = board_unique_counts.get(board_key, 0) + new_count
+                if (
+                    board_unique_counts[board_key] >= max_unique
+                    and board_done_counts[board_key] >= minimum_queries_per_board
+                ):
+                    stop_event.set()
             if progress:
                 sources = ", ".join(set(j.get("source", "?") for j in jobs)) if jobs else "no boards"
-                suffix = " (stopping — enough results)" if stop_early.is_set() else ""
+                suffix = f" ({board_key} coverage complete)" if stop_event.is_set() else ""
                 progress(f"  [{n}/{total_tasks}] '{term}' in {loc} → {len(jobs)} results from {sources}{suffix}")
             return jobs
 
         # --- Launch JobSpy searches + additional scrapers concurrently ---
         if progress:
-            progress(f"Searching {total_tasks} role×location combos in parallel...")
+            if isinstance(jobspy_boards, list) and jobspy_boards:
+                progress(
+                    f"Searching {total_combos} role×location combos across "
+                    f"{len(jobspy_boards)} boards ({total_tasks} source searches) in parallel..."
+                )
+            else:
+                progress(f"Searching {total_combos} role×location combos in parallel...")
 
-        # Cap workers to avoid overwhelming job board servers with concurrent
-        # requests.  Each worker hits 5 sites simultaneously, so 6 workers =
-        # 30 concurrent requests.  More than that risks IP blocks.
-        max_jobspy_workers = min(total_tasks, settings.get("max_parallel_searches", 6))
+        # ``max_parallel_searches`` remains the concurrency budget PER board.
+        # Splitting explicit boards creates one outer task per board, so scale
+        # the pool by the number of boards. This preserves the old number of
+        # network requests (six role/location calls × N internal JobSpy board
+        # workers) without letting a slow board hold a healthy board's rows.
+        board_count = len(jobspy_boards) if isinstance(jobspy_boards, list) else 1
+        max_jobspy_workers = min(
+            total_tasks,
+            max(1, int(settings.get("max_parallel_searches", 6))) * max(1, board_count),
+        )
 
         # Prepare additional scraper arguments
         enabled_names: list[str] = []
+        all_scrapers: dict[str, Any] = {}
         try:
             from job_finder.tools.scrapers import get_registry, run_scrapers
 
@@ -1442,6 +1662,7 @@ class JobFinderPipeline:
         # Run JobSpy searches in a thread pool, and additional scrapers
         # concurrently in their own thread.
         extra_jobs_result: list[dict] = []
+        additional_outcomes: list[dict[str, Any]] = []
 
         # Resolve filter strictness once and pass it into scrapers so their
         # per-job _match_roles calls use the same mode/founding-bypass as
@@ -1463,6 +1684,7 @@ class JobFinderPipeline:
                     max_days_old=max_days_old,
                     watchlist_by_ats=watchlist_by_ats,
                     filters=scraper_filter_settings,
+                    outcome_sink=additional_outcomes,
                 )
             except Exception as e:
                 logger.warning("Additional scrapers failed (non-fatal): %s", e)
@@ -1478,25 +1700,79 @@ class JobFinderPipeline:
             scraper_thread.start()
 
         # Run JobSpy searches in parallel
-        if search_tasks:
+        if jobspy_tasks:
             with ThreadPoolExecutor(max_workers=max_jobspy_workers) as pool:
-                futures = {pool.submit(_search_one, t): t for t in search_tasks}
-                early_stopped = False
+                futures = {pool.submit(_search_one, t): t for t in jobspy_tasks}
+                cancelled_boards: set[str] = set()
                 for future in as_completed(futures):
                     try:
                         all_jobs.extend(future.result())
                     except Exception as e:
                         logger.warning("JobSpy search failed (non-fatal): %s", e)
-                    # Cancel queued (not yet started) tasks after early stop,
-                    # but keep collecting results from already-running tasks.
-                    if stop_early.is_set() and not early_stopped:
-                        early_stopped = True
+                    # Cancel queued work only for boards that independently met
+                    # their cap. Already-running calls still return their rows.
+                    for board_key, stop_event in list(board_stop_events.items()):
+                        if not stop_event.is_set() or board_key in cancelled_boards:
+                            continue
+                        cancelled_boards.add(board_key)
                         cancelled = 0
-                        for f in futures:
-                            if f.cancel():
+                        for queued, queued_task in futures.items():
+                            queued_boards = queued_task[2]
+                            queued_key = queued_boards[0].strip().lower() if queued_boards else "jobspy"
+                            if queued_key == board_key and queued.cancel():
                                 cancelled += 1
                         if cancelled:
-                            logger.info("Early stop: cancelled %d queued searches", cancelled)
+                            logger.info(
+                                "Early stop: cancelled %d queued %s searches after minimum coverage",
+                                cancelled,
+                                board_key,
+                            )
+
+        # JobSpy boards used to be invisible to source health because only
+        # plugin scrapers wrote scrape_runs. Persist one aggregate outcome per
+        # board per pull so LinkedIn/Indeed freshness and failures are auditable
+        # exactly like ATS, startup, crypto, remote, and community sources.
+        if jobspy_outcomes:
+            try:
+                from job_finder.models.database import record_scrape_runs
+
+                elapsed = max(0.0, time.monotonic() - jobspy_started_mono)
+                logged: list[dict[str, Any]] = []
+                for board_key, outcomes in jobspy_outcomes.items():
+                    reasons = [str(item.get("finish_reason") or "zero_rows") for item in outcomes]
+                    rows_found = sum(int(item.get("rows_found") or 0) for item in outcomes)
+                    failures = reasons.count("timeout") + reasons.count("exception")
+                    if failures and rows_found > 0:
+                        finish_reason = "partial"
+                    elif "timeout" in reasons:
+                        finish_reason = "timeout"
+                    elif "exception" in reasons:
+                        finish_reason = "exception"
+                    elif rows_found == 0:
+                        finish_reason = "zero_rows"
+                    else:
+                        finish_reason = "ok"
+                    errors = [
+                        str(item.get("error_sample") or "")
+                        for item in outcomes
+                        if item.get("error_sample")
+                    ]
+                    logged.append({
+                        "source": board_key,
+                        "vertical": "career",
+                        "started_at": jobspy_started_at,
+                        "duration_s": elapsed,
+                        "finish_reason": finish_reason,
+                        "rows_found": rows_found,
+                        "rows_invalid": 0,
+                        "error_sample": (
+                            f"{failures} of {len(outcomes)} queries failed; {errors[0]}"
+                            if errors else ""
+                        ),
+                    })
+                record_scrape_runs(logged)
+            except Exception:
+                logger.warning("Could not persist JobSpy source health", exc_info=True)
 
         # Wait for additional scrapers to finish (with timeout to prevent hanging)
         if scraper_thread is not None:
@@ -1506,6 +1782,41 @@ class JobFinderPipeline:
                 if progress:
                     progress("Warning: some scrapers timed out, using partial results")
             all_jobs.extend(extra_jobs_result)
+
+        # Publish a structured receipt for EVERY expected career source. This
+        # is the contract behind the board's post-run wording: a zero-result
+        # source still completed, a partial source names its missing coverage,
+        # and a source that vanished from execution is an explicit failure.
+        coverage_entries: list[dict[str, Any]] = []
+        expected_jobspy = (
+            [str(board).strip().lower() for board in jobspy_boards]
+            if isinstance(jobspy_boards, list)
+            else (["jobspy"] if jobspy_tasks else [])
+        )
+        for source in expected_jobspy:
+            meta = all_scrapers.get(source)
+            display = getattr(meta, "display_name", "") or source.replace("_", " ").title()
+            coverage_entries.append(
+                _source_coverage_entry(
+                    source,
+                    display,
+                    list(jobspy_outcomes.get(source, [])),
+                )
+            )
+        by_additional: dict[str, list[dict[str, Any]]] = {}
+        for outcome in additional_outcomes:
+            by_additional.setdefault(str(outcome.get("source") or "unknown"), []).append(outcome)
+        for source in enabled_names:
+            meta = all_scrapers.get(source)
+            display = getattr(meta, "display_name", "") or source.replace("_", " ").title()
+            coverage_entries.append(
+                _source_coverage_entry(
+                    source,
+                    display,
+                    list(by_additional.get(source, [])),
+                )
+            )
+        self._last_source_coverage = _source_coverage_receipt(coverage_entries)
 
         # Guarantee the contract fields (date_confidence, salary_source,
         # work_type_confidence) on EVERY job. Plugin scrapers already pass
@@ -1662,16 +1973,20 @@ class JobFinderPipeline:
             finalize_scraper_jobs(no_desc)
 
         # --- Salary filter: remove jobs with known salary below minimum ---
-        # Use min_acceptable_tc if set (the user's real floor), otherwise
-        # fall back to min_base. Only a small flex (15%) to account for
-        # equity/bonus that aren't in the listed base range.
+        # "Known" here means comparable: stated in the user's currency.
+        # A minimum is a hard boundary. Strictness may widen role/title
+        # matching, but it must never silently lower the number the user set.
+        # Missing or different currencies stay eligible as "not comparable".
         salary_floor = _resolve_salary_floor(self.config)
         if salary_floor and salary_floor > 0:
-            hard_floor = salary_floor * float(filter_settings["salary_flex"])
+            hard_floor = salary_floor
+            target_currency = str(
+                (self.config.get("compensation") or {}).get("currency") or ""
+            ).strip().upper()
             pre_count = len(deduped)
             deduped = [
                 j for j in deduped
-                if _job_salary_passes(j, hard_floor)
+                if _job_salary_passes(j, hard_floor, target_currency or None)
             ]
             dropped = pre_count - len(deduped)
             self._record_funnel_stage("salary", "Salary floor", pre_count, len(deduped))
@@ -1796,11 +2111,11 @@ class JobFinderPipeline:
         match_mode = str(resolved.get("role_match_mode", "all_significant"))
         strictness = str(resolved.get("strictness", _DEFAULT_STRICTNESS))
 
-        # job_passes_role_filter is the single source of truth shared with the
-        # DB purge below — it applies the balanced non-remote any_word rescue
-        # and crypto-aware matching for crypto-domain jobs. Keeping the in-memory
-        # filter and the purge on the same predicate ensures the pipeline never
-        # surfaces a job this run while deleting that same record from the DB.
+        # Exact saved-role matches and crypto technical adjacency are separate
+        # buckets. The old path let crypto rescue masquerade as "primary",
+        # which made a generic platform role indistinguishable from a Data
+        # Engineer match. Keep the wider crypto inventory, but label it
+        # honestly and order it after confirmed role-family matches.
         pre_count = len(jobs)
         primary = [
             j for j in jobs
@@ -1809,18 +2124,36 @@ class JobFinderPipeline:
                 match_mode=match_mode,
                 include_founding=include_founding,
                 strictness=strictness,
-                allow_crypto_rescue=wants_crypto,
+                allow_crypto_rescue=False,
             )
         ]
         for job in primary:
             job["match_bucket"] = "primary"
 
+        primary_ids = {id(job) for job in primary}
         adjacent: list[dict] = []
-        expanded_roles = list(getattr(self, "_expanded_roles", None) or [])
-        if len(primary) < 10 and expanded_roles:
-            primary_ids = {id(job) for job in primary}
+        if wants_crypto:
             for job in jobs:
                 if id(job) in primary_ids:
+                    continue
+                if job_passes_role_filter(
+                    job,
+                    target_roles,
+                    match_mode=match_mode,
+                    include_founding=include_founding,
+                    strictness=strictness,
+                    allow_crypto_rescue=True,
+                ):
+                    job["match_bucket"] = "adjacent"
+                    adjacent.append(job)
+                    if len(adjacent) >= 100:
+                        break
+
+        expanded_roles = list(getattr(self, "_expanded_roles", None) or [])
+        if len(primary) < 10 and expanded_roles and len(adjacent) < 100:
+            kept_ids = primary_ids | {id(job) for job in adjacent}
+            for job in jobs:
+                if id(job) in kept_ids:
                     continue
                 if job_passes_role_filter(
                     job,
@@ -1828,11 +2161,11 @@ class JobFinderPipeline:
                     match_mode=match_mode,
                     include_founding=include_founding,
                     strictness=strictness,
-                    allow_crypto_rescue=wants_crypto,
+                    allow_crypto_rescue=False,
                 ):
                     job["match_bucket"] = "adjacent"
                     adjacent.append(job)
-                    if len(adjacent) >= 20:
+                    if len(adjacent) >= 100:
                         break
         filtered = primary + adjacent
 
@@ -1876,17 +2209,8 @@ class JobFinderPipeline:
 
     # -- Staffing agency filter -------------------------------------------
 
-    # Common staffing / recruitment agencies (lowercase for matching)
-    _STAFFING_AGENCIES: set[str] = {
-        "robert half", "teksystems", "randstad", "insight global",
-        "adecco", "kelly services", "manpowergroup", "hays", "kforce",
-        "apex systems", "aston carter", "aerotek", "modis",
-        "beacon hill staffing", "cybercoders", "dice staffing",
-        "express employment", "jobot", "michael page", "page group",
-        "phaidon international", "recruiting from scratch",
-        "signature consultants", "staffing solutions enterprises",
-        "talent acquisition concepts", "talentbridge",
-    }
+    # Compatibility alias for callers/tests that inspected the old class set.
+    _STAFFING_AGENCIES: set[str] = set(STAFFING_AGENCY_NAMES)
 
     def filter_staffing_agencies(
         self,
@@ -1918,13 +2242,7 @@ class JobFinderPipeline:
     @classmethod
     def _is_staffing_agency(cls, company: str) -> bool:
         """Return True if *company* matches a known staffing agency (case-insensitive)."""
-        if not company:
-            return False
-        company_lower = company.lower().strip()
-        for agency in cls._STAFFING_AGENCIES:
-            if agency in company_lower:
-                return True
-        return False
+        return is_staffing_agency(company)
 
     # -- Stage 2: Resume parsing (no LLM) ---------------------------------
 
@@ -2771,6 +3089,8 @@ class JobFinderPipeline:
                 rank_source=job.get("rank_source"),
                 match_bucket=job.get("match_bucket"),
                 match_reasons=job.get("match_reasons"),
+                industry_tags=job.get("industry_tags"),
+                ecosystem_tags=job.get("ecosystem_tags"),
                 score_reasoning=job.get("score_reasoning"),
                 score_evidence=job.get("score_evidence"),
                 key_strengths=json.dumps(job.get("key_strengths", [])),

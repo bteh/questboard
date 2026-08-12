@@ -8,6 +8,7 @@ can render supply honesty instead of pretending the kind does not exist.
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -110,12 +111,170 @@ def test_zero_supply_kinds_still_appear_for_supply_honesty(api_client) -> None:
 
     payload = client.get("/api/v1/board/summary").json()
     ids = [k["id"] for k in payload["kinds"]]
-    for expected in ("odd", "deliver", "lookafter", "flip", "house", "body", "party"):
+    for expected in (
+        "odd", "deliver", "lookafter", "flip", "house", "scholarship", "body", "party"
+    ):
         assert expected in ids
     assert _kind(payload, "deliver")["count"] == 0
     # ordered by the registry's display order
     orders = [k["order"] for k in payload["kinds"]]
     assert orders == sorted(orders)
+
+
+def test_research_only_legacy_rows_never_count_as_live_supply(api_client) -> None:
+    client, jf_db = api_client
+    jf_db.save_application(
+        job_title="Legacy credit-card lead",
+        company="Research feed",
+        job_url="https://example.com/research-only",
+        source="doctorofcredit",
+        vertical="flip",
+    )
+
+    payload = client.get("/api/v1/board/summary").json()
+    assert payload["total"] == 0
+    assert _kind(payload, "flip")["count"] == 0
+
+
+def test_career_freshness_requires_a_completed_whole_pull(api_client) -> None:
+    """A fresh individual source response cannot make an interrupted pull fresh."""
+    client, _jf_db = api_client
+    from datetime import datetime, timedelta, timezone
+
+    from app.models import database as backend_db
+    from app.models.workspace import Workspace, WorkspaceSearchRun
+    from job_finder.models.database import ScrapeRunRecord
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    db = backend_db._SessionLocal()
+    try:
+        workspace = Workspace(id="freshness-workspace", name="Freshness", slug="freshness")
+        db.add(workspace)
+        db.add_all([
+            WorkspaceSearchRun(
+                workspace_id=workspace.id,
+                run_id="completed-pull",
+                status="completed",
+                started_at=now - timedelta(hours=3),
+                completed_at=now - timedelta(hours=2),
+            ),
+            WorkspaceSearchRun(
+                workspace_id=workspace.id,
+                run_id="interrupted-pull",
+                status="running",
+                started_at=now - timedelta(minutes=5),
+            ),
+            ScrapeRunRecord(
+                source="linkedin",
+                vertical="career",
+                started_at=now - timedelta(minutes=4),
+                finish_reason="ok",
+                rows_found=20,
+            ),
+            ScrapeRunRecord(
+                source="scholarshipamerica",
+                vertical="scholarship",
+                started_at=now - timedelta(minutes=3),
+                finish_reason="ok",
+                rows_found=5,
+            ),
+        ])
+        db.commit()
+    finally:
+        db.close()
+
+    payload = client.get("/api/v1/board/summary").json()
+    assert payload["career_checked_at"].startswith(
+        (now - timedelta(hours=2)).isoformat(timespec="seconds")
+    )
+    assert payload["side_quest_checked_at"].startswith(
+        (now - timedelta(minutes=3)).isoformat(timespec="seconds")
+    )
+    assert payload["career_refresh"]["run_id"] == "interrupted-pull"
+    assert payload["career_refresh"]["status"] == "running"
+
+
+def test_career_receipt_survives_reload_with_exact_source_coverage(api_client) -> None:
+    client, _jf_db = api_client
+    from datetime import datetime, timezone
+
+    from app.models import database as backend_db
+    from app.models.workspace import Workspace, WorkspaceSearchEvent, WorkspaceSearchRun
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    coverage = {
+        "total": 3,
+        "ok": 1,
+        "zero": 1,
+        "partial": 1,
+        "failed": 0,
+        "sources": [
+            {
+                "source": "linkedin",
+                "display_name": "LinkedIn",
+                "state": "partial",
+                "rows_found": 1484,
+                "attempts": 29,
+                "failed_attempts": 1,
+                "error": "one query timed out",
+            },
+            {
+                "source": "indeed",
+                "display_name": "Indeed",
+                "state": "ok",
+                "rows_found": 954,
+                "attempts": 18,
+                "failed_attempts": 0,
+                "error": "",
+            },
+            {
+                "source": "remoteok",
+                "display_name": "RemoteOK",
+                "state": "zero",
+                "rows_found": 0,
+                "attempts": 1,
+                "failed_attempts": 0,
+                "error": "",
+            },
+        ],
+    }
+    db = backend_db._SessionLocal()
+    try:
+        workspace = Workspace(id="receipt-workspace", name="Receipt", slug="receipt")
+        db.add(workspace)
+        db.add(
+            WorkspaceSearchRun(
+                workspace_id=workspace.id,
+                run_id="receipt-run",
+                status="completed",
+                started_at=now,
+                completed_at=now,
+                jobs_found=530,
+            )
+        )
+        db.add(
+            WorkspaceSearchEvent(
+                workspace_id=workspace.id,
+                run_id="receipt-run",
+                event_type="complete",
+                payload=json.dumps({
+                    "run_id": "receipt-run",
+                    "status": "completed",
+                    "jobs_found": 530,
+                    "new_jobs": 265,
+                    "source_coverage": coverage,
+                }),
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    receipt = client.get("/api/v1/board/summary").json()["career_refresh"]
+    assert receipt["run_id"] == "receipt-run"
+    assert receipt["new_jobs"] == 265
+    assert receipt["source_coverage"]["total"] == 3
+    assert receipt["source_coverage"]["sources"][0]["state"] == "partial"
 
 
 def test_dead_personal_and_past_event_rows_never_count(api_client) -> None:
@@ -221,10 +380,9 @@ def test_stale_casting_by_publish_date_never_counts(api_client) -> None:
 
 
 def test_past_event_day_is_stale_for_every_vertical(api_client) -> None:
-    """The read-time stale filter: an event day (UTC) that already passed
-    expires the row no matter the vertical. Today and future events stay,
-    rows with no event date pass untouched, and the camera publish-date
-    shelf life keeps working."""
+    """The read-time stale filter: an event or end/deadline day (UTC) that
+    already passed expires the row no matter the vertical. Today and future
+    dates stay, undated rows pass, and the camera publish shelf life works."""
     _, jf_db = api_client
 
     session = jf_db._SessionLocal()
@@ -271,6 +429,20 @@ def test_past_event_day_is_stale_for_every_vertical(api_client) -> None:
                 job_url="https://example.com/quests/stale-no-date",
                 vertical="study",
             ),
+            "past_scholarship_deadline": ApplicationRecord(
+                job_title="Scholarship closed yesterday",
+                company="Foundation",
+                job_url="https://example.com/quests/stale-scholarship",
+                vertical="scholarship",
+                event_end=datetime(2026, 7, 13, 23, 59),
+            ),
+            "today_scholarship_deadline": ApplicationRecord(
+                job_title="Scholarship closes today",
+                company="Foundation",
+                job_url="https://example.com/quests/today-scholarship",
+                vertical="scholarship",
+                event_end=datetime(2026, 7, 14, 0, 0),
+            ),
             "shelf_camera": ApplicationRecord(
                 job_title="Old casting call, date only in the text",
                 company="AuditionsFree",
@@ -294,8 +466,10 @@ def test_past_event_day_is_stale_for_every_vertical(api_client) -> None:
 
     assert ids["past_camera"] not in kept
     assert ids["past_lookafter"] not in kept
+    assert ids["past_scholarship_deadline"] not in kept
     assert ids["shelf_camera"] not in kept
     assert ids["today_body"] in kept
+    assert ids["today_scholarship_deadline"] in kept
     assert ids["future_camera"] in kept
     assert ids["no_date_study"] in kept
 

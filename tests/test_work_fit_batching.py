@@ -16,12 +16,9 @@ because that write is all-or-nothing the timeout threw away the entire run.
 The last rankings that landed were from a night when the board yielded 29
 candidates; the board grew past what one write can finish in time.
 
-So set_work_fit accepts batches. The catch is that it CLEARS previous
-verdicts, which is what keeps the board showing one run rather than a pile of
-stale ones. Clearing on every batch would leave only the last batch. The run
-already announces itself (the app clears the progress trail when it launches
-the assistant), so the first write of a run clears and the rest append. The
-assistant needs no new flag it could get wrong.
+So set_work_fit accepts batches and fingerprints each judgment against the
+posting plus the current resume/preferences. New runs retain unchanged work;
+only stale shortlist rows need another model pass.
 """
 
 from __future__ import annotations
@@ -107,9 +104,7 @@ def test_a_second_batch_keeps_the_first(work_db, service):
     assert _verdicts(work_db) == {ids[0]: "strong", ids[1]: "good"}
 
 
-def test_a_new_run_clears_the_previous_one(work_db, service):
-    """Otherwise yesterday's verdicts sit next to today's with no way to tell
-    them apart."""
+def test_a_new_run_preserves_an_unchanged_previous_fit(work_db, service):
     from app.services import agent_run_progress
 
     ids = _ids(work_db)
@@ -118,7 +113,7 @@ def test_a_new_run_clears_the_previous_one(work_db, service):
     agent_run_progress.clear()  # what POST /agent/run does
     service.set_work_fit(work_db, [{"opportunity_id": ids[1], "verdict": "reach"}])
 
-    assert _verdicts(work_db) == {ids[1]: "reach"}
+    assert _verdicts(work_db) == {ids[0]: "strong", ids[1]: "reach"}
 
 
 def test_batches_within_one_run_share_a_run_id(work_db, service):
@@ -155,11 +150,8 @@ def test_a_batch_matching_nothing_still_does_not_wipe_the_board(work_db, service
     assert _verdicts(work_db) == {ids[0]: "strong"}
 
 
-def test_a_later_batch_cannot_reuse_an_earlier_batchs_rank(work_db, service):
-    """Two #1 strong fits reached the board: the end-of-run sweep restarted
-    numbering at 1, colliding with the main pass. Within one run a rank is an
-    order, so a colliding later-batch rank renumbers to continue after the
-    highest rank already written, keeping the batch's own order."""
+def test_a_later_batch_inserts_at_its_requested_global_rank(work_db, service):
+    """A new #1 shifts current anchors down without duplicate ranks."""
     from job_finder.models.database import ApplicationRecord
 
     ids = _ids(work_db)
@@ -175,8 +167,9 @@ def test_a_later_batch_cannot_reuse_an_earlier_batchs_rank(work_db, service):
     for i in ids[:3]:
         raw = work_db.get(ApplicationRecord, i).agent_fit_json
         ranks[i] = json.loads(raw)["rank"]
-    assert ranks[ids[0]] == 1
-    assert ranks[ids[2]] == 3, "colliding sweep rank continues after the max"
+    assert ranks[ids[2]] == 1
+    assert ranks[ids[0]] == 2
+    assert ranks[ids[1]] == 3
     assert len(set(ranks.values())) == 3
 
 

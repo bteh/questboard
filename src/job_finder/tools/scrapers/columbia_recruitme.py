@@ -37,8 +37,9 @@ the homepage covers only the latest 10 studies.
 
 robots.txt is the stock Drupal file: it disallows ``/search/`` (the core
 search module, trailing slash) but not the Views page at ``/search``, and
-leaves ``/studyinfopage/`` unrestricted. Requests keep a 1s gap and
-detail fetches are capped at ``max_results``.
+leaves ``/studyinfopage/`` unrestricted. The full index is returned, while a
+bounded newest subset is enriched from detail pages with a 1s gap. This keeps
+the source inside Questboard's 60-second boundary without dropping studies.
 """
 
 from __future__ import annotations
@@ -60,6 +61,7 @@ _BASE = "https://recruit.cumc.columbia.edu"
 _SEARCH_URL = _BASE + "/search?page={page}"
 _MAX_PAGES = 12  # 1751 studies / 200 per page live; a runaway pager stops here
 _DELAY_S = 1.0
+_DETAIL_ENRICH_CAP = 20
 _RECRUITING = "currently recruiting"
 
 _MONEY = r"\$\s*(\d[\d,]*(?:\.\d+)?)"
@@ -296,8 +298,8 @@ def search_columbia_recruitme(
 ) -> list[dict]:
     """Fetch recruiting studies from Columbia RecruitMe.
 
-    ``roles`` is ignored on purpose: studies are not career titles. Detail
-    fetches are capped at ``max_results`` with a 1s gap between requests.
+    ``roles`` is ignored on purpose: studies are not career titles. The full
+    index set is kept; up to 20 newest rows receive detail-page enrichment.
     """
     logger.info("Fetching recruiting studies from Columbia RecruitMe...")
 
@@ -327,8 +329,14 @@ def search_columbia_recruitme(
             break  # recruiting sorts first; the rest of the index is closed
 
     results: list[dict] = []
+    enriched = 0
     for row in rows:
-        time.sleep(_DELAY_S)
+        if enriched >= _DETAIL_ENRICH_CAP:
+            results.append(row)
+            continue
+        if enriched:
+            time.sleep(_DELAY_S)
+        enriched += 1
         html = _fetch_detail(row["url"])
         detail = _parse_detail(html) if html else {}
         if detail.get("closed"):

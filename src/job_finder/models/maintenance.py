@@ -44,6 +44,11 @@ Current repairs:
   annualized) with salary_source='parsed_from_description', and never
   overwrites a value the scraper already reported.
 
+  company_taxonomy v2 -- reclassifies industry/ecosystem tags after the
+  taxonomy learned to separate a crypto job from a crypto-native company.
+  This removes cross-company contamination while preserving relevant roles
+  found on authoritative crypto job and portfolio boards.
+
 Runnable directly against a DB file:
 
     python -m job_finder.models.maintenance --db data/job_tracker.db
@@ -646,6 +651,95 @@ def repair_salaries(engine, *, force: bool = False) -> int:
         return changed
 
 
+TAXONOMY_REPAIR_NAME = "company_taxonomy"
+TAXONOMY_REPAIR_VERSION = 2
+_TAXONOMY_REQUIRED_COLS = {
+    "id", "company", "source", "job_title", "description",
+    "industry_tags", "ecosystem_tags",
+}
+
+
+def _scan_and_repair_taxonomy(conn, *, has_vertical: bool) -> int:
+    """Recompute row tags from evidence, discarding previously inferred tags."""
+    from job_finder.company_taxonomy import classify_job_taxonomy, tags_json
+
+    where = " WHERE vertical = 'career'" if has_vertical else ""
+    rows = conn.execute(text(
+        "SELECT id, company, source, job_title, description, "
+        f"industry_tags, ecosystem_tags FROM applications{where}"
+    )).fetchall()
+    changed = 0
+    for row in rows:
+        try:
+            # Crypto sources may provide an explicit chain/network tag that
+            # is not repeated in the title or description. Preserve that
+            # job-level provenance while discarding tags on generic sources.
+            trusted_ecosystems = (
+                row.ecosystem_tags
+                if (row.source or "").strip().casefold()
+                in {"cryptojobslist", "web3career", "getro", "consider"}
+                else None
+            )
+            industries, ecosystems = classify_job_taxonomy(
+                company=row.company,
+                source=row.source,
+                title=row.job_title,
+                description=row.description,
+                ecosystem_tags=trusted_ecosystems,
+                # Deliberately omit stored tags: v1 could have inherited a
+                # crypto label from an unrelated job at the same employer.
+            )
+            industry_json = tags_json(industries)
+            ecosystem_json = tags_json(ecosystems)
+            if (
+                industry_json == (row.industry_tags or "[]")
+                and ecosystem_json == (row.ecosystem_tags or "[]")
+            ):
+                continue
+            conn.execute(
+                text(
+                    "UPDATE applications SET industry_tags = :industries, "
+                    "ecosystem_tags = :ecosystems WHERE id = :id"
+                ),
+                {
+                    "industries": industry_json,
+                    "ecosystems": ecosystem_json,
+                    "id": row.id,
+                },
+            )
+            changed += 1
+        except Exception:
+            logger.warning(
+                "taxonomy repair: row %s failed, skipping", row.id,
+                exc_info=True,
+            )
+    return changed
+
+
+def repair_taxonomy(engine, *, force: bool = False) -> int:
+    """Run the source-independent taxonomy correction once."""
+    inspector = inspect(engine)
+    table_names = inspector.get_table_names()
+    has_applications = "applications" in table_names
+    columns: set[str] = set()
+    if has_applications:
+        columns = {column["name"] for column in inspector.get_columns("applications")}
+    can_repair = _TAXONOMY_REQUIRED_COLS.issubset(columns)
+    with engine.begin() as conn:
+        if (
+            _applied_version(conn, TAXONOMY_REPAIR_NAME) >= TAXONOMY_REPAIR_VERSION
+            and not force
+        ):
+            return 0
+        changed = (
+            _scan_and_repair_taxonomy(conn, has_vertical="vertical" in columns)
+            if can_repair
+            else 0
+        )
+        _record_version(conn, TAXONOMY_REPAIR_NAME, TAXONOMY_REPAIR_VERSION)
+        return changed
+
+
 DESCRIPTION_REFETCH_LIMIT = 50
 
 # Only sources whose detail page we know how to read. A source missing from
@@ -785,6 +879,55 @@ def refetch_missing_descriptions(engine, *, limit: int = DESCRIPTION_REFETCH_LIM
     return filled
 
 
+RESEARCH_ONLY_REPAIR_NAME = "research_only_tombstones"
+RESEARCH_ONLY_REPAIR_VERSION = 1
+
+
+def repair_research_only_rows(engine, *, force: bool = False) -> int:
+    """Tombstone legacy rows from sources now classified as research only.
+
+    These rows are preserved for audit/history and can still be inspected by
+    an explicit include-dead query; they simply stop presenting as current
+    Side Quests. The source roster is derived from the registry so this repair
+    cannot drift from refresh selection and the board's read-time backstop.
+    """
+    has_applications = "applications" in inspect(engine).get_table_names()
+    with engine.begin() as conn:
+        if (
+            _applied_version(conn, RESEARCH_ONLY_REPAIR_NAME)
+            >= RESEARCH_ONLY_REPAIR_VERSION
+            and not force
+        ):
+            return 0
+        changed = 0
+        if has_applications:
+            from job_finder.tools.scrapers import get_registry
+
+            names = sorted(
+                name.lower()
+                for name, meta in get_registry().items()
+                if getattr(meta, "research_only", False)
+            )
+            if names:
+                placeholders = ", ".join(f":r{i}" for i in range(len(names)))
+                params = {f"r{i}": name for i, name in enumerate(names)}
+                result = conn.execute(
+                    text(
+                        "UPDATE applications SET url_status = 'expired' "
+                        f"WHERE LOWER(COALESCE(source, '')) IN ({placeholders}) "
+                        "AND COALESCE(url_status, '') NOT IN ('dead', 'expired')"
+                    ),
+                    params,
+                )
+                changed = int(result.rowcount or 0)
+        _record_version(
+            conn,
+            RESEARCH_ONLY_REPAIR_NAME,
+            RESEARCH_ONLY_REPAIR_VERSION,
+        )
+        return changed
+
+
 def run_startup_repairs(engine) -> None:
     """Startup hook, called from ``database._migrate_db``. Never raises."""
     try:
@@ -832,6 +975,17 @@ def run_startup_repairs(engine) -> None:
             "salary repair failed; will retry next launch", exc_info=True
         )
     try:
+        retagged = repair_taxonomy(engine)
+        if retagged:
+            logger.info(
+                "company taxonomy repair v%d: corrected %d row(s)",
+                TAXONOMY_REPAIR_VERSION, retagged,
+            )
+    except Exception:
+        logger.warning(
+            "company taxonomy repair failed; will retry next launch", exc_info=True
+        )
+    try:
         from job_finder.models.remote_flag_repair import (
             REMOTE_FLAG_REPAIR_VERSION,
             repair_remote_flags,
@@ -862,6 +1016,18 @@ def run_startup_repairs(engine) -> None:
     except Exception:
         logger.warning(
             "company tier repair failed; will retry next launch", exc_info=True
+        )
+    try:
+        tombstoned = repair_research_only_rows(engine)
+        if tombstoned:
+            logger.info(
+                "research-only repair v%d: expired %d legacy row(s)",
+                RESEARCH_ONLY_REPAIR_VERSION,
+                tombstoned,
+            )
+    except Exception:
+        logger.warning(
+            "research-only repair failed; will retry next launch", exc_info=True
         )
 
 
@@ -912,6 +1078,7 @@ def main(argv: list[str] | None = None) -> int:
         collapsed = repair_duplicates(engine, force=args.force)
         converted = repair_dates(engine, force=args.force)
         filled = repair_salaries(engine, force=args.force)
+        tombstoned = repair_research_only_rows(engine, force=args.force)
         refetched = (
             refetch_missing_descriptions(engine, limit=args.refetch_descriptions)
             if args.refetch_descriptions
@@ -934,6 +1101,10 @@ def main(argv: list[str] | None = None) -> int:
     print(
         f"salary repair v{SALARY_REPAIR_VERSION}: "
         f"{filled} row(s) backfilled in {db_path}"
+    )
+    print(
+        f"research-only repair v{RESEARCH_ONLY_REPAIR_VERSION}: "
+        f"{tombstoned} legacy row(s) expired in {db_path}"
     )
     if args.refetch_descriptions:
         print(

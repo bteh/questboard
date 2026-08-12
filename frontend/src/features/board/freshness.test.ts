@@ -13,6 +13,12 @@ describe('checkedAgoLabel', () => {
     expect(checkedAgoLabel('2026-07-07T12:00:00', now)).toBe('sources checked 3 days ago');
   });
 
+  it('can say that only the latest independently scheduled source was checked', () => {
+    expect(checkedAgoLabel('2026-07-10T10:00:00', now, 'latest source')).toBe(
+      'latest source checked 2h ago',
+    );
+  });
+
   it('says nothing before the first run or on garbage', () => {
     expect(checkedAgoLabel(null, now)).toBeNull();
     expect(checkedAgoLabel(undefined, now)).toBeNull();

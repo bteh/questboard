@@ -218,7 +218,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
         // (a scrape completes even if the SSE didn't deliver 'complete', e.g.
         // the backend restarted). Reconcile with the real run status before
         // ever declaring failure, and keep polling briefly if it's still going.
-        let cancelled = false;
+        const cancelled = false;
         (async () => {
           for (let i = 0; i < 30 && !cancelled; i++) {
             try {
@@ -233,6 +233,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
                   strong_matches: 0,
                   duration_seconds: 0,
                   error: null,
+                  source_coverage: s.source_coverage ?? null,
                 });
                 setState('completed');
                 queryClient.invalidateQueries({ queryKey: ['applications'] });

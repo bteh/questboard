@@ -1617,6 +1617,7 @@ xendit
 xohealthinc
 xosinc
 yalochatinc
+yipitdata
 yipitdatajobs
 ylopo
 yoodliinc

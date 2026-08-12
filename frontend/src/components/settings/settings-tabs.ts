@@ -3,9 +3,9 @@
    working by mapping onto restock. The Auto-apply tab is gone (PRODUCT.md
    bans mass auto-apply); old ?tab=auto-apply links drop to the default. */
 
-export type SettingsTab = 'resume' | 'assistant' | 'restock' | 'companies';
+export type SettingsTab = 'resume' | 'assistant' | 'restock' | 'companies' | 'privacy';
 
-export const SETTINGS_TABS: SettingsTab[] = ['resume', 'assistant', 'restock', 'companies'];
+export const SETTINGS_TABS: SettingsTab[] = ['resume', 'assistant', 'restock', 'companies', 'privacy'];
 
 export function resolveSettingsTab(value: unknown): SettingsTab | undefined {
   if (value === 'search') return 'restock';

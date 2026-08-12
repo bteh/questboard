@@ -111,6 +111,80 @@ def test_full_search_work_page_fits_an_agent_tool_result(seeded_db):
     )
 
 
+def test_search_work_advances_to_unreviewed_rows_after_first_page(seeded_db):
+    """Reviewed top rows are anchors, not a wall that strands the tail."""
+    from app.services.local_agent_service import _MAX_RESULTS, search_work, set_work_fit
+
+    first = search_work(
+        seeded_db,
+        queries=["Data Engineering Manager"],
+        use_saved_preferences=False,
+        page_size=_MAX_RESULTS,
+    )
+    set_work_fit(seeded_db, [
+        {
+            "opportunity_id": row["opportunity_id"],
+            "verdict": "good",
+            "rank": index,
+        }
+        for index, row in enumerate(first["results"], 1)
+    ])
+
+    second = search_work(
+        seeded_db,
+        queries=["Data Engineering Manager"],
+        use_saved_preferences=False,
+        page_size=_MAX_RESULTS,
+    )
+
+    assert second["total_matching"] == _MAX_RESULTS + 10
+    assert second["reviewed_current_total"] == _MAX_RESULTS
+    assert second["needs_review_total"] == 10
+    assert second["reviewed_current_in_shortlist"] == 10
+    assert second["needs_review_in_shortlist"] == 10
+    assert {
+        row["opportunity_id"] for row in second["results"]
+        if row["assistant_review"]["state"] == "needs_review"
+    }.isdisjoint({row["opportunity_id"] for row in first["results"]})
+
+
+def test_board_mode_scans_past_the_1000_row_prefilter(seeded_db):
+    from app.services.local_agent_service import search_work
+    from job_finder.models.database import ApplicationRecord
+
+    now = datetime.now(timezone.utc)
+    seeded_db.add_all([
+        ApplicationRecord(
+            job_title=f"Data Engineering Manager Overflow {index}",
+            company=f"Overflow {index}",
+            location="Remote, United States",
+            remote_scope="us",
+            is_remote=True,
+            work_type="remote",
+            job_url=f"https://overflow.example/jobs/{index}",
+            source="Greenhouse",
+            description="Own the data platform.",
+            vertical="career",
+            date_posted=now.isoformat(),
+            date_confidence="exact",
+            date_found=now - timedelta(seconds=index),
+            last_seen_at=now,
+        )
+        for index in range(1005)
+    ])
+    seeded_db.commit()
+
+    result = search_work(
+        seeded_db,
+        queries=["Data Engineering Manager"],
+        use_saved_preferences=False,
+        browse_all=True,
+    )
+
+    assert result["total_matching"] == result["result_count"] == 1065
+    assert len(result["results"]) == 1065
+
+
 def test_full_side_quest_page_fits_an_agent_tool_result(tmp_path, monkeypatch):
     """The quest lane builds the same payload, so it carries the same risk."""
     data_dir = tmp_path / "data"

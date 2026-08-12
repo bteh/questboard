@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createRoute, Link, redirect, useNavigate } from '@tanstack/react-router';
 import { useQueries, useQuery } from '@tanstack/react-query';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { CoinsDollarIcon, Search01Icon } from '@hugeicons/core-free-icons';
+import { Search01Icon } from '@hugeicons/core-free-icons';
 import { Route as appRoute } from './app';
 import {
   Chip,
@@ -53,7 +53,7 @@ import {
   type KindKey,
   type Workflow,
 } from '@/features/board/kind-params';
-import type { BoardSummaryFilters } from '@/api/board';
+import type { BoardSummaryFilters, CareerRefreshReceipt } from '@/api/board';
 import { KindRail } from '@/features/board/kind-rail';
 import { LaneTabs } from '@/features/board/lane-tabs';
 import { PlacePicker } from '@/features/board/place-picker';
@@ -73,6 +73,14 @@ import { JobDetailSheet } from '@/features/board/job-detail-sheet';
 import { newestFirst } from '@/features/board/poster-model';
 import { PosterWall } from '@/features/board/poster-wall';
 import { useBoardSummary } from '@/hooks/use-board-summary';
+import { useAgentRunActive } from '@/hooks/use-agent-clients';
+import { useOnboardingState } from '@/hooks/use-workspace';
+import { kindSearchForLane } from '@/features/board/lane-filter-state';
+import { workSortLabel } from '@/features/board/review-coverage';
+import {
+  receiptFromRunResult,
+  refreshAwareSinceLine,
+} from '@/features/board/refresh-receipt';
 import type {
   ApplicationFilters,
   ApplicationResponse,
@@ -129,23 +137,34 @@ interface Preset {
   params: Partial<ApplicationFilters>;
   group?: string;
   careerOnly?: boolean;
+  questOnly?: boolean;
 }
 
 const PRESETS: Preset[] = [
-  { key: 'noexp', label: 'no experience needed', params: { first_quest_ok: true } },
-  { key: 'remote', label: 'remote', params: { is_remote: true } },
+  {
+    key: 'noexp',
+    label: 'no experience needed',
+    params: { first_quest_ok: true },
+    questOnly: true,
+  },
+  { key: 'remote', label: 'remote', params: { is_remote: true }, questOnly: true },
+  {
+    key: 'founding',
+    label: 'founding',
+    params: { founding_only: true },
+    careerOnly: true,
+  },
   /* score_source narrows to AI-scored rows: the keyword fallback stamps
      STRONG_APPLY on a lenient scale, and those guesses must not pad this
      chip's count or ride its filter */
 ];
 
-/* "new this week" stays on the chip row, but it writes ?days=7 now: the
-   posted select is the one source of truth for freshness, and the chip
-   lights whenever the select says this week. Legacy ?p=fresh URLs fold
-   into days=7 inside validateBoardSearch. */
+/* The 7-day posted shortcut writes ?days=7: the date select remains the one
+   source of truth and the chip lights whenever that rolling window is active.
+   Legacy ?p=fresh URLs fold into days=7 inside validateBoardSearch. */
 const FRESH_CHIP: Preset = {
   key: 'fresh',
-  label: 'new this week',
+  label: 'posted last 7 days',
   params: { posted_within_days: 7 },
 };
 
@@ -155,17 +174,7 @@ const PRESET_KEYS = PRESETS.map((p) => p.key);
    source-category chip belongs to the work lane, and a hidden careerOnly
    preset must not keep silently filtering the feed. */
 function kindSearch(prev: BoardParams, key: KindKey): BoardParams {
-  let keys = presetKeysFrom(prev.p, PRESET_KEYS);
-  if (!isCareerKind(key)) {
-    keys = new Set([...keys].filter((k) => !PRESETS.find((p) => p.key === k)?.careerOnly));
-  }
-  return {
-    ...prev,
-    v: key === 'all' ? undefined : key,
-    f: (prev.v ?? 'all') === key ? prev.f : undefined,
-    p: presetKeysTo(keys, PRESET_KEYS),
-    src: isCareerKind(key) ? prev.src : undefined,
-  };
+  return kindSearchForLane(prev, key, PRESETS, PRESET_KEYS);
 }
 
 /* The lane switcher's targets. The active tab keeps its state (clicking it
@@ -326,18 +335,27 @@ function BoardPage() {
   const labels = useSourceLabels();
   const navigate = useNavigate();
   const params = Route.useSearch();
+  const { data: onboarding } = useOnboardingState();
 
   /* the URL is the one truth for the kind tag, presets, and the work
      lane's source-category chip */
   const kindKey: KindKey = params.v ?? 'all';
-  const activeKeys = useMemo(() => presetKeysFrom(params.p, PRESET_KEYS), [params.p]);
-  const sourceCategory = params.src ?? null;
-  /* the posted window (?days) narrows the view on every lane; the work
-     lane's saved max_days_old stays the pull window, untouched by this */
-  const postedDays = params.days;
-  const postedWithin = postedWithinDays(postedDays);
-  const foundWithin = foundWithinDays(postedDays);
-
+  const careerLane = isCareerKind(kindKey);
+  const urlActiveKeys = useMemo(() => presetKeysFrom(params.p, PRESET_KEYS), [params.p]);
+  /* Like the date select below, one-click Work filters update the query
+     locally first. The URL remains durable history, but is no longer on the
+     critical path between a click and the filtered result. */
+  const [foundingOnly, setFoundingOnlyView] = useState(urlActiveKeys.has('founding'));
+  const pushedFoundingRef = useRef(urlActiveKeys.has('founding'));
+  const [sourceCategoryView, setSourceCategoryView] = useState<string | null>(params.src ?? null);
+  const pushedSourceCategoryRef = useRef<string | null>(params.src ?? null);
+  const activeKeys = useMemo(() => {
+    const next = new Set(urlActiveKeys);
+    if (careerLane && foundingOnly) next.add('founding');
+    else next.delete('founding');
+    return next;
+  }, [urlActiveKeys, careerLane, foundingOnly]);
+  const sourceCategory = careerLane ? sourceCategoryView : null;
   /* text inputs buffer locally, debounce into the URL with replace so
      typing never spams history */
   const [searchRaw, setSearchRaw] = useState(params.q ?? '');
@@ -345,6 +363,15 @@ function BoardPage() {
   const [nearOnly, setNearOnly] = useState(params.near === '1');
   const [payFromRaw, setPayFromRaw] = useState(params.from ?? '');
   const [payToRaw, setPayToRaw] = useState(params.to ?? '');
+  /* Selects should feel like filters, not navigation. Apply the date choice
+     to the query synchronously, then mirror it into the URL for history and
+     persistence. Waiting for the router round-trip made New today appear to
+     do nothing until some later action (usually Get new jobs) caused a
+     rerender/refetch. */
+  const [postedDays, setPostedDaysView] = useState<PostedDaysKey | undefined>(params.days);
+  const pushedPostedDaysRef = useRef<PostedDaysKey | undefined>(params.days);
+  const postedWithin = postedWithinDays(postedDays);
+  const foundWithin = foundWithinDays(postedDays);
   /* newest first by default: the API's score sort floats unscored rows to
      the top (desc nullsfirst), which reads as noise on a board */
   const [sortNewest, setSortNewest] = useState(() => readSavedBoardState()?.sort !== 'score');
@@ -363,6 +390,7 @@ function BoardPage() {
   const payTo = useDebounced(payToRaw.trim());
   const payFloor = parseAmount(payFrom);
   const payCeiling = parseAmount(payTo);
+  const payCurrency = onboarding?.preferences.compensation.currency?.trim().toUpperCase() || undefined;
 
   /* near me only is meaningless without a place, so it rides the place text */
   const nearParam = nearOnly && place ? '1' : undefined;
@@ -423,6 +451,28 @@ function BoardPage() {
     setPayToRaw(params.to ?? '');
   }, [params.q, params.place, params.near, params.from, params.to]);
 
+  /* Back/forward may change the URL without going through the select. Adopt
+     that external value, while leaving our own local-first update alone. */
+  useEffect(() => {
+    if (params.days === pushedPostedDaysRef.current) return;
+    pushedPostedDaysRef.current = params.days;
+    setPostedDaysView(params.days);
+  }, [params.days]);
+
+  useEffect(() => {
+    const fromUrl = urlActiveKeys.has('founding');
+    if (fromUrl === pushedFoundingRef.current) return;
+    pushedFoundingRef.current = fromUrl;
+    setFoundingOnlyView(fromUrl);
+  }, [urlActiveKeys]);
+
+  useEffect(() => {
+    const fromUrl = params.src ?? null;
+    if (fromUrl === pushedSourceCategoryRef.current) return;
+    pushedSourceCategoryRef.current = fromUrl;
+    setSourceCategoryView(fromUrl);
+  }, [params.src]);
+
   /* the whole state persists locally so the next bare /board reopens it */
   useEffect(() => {
     saveBoardState({
@@ -448,8 +498,13 @@ function BoardPage() {
       search: search || undefined,
       location: place || undefined,
       location_strict: nearParam ? true : undefined,
-      salary_min: payFloor ?? undefined,
-      salary_max: payCeiling ?? undefined,
+      ...(careerLane
+        ? {
+            salary_min: payFloor ?? undefined,
+            salary_max: payCeiling ?? undefined,
+            salary_currency: payFloor !== null || payCeiling !== null ? payCurrency : undefined,
+          }
+        : {}),
       posted_within_days: postedWithin,
       found_within_days: foundWithin,
       source_category: sourceCategory ?? undefined,
@@ -460,30 +515,40 @@ function BoardPage() {
       page_size: PAGE_SIZE,
       scope: 'board',
     }),
-    [kindKey, activeKeys, params.f, search, place, nearParam, payFloor, payCeiling, postedWithin, sortNewest, sourceCategory],
+    [kindKey, careerLane, activeKeys, params.f, search, place, nearParam, payFloor, payCeiling, payCurrency, postedWithin, foundWithin, sortNewest, sourceCategory],
   );
 
   /* the rail's counts must describe THIS board: the same user filters ride
      the summary query (per-kind counts stay per-kind, so no vertical) */
   const summaryFilters = useMemo<BoardSummaryFilters>(
     () => ({
-      ...presetParams(activeKeys),
+      // Founding is a Work-only title facet. The summary rail describes Side
+      // quests and its endpoint intentionally has no founding vocabulary.
+      ...(isCareerKind(kindKey) ? {} : presetParams(activeKeys)),
       search: search || undefined,
       location: place || undefined,
       location_strict: nearParam ? true : undefined,
-      salary_min: payFloor ?? undefined,
-      salary_max: payCeiling ?? undefined,
+      ...(careerLane
+        ? {
+            salary_min: payFloor ?? undefined,
+            salary_max: payCeiling ?? undefined,
+            salary_currency: payFloor !== null || payCeiling !== null ? payCurrency : undefined,
+          }
+        : {}),
       posted_within_days: postedWithin,
       found_within_days: foundWithin,
     }),
-    [activeKeys, search, place, nearParam, payFloor, payCeiling, postedWithin],
+    [kindKey, careerLane, activeKeys, search, place, nearParam, payFloor, payCeiling, payCurrency, postedWithin, foundWithin],
   );
-  const checkedAgo = checkedAgoLabel(useBoardSummary(summaryFilters).data?.checked_at);
+  const summary = useBoardSummary(summaryFilters).data;
+  const checkedAgo = checkedAgoLabel(
+    careerLane ? summary?.career_checked_at : summary?.side_quest_checked_at,
+    new Date(),
+    careerLane ? 'sources' : 'latest source',
+  );
 
   const filtersKey = JSON.stringify(baseFilters);
   const pages = pageState.key === filtersKey ? pageState.pages : 1;
-  const careerLane = isCareerKind(kindKey);
-
   /* one query per loaded page, on the same ['applications', filters] keys
      the rest of the app shares, flattened so the Jobs lane can group rows
      across pages */
@@ -493,6 +558,7 @@ function BoardPage() {
       queryFn: () => careerLane
         ? getProfileWork({ ...baseFilters, page: i + 1 })
         : getApplications({ ...baseFilters, page: i + 1 }),
+      refetchInterval: foundWithin ? 60_000 : false,
     })),
   });
   const firstPage = pageQueries[0];
@@ -512,6 +578,7 @@ function BoardPage() {
   const fitOrder = hasAgentVerdicts && (sortTouched ? !sortNewest : true);
   /* what the sort control honestly shows: fit order reads as best score */
   const sortShowsBest = fitOrder || !sortNewest;
+  const sortLabel = workSortLabel(sortShowsBest, workMeta?.unreviewed_count);
   /* the roles API keeps ranked rows first whatever sort it is asked for, so
      an explicit "newly found" pick with verdicts re-orders the loaded rows */
   const wallItems =
@@ -522,18 +589,20 @@ function BoardPage() {
      narrows; otherwise the filtered total already IS the lane total. */
   const workFiltersOn =
     careerLane &&
-    Boolean(search || place || payFloor !== null || payCeiling !== null || postedDays);
+    Boolean(
+      search || place || payFloor !== null || payCeiling !== null || postedDays ||
+        activeKeys.has('founding'),
+    );
   const workLaneBase = useMemo<ApplicationFilters>(
     () => ({
       ...kindParams(kindKey),
-      ...presetParams(activeKeys),
       facet: params.f,
       source_category: sourceCategory ?? undefined,
       page: 1,
       page_size: 1,
       scope: 'board',
     }),
-    [kindKey, activeKeys, params.f, sourceCategory],
+    [kindKey, params.f, sourceCategory],
   );
   const workLaneTotalQuery = useQuery({
     queryKey: ['profile-work', workLaneBase],
@@ -553,7 +622,7 @@ function BoardPage() {
   const questBaselineQuery = useQuery({
     queryKey: ['applications', questBaselineFilters],
     queryFn: () => getApplications(questBaselineFilters),
-    enabled: !careerLane && Boolean(postedDays),
+    enabled: !careerLane && postedWithin !== undefined,
   });
   const questHiddenNote = careerLane
     ? null
@@ -586,7 +655,12 @@ function BoardPage() {
      "new this week". Pressing Get new jobs is when the reader starts caring
      what changed: when the pull completes, "new" re-anchors at the pull's
      start, and the stored cutoff advances so the next visit agrees. */
-  const { state: searchState } = useSearchContext();
+  const {
+    state: searchState,
+    result: searchResult,
+    error: searchError,
+  } = useSearchContext();
+  const agentRefreshRunning = useAgentRunActive();
   const pullStartedAt = useRef<string | null>(null);
   useEffect(() => {
     if (searchState === 'running' && pullStartedAt.current === null) {
@@ -606,19 +680,17 @@ function BoardPage() {
 
   /* which empty board is this: the filters cut everything, or nothing has
      been fetched yet? The message must match the cause. */
-  const emptyState = boardEmptyState(
-    total,
-    boardFiltersActive({
-      search,
-      place,
-      payFrom,
-      payTo,
-      facet: params.f,
-      presetCount: activeKeys.size,
-      sourceCategory,
-      postedDays,
-    }),
-  );
+  const visibleFiltersActive = boardFiltersActive({
+    search,
+    place,
+    payFrom,
+    payTo,
+    facet: params.f,
+    presetCount: activeKeys.size,
+    sourceCategory,
+    postedDays,
+  });
+  const emptyState = boardEmptyState(total, visibleFiltersActive);
 
   const newSince = careerLane
     ? countNewSince(visibleItems, workCutoff, {
@@ -626,7 +698,40 @@ function BoardPage() {
         hasMore: total === undefined || pages * PAGE_SIZE < total,
       })
     : null;
-  const sinceLine = newSince ? newSinceLine(newSince, workCutoff) : null;
+  const normalSinceLine = newSince ? newSinceLine(newSince, workCutoff) : null;
+  const liveRefreshReceipt: CareerRefreshReceipt | null =
+    searchState === 'running' || agentRefreshRunning
+      ? {
+          run_id: '',
+          status: 'running',
+          started_at: null,
+          completed_at: null,
+          jobs_found: 0,
+          new_jobs: 0,
+          error: null,
+          source_coverage: null,
+        }
+      : searchState === 'failed'
+        ? {
+            run_id: '',
+            status: 'failed',
+            started_at: null,
+            completed_at: null,
+            jobs_found: 0,
+            new_jobs: 0,
+            error: searchError,
+            source_coverage: null,
+          }
+        : searchState === 'completed' && searchResult
+          ? {
+              run_id: searchResult.run_id,
+              started_at: null,
+              completed_at: null,
+              ...receiptFromRunResult(searchResult),
+            }
+          : null;
+  const effectiveRefreshReceipt = liveRefreshReceipt ?? summary?.career_refresh ?? null;
+  const sinceLine = refreshAwareSinceLine(normalSinceLine, effectiveRefreshReceipt);
 
   function selectKind(key: KindKey) {
     void navigate({
@@ -646,6 +751,8 @@ function BoardPage() {
   /* the work lane's source-category chip rides the URL (?src=) and the
      saved board state, so a reload or nav keeps the selection */
   function selectSourceCategory(category: string | null) {
+    setSourceCategoryView(category);
+    pushedSourceCategoryRef.current = category;
     void navigate({
       to: '/board',
       search: (prev: BoardParams) => ({ ...prev, src: category ?? undefined }),
@@ -654,6 +761,8 @@ function BoardPage() {
 
   /* the posted window rides the URL (?days=) like every other filter */
   function setPostedDays(value: PostedDaysKey | undefined) {
+    setPostedDaysView(value);
+    pushedPostedDaysRef.current = value;
     void navigate({
       to: '/board',
       search: (prev: BoardParams) => ({ ...prev, days: value }),
@@ -661,6 +770,11 @@ function BoardPage() {
   }
 
   function toggle(key: string) {
+    if (key === 'founding') {
+      const next = !activeKeys.has('founding');
+      setFoundingOnlyView(next);
+      pushedFoundingRef.current = next;
+    }
     void navigate({
       to: '/board',
       search: (prev: BoardParams) => {
@@ -718,13 +832,20 @@ function BoardPage() {
       search: search || undefined,
       location: place || undefined,
       location_strict: nearParam ? true : undefined,
-      salary_min: payFloor ?? undefined,
-      salary_max: payCeiling ?? undefined,
+      ...(careerLane
+        ? {
+            salary_min: payFloor ?? undefined,
+            salary_max: payCeiling ?? undefined,
+            salary_currency: payFloor !== null || payCeiling !== null ? payCurrency : undefined,
+          }
+        : {}),
       posted_within_days: postedWithin,
-      found_within_days: foundWithin,
       /* the probed chip's own params win: the fresh chip counts its 7-day
          window even while the select holds a different one */
       ...preset.params,
+      // The Fresh chip replaces the date select. While "new today" is
+      // active, its first-seen constraint must not leak into the 7-day count.
+      found_within_days: preset.key === 'fresh' ? undefined : foundWithin,
       page: 1,
       page_size: 1,
       scope: 'board',
@@ -750,7 +871,7 @@ function BoardPage() {
                 setSortNewest(sortShowsBest);
               }}
             >
-              Matches your target roles · sort: <b>{sortShowsBest ? 'best score' : 'newly found'}</b>
+              Matches your target roles · sort: <b>{sortLabel}</b>
             </button>
           ) : (
             <span className="qb-sort">newest first</span>
@@ -806,8 +927,12 @@ function BoardPage() {
             />
             <WorkToolbar
               checkedAgo={checkedAgo}
+              refreshReceipt={effectiveRefreshReceipt}
               shownCount={total}
               laneTotal={workLaneTotal}
+              reviewedCount={workMeta?.reviewed_count}
+              unreviewedCount={workMeta?.unreviewed_count}
+              filtering={firstPage.isFetching && visibleFiltersActive}
               search={searchRaw}
               onSearch={setSearchRaw}
               place={placeRaw}
@@ -820,12 +945,16 @@ function BoardPage() {
               onPayTo={setPayToRaw}
               postedDays={postedDays}
               onPostedDays={setPostedDays}
+              foundingOnly={activeKeys.has('founding')}
+              onFoundingOnly={() => toggle('founding')}
               sourceCategory={sourceCategory}
             />
             <SourceCategoryChips
               counts={workMeta?.source_categories}
               selected={sourceCategory}
               onSelect={selectSourceCategory}
+              foundingOnly={activeKeys.has('founding')}
+              onFoundingToggle={() => toggle('founding')}
             />
           </>
         ) : (
@@ -846,28 +975,10 @@ function BoardPage() {
                 ariaLabel="Filter by place; remote quests pass unless near me only is on"
                 className="qb-tray-field qb-tray-place"
               />
-              <label className="qb-tray-field qb-tray-pay">
-                <HugeiconsIcon icon={CoinsDollarIcon} size={16} strokeWidth={1.7} />
-                <input
-                  inputMode="numeric"
-                  placeholder="pay from 150k"
-                  aria-label="Pay floor, a year"
-                  value={payFromRaw}
-                  onChange={(e) => setPayFromRaw(e.target.value)}
-                />
-                <span className="qb-tray-to">to</span>
-                <input
-                  inputMode="numeric"
-                  placeholder="210k"
-                  aria-label="Pay ceiling, a year"
-                  value={payToRaw}
-                  onChange={(e) => setPayToRaw(e.target.value)}
-                />
-              </label>
               <label className="qb-tray-field qb-tray-posted">
-                <span className="qb-tray-label">posted</span>
+                <span className="qb-tray-label">date</span>
                 <select
-                  aria-label="Posted within"
+                  aria-label="Filter by date"
                   value={postedDays ?? ''}
                   onChange={(e) => setPostedDays(normalizePostedDays(e.target.value))}
                 >
@@ -935,7 +1046,8 @@ function BoardPage() {
         )}
         {emptyState === 'filtered-empty' && (
           <p style={{ marginTop: 40, fontSize: 14.5, color: 'var(--soft)' }}>
-            Nothing on the board matches. Clear a chip or the search.
+            Nothing on the board matches these filters. They are already applied—clear a filter
+            or choose another value.
           </p>
         )}
         {/* nothing fetched, nothing set: the door is a restock, not a chip.
@@ -994,7 +1106,7 @@ function BoardPage() {
               fitGrouped={fitOrder}
               onOpenSheet={setSheetApp}
               onExplain={setExplainApp}
-              onOpenDetail={careerLane ? openDetail : undefined}
+              onOpenDetail={openDetail}
             />
             <HouseRules />
             {pages * PAGE_SIZE < total && (
@@ -1011,7 +1123,7 @@ function BoardPage() {
           </div>
         )}
 
-        {total === 0 && careerLane && (
+        {total === 0 && careerLane && emptyState === 'truly-empty' && (
           <div className="qb-board-empty" role="status">
             <p className="qb-board-empty-lead">No jobs on your board for these roles yet.</p>
             <p>

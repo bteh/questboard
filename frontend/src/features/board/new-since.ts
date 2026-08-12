@@ -107,7 +107,9 @@ export function newSinceLine(res: NewSinceCount, cutoff: string | null): string 
     t === null
       ? ''
       : new Date(t).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  if (res.count === 0) return `Nothing new since your last visit${date ? `, ${date}` : ''}`;
+  if (res.count === 0) {
+    return `No jobs added to your board since your last visit${date ? `, ${date}` : ''}`;
+  }
   return `${res.count}${res.exact ? '' : '+'} found since your last visit${date ? `, ${date}` : ''}`;
 }
 

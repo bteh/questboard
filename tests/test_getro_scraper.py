@@ -162,6 +162,42 @@ class GetroSearchTest(unittest.TestCase):
         urls = [j["url"] for j in jobs]
         self.assertEqual(len(urls), len(set(urls)))
 
+    def test_zero_match_page_does_not_hide_later_matches(self) -> None:
+        first_page = [
+            _job(
+                id=i,
+                title="Office Manager",
+                url=f"https://x/office-{i}",
+                skills=[],
+                seniority=None,
+            )
+            for i in range(20)
+        ]
+        second_page = [
+            _job(
+                id=100 + i,
+                title="Senior Data Engineer" if i == 0 else "Office Manager",
+                url=f"https://x/page-two-{i}",
+                skills=[],
+                seniority=None,
+            )
+            for i in range(20)
+        ]
+
+        def fetch(_network_id, page):
+            return {0: first_page, 1: second_page}.get(page, [])
+
+        with (
+            patch.object(self.mod, "_GETRO_NETWORKS", [("test", 1)]),
+            patch.object(self.mod, "_fetch_search", side_effect=fetch),
+        ):
+            jobs = self.mod.search_getro(
+                roles=["data engineer"],
+                max_results=10,
+            )
+
+        self.assertEqual([job["title"] for job in jobs], ["Senior Data Engineer"])
+
     def test_network_error_returns_empty_not_exception(self) -> None:
         """A network failure during fetch must degrade to [] — never raise."""
         def boom(network_id, page):

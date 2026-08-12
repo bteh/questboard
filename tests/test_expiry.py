@@ -136,6 +136,26 @@ def test_absence_spares_rows_the_latest_healthy_run_confirmed(db, fake_sources):
     assert _status(db, fresh) == "unknown"
 
 
+def test_absence_expiry_refuses_a_failed_latest_run(db, fake_sources):
+    """Old healthy history cannot make a timeout look like absence evidence."""
+    from job_finder.expiry import expire_for_source
+
+    snap, _ = fake_sources
+    stale = _seed_row(db, snap, "https://s.example/still-live", seen_days_ago=5)
+    _record_healthy_runs(db, snap, 2, 1)
+    db.record_scrape_runs([{
+        "source": snap,
+        "rows_found": 0,
+        "finish_reason": "timeout",
+        "started_at": datetime.utcnow(),
+    }])
+
+    result = expire_for_source(snap)
+    assert result["expired"] == 0
+    assert "latest run incomplete: timeout" in result["skipped"]
+    assert _status(db, stale) == "unknown"
+
+
 def test_staleness_ttl_expires_unconfirmed_rows(db, fake_sources):
     from job_finder.expiry import expire_for_source
 
@@ -193,15 +213,18 @@ def test_quest_refresh_never_truncates_a_full_snapshot(db, fake_sources, monkeyp
     ENTIRE current set; a truncating cap would expire live offers."""
     import job_finder.quests as quests
 
+    snap, _ = fake_sources
     seen: dict = {}
 
     def fake_run(names=None, max_results=0, **_kwargs):
         seen["max_results"] = max_results
+        seen["max_results_by_source"] = _kwargs.get("max_results_by_source", {})
         return []
 
     monkeypatch.setattr(quests, "run_scrapers", fake_run)
     quests.run_quest_search(["house"])
     assert seen["max_results"] >= 100
+    assert seen["max_results_by_source"][snap] >= 500
 
 
 def test_resave_revives_a_tombstone_and_keeps_the_log_order(db, fake_sources):

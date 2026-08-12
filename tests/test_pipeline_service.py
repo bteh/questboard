@@ -277,6 +277,44 @@ class StartRunIdempotentTest(unittest.TestCase):
         self.assertEqual(result.workspace_id, "ws_b")
         self.assertNotEqual(result.run_id, "run-a")
 
+    def test_durable_run_persists_effective_remote_location_and_does_not_execute_inline(self) -> None:
+        loop = asyncio.new_event_loop()
+        self.addCleanup(loop.close)
+        captured: dict[str, object] = {}
+        settings = SimpleNamespace(
+            hosted_mode=False,
+            dev_hosted_auth_enabled=False,
+            resolved_app_release="test-release",
+        )
+
+        def fake_register(_db, _workspace_id, _run_id, _status, _mode, _snapshot, _started_at, *, request_payload):
+            captured.update(request_payload)
+
+        with patch("app.services.pipeline_service.get_settings", return_value=settings), \
+             patch("app.services.pipeline_service._with_db", side_effect=lambda callback: callback(object())), \
+             patch("app.services.workspace_service.get_active_search_run", return_value=None), \
+             patch("app.services.workspace_service.register_search_run", side_effect=fake_register), \
+             patch.object(self.pipeline_service._executor, "submit") as submit:
+            result = self.pipeline_service.start_run(
+                roles=["data engineer"],
+                locations=["Los Angeles, CA"],
+                keywords=[],
+                include_remote=True,
+                workplace_preference="remote_friendly",
+                max_days_old=30,
+                use_ai=False,
+                profile="workspace",
+                mode="search_only",
+                loop=loop,
+                workspace_id="ws_durable",
+                snapshot=object(),
+                durable=True,
+            )
+
+        self.assertEqual(captured["locations"], ["Los Angeles, CA", "Remote"])
+        self.assertEqual(result.status, "pending")
+        submit.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

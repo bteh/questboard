@@ -12,11 +12,13 @@ validates the id against this registry at import time.
 from __future__ import annotations
 
 import json
+import sys
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
-_KINDS_JSON = Path(__file__).resolve().parents[2] / "packages" / "kinds" / "kinds.json"
+_BUNDLE_ROOT = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[2]))
+_KINDS_JSON = _BUNDLE_ROOT / "packages" / "kinds" / "kinds.json"
 
 
 @dataclass(frozen=True)

@@ -70,6 +70,29 @@ def _new_counts() -> dict[str, int]:
     return {"found": 0, "saved": 0, "deduped": 0, "skipped_stale": 0}
 
 
+def _row_is_stale(row: dict, now: datetime) -> bool:
+    """Whether a quest's stated actionable window has already closed.
+
+    An event start is a moment, so a past timestamp is stale immediately.
+    End dates and application deadlines are calendar promises: keep the row
+    through the whole stated UTC day and hide it the following day. Missing
+    or unparseable values prove nothing and stay eligible.
+    """
+    event_start = _to_naive_utc(row.get("event_start"))
+    if event_start is not None and event_start < now:
+        return True
+    for value in (
+        row.get("event_end"),
+        (row.get("quest") or {}).get("apply_by")
+        if isinstance(row.get("quest"), dict)
+        else None,
+    ):
+        deadline = _to_naive_utc(value)
+        if deadline is not None and deadline.date() < now.date():
+            return True
+    return False
+
+
 def run_quest_search(
     verticals: list[str],
     *,
@@ -135,6 +158,12 @@ def run_quest_search(
         # fetch their ENTIRE current set or the absence-expiry rule would
         # tombstone live offers the cap truncated away
         max_results=100,
+        # A source that declares full_snapshot must actually fetch its entire
+        # live set or absence can never be evidence. High-volume windowed
+        # feeds stay at 100 and are labeled partial when they hit that cap.
+        max_results_by_source={
+            name: 1000 for name in names if registry[name].full_snapshot
+        },
         progress=progress,
         scraper_kwargs=scraper_kwargs or None,
     )
@@ -177,7 +206,7 @@ def run_quest_search(
             continue
 
         event_start = _to_naive_utc(row.get("event_start"))
-        if event_start is not None and event_start < now:
+        if _row_is_stale(row, now):
             counts["skipped_stale"] += 1
             summary["skipped_stale"] += 1
             continue

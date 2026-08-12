@@ -6,7 +6,9 @@
    fields that only narrow rows already on the board, with no button, so it
    cannot read as a search form. Only the top button touches the network,
    through the same pipeline the Restock page runs. The line under the
-   filters states only what the data backs. */
+   filters states only what the data backs. Filter changes read the already
+   stored board immediately; the filled button alone contacts external job
+   sources. */
 
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -27,24 +29,44 @@ import {
 } from '@/features/board/posted-filter';
 import { payScopeNote } from '@/features/board/pay-scope';
 import { AssistantSteps } from '@/features/board/assistant-steps.tsx';
-import { RoleProposalCard } from '@/features/board/role-proposal-card';
 import { SourceScoreboard } from '@/features/board/source-scoreboard.tsx';
 import { useRunWorkSearch } from '@/features/board/use-run-work-search';
 import { useAssistantReady } from '@/features/board/use-assistant-ready';
 import { useRunAssistant } from '@/features/board/use-run-assistant';
+import { reviewCoverageText } from '@/features/board/review-coverage';
 import { useAgentProgress } from '@/hooks/use-agent-clients';
 import { consumeFirstRunPending } from '@/components/onboarding/first-run';
 import { useOnboardingState } from '@/hooks/use-workspace';
 import { formatStatedPay, parseAmount } from '@/utils/board-card';
+import type { CareerRefreshReceipt } from '@/api/board';
+import {
+  receiptFromRunResult,
+  refreshReceiptCopy,
+} from '@/features/board/refresh-receipt';
+import {
+  filterPlaceholder,
+  filterTrayCaption,
+  filterStatusText,
+  primaryRunKind,
+  pullReceipt,
+} from '@/features/board/work-toolbar-logic';
 
 
 interface WorkToolbarProps {
   /** the board summary's honest "sources checked Xh ago", or null */
   checkedAgo: string | null;
+  /** newest durable Find Work attempt, including its source receipt */
+  refreshReceipt?: CareerRefreshReceipt | null;
   /** rows the current toolbar filters keep: the filtered query's total */
   shownCount?: number;
   /** every job on the lane before the toolbar filters bite */
   laneTotal?: number;
+  /** current assistant judgments across this filtered lane */
+  reviewedCount?: number;
+  /** jobs whose prior judgment is absent or stale */
+  unreviewedCount?: number;
+  /** a changed view filter is being applied to the stored board */
+  filtering?: boolean;
   search: string;
   onSearch: (value: string) => void;
   place: string;
@@ -61,6 +83,9 @@ interface WorkToolbarProps {
       max_days_old in Settings stays the PULL window and is untouched */
   postedDays: PostedDaysKey | undefined;
   onPostedDays: (value: PostedDaysKey | undefined) => void;
+  /** Named founding roles plus source-stated first functional hires. */
+  foundingOnly: boolean;
+  onFoundingOnly: () => void;
   /** which source chip is open, if any. A chip browses past the saved search,
       so the saved pay floor stops applying and the status line says so. */
   sourceCategory?: string | null;
@@ -72,97 +97,12 @@ interface FilterChip {
   clear: () => void;
 }
 
-const TIMED_OUT_RE = /^\s+.+: timed out$/;
-
-const WORKPLACE_WORDS: Record<string, string> = {
-  remote_friendly: 'remote friendly',
-  remote_only: 'remote only',
-  location_only: 'on location',
-};
-
-/* Which run the one button fires: the assistant (pull plus ranking) when it's
-   ready, the plain pull otherwise. Pinned in work-toolbar.test.ts. */
-export function primaryRunKind(assistantReady: boolean): 'assistant' | 'pull' {
-  return assistantReady ? 'assistant' : 'pull';
-}
-
-/* The full receipt of the saved search the button will run: roles, place,
-   remote stance, and pay floor on one line, so nobody has to open
-   Settings to learn what the click does. When the assistant is ready the lead
-   says it ranks too. Undefined means still loading. */
-export function pullReceipt(
-  prefs:
-    | {
-        roles: string[];
-        preferred_places: { label: string }[];
-        workplace_preference: string;
-        compensation: { min_base: number | null };
-      }
-    | undefined,
-  assistantReady = false,
-): string {
-  if (prefs === undefined) return 'Pulls fresh postings for your target roles.';
-  if (!prefs.roles.length) return 'No target roles saved yet.';
-  const roles =
-    prefs.roles.length === 1
-      ? prefs.roles[0]
-      : `${prefs.roles[0]} and ${prefs.roles.length - 1} more role${prefs.roles.length > 2 ? 's' : ''}`;
-  const lead = assistantReady
-    ? `Pulls fresh postings and ranks them for ${roles}`
-    : `Pulls fresh postings for ${roles}`;
-  const parts = [lead];
-  if (prefs.preferred_places.length > 0) parts.push(prefs.preferred_places[0].label);
-  const stance = WORKPLACE_WORDS[prefs.workplace_preference];
-  if (stance) parts.push(stance);
-  const floor = prefs.compensation?.min_base;
-  if (floor) parts.push(`$${Math.round(floor / 1000)}K+ base`);
-  return `${parts.join(' · ')}.`;
-}
-
-/* The placeholder names the box's real job: it narrows rows already on the
-   board, and the count keeps that concrete. Under two rows, or while the
-   total is loading, the words stand alone. */
-export function filterPlaceholder(count: number | undefined): string {
-  return count !== undefined && count > 1 ? `Filter these ${count} jobs` : 'Filter these jobs';
-}
-
-/* The line under the filters, in plain words: what shows against the whole
-   lane while a filter narrows, the bare total otherwise, with the honest
-   freshness phrase. Never claims a lane smaller than what shows. The
-   hiddenNote is the posted filter's confession (rows without a verifiable
-   date are dropped); it rides the end of the line when set. */
-export function filterStatusText({
-  shown,
-  laneTotal,
-  filtered,
-  checkedAgo,
-  hiddenNote,
-  scopeNote,
-}: {
-  shown: number | undefined;
-  laneTotal: number | undefined;
-  filtered: boolean;
-  checkedAgo: string | null;
-  hiddenNote?: string | null;
-  scopeNote?: string | null;
-}): string {
-  if (shown === undefined) return checkedAgo ?? '';
-  const jobs = (n: number) => `${n} job${n === 1 ? '' : 's'}`;
-  const lead = filtered
-    ? laneTotal !== undefined && laneTotal >= shown
-      ? `Showing ${shown} of ${jobs(laneTotal)}`
-      : `Showing ${jobs(shown)}`
-    : jobs(shown);
-  // The scope note rides next to the counts because it explains them.
-  return [lead, checkedAgo, scopeNote, hiddenNote].filter(Boolean).join(' · ');
-}
-
 /* The pull's own report, under the actions row it belongs to: a running
    clock while sources answer, the failure with its retry door, and the
    completed tally. Idle renders nothing; the filter line below carries the
    board's counts. Stays mounted so the completion toast can fire even when
    the run ends off-screen. */
-function RunStatusLine() {
+function RunStatusLine({ persistedReceipt }: { persistedReceipt?: CareerRefreshReceipt | null }) {
   const { state, messages, progress, result, error } = useSearchContext();
 
   // A running clock so the wait shows life, plus a toast on the running->done
@@ -170,17 +110,17 @@ function RunStatusLine() {
   const [elapsed, setElapsed] = useState(0);
   const prevState = useRef(state);
   useEffect(() => {
-    if (state !== 'running') {
-      setElapsed(0);
-      return;
-    }
-    const id = setInterval(() => setElapsed((s) => s + 1), 1000);
+    if (state !== 'running') return;
+    const id = setInterval(() => setElapsed((seconds) => seconds + 1), 1000);
     return () => clearInterval(id);
   }, [state]);
   useEffect(() => {
     if (prevState.current === 'running' && state === 'completed') {
-      const n = result?.new_jobs ?? 0;
-      toast.success(n > 0 ? `Board updated · ${n} new job${n === 1 ? '' : 's'}` : 'Board checked · nothing new this time');
+      if (result) {
+        const copy = refreshReceiptCopy(receiptFromRunResult(result));
+        if (copy.tone === 'warn') toast.warning(copy.text);
+        else toast.success(copy.text);
+      }
     }
     prevState.current = state;
   }, [state, result]);
@@ -215,21 +155,34 @@ function RunStatusLine() {
   }
 
   if (state === 'failed') {
+    const copy = refreshReceiptCopy({
+      status: 'failed',
+      jobs_found: 0,
+      new_jobs: 0,
+      error,
+      source_coverage: null,
+    });
     return (
-      <p className="qb-workline" role="status">
-        That didn’t finish{error ? `: ${error}` : ''}. Click <b>“Get new jobs”</b> to try again.
+      <p className="qb-workline qb-receipt" data-tone="bad" role="status">
+        {copy.text} Click <b>“Get new jobs”</b> to try again.
       </p>
     );
   }
 
   if (state === 'completed' && result) {
-    const timeouts = messages.filter((m) => TIMED_OUT_RE.test(m)).length;
-    const n = result.new_jobs ?? 0;
-    const lead = n > 0 ? `Board updated · ${n} new` : 'Board checked · nothing new';
+    const copy = refreshReceiptCopy(receiptFromRunResult(result));
     return (
-      <p className="qb-workline" role="status">
-        {lead} ({result.jobs_found} scanned)
-        {timeouts > 0 ? ` · ${timeouts} source${timeouts === 1 ? '' : 's'} timed out` : ''}.
+      <p className="qb-workline qb-receipt" data-tone={copy.tone} role="status">
+        {copy.text}
+      </p>
+    );
+  }
+
+  if (state === 'idle' && persistedReceipt) {
+    const copy = refreshReceiptCopy(persistedReceipt);
+    return (
+      <p className="qb-workline qb-receipt" data-tone={copy.tone} role="status">
+        {copy.text}
       </p>
     );
   }
@@ -266,8 +219,12 @@ function AssistantRunLine() {
 
 export function WorkToolbar({
   checkedAgo,
+  refreshReceipt,
   shownCount,
   laneTotal,
+  reviewedCount,
+  unreviewedCount,
+  filtering = false,
   search,
   onSearch,
   place,
@@ -280,8 +237,11 @@ export function WorkToolbar({
   onPayTo,
   postedDays,
   onPostedDays,
+  foundingOnly,
+  onFoundingOnly,
   sourceCategory = null,
 }: WorkToolbarProps) {
+  const { runId: searchRunId } = useSearchContext();
   const { run, ready, running } = useRunWorkSearch();
   const { ready: assistantReady, isDesktop, loading: assistantLoading } = useAssistantReady();
   const assistant = useRunAssistant();
@@ -328,9 +288,11 @@ export function WorkToolbar({
 
   const { data: onboarding } = useOnboardingState();
   const prefs = onboarding?.preferences;
+  const payCurrency = prefs?.compensation.currency?.trim().toUpperCase() || undefined;
   const savedRoles = onboarding ? (prefs?.roles ?? []) : undefined;
   const noteText = pullReceipt(onboarding ? prefs : undefined, assistantReady);
   const noteLink = savedRoles && savedRoles.length === 0 ? 'Set roles' : 'Edit search';
+  const coverageText = reviewCoverageText(reviewedCount, unreviewedCount);
 
   const payFloor = parseAmount(payFrom.trim());
   const payCeiling = parseAmount(payTo.trim());
@@ -344,14 +306,14 @@ export function WorkToolbar({
   if (payFloor !== null) {
     chips.push({
       key: 'from',
-      label: `${formatStatedPay(payFloor, null)} incl. unstated pay`,
+      label: `${formatStatedPay(payFloor, null, payCurrency)} incl. unstated/unlike currency`,
       clear: () => onPayFrom(''),
     });
   }
   if (payCeiling !== null) {
     chips.push({
       key: 'to',
-      label: formatStatedPay(null, payCeiling),
+      label: formatStatedPay(null, payCeiling, payCurrency),
       clear: () => onPayTo(''),
     });
   }
@@ -360,6 +322,13 @@ export function WorkToolbar({
       key: 'days',
       label: postedChipLabel(postedDays),
       clear: () => onPostedDays(undefined),
+    });
+  }
+  if (foundingOnly) {
+    chips.push({
+      key: 'founding',
+      label: 'founding / first hire',
+      clear: onFoundingOnly,
     });
   }
 
@@ -387,18 +356,22 @@ export function WorkToolbar({
           )}
         </span>
       </div>
-      {/* The assistant run has no SSE line of its own, so after it finishes the
-          toast is the report and the inline line clears. Only a plain pull owns
-          RunStatusLine, so its stale "N new" can't reappear under a rank. */}
-      {lastRun === 'assistant' ? (
-        assistant.isPending ? (
-          <AssistantRunLine />
-        ) : null
+      {/* The assistant run has no SSE line of its own. Its inline progress
+          clears after completion and the refreshed ranking is the result.
+          Only a plain pull owns RunStatusLine, so its stale "N new" cannot
+          reappear under a rank. */}
+      {lastRun === 'assistant' && assistant.isPending ? (
+        <AssistantRunLine />
       ) : (
-        <RunStatusLine />
+        <RunStatusLine
+          key={searchRunId ?? refreshReceipt?.run_id ?? 'no-refresh'}
+          persistedReceipt={refreshReceipt}
+        />
       )}
-      <RoleProposalCard enabled={isDesktop} />
-      <p className="qb-tray-caption">Narrow what's on the board</p>
+      <p className="qb-tray-caption" aria-live="polite">
+        {filterTrayCaption(filtering)}
+        {coverageText ? ` · ${coverageText}` : ''}
+      </p>
       <div className="qb-tray" role="search">
         <label className="qb-tray-field qb-tray-grow">
           <HugeiconsIcon icon={Search01Icon} size={16} strokeWidth={1.7} />
@@ -417,22 +390,24 @@ export function WorkToolbar({
         />
         <label className="qb-tray-field qb-tray-minpay">
           <HugeiconsIcon icon={CoinsDollarIcon} size={16} strokeWidth={1.7} />
-          <span className="qb-tray-label">min listed pay</span>
+          <span className="qb-tray-label">
+            min listed pay{payCurrency ? ` (${payCurrency})` : ''}
+          </span>
           <input
             inputMode="numeric"
             /* "any", never a number. A sample amount here reads as a filter
                that is switched on, and sat next to the receipt's real saved
                floor as a second, contradicting figure. */
             placeholder="any"
-            aria-label="Minimum listed pay, a year"
+            aria-label={`Minimum listed pay a year${payCurrency ? ` in ${payCurrency}` : ''}`}
             value={payFrom}
             onChange={(e) => onPayFrom(e.target.value)}
           />
         </label>
         <label className="qb-tray-field qb-tray-posted">
-          <span className="qb-tray-label">posted</span>
+          <span className="qb-tray-label">date</span>
           <select
-            aria-label="Posted within"
+            aria-label="Filter by date"
             value={postedDays ?? ''}
             onChange={(e) => onPostedDays(normalizePostedDays(e.target.value))}
           >

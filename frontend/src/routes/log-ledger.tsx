@@ -87,6 +87,7 @@ const SOURCE_LABEL_MAP: Record<string, string> = {
   lever: 'Lever',
   remoteok: 'RemoteOK',
   cryptojobslist: 'CryptoJobsList',
+  web3career: 'Web3.career',
   workatastartup: 'YC Work at a Startup',
   arbeitnow: 'Arbeitnow',
   themuse: 'The Muse',

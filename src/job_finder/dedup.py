@@ -263,7 +263,7 @@ _SOURCE_RANK = {
     "greenhouse": 4, "lever": 4, "ashby": 4, "workday": 4,
     "glassdoor": 3, "workatastartup": 3,
     "remotive": 2, "himalayas": 2, "remoteok": 2, "hackernews": 2,
-    "weworkremotely": 2, "cryptojobslist": 2, "arbeitnow": 2,
+    "weworkremotely": 2, "cryptojobslist": 2, "web3career": 2, "arbeitnow": 2,
     "themuse": 2, "zip_recruiter": 2, "google": 1,
 }
 

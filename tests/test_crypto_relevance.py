@@ -44,20 +44,29 @@ def test_new_crypto_vocab_matches(title):
 @pytest.mark.parametrize(
     "title",
     [
-        "Rust Engineer",            # 'rust' dropped — too generic / non-crypto
         "Senior Marketing Manager",
         "Registered Nurse",
-        "Node.js Developer",        # 'node' dropped — too generic
     ],
 )
 def test_non_crypto_titles_not_rescued(title):
     assert _match_roles_crypto(title, ["data engineer"]) is False
 
 
-def test_match_roles_crypto_title_only_ignores_clean_signal_in_other_fields():
-    # Matching is title-only on purpose — a generic title is NOT rescued by a
-    # crypto term elsewhere, because board/tag metadata is too noisy.
-    assert _match_roles_crypto("Senior Backend Engineer", ["data engineer"]) is False
+@pytest.mark.parametrize(
+    "title",
+    [
+        "Senior Backend Engineer",
+        "Staff Platform Engineer, Observability",
+        "Site Reliability Engineer",
+        "Rust Engineer",
+        "Node.js Developer",
+    ],
+)
+def test_confirmed_crypto_domain_keeps_bounded_technical_adjacency(title):
+    # _match_roles_crypto is invoked only after the source/company is confirmed
+    # crypto. Generic technical titles are useful adjacency there, while the
+    # off-family guard still rejects marketing/design/sales/etc.
+    assert _match_roles_crypto(title, ["data engineer"]) is True
 
 
 def test_match_roles_crypto_still_honors_plain_role_match():

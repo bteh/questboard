@@ -37,6 +37,31 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
+def preload_jobspy() -> str:
+    """Import JobSpy on the caller's thread and return any import error.
+
+    The desktop runtime starts searches on a worker thread.  In a frozen
+    PyInstaller process, JobSpy's first import (including its Pydantic models
+    and scraper modules) is not reliable when that first import happens in a
+    worker: the exception used to escape before telemetry existed, making both
+    Indeed and LinkedIn look as if they had never been attempted.  Desktop
+    startup calls this once on the main thread.  Keeping the function public
+    also gives the bundle verifier one small dependency health check without
+    contacting a job board.
+
+    Do not cache the callable here.  Tests and embedders intentionally replace
+    ``sys.modules['jobspy']``; the ordinary search path should continue to
+    resolve that module at call time.
+    """
+    try:
+        from jobspy import scrape_jobs as _scrape_jobs  # noqa: F401
+    except Exception as exc:  # ImportError is not the only frozen-import failure
+        error = f"{type(exc).__name__}: {exc}"
+        logger.error("JobSpy could not be imported: %s", error)
+        return error
+    return ""
+
+
 # -- Per-board circuit breaker ---------------------------------------------
 
 _FAILURE_THRESHOLD = 3
@@ -207,7 +232,7 @@ _DEFAULT_BOARDS = ["indeed", "glassdoor", "zip_recruiter", "google"]
 
 def search_jobs(
     search_term: str,
-    location: str = "Los Angeles, CA",
+    location: str = "United States",
     results_wanted: int = 25,
     hours_old: int = 336,
     is_remote: bool | None = None,
@@ -216,6 +241,7 @@ def search_jobs(
     boards: list[str] | None = None,
     distance: int | None = None,
     scrape_timeout: float | None = None,
+    telemetry: dict[str, Any] | None = None,
 ) -> list[dict]:
     """Search multiple job boards via JobSpy and return normalised dicts.
 
@@ -233,10 +259,28 @@ def search_jobs(
         JobSpy site names to scrape.  Defaults to Indeed, Glassdoor,
         ZipRecruiter, and Google. LinkedIn is opt-in via ``job_boards``.
     """
+    started = time.monotonic()
+
+    def _finish(reason: str, rows: int = 0, error: str = "") -> None:
+        if telemetry is None:
+            return
+        telemetry.update({
+            "finish_reason": reason,
+            "rows_found": max(0, int(rows)),
+            "duration_s": round(time.monotonic() - started, 3),
+            "error_sample": str(error)[:500],
+        })
+
     try:
         from jobspy import scrape_jobs
-    except ImportError:
-        logger.error("python-jobspy not installed. Run: pip install python-jobspy")
+    except Exception as exc:
+        # A frozen desktop import can fail with more than ImportError (for
+        # example while a dependency initialises a model).  Always turn that
+        # into source telemetry instead of letting the board disappear with
+        # ``attempts: 0`` and no explanation.
+        error = f"{type(exc).__name__}: {exc}"
+        logger.error("python-jobspy could not be imported: %s", error)
+        _finish("exception", error=error)
         return []
 
     requested_boards = list(boards or _DEFAULT_BOARDS)
@@ -250,6 +294,10 @@ def search_jobs(
         # All requested boards are circuit-open. Returning [] saves the cost
         # of a doomed scrape_jobs call (which JobSpy would retry ~30× before
         # giving up).
+        _finish(
+            "exception",
+            error=f"circuit open for {', '.join(skipped_boards) or 'requested boards'}",
+        )
         return []
     site_names = active_boards
 
@@ -310,6 +358,10 @@ def search_jobs(
                 )
                 for b in active_boards:
                     _record_board_failure(b)
+                _finish(
+                    "timeout",
+                    error=f"scrape exceeded {scrape_timeout:.0f}s for {', '.join(site_names)}",
+                )
                 return []
             if "exc" in _scrape_result:
                 raise _scrape_result["exc"]  # let the outer except log + return []
@@ -323,6 +375,7 @@ def search_jobs(
         _record_board_success(active_boards, jobs_df)
 
         if jobs_df.empty:
+            _finish("zero_rows")
             return []
 
         jobs_list: list[dict] = []
@@ -373,8 +426,10 @@ def search_jobs(
                 job["salary_max_annualized"] = annualize_amount(job["salary_max"], interval)
             jobs_list.append(job)
 
+        _finish("ok", rows=len(jobs_list))
         return jobs_list
 
     except Exception as e:
         logger.error("Job search failed for '%s' in %s: %s", search_term, location, e)
+        _finish("exception", error=str(e))
         return []

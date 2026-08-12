@@ -75,6 +75,11 @@ class ApplicationRecord(Base):
     # same URL as the original.
     job_url = Column(String(2000), nullable=True)
     source = Column(String(100), default="")  # LinkedIn, Indeed, etc.
+    # Source-independent taxonomy. JSON arrays stored as text keep SQLite
+    # local-first while allowing one posting/company to belong to multiple
+    # industries or ecosystems. Source remains provenance only.
+    industry_tags = Column(Text, default="[]", server_default="[]")
+    ecosystem_tags = Column(Text, default="[]", server_default="[]")
     description = Column(Text, default="")
     is_remote = Column(Boolean, default=False)
     work_type = Column(String(20), default="")  # remote, hybrid, onsite
@@ -473,6 +478,14 @@ def _migrate_db(engine) -> None:
             conn.execute(
                 text("ALTER TABLE applications ADD COLUMN work_type VARCHAR(20) DEFAULT ''")
             )
+        if "industry_tags" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN industry_tags TEXT DEFAULT '[]'")
+            )
+        if "ecosystem_tags" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN ecosystem_tags TEXT DEFAULT '[]'")
+            )
         if "url_status" not in existing_cols:
             conn.execute(
                 text("ALTER TABLE applications ADD COLUMN url_status VARCHAR(20) DEFAULT 'unknown'")
@@ -664,6 +677,54 @@ def _migrate_db(engine) -> None:
             conn.execute(
                 text("ALTER TABLE applications ADD COLUMN quest_json TEXT DEFAULT ''")
             )
+        # Source-independent taxonomy backfill. This is intentionally
+        # idempotent and deterministic: rows already tagged are untouched,
+        # while historical crypto-source and known-company rows immediately
+        # join the Crypto shelf after upgrading.
+        from job_finder.company_taxonomy import classify_job_taxonomy, tags_json
+
+        # A few very old/minimal local DBs predate even source/description.
+        # Select empty aliases for absent legacy columns so this additive
+        # migration never blocks the later create_all/schema-drift repairs.
+        def _taxonomy_select(name: str) -> str:
+            if name in existing_cols or name in {"industry_tags", "ecosystem_tags"}:
+                return name
+            return f"'' AS {name}"
+
+        taxonomy_fields = ", ".join(
+            _taxonomy_select(name)
+            for name in (
+                "id", "company", "source", "job_title", "description",
+                "industry_tags", "ecosystem_tags",
+            )
+        )
+        taxonomy_rows = conn.execute(
+            text(
+                f"SELECT {taxonomy_fields} FROM applications "
+                "WHERE (industry_tags IS NULL OR industry_tags = '' OR industry_tags = '[]') "
+                "OR (ecosystem_tags IS NULL OR ecosystem_tags = '')"
+            )
+        ).fetchall()
+        for row in taxonomy_rows:
+            industries, ecosystems = classify_job_taxonomy(
+                company=row.company,
+                source=row.source,
+                title=row.job_title,
+                description=row.description,
+                industry_tags=row.industry_tags,
+                ecosystem_tags=row.ecosystem_tags,
+            )
+            conn.execute(
+                text(
+                    "UPDATE applications SET industry_tags = :industries, "
+                    "ecosystem_tags = :ecosystems WHERE id = :id"
+                ),
+                {
+                    "industries": tags_json(industries),
+                    "ecosystems": tags_json(ecosystems),
+                    "id": row.id,
+                },
+            )
         # create_all skips tables that already exist, so existing DBs need the
         # quest indexes created here. The composite index needs status, which
         # every real DB has; skip it on partial tables instead of failing boot.
@@ -810,6 +871,8 @@ def save_application(
     rank_source: str | None = None,
     match_bucket: str | None = None,
     match_reasons: list[dict] | str | None = None,
+    industry_tags: list[str] | str | None = None,
+    ecosystem_tags: list[str] | str | None = None,
     date_posted: str | None = None,
     date_confidence: str | None = None,
     vertical: str = "career",
@@ -840,6 +903,19 @@ def save_application(
         match_reasons_json = match_reasons
     else:
         match_reasons_json = ""
+
+    from job_finder.company_taxonomy import classify_job_taxonomy, tags_json
+
+    resolved_industries, resolved_ecosystems = classify_job_taxonomy(
+        company=company,
+        source=source,
+        title=job_title,
+        description=description,
+        industry_tags=industry_tags,
+        ecosystem_tags=ecosystem_tags,
+    )
+    industry_tags_json = tags_json(resolved_industries)
+    ecosystem_tags_json = tags_json(resolved_ecosystems)
 
     session = get_session()
     try:
@@ -876,6 +952,12 @@ def save_application(
                 ):
                     existing.company_type = company_type
                     changed = True
+                if industry_tags_json != (getattr(existing, "industry_tags", "") or "[]"):
+                    existing.industry_tags = industry_tags_json
+                    changed = True
+                if ecosystem_tags_json != (getattr(existing, "ecosystem_tags", "") or "[]"):
+                    existing.ecosystem_tags = ecosystem_tags_json
+                    changed = True
                 # Adopt a better post date on re-scrape: a listing that now
                 # carries a verifiable date replaces an empty/guessed one, but a
                 # known date is never downgraded back to a guess (rank order).
@@ -903,6 +985,20 @@ def save_application(
                     if codes:
                         existing.state_codes = codes
                         changed = True
+                # A Side Quest's URL is its stable identity, not a frozen
+                # snapshot. Sources can clarify requirements, deadlines, or
+                # application steps after the first discovery. Refresh the
+                # structured payload when it is present, while deliberately
+                # leaving ``changed`` false: source maintenance must not bump
+                # the user's log timestamp or make an old quest look new.
+                # An empty later scrape never erases richer stored metadata.
+                if (
+                    vertical != "career"
+                    and existing.vertical != "career"
+                    and quest_json
+                    and quest_json != (existing.quest_json or "")
+                ):
+                    existing.quest_json = quest_json
                 if changed:
                     existing.updated_at = _utcnow()
                 else:
@@ -918,11 +1014,22 @@ def save_application(
                 session.expunge(existing)
                 return existing
 
-        # Skip cross-source duplicates by normalized company + title.
+        # Reconcile cross-source duplicates by normalized company + title.
         # Career only: two quests from the same org with the same title are
         # usually different sessions, and a quest must never merge into a job.
+        #
+        # Do not blindly keep the first URL.  A common discovery sequence is
+        # BuiltIn/LinkedIn first, then the employer's Greenhouse/Ashby posting
+        # on a later pull.  Keeping the aggregator row made a dead intermediary
+        # link hide a live official application (YipitData #8080900 was the
+        # production example).  Confirm that this is the same posting, then
+        # promote the official URL/source in place so first-seen history and
+        # any user workflow state stay attached to the same record.
         if vertical == "career" and job_title and company:
             from job_finder.pipeline import _normalize_company, _normalize_title
+            from job_finder.dedup import same_posting
+            from job_finder.job_trust import is_direct_source
+
             norm_co = _normalize_company(company)
             norm_title = _normalize_title(job_title)
             if norm_co and norm_title:
@@ -944,8 +1051,62 @@ def save_application(
                         _normalize_company(cand.company or "") == norm_co
                         and _normalize_title(cand.job_title or "") == norm_title
                     ):
+                        incoming_job = {
+                            "title": job_title,
+                            "company": company,
+                            "location": location,
+                            "is_remote": bool(is_remote),
+                            "url": job_url,
+                            "source": source,
+                            "description": description,
+                        }
+                        stored_job = {
+                            "title": cand.job_title or "",
+                            "company": cand.company or "",
+                            "location": cand.location or "",
+                            "is_remote": bool(cand.is_remote),
+                            "url": cand.job_url or "",
+                            "source": cand.source or "",
+                            "description": cand.description or "",
+                        }
+                        # Same company/title is not enough: separate openings
+                        # in Los Angeles and New York must remain separate.
+                        if not same_posting(stored_job, incoming_job):
+                            continue
+
                         # Update existing record if new data is richer
                         updated = False
+                        existing_url_state = (cand.url_status or "").strip().lower()
+                        promote_incoming_url = bool(job_url) and job_url != (cand.job_url or "") and (
+                            (
+                                is_direct_source(source)
+                                and not is_direct_source(cand.source)
+                            )
+                            or existing_url_state in {"dead", "expired"}
+                            or not cand.job_url
+                        )
+                        if promote_incoming_url:
+                            cand.job_url = job_url
+                            cand.source = source
+                            # The incoming source just returned this posting;
+                            # let the normal link verifier confirm the new URL.
+                            cand.url_status = "unknown"
+                            cand.last_checked_at = None
+                            cand.last_seen_at = _utcnow()
+                            if location:
+                                from job_finder.us_states import state_codes_field
+
+                                cand.location = location
+                                cand.state_codes = state_codes_field(location)
+                                cand.remote_scope = _remote_scope_field(location)
+                            cand.is_remote = bool(is_remote)
+                            if work_type:
+                                cand.work_type = work_type
+                            updated = True
+                        else:
+                            # Seeing the same opening from another current
+                            # source still confirms that it has not vanished.
+                            cand.last_seen_at = _utcnow()
                         if not cand.salary_min and salary_min:
                             cand.salary_min = salary_min
                             updated = True
@@ -967,9 +1128,33 @@ def save_application(
                         if salary_source and not cand.salary_source:
                             cand.salary_source = salary_source
                             updated = True
-                        if date_posted and not getattr(cand, "date_posted", ""):
-                            cand.date_posted = date_posted
-                            cand.date_confidence = date_confidence or ""
+                        if date_posted:
+                            from job_finder.tools.scrapers._utils import _parse_posted_date
+
+                            confidence_rank = {"exact": 3, "fuzzy": 2, "missing": 1, "": 0}
+                            incoming_conf = (date_confidence or "").strip().lower()
+                            stored_conf = (getattr(cand, "date_confidence", "") or "").strip().lower()
+                            replace_date = confidence_rank.get(incoming_conf, 0) > confidence_rank.get(
+                                stored_conf, 0
+                            )
+                            if confidence_rank.get(incoming_conf, 0) >= 2 and confidence_rank.get(
+                                stored_conf, 0
+                            ) >= 2:
+                                incoming_date = _parse_posted_date(date_posted)
+                                stored_date = _parse_posted_date(getattr(cand, "date_posted", ""))
+                                replace_date = bool(
+                                    incoming_date is not None
+                                    and (stored_date is None or incoming_date > stored_date)
+                                )
+                            if replace_date:
+                                cand.date_posted = date_posted
+                                cand.date_confidence = date_confidence or ""
+                                updated = True
+                        if industry_tags_json != (getattr(cand, "industry_tags", "") or "[]"):
+                            cand.industry_tags = industry_tags_json
+                            updated = True
+                        if ecosystem_tags_json != (getattr(cand, "ecosystem_tags", "") or "[]"):
+                            cand.ecosystem_tags = ecosystem_tags_json
                             updated = True
                         if overall_score and (not cand.overall_score or overall_score > cand.overall_score):
                             cand.overall_score = overall_score
@@ -1036,6 +1221,8 @@ def save_application(
             remote_scope=_remote_scope_field(location),
             job_url=job_url,
             source=source,
+            industry_tags=industry_tags_json,
+            ecosystem_tags=ecosystem_tags_json,
             last_seen_at=_utcnow(),
             description=description,
             is_remote=is_remote,

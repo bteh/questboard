@@ -140,8 +140,9 @@ const PERIOD_UNITS: Record<string, string> = {
 
 export function payUnitFor(app: ApplicationResponse): string {
   const unit = PERIOD_UNITS[(app.salary_period || '').toLowerCase()] || '';
-  // Match the existing salary_source standard: only parsed-from-description
-  // pay gets the estimated marker; reported or unknown provenance stays bare.
+  if (app.salary_source === 'source_estimate') {
+    return unit ? `${unit}, source estimate` : 'source estimate';
+  }
   if (app.salary_source === 'parsed_from_description') {
     return unit ? `${unit}, estimated from description` : 'estimated from description';
   }
@@ -274,7 +275,9 @@ export function questPay(app: ApplicationResponse): { pay: string; payUnit: stri
     pay = `${c}${fmtQuestAmount(max as number)}`;
     unit = 'max';
   }
-  if (app.salary_source === 'parsed_from_description') {
+  if (app.salary_source === 'source_estimate') {
+    unit = unit ? `${unit}, source estimate` : 'source estimate';
+  } else if (app.salary_source === 'parsed_from_description') {
     unit = unit ? `${unit}, estimated from description` : 'estimated from description';
   }
   return { pay, payUnit: unit };

@@ -48,6 +48,16 @@ describe('the poster model', () => {
     expect(toPoster(app({ vertical: 'lens' }), 'x').kind).toBe('skill');
   });
 
+  it('adds honest effort and criteria to Side Quests, never career jobs', () => {
+    const quest = toPoster(app({ vertical: 'scholarship' }), 'Scholarship America');
+    expect(quest.requirements?.effort).toMatchObject({
+      level: 'involved',
+      basis: 'typical',
+    });
+    expect(quest.requirements?.criteria.items[0]).toContain('eligibility proof');
+    expect(toPoster(app({ vertical: 'career' }), 'BuiltIn').requirements).toBeUndefined();
+  });
+
   it('career rows carry no flavor tags, and remote never doubles', () => {
     // remote/location reads on the meta line; it must not also be a tag
     expect(toPoster(app({ vertical: 'career', is_remote: true, work_type: 'remote' }), 'BuiltIn').tags)

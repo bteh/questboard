@@ -72,12 +72,27 @@ export interface LocalFit {
   matched_skills: string[];
 }
 
+/** Structured metadata carried in quest_json. Sources may add their own
+ * fields, while these shared fields power the Side Quest requirements UI. */
+export interface QuestMetadata extends Record<string, unknown> {
+  bring?: string;
+  catch?: string;
+  apply_by?: string;
+  pay_note?: string;
+  application_effort?: 'quick' | 'some_prep' | 'involved';
+  application_effort_note?: string;
+  criteria?: string | string[];
+}
+
 export interface ApplicationBase {
   job_title: string;
   company: string;
   location: string;
   job_url: string;
   source: string;
+  /** Source-independent company/job taxonomy. */
+  industry_tags?: string[];
+  ecosystem_tags?: string[];
   description: string;
   is_remote: boolean;
   work_type: string;
@@ -91,7 +106,7 @@ export interface ApplicationBase {
   salary_min_annualized?: number | null;
   salary_max_annualized?: number | null;
   // Additive provenance fields — absent on records scored before they shipped.
-  salary_source?: 'reported' | 'parsed_from_description' | null;
+  salary_source?: 'reported' | 'parsed_from_description' | 'source_estimate' | null;
   work_type_confidence?: 'reported' | 'inferred' | null;
   date_confidence?: 'exact' | 'fuzzy' | 'missing' | null;
   // Trust & freshness (ghost-job defense). date_posted is the job's TRUE
@@ -112,7 +127,7 @@ export interface ApplicationResponse extends ApplicationBase {
   is_rolling?: boolean;
   first_quest_ok?: boolean;
   /** Parsed quest_json served by the API; prefer this over quest_json. */
-  quest?: Record<string, unknown> | null;
+  quest?: QuestMetadata | null;
   quest_json?: string;
   overall_score: number | null;
   technical_score: number | null;
@@ -184,6 +199,10 @@ export interface ProfileWorkListResponse extends ApplicationListResponse {
   candidate_queries: string[];
   filters_applied: Record<string, unknown>;
   ranking_owner: 'connected_agent';
+  reviewed_count: number;
+  ranked_count: number;
+  skipped_count: number;
+  unreviewed_count: number;
   /** source kind -> count across the full career inventory, for browse chips */
   source_categories?: Record<string, number>;
   retrieval_note: string;
@@ -230,7 +249,10 @@ export interface ApplicationFilters {
   first_quest_ok?: boolean;
   /** Keep only rows provably posted in the last N days; unverifiable dates drop. */
   posted_within_days?: number;
+  /** Calendar window on Questboard's first-seen clock, interpreted here. */
   found_within_days?: number;
+  /** IANA zone used for calendar-day boundaries. */
+  timezone_name?: string;
   /** Keep only rows whose taping/session date falls in the next N days. */
   event_within_days?: number;
   status?: string;
@@ -248,17 +270,21 @@ export interface ApplicationFilters {
       kind in vertical, the API 400s otherwise */
   facet?: string;
   source?: string;
-  /** Browse by source kind: remote | ats | startup | crypto | community | jobspy */
+  /** Browse by source kind: remote | ats | startup | vc | crypto | community | jobspy */
   source_category?: string;
   search?: string;
   sort_by?: string;
   sort_order?: 'asc' | 'desc';
   min_score?: number;
   is_remote?: boolean;
+  /** Named founding roles plus source-stated first functional hires. */
+  founding_only?: boolean;
   /** Annual pay floor; the API keeps rows with no stated pay. */
   salary_min?: number;
   /** Annual pay ceiling; the API keeps rows with no stated pay. */
   salary_max?: number;
+  /** ISO currency for pay bounds; unlike or unstated currencies are not compared. */
+  salary_currency?: string;
   page?: number;
   page_size?: number;
   profile?: string;

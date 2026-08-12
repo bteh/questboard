@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useIsMutating, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
   connectAgent,
@@ -12,6 +12,7 @@ import {
 
 const AGENT_CLIENTS_KEY = ['agent-clients'] as const;
 const ROLE_PROPOSALS_KEY = ['role-proposals'] as const;
+const AGENT_RUN_KEY = ['agent-run'] as const;
 
 /** Read which MCP assistants are installed and connected. */
 export function useAgentClients() {
@@ -44,11 +45,18 @@ export function useDisconnectAgent() {
 export function useRunAgent() {
   const queryClient = useQueryClient();
   return useMutation({
+    mutationKey: AGENT_RUN_KEY,
     mutationFn: ({ task, client }: { task?: string; client?: string } = {}) => runAgent(task, client),
     onSettled: () => {
       void queryClient.refetchQueries({ queryKey: ROLE_PROPOSALS_KEY, type: 'active' });
     },
   });
+}
+
+/** Shared truth for the headless assistant run, so the board cannot keep an
+ *  old "no jobs added" line visible while the primary button is refreshing. */
+export function useAgentRunActive(): boolean {
+  return useIsMutating({ mutationKey: AGENT_RUN_KEY }) > 0;
 }
 
 /** Poll the running assistant's real progress. Enabled only while a run is in

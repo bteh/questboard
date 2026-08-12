@@ -29,6 +29,8 @@ class LocalSessionBootstrapTest(unittest.TestCase):
             for key in [
                 "DATA_DIR",
                 "WORKSPACE_STORAGE_DIR",
+                "RESUME_DIR",
+                "CONFIG_DIR",
                 "HOSTED_MODE",
                 "MANAGE_SCHEMA_ON_STARTUP",
                 "DATABASE_URL",
@@ -293,3 +295,95 @@ class LocalSessionBootstrapTest(unittest.TestCase):
         self.assertEqual(data["preferences"]["keywords"], [])
         self.assertEqual(data["preferences"]["companies"], [])
         self.assertEqual(data["preferences"]["preferred_places"], [])
+
+    def test_desktop_erase_removes_personal_data_and_keeps_current_session(self) -> None:
+        os.environ["QUESTBOARD_DESKTOP_MODE"] = "true"
+        resume_dir = Path(self.temp_dir) / "resumes"
+        config_dir = Path(self.temp_dir) / "config"
+        os.environ["RESUME_DIR"] = str(resume_dir)
+        os.environ["CONFIG_DIR"] = str(config_dir)
+
+        desktop_client = TestClient(importlib.import_module("app.main").app)
+        self.addCleanup(desktop_client.close)
+        bootstrap = desktop_client.post("/api/v1/session/bootstrap").json()
+        auth_headers = {"X-Questboard-Session": bootstrap["session_token"]}
+        mutation_headers = {
+            **auth_headers,
+            "X-CSRF-Token": bootstrap["csrf_token"],
+        }
+
+        state = desktop_client.get("/api/v1/onboarding/state", headers=auth_headers).json()
+        preferences = {
+            **state["preferences"],
+            "roles": ["Private target role"],
+            "keywords": ["private keyword"],
+        }
+        save = desktop_client.post(
+            "/api/v1/onboarding/preferences",
+            headers=mutation_headers,
+            json=preferences,
+        )
+        self.assertEqual(save.status_code, 200, save.text)
+
+        upload = desktop_client.post(
+            "/api/v1/onboarding/resume",
+            headers=mutation_headers,
+            files={
+                "file": (
+                    "private-resume.pdf",
+                    b"%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF",
+                    "application/pdf",
+                )
+            },
+        )
+        self.assertEqual(upload.status_code, 200, upload.text)
+
+        application_model = importlib.import_module("app.models.application").ApplicationRecord
+        db_gen = self.backend_db.get_db()
+        db = next(db_gen)
+        try:
+            db.add(
+                application_model(
+                    job_title="Private saved job",
+                    company="Private company",
+                    source="manual",
+                    profile="workspace",
+                    workspace_id=bootstrap["workspace_id"],
+                )
+            )
+            db.commit()
+        finally:
+            db_gen.close()
+
+        private_paths = [
+            resume_dir / "private-resume-copy.pdf",
+            config_dir / "private-search-config.yaml",
+            Path(self.data_dir) / "backups" / "job_tracker-private.db",
+            Path(self.data_dir) / "expanded_roles_workspace_private.json",
+        ]
+        for private_path in private_paths:
+            private_path.parent.mkdir(parents=True, exist_ok=True)
+            private_path.write_text("private", encoding="utf-8")
+
+        erased = desktop_client.delete("/api/v1/onboarding/data", headers=mutation_headers)
+        self.assertEqual(erased.status_code, 200, erased.text)
+        self.assertTrue(erased.json()["complete"])
+        self.assertGreater(erased.json()["records_deleted"], 0)
+        self.assertTrue(all(not private_path.exists() for private_path in private_paths))
+
+        # The same app session remains valid, but onboarding and the board are
+        # genuinely blank. A reset never forces a hidden reinstall or leaves
+        # stale personal rows in the shared local database.
+        reset_state = desktop_client.get("/api/v1/onboarding/state", headers=auth_headers)
+        self.assertEqual(reset_state.status_code, 200, reset_state.text)
+        reset_payload = reset_state.json()
+        self.assertTrue(reset_payload["needs_resume"])
+        self.assertEqual(reset_payload["preferences"]["roles"], [])
+        self.assertEqual(reset_payload["preferences"]["keywords"], [])
+
+        db_gen = self.backend_db.get_db()
+        db = next(db_gen)
+        try:
+            self.assertEqual(db.query(application_model).count(), 0)
+        finally:
+            db_gen.close()

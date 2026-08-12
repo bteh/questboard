@@ -137,7 +137,7 @@ describe('the honest zero', () => {
   // stale cache, because nothing said otherwise.
   it('says plainly when nothing is new', () => {
     expect(newSinceLine({ count: 0, exact: true }, LAST_VISIT))
-      .toMatch(/^Nothing new since your last visit, \w{3} \d{1,2}$/);
+      .toMatch(/^No jobs added to your board since your last visit, \w{3} \d{1,2}$/);
   });
 
   it('stays silent only when there is no cutoff to compare against', () => {

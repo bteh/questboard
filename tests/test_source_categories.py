@@ -33,6 +33,10 @@ def test_workatastartup_keeps_the_startup_promise():
     assert get_registry()["workatastartup"].category == "startup"
 
 
+def test_getro_community_is_labeled_as_a_vc_portfolio_not_early_startup():
+    assert get_registry()["getro_startups"].category == "vc"
+
+
 def test_a_builtin_company_is_not_presumed_an_early_startup():
     """Netflix via BuiltIn, no funding signals: the source must not tier it."""
     assert classify_company("Netflix", source_category="general") != "Early Startup"

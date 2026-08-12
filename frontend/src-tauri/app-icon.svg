@@ -1,27 +1,41 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="1024" height="1024" rx="224" fill="#12121A"/>
-  <rect x="168" y="168" width="688" height="688" rx="176" fill="url(#questboardGradient)"/>
-  <path
-    d="M512 292L682 380V626L512 732L342 626V380L512 292Z"
-    fill="white"
-    fill-opacity="0.96"
-  />
-  <path
-    d="M512 364L610 414V566L512 620L414 566V414L512 364Z"
-    fill="#7A6BFF"
-  />
-  <path
-    d="M342 380L512 468L682 380"
-    stroke="#12121A"
-    stroke-width="28"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-    opacity="0.18"
-  />
   <defs>
-    <linearGradient id="questboardGradient" x1="220" y1="204" x2="820" y2="828" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#8A84FF"/>
-      <stop offset="1" stop-color="#5D6BFF"/>
+    <linearGradient id="board" x1="196" y1="112" x2="824" y2="936" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4A785F"/>
+      <stop offset="1" stop-color="#345A47"/>
     </linearGradient>
+    <linearGradient id="paper" x1="448" y1="164" x2="574" y2="834" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFDF8"/>
+      <stop offset="1" stop-color="#F6F3EC"/>
+    </linearGradient>
+    <radialGradient id="pin" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(486 742) rotate(54.5) scale(110 110)">
+      <stop stop-color="#C66B43"/>
+      <stop offset="0.58" stop-color="#A6522E"/>
+      <stop offset="1" stop-color="#824027"/>
+    </radialGradient>
+    <filter id="tileShadow" x="10" y="18" width="1004" height="1018" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="22" stdDeviation="20" flood-color="#1C1B17" flood-opacity="0.22"/>
+    </filter>
+    <filter id="paperShadow" x="338" y="132" width="372" height="784" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="15" flood-color="#203A2C" flood-opacity="0.34"/>
+    </filter>
   </defs>
+
+  <!-- The board: one calm macOS-scale silhouette, with room for the system mask. -->
+  <g filter="url(#tileShadow)">
+    <rect x="48" y="48" width="928" height="928" rx="224" fill="url(#board)"/>
+    <rect x="61" y="61" width="902" height="902" rx="211" stroke="#FFFDF8" stroke-opacity="0.10" stroke-width="6"/>
+  </g>
+
+  <!-- A pinned notice reduced to the universal sign that a quest is waiting. -->
+  <g filter="url(#paperShadow)">
+    <g transform="rotate(-4 512 390)">
+      <rect x="410" y="150" width="204" height="480" rx="102" fill="url(#paper)"/>
+    </g>
+    <circle cx="512" cy="768" r="110" fill="url(#paper)"/>
+  </g>
+
+  <!-- Clay pushpin center: the small second-read detail used throughout Questboard. -->
+  <circle cx="512" cy="768" r="47" fill="url(#pin)"/>
+  <ellipse cx="495" cy="749" rx="13" ry="10" fill="#FFFDF8" fill-opacity="0.18"/>
 </svg>

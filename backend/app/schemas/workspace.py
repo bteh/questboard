@@ -152,6 +152,20 @@ class WorkspaceResumeUploadResponse(BaseModel):
     derived_keywords: list[str] = []
 
 
+class WorkspaceDataEraseResponse(BaseModel):
+    complete: bool = True
+    records_deleted: int = 0
+    files_deleted: int = 0
+    message: str = "Your Questboard data was erased"
+    retained: list[str] = Field(
+        default_factory=lambda: [
+            "the installed application",
+            "public source definitions",
+            "your sign-in account, if any",
+        ]
+    )
+
+
 class LocationSuggestion(BaseModel):
     label: str
     kind: Literal["city", "region", "country", "manual"] = "manual"

@@ -48,10 +48,6 @@ still carry the blobs). Do not run it as part of normal CI.
 
 Source development currently uses `backend/data/job_tracker.db`; the Makefile and source MCP installer now point to that same file explicitly. The packaged Tauri app uses the platform application-data directory. Settings should eventually display the exact active data root and connection status, and a reviewed migration should consolidate legacy source databases without silently overwriting user data.
 
-### Local refresh concurrency
-
-The desktop API and stdio MCP process can both open the same SQLite database safely through WAL, but their in-memory run guards are process-local. V1 documentation should tell users not to start simultaneous refreshes. The durable fix is a single local daemon that owns refresh leases while both UI and MCP act as clients.
-
 ### Legacy in-app AI remains
 
 BYO API and Ollama paths still exist. They are compatibility paths, not the new primary product. Remove or isolate them only after the MCP workflow covers resume analysis, matching, and application drafting without regressions.

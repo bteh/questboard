@@ -1,47 +1,11 @@
-# Job Search Configuration
-# Customize these to match your target roles and preferences
+# Neutral fallback configuration for a fresh checkout or packaged runtime.
+# Personal roles, locations, compensation, and resume paths belong in the
+# workspace database or an ignored config/profiles/<name>.yaml file. Never put
+# a maintainer's search here: this file is shipped to every user.
 
-target_roles:
-  # Data Engineering
-  - "data platform engineer"
-  - "analytics engineer"
-  - "senior data engineer"
-  - "staff data engineer"
-  - "principal data engineer"
-  - "founding data engineer"
-  - "head of data"
-  - "director of data engineering"
-  - "director of data"
-  - "manager data engineering"
-  # Management / Leadership
-  - "engineering manager"
-  - "senior engineering manager"
-  - "director of engineering"
-  - "VP engineering"
-  - "VP of data"
-  - "CTO"
-
-# Keyword-based searches (technologies/tools)
-keyword_searches:
-  - "dbt"
-  - "Trino"
-  - "lakehouse"
-  - "data platform"
-  - "iceberg data engineer"
-  - "founding engineer data"
-  - "build data team"
-  - "head of data"
-  - "data leader"
-  # Crypto / Web3
-  - "blockchain"
-  - "web3"
-  - "crypto"
-  - "defi"
-  - "onchain"
-
-locations:
-  - "Los Angeles, CA"
-  - "Remote"
+target_roles: []
+keyword_searches: []
+locations: []
 
 # Job boards to scrape via JobSpy.
 #
@@ -88,6 +52,8 @@ additional_sources:
     enabled: true
   - name: "cryptojobslist"
     enabled: true
+  - name: "web3career"
+    enabled: true
   - name: "getro"
     enabled: true
   - name: "consider"
@@ -99,13 +65,13 @@ additional_sources:
   - name: "themuse"
     enabled: true
 
-# Career baseline — used for career progression scoring
+# Career baseline. Blank values keep the level filter disabled until the user
+# describes their own work.
 career_baseline:
-  current_title: "Senior Data Engineer"
-  current_level: "senior"  # junior, mid, senior, staff, principal, manager, director, vp, cto
-  current_tc: 200000
-  min_acceptable_tc: 200000
-  preferred_direction: "up_or_lateral_leadership"  # up, up_or_lateral_leadership, any
+  current_title: ""
+  current_level: ""
+  current_tc: 0
+  preferred_direction: "any"
 
 # Scoring weights (must sum to 1.0)
 scoring:
@@ -119,8 +85,9 @@ scoring:
 
 # Compensation filters
 compensation:
-  min_base: 190000
-  target_total_comp: 300000
+  currency: "USD"
+  pay_period: "annual"
+  target_total_comp: 0
   include_equity: true
 
 # Search frequency
@@ -131,7 +98,8 @@ search_settings:
   exclude_staffing_agencies: true
   country: "USA"
   max_parallel_searches: 6  # Concurrent JobSpy workers (each hits 5 boards, so 6 = 30 requests)
-  max_unique_jobs: 500      # Stop early once this many unique jobs found
+  max_unique_jobs: 500      # Per-JobSpy-board cap; one source never cancels another
+  min_queries_per_source: 15 # Cover at least this many role queries per board before its cap can stop secondary locations
   max_search_tasks: 30      # Hard cap on total JobSpy queries (term × location combos)
   ai_score_top_n: 60        # Keyword-score all jobs, then AI-score only the top N for speed (<=0 = AI-score all)
 

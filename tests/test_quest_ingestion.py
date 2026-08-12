@@ -141,6 +141,21 @@ def fake_party_scrapers():
 # run_quest_search
 
 
+def test_stale_row_checks_event_start_end_and_apply_deadline_by_calendar_day():
+    from datetime import datetime
+
+    from job_finder.quests import _row_is_stale
+
+    now = datetime(2026, 8, 7, 15, 0)
+    assert _row_is_stale({"event_start": "2026-08-07T14:59:59Z"}, now)
+    assert _row_is_stale({"event_end": "2026-08-06"}, now)
+    assert _row_is_stale({"quest": {"apply_by": "2026-08-06"}}, now)
+    # A deadline remains actionable through its entire stated day.
+    assert not _row_is_stale({"event_end": "2026-08-07"}, now)
+    assert not _row_is_stale({"quest": {"apply_by": "2026-08-07"}}, now)
+    assert not _row_is_stale({"quest": {"apply_by": "not stated"}}, now)
+
+
 def test_selects_only_requested_vertical_scrapers(db, monkeypatch):
     from job_finder import quests
 
@@ -235,6 +250,45 @@ def test_second_run_dedups_everything(db, fake_party_scrapers):
     assert second["deduped"] == 4  # 3 known rows + the in-run duplicate URL
     assert second["skipped_stale"] == 1
     assert len(db.get_all_applications(verticals=["party"])) == 3
+
+
+def test_known_quest_refreshes_structured_metadata_without_looking_new(
+    db, fake_party_scrapers,
+):
+    from job_finder.quests import run_quest_search
+
+    run_quest_search(["party"], only_sources=["fake_party_plain"])
+    before = db.get_all_applications(verticals=["party"])[0]
+    before_updated_at = before.updated_at
+    meta = get_registry()["fake_party_plain"]
+    original = meta.search_fn
+
+    def refreshed(roles=None, max_results=50, **kwargs):
+        return [{
+            "title": "Door list helper",
+            "company": "Fake Party Plain",
+            "url": "https://party2.example/quest/1",
+            "source": "fake_party_plain",
+            "vertical": "party",
+            "quest": {
+                "pay_text": "$50",
+                "application_effort": "quick",
+                "criteria": ["Be 18 or older"],
+            },
+        }]
+
+    meta.search_fn = refreshed
+    try:
+        summary = run_quest_search(["party"], only_sources=["fake_party_plain"])
+    finally:
+        meta.search_fn = original
+
+    assert summary["saved"] == 0
+    assert summary["deduped"] == 1
+    current = db.get_all_applications(verticals=["party"])[0]
+    assert json.loads(current.quest_json)["application_effort"] == "quick"
+    assert json.loads(current.quest_json)["criteria"] == ["Be 18 or older"]
+    assert current.updated_at == before_updated_at
 
 
 # ---------------------------------------------------------------------------

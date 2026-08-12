@@ -7,6 +7,10 @@ import { kindForVertical } from '@questboard/kinds';
 import { cleanDescription } from '@/utils/format';
 import { cleanCompany, toBoardCard, type BoardCardModel } from '@/utils/board-card';
 import { kindCopy, type KindCopy } from '@/features/board/kind-copy';
+import {
+  requirementsForQuest,
+  type QuestRequirements,
+} from '@/features/board/quest-requirements';
 import { getCompanyLogoUrl } from '@/utils/company-domains';
 import { avatarColor } from '@/utils/colors';
 import type { AgentFitVerdict, ApplicationResponse } from '@/types/application';
@@ -28,6 +32,8 @@ export interface PosterModel {
   /** true when the career fit line replaces the kind template */
   hasFit: boolean;
   tags: string[];
+  /** setup/application effort and criteria; Side Quests only */
+  requirements?: QuestRequirements;
   rotateDeg: number;
   /** the company/source logo, resolved from the poster's own company + url */
   logoUrl?: string;
@@ -232,6 +238,7 @@ export function toPoster(app: ApplicationResponse, sourceLabel: string): PosterM
     copy,
     hasFit,
     tags: tags.slice(0, 2),
+    requirements: requirementsForQuest(app, kind, copy.bring) ?? undefined,
     rotateDeg: rotationFor(app.id),
     logoUrl: logoWell ? undefined : logoUrl,
     logoWell,

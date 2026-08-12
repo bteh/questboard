@@ -2531,6 +2531,7 @@ dependencies = [
 name = "questboard-desktop"
 version = "0.2.0"
 dependencies = [
+ "libc",
  "tauri",
  "tauri-build",
  "tauri-plugin-shell",

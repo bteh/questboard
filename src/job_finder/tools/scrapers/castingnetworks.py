@@ -1,13 +1,11 @@
-"""Casting Networks - public casting calls via JSON-LD JobPosting blocks.
+"""Casting Networks - public casting calls from its server-rendered cards.
 
-The public listing at ``https://www.castingnetworks.com/casting-calls/``
-embeds a schema.org ItemList of role deep links, and each role page embeds a
-full JobPosting block (title, description, datePosted, validThrough,
-hiringOrganization, jobLocation when stated, baseSalary when stated). Probed
-live 2026-07-08: plain GETs return HTTP 200, no Cloudflare challenge; the
-listing carried 8 open roles. ``hiringOrganization.name`` is the platform
-itself ("Casting Networks") on every probed role, never the production
-company, so ``company`` reads as the platform.
+The source removed its JSON-LD listing in August 2026 and intermittently
+returns 403 for the bare canonical URL. Its public casting-calls page still
+server-renders mobile role cards with role/project names, stated rate,
+location, ages, union, description, due date, and deep link. Questboard uses
+that public HTML and a same-page fallback path; the older JSON-LD path remains
+as a compatibility fallback for cached or regionally different responses.
 
 Quest vertical: "camera". Career role keywords do not map onto casting-call
 titles, so ``roles`` is accepted for registry compatibility and ignored.
@@ -19,8 +17,11 @@ import json
 import logging
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime
+from urllib.parse import urljoin
 
 import requests
+from bs4 import BeautifulSoup
 
 from job_finder.tools.scrapers._registry import register_scraper
 from job_finder.tools.scrapers._utils import _HEADERS, _strip_html
@@ -28,12 +29,22 @@ from job_finder.tools.scrapers._utils import _HEADERS, _strip_html
 logger = logging.getLogger(__name__)
 
 _LISTING_URL = "https://www.castingnetworks.com/casting-calls/"
+_LISTING_FALLBACK_URL = "https://www.castingnetworks.com/casting-calls/backgrounds/"
 _ROLE_PATH_MARKER = "/talent/project/"
 _MAX_WORKERS = 6
 _PAGE_TIMEOUT = 10
 
 # The shared headers advertise JSON; these pages are HTML.
-_HTML_HEADERS = {**_HEADERS, "Accept": "text/html,application/xhtml+xml"}
+_HTML_HEADERS = {
+    **_HEADERS,
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/127.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+}
 
 _LD_JSON_RE = re.compile(
     r"<script[^>]*type=[\"']application/ld\+json[\"'][^>]*>(.*?)</script>",
@@ -65,6 +76,9 @@ _NON_UNION_RE = re.compile(r"\bnon[- ]?union\b")
 _PERIOD_BY_UNIT = {
     "HOUR": "hourly", "DAY": "daily", "WEEK": "weekly", "MONTH": "monthly", "YEAR": "yearly",
 }
+
+_CARD_MONEY_RE = re.compile(r"\$\s*(\d[\d,]*(?:\.\d+)?)")
+_CARD_DUE_RE = re.compile(r"Due\s+Date:\s*(\d{1,2}/\d{1,2}/\d{4})", re.IGNORECASE)
 
 
 def _get_html(url: str) -> str:
@@ -128,6 +142,99 @@ def _listing_role_urls(html: str) -> list[str]:
                     seen.add(key)
                     urls.append(url)
     return urls
+
+
+def _clean(node) -> str:
+    return re.sub(r"\s+", " ", node.get_text(" ", strip=True)).strip() if node else ""
+
+
+def _card_pill(card, icon_name: str) -> str:
+    """Text beside a named icon in one current server-rendered role card."""
+    for image in card.select("small img[src]"):
+        if icon_name in str(image.get("src") or "").lower():
+            return _clean(image.find_next_sibling("span"))
+    return ""
+
+
+def _card_rows(html: str) -> list[dict]:
+    """Current mobile casting-call cards to rows, in listing order."""
+    rows: list[dict] = []
+    seen: set[str] = set()
+    for card in BeautifulSoup(html, "html.parser").select(
+        "li.casting-calls-card-mobile"
+    ):
+        link = card.select_one(f'a[href*="{_ROLE_PATH_MARKER}"]')
+        title_node = card.select_one("h3")
+        title = _clean(title_node)
+        href = str(link.get("href") or "").strip() if link else ""
+        url = urljoin("https://www.castingnetworks.com", href)
+        if not title or not href or url in seen:
+            continue
+        seen.add(url)
+
+        project = _clean(title_node.find_next_sibling("p")) if title_node else ""
+        description = ""
+        for label in card.select("p.fw-bold"):
+            if _clean(label).casefold() == "about this role":
+                description = _clean(label.find_next_sibling("p"))
+                break
+        rate = _card_pill(card, "payment_cc")
+        age = _card_pill(card, "birthday-cake")
+        union = _card_pill(card, "union")
+        location = _card_pill(card, "location_cc")
+        card_box = card.select_one("div.card")
+
+        quest: dict = {}
+        if card_box is not None:
+            if card_box.get("project-id"):
+                quest["project_id"] = str(card_box["project-id"])
+            if card_box.get("role-id"):
+                quest["role_id"] = str(card_box["role-id"])
+            if card_box.get("data-project-type"):
+                quest["project_type"] = str(card_box["data-project-type"])
+        if rate:
+            quest["pay_note"] = rate
+        if union:
+            quest["union"] = union
+        age_numbers = [int(value) for value in re.findall(r"\d{1,2}", age)]
+        if age_numbers and 0 < age_numbers[0] < 100:
+            quest["age_min"] = age_numbers[0]
+            if len(age_numbers) > 1 and age_numbers[0] <= age_numbers[1] < 100:
+                quest["age_max"] = age_numbers[1]
+
+        due_match = _CARD_DUE_RE.search(_clean(card))
+        due = ""
+        if due_match:
+            try:
+                due = datetime.strptime(due_match.group(1), "%m/%d/%Y").date().isoformat()
+            except ValueError:
+                due = ""
+        if due:
+            quest["apply_by"] = due
+
+        row: dict = {
+            "title": title,
+            "company": project or "Casting Networks",
+            "location": location,
+            "url": url,
+            "source": "castingnetworks",
+            "vertical": "camera",
+            "description": description,
+            "quest": quest,
+        }
+        if due:
+            row["event_end"] = due
+        amounts = [float(value.replace(",", "")) for value in _CARD_MONEY_RE.findall(rate)]
+        if amounts:
+            row["salary_min"] = min(amounts)
+            row["salary_max"] = max(amounts)
+            row["salary_period"] = "session"
+            row["salary_source"] = "reported"
+        low = f"{title}\n{description}".lower()
+        if any(rx.search(low) for rx in _FIRST_QUEST_RES):
+            row["first_quest_ok"] = True
+        rows.append(row)
+    return rows
 
 
 def _find_jobposting(html: str) -> dict | None:
@@ -303,7 +410,16 @@ def search_castingnetworks(
     logger.info("Fetching casting calls from Casting Networks...")
     listing_html = _get_html(_LISTING_URL)
     if not listing_html:
+        listing_html = _get_html(_LISTING_FALLBACK_URL)
+    if not listing_html:
         return []
+
+    card_rows = _card_rows(listing_html)
+    if card_rows:
+        rows = card_rows[:max_results]
+        logger.info("Casting Networks: found %d casting calls from listing cards", len(rows))
+        return rows
+
     role_urls = _listing_role_urls(listing_html)[:max_results]
     if not role_urls:
         logger.info("Casting Networks: no casting calls on the public listing")

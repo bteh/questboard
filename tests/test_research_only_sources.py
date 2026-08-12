@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from sqlalchemy import create_engine, text
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC_PATH = str(ROOT / "src")
@@ -67,3 +68,28 @@ def test_quest_refresh_never_selects_research_only(monkeypatch) -> None:
     # the refresh still runs real quest sources; the filter must not
     # accidentally empty the sweep
     assert ran, "quest refresh selected no sources at all"
+
+
+def test_versioned_repair_tombstones_legacy_research_rows(tmp_path) -> None:
+    from job_finder.models.maintenance import repair_research_only_rows
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'research.db'}")
+    with engine.begin() as conn:
+        conn.execute(text(
+            "CREATE TABLE applications ("
+            "id INTEGER PRIMARY KEY, source TEXT, url_status TEXT)"
+        ))
+        conn.execute(text(
+            "INSERT INTO applications (id, source, url_status) VALUES "
+            "(1, 'doctorofcredit', 'unknown'), "
+            "(2, 'scholarshipamerica', 'unknown')"
+        ))
+
+    assert repair_research_only_rows(engine) == 1
+    with engine.begin() as conn:
+        statuses = dict(conn.execute(text(
+            "SELECT source, url_status FROM applications ORDER BY id"
+        )).fetchall())
+    assert statuses["doctorofcredit"] == "expired"
+    assert statuses["scholarshipamerica"] == "unknown"
+    assert repair_research_only_rows(engine) == 0

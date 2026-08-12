@@ -75,6 +75,23 @@ describe('PosterWall clipped stamp', () => {
     expect(screen.getByRole('button', { name: 'Clip' })).toBeTruthy();
     expect(screen.queryByText(/in your log/)).toBeNull();
   });
+
+  it('shows effort on Side Quests and opens their details', () => {
+    const onOpenDetail = vi.fn();
+    render(
+      <PosterWall
+        items={[app({ vertical: 'scholarship' })]}
+        labels={{}}
+        onOpenSheet={() => {}}
+        onExplain={() => {}}
+        onOpenDetail={onOpenDetail}
+      />,
+    );
+    expect(screen.getByText('More involved')).toBeTruthy();
+    expect(screen.getByText('criteria')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'details' }));
+    expect(onOpenDetail).toHaveBeenCalledOnce();
+  });
 });
 
 describe('PosterWall fit grouping', () => {

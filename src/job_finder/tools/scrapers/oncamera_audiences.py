@@ -26,8 +26,10 @@ rows never carry salary keys, and prize copy ("win cash and prizes") is a
 game outcome, not comp. The source states no posted dates either, so rows
 never emit date_posted.
 
-Show-page fetches wait 1s apart and are capped per run; cards past the cap
-still emit from index data alone (name, city, age, blurb).
+Show-page fetches are serial and capped per run; cards past the cap still
+emit from index data alone (name, city, age, blurb). The source's robots.txt
+declares no crawl delay, so an artificial wait does not push a normal refresh
+past Questboard's 60-second source boundary.
 """
 
 from __future__ import annotations
@@ -53,8 +55,9 @@ _HOST = "on-camera-audiences.com"
 _SOURCE = "oncamera_audiences"
 _VERTICAL = "audience"
 
-_FETCH_DELAY_S = 1.0
 _MAX_SHOW_PAGES = 40
+_SHOW_TIMEOUT = 4
+_RUN_BUDGET_S = 52.0
 _MAX_DESCRIPTION = 3000
 
 # Index h4: "Los Angeles / Age: 8+", "Kearny, NJ / Age: 16+", " / Age: 21+"
@@ -86,11 +89,10 @@ def _fetch_listing() -> str | None:
 
 
 def _fetch_show(url: str) -> str | None:
-    """GET one show page, waiting the politeness delay first; None on failure."""
-    time.sleep(_FETCH_DELAY_S)
+    """GET one show page; None on failure (requests stay serial and capped)."""
     try:
         resp = requests.get(
-            url, headers={**_HEADERS, "Accept": "text/html"}, timeout=_TIMEOUT
+            url, headers={**_HEADERS, "Accept": "text/html"}, timeout=_SHOW_TIMEOUT
         )
         resp.raise_for_status()
         return resp.text
@@ -262,6 +264,7 @@ def search_oncamera_audiences(
     when a caller names them.
     """
     logger.info("Fetching shows from On Camera Audiences...")
+    deadline = time.monotonic() + _RUN_BUDGET_S
     html = _fetch_listing()
     if not html:
         return []
@@ -273,7 +276,7 @@ def search_oncamera_audiences(
         if len(results) >= max_results:
             break
         detail: dict = {}
-        if fetched < _MAX_SHOW_PAGES:
+        if fetched < _MAX_SHOW_PAGES and time.monotonic() + 1 < deadline:
             fetched += 1
             page = _fetch_show(card["url"])
             if page:

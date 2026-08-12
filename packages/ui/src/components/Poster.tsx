@@ -79,6 +79,8 @@ export interface PosterProps {
   desc?: string;
   /** what to bring; a node so the fit line can carry an inline action */
   bring: ReactNode;
+  /** Side Quests name this plainly; career posters keep the original label. */
+  bringLabel?: string;
   /** true when the quest needs nothing: the line gets the friendly check */
   bringFree?: boolean;
   /** the honest trap, when the kind or the data carries one */
@@ -87,6 +89,13 @@ export interface PosterProps {
   disclosure?: string;
   /** flavor tags: time and effort only, two at most */
   tags?: string[];
+  /** setup/application effort; never the time to complete or win the quest */
+  effort?: {
+    level: 'quick' | 'some_prep' | 'involved';
+    label: string;
+    time: string;
+    typical?: boolean;
+  };
   /** the connected assistant's fit verdict for this row, from its last run */
   fitBadge?: { label: string; verdict: 'strong' | 'good' | 'reach' | 'skip' };
   /** fast offline skill-coverage hint, shown until the agent's verdict lands */
@@ -120,10 +129,12 @@ export function Poster({
   newHere,
   desc,
   bring,
+  bringLabel = 'bring',
   bringFree,
   catchLine,
   disclosure,
   tags = [],
+  effort,
   fitBadge,
   skillBadge,
   pay,
@@ -219,8 +230,31 @@ export function Poster({
             ))}
           </div>
         )}
-        <div className={cx('qb-p-bring', bringFree && 'qb-p-bring-free')}>
-          <span className="qb-p-bring-label">bring</span>
+        {effort && (
+          <div className="qb-p-effort" aria-label={`Application effort: ${effort.label}, ${effort.time}`}>
+            <span className="qb-p-effort-label">effort</span>
+            <span className="qb-p-effort-marks" aria-hidden="true">
+              {[1, 2, 3].map((mark) => (
+                <i
+                  key={mark}
+                  className={cx(
+                    mark === 1 ||
+                      (mark === 2 && effort.level !== 'quick') ||
+                      (mark === 3 && effort.level === 'involved')
+                      ? 'is-filled'
+                      : undefined,
+                  )}
+                />
+              ))}
+            </span>
+            <span className="qb-p-effort-body">
+              <strong>{effort.label}</strong> · {effort.time}
+              {effort.typical && <em> · typical</em>}
+            </span>
+          </div>
+        )}
+        <div className={cx('qb-p-bring', effort && 'qb-p-bring-after-effort', bringFree && 'qb-p-bring-free')}>
+          <span className="qb-p-bring-label">{bringLabel}</span>
           <span className="qb-p-bring-body">{bring}</span>
         </div>
         {catchLine && (

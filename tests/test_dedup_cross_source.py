@@ -133,6 +133,48 @@ def test_alo_pair_merges_and_direct_source_wins():
     assert set(best.get("all_sources", [])) == {"greenhouse", "linkedin"}
 
 
+def test_recent_aggregator_repost_refreshes_older_direct_ats_copy():
+    description = (
+        "Lead the data engineering and analytics team, own the warehouse, "
+        "governance, BI delivery, and reliable production pipelines."
+    )
+    builtin = _job(
+        "Sr. Manager, Data Engineering & Analytics",
+        "Serve Robotics",
+        "United States; Toronto, Ontario, Canada",
+        description,
+        "https://builtin.com/job/sr-manager-data-engineering-analytics/9414145",
+        "builtin",
+        remote=True,
+        date_posted="2026-07-18",
+        date_confidence="exact",
+        direct_application_url=(
+            "https://jobs.ashbyhq.com/serverobotics/"
+            "887ef3a7-3bde-4649-820a-a54b0afc4cf9"
+        ),
+    )
+    ashby = _job(
+        "Sr. Manager, Data Engineering & Analytics",
+        "Serve Robotics",
+        "USA (remote); British Columbia (remote); Calgary (remote)",
+        description,
+        "https://jobs.ashbyhq.com/serverobotics/887ef3a7-3bde-4649-820a-a54b0afc4cf9",
+        "ashby",
+        remote=True,
+        date_posted="2026-05-19T15:32:37Z",
+        date_confidence="exact",
+    )
+
+    deduped = _deduplicate([builtin, ashby])
+
+    assert len(deduped) == 1
+    assert deduped[0]["source"] == "ashby"
+    assert deduped[0]["date_posted"] == "2026-07-18"
+    assert deduped[0]["direct_application_url"].startswith(
+        "https://jobs.ashbyhq.com/serverobotics/"
+    )
+
+
 def test_alo_yoga_spacing_variant_merges():
     jobs = [
         _job("Senior Data Analyst", "Alo Yoga", "Beverly Hills, CA",

@@ -100,6 +100,14 @@ def clear() -> None:
         logger.debug("could not clear agent progress", exc_info=True)
 
 
+def erase() -> None:
+    """Remove all persisted assistant progress during a privacy reset."""
+    try:
+        _progress_path().unlink(missing_ok=True)
+    except OSError:
+        logger.warning("Could not erase agent progress", exc_info=True)
+
+
 def record(tool: str) -> None:
     """Note that the run reached ``tool``.
 

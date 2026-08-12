@@ -32,6 +32,11 @@ logger = logging.getLogger(__name__)
 # 60s per-scraper cap (serial detail GETs × the per-posting loop) and starve
 # the shared scraper pool of time better spent on startup/crypto sources.
 _TIMEOUT = 8
+# Employers use independent Workday tenants/hosts. Twelve workers keeps each
+# tenant's request stream unchanged while avoiding four serial waves across
+# the 20+ configured employers. The previous six-worker ceiling made Workday
+# the slowest healthy source in live runs (often 60-80 seconds).
+_MAX_EMPLOYER_WORKERS = 12
 _UA = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -487,7 +492,7 @@ def search_workday(
             logger.warning("Workday scraper failed for %s: %s", emp.get("name", key), e)
             return []
 
-    workers = min(len(employers), 6)
+    workers = min(len(employers), _MAX_EMPLOYER_WORKERS)
     with ThreadPoolExecutor(max_workers=workers) as pool:
         futures = {pool.submit(_run, item): item[0] for item in employers.items()}
         for future in as_completed(futures):

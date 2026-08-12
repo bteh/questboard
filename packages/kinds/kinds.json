@@ -109,11 +109,83 @@
       ]
     },
     {
+      "id": "scholarship",
+      "label": "Find a scholarship",
+      "sub": "school, training, veterans, career changes",
+      "hue": "#4E6C86",
+      "order": 4,
+      "legacy_verticals": [],
+      "facets": [
+        {
+          "id": "highschool",
+          "label": "high school",
+          "terms": [
+            "high school",
+            "high-school",
+            "secondary school",
+            "graduating senior"
+          ]
+        },
+        {
+          "id": "college",
+          "label": "college",
+          "terms": [
+            "college",
+            "university",
+            "undergraduate",
+            "post-secondary",
+            "postsecondary",
+            "bachelor",
+            "master",
+            "doctoral"
+          ]
+        },
+        {
+          "id": "veterans",
+          "label": "veterans & families",
+          "terms": [
+            "veteran",
+            "service member",
+            "military",
+            "armed forces",
+            "national guard",
+            "reserve",
+            "fry scholarship",
+            "gi bill"
+          ]
+        },
+        {
+          "id": "stem",
+          "label": "STEM",
+          "terms": [
+            "stem",
+            "science",
+            "technology",
+            "engineering",
+            "mathematics",
+            "computer",
+            "data"
+          ]
+        },
+        {
+          "id": "trade",
+          "label": "trade & career training",
+          "terms": [
+            "vocational",
+            "trade school",
+            "technical school",
+            "career training",
+            "certification"
+          ]
+        }
+      ]
+    },
+    {
       "id": "skill",
       "label": "Bring a skill",
       "sub": "freelance, commissions, gigs",
       "hue": "#3F6B54",
-      "order": 4,
+      "order": 5,
       "legacy_verticals": [
         "lens"
       ]
@@ -123,7 +195,7 @@
       "label": "Perform & entertain",
       "sub": "casting, voice, music",
       "hue": "#A6522E",
-      "order": 5,
+      "order": 6,
       "legacy_verticals": [
         "camera"
       ],
@@ -161,7 +233,7 @@
       "label": "Be in the audience",
       "sub": "tapings, game shows, live TV",
       "hue": "#96437E",
-      "order": 6,
+      "order": 7,
       "legacy_verticals": []
     },
     {
@@ -169,7 +241,7 @@
       "label": "Join a study",
       "sub": "sleep labs, plasma, trials",
       "hue": "#7D3B4C",
-      "order": 7,
+      "order": 8,
       "legacy_verticals": []
     },
     {
@@ -177,7 +249,7 @@
       "label": "Odd jobs",
       "sub": "help a neighbor, one-days",
       "hue": "#7A5C3E",
-      "order": 8,
+      "order": 9,
       "legacy_verticals": []
     },
     {
@@ -185,7 +257,7 @@
       "label": "Deliver & drive",
       "sub": "packages and rides",
       "hue": "#44607A",
-      "order": 9,
+      "order": 10,
       "legacy_verticals": []
     },
     {
@@ -193,7 +265,7 @@
       "label": "Flip & rent",
       "sub": "cards, thrift, your car",
       "hue": "#6B5081",
-      "order": 10,
+      "order": 11,
       "legacy_verticals": [],
       "facets": [
         {
@@ -221,7 +293,7 @@
       "label": "Take the stage",
       "sub": "talks, panels, CFPs",
       "hue": "#2E6472",
-      "order": 11,
+      "order": 12,
       "legacy_verticals": []
     },
     {
@@ -229,7 +301,7 @@
       "label": "Pitch it",
       "sub": "funding, hackathons, accelerators",
       "hue": "#585089",
-      "order": 12,
+      "order": 13,
       "legacy_verticals": []
     },
     {
@@ -237,7 +309,7 @@
       "label": "Party quests",
       "sub": "gather friends, make one",
       "hue": "#A65A6E",
-      "order": 13,
+      "order": 14,
       "legacy_verticals": [
         "party"
       ]
@@ -247,7 +319,7 @@
       "label": "Find work",
       "sub": "jobs, full-time, contract",
       "hue": "#3D4756",
-      "order": 14,
+      "order": 15,
       "legacy_verticals": [
         "career"
       ]

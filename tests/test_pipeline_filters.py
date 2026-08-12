@@ -34,6 +34,9 @@ class StaffingAgencyFilterTest(unittest.TestCase):
             {"title": "Frontend Eng", "company": "Hays", "url": "http://h"},
             {"title": "Platform Eng", "company": "Kforce", "url": "http://i"},
             {"title": "Infra Eng", "company": "Apex Systems", "url": "http://j"},
+            {"title": "Data Eng", "company": "Jobgether", "url": "http://j2"},
+            {"title": "Data Eng", "company": "Eleven Recruiting", "url": "http://j3"},
+            {"title": "Data Eng", "company": "Motion Recruitment", "url": "http://j4"},
             # Real companies — should survive the filter
             {"title": "Staff Eng", "company": "Stripe", "url": "http://k"},
             {"title": "SDE", "company": "Google", "url": "http://l"},
@@ -342,7 +345,9 @@ class CryptoSourceRoleRescueTest(unittest.TestCase):
             {"title": "Senior Solidity Engineer", "company": "X", "url": "http://b",
              "is_remote": True, "source": "cryptojobslist"},
         ]
-        self.assertEqual([job["title"] for job in pipe.filter_by_role(jobs)], ["Senior Solidity Engineer"])
+        filtered = pipe.filter_by_role(jobs)
+        self.assertEqual([job["title"] for job in filtered], ["Senior Solidity Engineer"])
+        self.assertEqual(filtered[0]["match_bucket"], "adjacent")
 
     def test_non_crypto_remote_jobs_still_filtered_strictly(self) -> None:
         """The rescue is crypto-source-scoped — generic remote firehose stays strict."""

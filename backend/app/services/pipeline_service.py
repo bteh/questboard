@@ -76,8 +76,10 @@ class PipelineRun:
     keyword_scored_count: int = 0
     funnel: list[dict] = field(default_factory=list)
     error: str | None = None
+    source_coverage: dict[str, Any] = field(default_factory=dict)
     queue: asyncio.Queue | None = None
     loop: asyncio.AbstractEventLoop | None = None
+    worker_id: str = ""
 
 
 # In-memory store of recent runs (capped)
@@ -231,6 +233,7 @@ def _persist_workspace_event(run: PipelineRun, event_type: str, data: str) -> No
             run.run_id,
             event_type,
             data,
+            worker_id=run.worker_id,
         )
 
     try:
@@ -315,6 +318,7 @@ def start_run(
     config_override: dict | None = None,
     llm_override: Any | None = None,
     snapshot=None,
+    durable: bool = False,
 ) -> PipelineRun:
     """Launch a pipeline run in a background thread. Returns immediately.
 
@@ -339,6 +343,44 @@ def start_run(
                 logger.info(
                     "Search already in progress for workspace %s; returning existing run %s",
                     workspace_id, existing.run_id,
+                )
+                return existing
+
+        # A stdio MCP process has its own memory, so its in-flight run is not
+        # visible in this module's _runs when another assistant process starts.
+        # Durable callers also consult the shared DB before creating a second
+        # pull for the same workspace.
+        if durable:
+            active_record = None
+
+            def _active_callback(db) -> None:
+                nonlocal active_record
+                from app.services import workspace_service
+
+                active_record = workspace_service.get_active_search_run(db, workspace_id)
+
+            _with_db(_active_callback)
+            if active_record is not None:
+                existing = PipelineRun(
+                    run_id=active_record.run_id,
+                    profile="workspace",
+                    mode=active_record.mode or mode,
+                    workspace_id=workspace_id,
+                    status=active_record.status,
+                    started_at=_coerce_utc(active_record.started_at),
+                    completed_at=_coerce_utc(active_record.completed_at),
+                    jobs_found=int(active_record.jobs_found or 0),
+                    jobs_scored=int(active_record.jobs_scored or 0),
+                    error=active_record.error or None,
+                    queue=asyncio.Queue() if not get_settings().hosted_mode else None,
+                    loop=loop,
+                )
+                if not get_settings().hosted_mode:
+                    _runs[existing.run_id] = existing
+                logger.info(
+                    "Durable search already active for workspace %s; returning run %s",
+                    workspace_id,
+                    existing.run_id,
                 )
                 return existing
 
@@ -369,9 +411,18 @@ def start_run(
         _cleanup_old_runs()
         _runs[run_id] = run
 
+    effective_locations = list(locations)
+    if workplace_preference == "remote_only":
+        effective_locations = ["Remote"]
+    elif include_remote and "Remote" not in effective_locations:
+        effective_locations.append("Remote")
+
     request_payload = {
         "roles": roles,
-        "locations": locations,
+        # Persist the locations the executor will actually search. The durable
+        # worker reconstructs work from this payload; storing only the selected
+        # city silently dropped Remote from remote-friendly MCP pulls.
+        "locations": effective_locations,
         "keywords": keywords,
         "companies": companies or [],
         "include_remote": include_remote,
@@ -380,20 +431,29 @@ def start_run(
         "use_ai": use_ai,
         "profile": profile,
         "mode": mode,
+        "durable": durable,
     }
 
     if workspace_id and snapshot is not None:
         def _callback(db) -> None:
             from app.services import workspace_service
 
+            # Non-durable local calls execute immediately in this process. Put
+            # their persisted row in running before commit so the desktop's
+            # durable worker can never race in and claim the same run.
+            persisted_status = run.status
+            persisted_started_at = run.started_at
+            if not get_settings().hosted_mode and not durable:
+                persisted_status = "running"
+                persisted_started_at = _utcnow()
             workspace_service.register_search_run(
                 db,
                 workspace_id,
                 run.run_id,
-                run.status,
+                persisted_status,
                 run.mode,
                 snapshot,
-                run.started_at,
+                persisted_started_at,
                 request_payload=request_payload,
             )
 
@@ -412,6 +472,11 @@ def start_run(
             _emit_stage_event(run, stage="queued", percent=1)
             return run
 
+    if durable and workspace_id:
+        _send_event(run, "progress", "Queued - the desktop backend will run this refresh")
+        _emit_stage_event(run, stage="queued", percent=1)
+        return run
+
     # Merge keywords into roles for SEARCH, but only title-shaped keywords —
     # pure skills ("rbac", "dbt", "sox compliance", "pii masking") return noise
     # as board job-title queries and burn the board's limited query budget.
@@ -420,12 +485,6 @@ def start_run(
     all_roles = list(roles)
     if keywords:
         all_roles.extend(k for k in keywords if _is_searchable_title(k))
-
-    effective_locations = list(locations)
-    if workplace_preference == "remote_only":
-        effective_locations = ["Remote"]
-    elif include_remote and "Remote" not in effective_locations:
-        effective_locations = list(effective_locations) + ["Remote"]
 
     _executor.submit(
         _execute_pipeline,
@@ -466,33 +525,7 @@ def _execute_pipeline(
     run.started_at = _coerce_utc(run.started_at) or _utcnow()
     _persist_workspace_run_status(run)
 
-    # Report only the sources actually in use, not the full plugin registry.
-    # Without this filter, the "searching N sources" line lies — it lists
-    # every registered scraper even when the user has disabled most of them.
-    try:
-        from job_finder.tools.scrapers import get_registry
-        from job_finder.pipeline import _load_search_config
-        _cfg = _load_search_config(run.profile)
-        _registry = get_registry()
-        _enabled_names: list[str] = []
-        for _board in _cfg.get("job_boards", []) or []:
-            _key = str(_board).strip().lower()
-            if _key in _registry:
-                _enabled_names.append(_registry[_key].display_name)
-        for _entry in _cfg.get("additional_sources", []) or []:
-            if not isinstance(_entry, dict) or not _entry.get("enabled"):
-                continue
-            _key = str(_entry.get("name", "")).strip().lower()
-            if _key in _registry:
-                _enabled_names.append(_registry[_key].display_name)
-        active_source_count = len(_enabled_names)
-        source_names = ", ".join(_enabled_names) if _enabled_names else "multiple sources"
-    except Exception:
-        active_source_count = 0
-        source_names = "multiple sources"
     mode_label = _MODE_LABELS.get(mode, mode)
-    _send_event(run, "progress", f"{mode_label} started — searching {active_source_count or 'multiple'} sources: {source_names}")
-    _send_event(run, "progress", f"Searching {len(roles)} terms across {len(locations)} locations")
 
     try:
         pipeline = get_pipeline(profile=run.profile)
@@ -506,6 +539,47 @@ def _execute_pipeline(
                     pipeline.config[key] = merged
                 else:
                     pipeline.config[key] = value
+
+        # Report the effective source set AFTER workspace overrides merge.
+        # Registry-default career scrapers count too: they run even without a
+        # YAML row, and omitting them made "searching 16 sources" describe a
+        # real 20-source pull.
+        try:
+            from job_finder.pipeline import _career_scraper_enabled
+            from job_finder.tools.scrapers import get_registry
+
+            registry = get_registry()
+            enabled_keys: list[str] = []
+            for board in pipeline.config.get("job_boards", []) or []:
+                key = str(board).strip().lower()
+                if key in registry and key not in enabled_keys:
+                    enabled_keys.append(key)
+            configured_sources = {
+                str(entry.get("name", "")).strip().lower(): entry
+                for entry in pipeline.config.get("additional_sources", []) or []
+                if isinstance(entry, dict) and entry.get("name")
+            }
+            for key, meta in registry.items():
+                if _career_scraper_enabled(meta, configured_sources.get(key)) and key not in enabled_keys:
+                    enabled_keys.append(key)
+            for entry in pipeline.config.get("watchlist", []) or []:
+                if not isinstance(entry, dict):
+                    continue
+                key = str(entry.get("ats", "")).strip().lower()
+                if key in registry and key not in enabled_keys:
+                    enabled_keys.append(key)
+            enabled_names = [registry[key].display_name for key in enabled_keys]
+            active_source_count = len(enabled_names)
+            source_names = ", ".join(enabled_names) if enabled_names else "no enabled sources"
+        except Exception:
+            active_source_count = 0
+            source_names = "multiple sources"
+        _send_event(
+            run,
+            "progress",
+            f"{mode_label} started — searching {active_source_count or 'multiple'} sources: {source_names}",
+        )
+        _send_event(run, "progress", f"Searching {len(roles)} terms across {len(locations)} locations")
 
         # ── AI Company Discovery ─────────────────────────────────
         # If the LLM is available and we have a resume, ask it to discover
@@ -661,16 +735,21 @@ def _execute_pipeline(
         if merged > 0:
             _send_event(run, "progress", f"Merged {merged} cross-source duplicates")
 
-        # Auto-check URLs to mark dead postings. Runs in the background
-        # after scoring so the user sees results immediately while expired
-        # jobs are quietly flagged.
+        # Auto-check URLs to mark dead postings. This final pass stays before
+        # completion so the board's first refetch already hides confirmed-dead
+        # rows; check_urls parallelizes the independent hosts to keep it short.
         if jobs and workspace_id:
             try:
                 _send_event(run, "progress", "Checking which job postings are still active...")
                 from app.services.application_service import check_urls as _check_urls
                 # Cover this run's jobs (capped); parallelized inside check_urls.
                 _limit = min(max(len(jobs), 50), 200)
-                _with_db(lambda db: _check_urls(db, limit=_limit, workspace_id=data_workspace_id))
+                _with_db(lambda db: _check_urls(
+                    db,
+                    limit=_limit,
+                    workspace_id=data_workspace_id,
+                    search_run_id=run.run_id,
+                ))
             except Exception as exc:
                 logger.debug("Auto URL check failed (non-fatal): %s", exc)
 
@@ -681,6 +760,10 @@ def _execute_pipeline(
                 src = j.get("source", "unknown") or "unknown"
                 sources[src] = sources.get(src, 0) + 1
 
+        run.source_coverage = dict(
+            getattr(pipeline, "_last_source_coverage", {}) or {}
+        )
+
         run.status = "completed"
         run.completed_at = _utcnow()
         duration = (run.completed_at - (_coerce_utc(run.started_at) or run.completed_at)).total_seconds()
@@ -688,6 +771,8 @@ def _execute_pipeline(
             run,
             "complete",
             json.dumps({
+                "run_id": run.run_id,
+                "status": "completed",
                 "jobs_found": run.jobs_found,
                 "new_jobs": run.new_jobs,
                 "jobs_before_filters": run.jobs_before_filters,
@@ -697,6 +782,7 @@ def _execute_pipeline(
                 "keyword_scored_count": run.keyword_scored_count,
                 "duration_seconds": round(duration, 1),
                 "sources": sources,
+                "source_coverage": run.source_coverage,
             }),
         )
         _persist_workspace_run_status(run)
@@ -949,6 +1035,8 @@ def _save_search_results(
             salary_min_annualized=job.get("salary_min_annualized"),
             salary_max_annualized=job.get("salary_max_annualized"),
             salary_source=job.get("salary_source"),
+            industry_tags=job.get("industry_tags"),
+            ecosystem_tags=job.get("ecosystem_tags"),
             profile=pipeline.profile_name,
             company_type=ct,
             work_type=wt,
@@ -965,7 +1053,7 @@ def _save_search_results(
 def _send_event(run: PipelineRun, event_type: str, data: str) -> None:
     """Thread-safe: push an SSE event onto the run's asyncio queue."""
     _persist_workspace_event(run, event_type, data)
-    if run.queue and run.loop:
+    if run.queue and run.loop and run.loop.is_running():
         try:
             asyncio.run_coroutine_threadsafe(
                 run.queue.put({"event": event_type, "data": data}),
@@ -995,11 +1083,13 @@ def _emit_stage_event(
     )
 
 
-def process_next_hosted_run(worker_id: str | None = None) -> bool:
-    """Claim and execute one hosted search run from durable storage."""
-    if not get_settings().hosted_mode:
-        return False
+def process_next_persisted_run(worker_id: str | None = None) -> bool:
+    """Claim and execute one search run from durable storage.
 
+    Hosted deployments call this from the standalone worker. The desktop API
+    calls the same path for MCP-started pulls, so the short-lived assistant
+    subprocess never owns the network work or the final database save.
+    """
     from app.models.database import get_db
     from app.services import workspace_service
 
@@ -1021,7 +1111,11 @@ def process_next_hosted_run(worker_id: str | None = None) -> bool:
             workspace_id=record.workspace_id,
             status="running",
             started_at=_coerce_utc(record.started_at),
+            worker_id=effective_worker_id,
         )
+        if not get_settings().hosted_mode:
+            _cleanup_old_runs()
+            _runs[run.run_id] = run
         _send_event(run, "progress", "Worker claimed run - starting search")
         _emit_stage_event(run, stage="searching", percent=3)
 
@@ -1055,8 +1149,9 @@ def process_next_hosted_run(worker_id: str | None = None) -> bool:
             llm_override=llm,
             target_companies=[str(item) for item in payload.get("companies") or []],
             emit_error_event=False,
-            # hosted-only path: rows belong to the visitor's workspace
-            data_workspace_id=record.workspace_id,
+            # Hosted rows belong to the visitor workspace. Desktop has one
+            # shared local pool, so its rows remain workspace_id NULL.
+            data_workspace_id=(record.workspace_id if get_settings().hosted_mode else None),
         )
 
         db.refresh(record)
@@ -1094,6 +1189,13 @@ def process_next_hosted_run(worker_id: str | None = None) -> bool:
             next(db_gen)
         except StopIteration:
             pass
+
+
+def process_next_hosted_run(worker_id: str | None = None) -> bool:
+    """Backward-compatible hosted worker entrypoint."""
+    if not get_settings().hosted_mode:
+        return False
+    return process_next_persisted_run(worker_id)
 
 
 async def stream_progress(run_id: str):

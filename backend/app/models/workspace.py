@@ -113,7 +113,7 @@ class WorkspacePreferences(Base):
     max_days_old = Column(Integer, default=14)
     include_linkedin_jobs = Column(Boolean, default=False)
     current_title = Column(String(300), default="")
-    current_level = Column(String(50), default="mid")
+    current_level = Column(String(50), default="")
     llm_provider = Column(String(100), default="")
     llm_base_url = Column(String(500), default="")
     llm_api_key = Column(Text, default="")

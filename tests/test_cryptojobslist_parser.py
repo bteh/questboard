@@ -34,6 +34,15 @@ def _make_html(jobs: list[dict]) -> str:
     )
 
 
+def _make_detail_html(job: dict) -> str:
+    payload = {"props": {"pageProps": {"job": job}}, "page": "/jobs/[slug]"}
+    return (
+        '<script id="__NEXT_DATA__" type="application/json">'
+        + json.dumps(payload)
+        + "</script>"
+    )
+
+
 _SAMPLE_JOB = {
     "_id": {"$oid": "abc"},
     "jobTitle": "Senior Solidity Engineer",
@@ -98,6 +107,46 @@ class CryptoJobsListParserTest(unittest.TestCase):
         self.assertIsNone(out["salary_min"])
         self.assertIsNone(out["salary_max"])
 
+    def test_normalize_reads_current_salary_object(self) -> None:
+        job = dict(
+            _SAMPLE_JOB,
+            jobPostingJSONLD=None,
+            salary={
+                "minValue": 200000,
+                "maxValue": 240000,
+                "currency": "USD",
+                "unitText": "YEAR",
+            },
+        )
+        out = self.mod._normalize_next_job(job)
+        self.assertEqual(out["salary_min"], 200000)
+        self.assertEqual(out["salary_max"], 240000)
+        self.assertEqual(out["salary_currency"], "USD")
+        self.assertEqual(out["salary_period"], "annual")
+        self.assertEqual(out["salary_source"], "reported")
+
+    def test_extracts_and_enriches_detail_job(self) -> None:
+        detail = dict(
+            _SAMPLE_JOB,
+            jobDescription="<p>Build the canonical data models in <b>Snowflake</b>.</p>",
+            salary={
+                "minValue": 200000,
+                "maxValue": 240000,
+                "currency": "USD",
+                "unitText": "YEAR",
+            },
+        )
+        parsed = self.mod._extract_next_data_detail_job(_make_detail_html(detail))
+        self.assertEqual(parsed["jobTitle"], "Senior Solidity Engineer")
+
+        thin = self.mod._normalize_next_job(dict(_SAMPLE_JOB, jobPostingJSONLD=None))
+        with patch.object(self.mod, "_fetch_detail_job", return_value=parsed):
+            enriched = self.mod._enrich_job(thin)
+        self.assertIn("canonical data models", enriched["description"])
+        self.assertNotIn("<p>", enriched["description"])
+        self.assertEqual(enriched["salary_min"], 200000)
+        self.assertEqual(enriched["salary_max"], 240000)
+
     def test_normalize_handles_non_remote_with_location(self) -> None:
         job = dict(
             _SAMPLE_JOB,
@@ -118,7 +167,9 @@ class CryptoJobsListParserTest(unittest.TestCase):
                  jobPostingJSONLD=None),
         ])
         with patch.object(self.mod, "_fetch_html", return_value=html):
-            jobs = self.mod.search_cryptojobslist(roles=["solidity engineer"], max_results=10)
+            jobs = self.mod.search_cryptojobslist(
+                roles=["solidity engineer"], max_results=10, enrich_details=False,
+            )
         titles = [j["title"] for j in jobs]
         self.assertIn("Senior Solidity Engineer", titles)
         self.assertNotIn("Marketing Coordinator", titles)
@@ -133,7 +184,9 @@ class CryptoJobsListParserTest(unittest.TestCase):
         ])
         with patch.object(self.mod, "_fetch_html", return_value=html):
             # role doesn't word-match, but "zk" is a crypto keyword → passes
-            jobs = self.mod.search_cryptojobslist(roles=["data engineer"], max_results=10)
+            jobs = self.mod.search_cryptojobslist(
+                roles=["data engineer"], max_results=10, enrich_details=False,
+            )
         self.assertEqual(len(jobs), 1)
 
     def test_search_paginates_until_max_results(self) -> None:
@@ -141,15 +194,57 @@ class CryptoJobsListParserTest(unittest.TestCase):
         page1 = _make_html([dict(_SAMPLE_JOB, seoSlug=f"job-{i}") for i in range(25)])
         page2 = _make_html([dict(_SAMPLE_JOB, seoSlug=f"job-{i+25}") for i in range(25)])
         fetch_mock = MagicMock(side_effect=[page1, page2, ""])
-        with patch.object(self.mod, "_fetch_html", fetch_mock):
-            jobs = self.mod.search_cryptojobslist(roles=None, max_results=40)
+        with (
+            patch.object(self.mod, "_fetch_html", fetch_mock),
+            patch.object(self.mod, "_LISTING_ROUTES", ("data",)),
+        ):
+            jobs = self.mod.search_cryptojobslist(
+                roles=None, max_results=40, enrich_details=False,
+            )
         self.assertGreaterEqual(len(jobs), 40)
         self.assertLessEqual(fetch_mock.call_count, 4)
+
+    def test_zero_match_page_does_not_hide_later_matches(self) -> None:
+        page1 = _make_html([
+            dict(
+                _SAMPLE_JOB,
+                jobTitle="Marketing Coordinator",
+                seoSlug=f"marketing-{i}",
+                jobPostingJSONLD=None,
+            )
+            for i in range(25)
+        ])
+        page2 = _make_html([
+            dict(
+                _SAMPLE_JOB,
+                jobTitle="Data Analytics Engineer",
+                seoSlug="data-analytics-engineer-at-alchemy",
+                jobPostingJSONLD=None,
+            )
+        ])
+
+        def fetch(url: str) -> str:
+            return page2 if "page=2" in url else page1
+
+        fetch_mock = MagicMock(side_effect=fetch)
+        with (
+            patch.object(self.mod, "_fetch_html", fetch_mock),
+            patch.object(self.mod, "_LISTING_ROUTES", ("data",)),
+            patch.object(self.mod, "_MAX_PAGES_PER_LANE", 2),
+        ):
+            jobs = self.mod.search_cryptojobslist(
+                roles=["data engineer"], max_results=10, enrich_details=False,
+            )
+        self.assertEqual([job["title"] for job in jobs], ["Data Analytics Engineer"])
+        self.assertEqual(fetch_mock.call_args_list[0].args[0], "https://cryptojobslist.com/data")
+        self.assertEqual(fetch_mock.call_args_list[1].args[0], "https://cryptojobslist.com/data?page=2")
 
     def test_search_returns_empty_on_403(self) -> None:
         """If Cloudflare ever locks down the homepage too, degrade gracefully."""
         with patch.object(self.mod, "_fetch_html", return_value=""):
-            jobs = self.mod.search_cryptojobslist(roles=["engineer"], max_results=10)
+            jobs = self.mod.search_cryptojobslist(
+                roles=["engineer"], max_results=10, enrich_details=False,
+            )
         self.assertEqual(jobs, [])
 
 

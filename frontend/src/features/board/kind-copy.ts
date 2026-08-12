@@ -25,6 +25,10 @@ const COPY: Record<string, KindCopy> = {
     bring: 'a current unedited photo, your sizes, your availability',
     catchLine: 'a retouched pro headshot gets you rejected here; they want you as you look now',
   },
+  audience: {
+    bring: 'the age, ID, dress, party-size, and arrival rules in the ticket offer',
+    catchLine: 'tickets can be overbooked; arriving late can mean no seat even with a reservation',
+  },
   odd: { bring: 'nothing, just show up', bringFree: true },
   deliver: {
     bring: 'a 4-door car, license, insurance, 21+, a background check',
@@ -45,11 +49,23 @@ const COPY: Record<string, KindCopy> = {
     bring: 'an ID and money to park; some banks check ChexSystems first',
     catchLine: 'the bonus is taxable income, and closing the account early can claw it back',
   },
+  scholarship: {
+    bring: 'the eligibility proof the sponsor asks for—often a transcript, FAFSA information, or service record',
+    catchLine: 'never pay to apply; verify the deadline and eligibility on the sponsor’s page before sharing sensitive documents',
+  },
   body: {
     bring: 'a government ID and a health screen',
     catchLine: 'eligibility screen on a real study; read the consent first',
   },
   party: { bring: '4 friends and a Saturday, nothing else', bringFree: true },
+  speak: {
+    bring: 'a session abstract, speaker bio, and the talk outline or samples requested',
+    catchLine: 'acceptance is not guaranteed, and travel or lodging may not be covered',
+  },
+  pitch: {
+    bring: 'a clear problem, project or team summary, and any deck or demo requested',
+    catchLine: 'check the rules for fees, equity, IP rights, and required attendance before applying',
+  },
 };
 
 export function kindCopy(kind: string): KindCopy {

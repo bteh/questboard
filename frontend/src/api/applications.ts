@@ -1,8 +1,12 @@
 import { apiGet, apiGetBlob, apiPost, apiPatch, apiDelete } from '@/lib/api-client';
+import { localTimeZone } from '@/lib/time-zone';
 import type { ApplicationListResponse, ProfileWorkListResponse, ApplicationResponse, ApplicationCreate, ApplicationUpdate, StatusUpdate, ApplicationFilters } from '@/types/application';
 
 export function getApplications(filters: ApplicationFilters = {}): Promise<ApplicationListResponse> {
   const params: Record<string, string | number | boolean | undefined> = { ...filters };
+  if (filters.found_within_days && !filters.timezone_name) {
+    params.timezone_name = localTimeZone();
+  }
   // Backend uses sort_dir not sort_order
   if (filters.sort_order) {
     params.sort_dir = filters.sort_order;
@@ -19,10 +23,15 @@ export function getProfileWork(filters: ApplicationFilters = {}): Promise<Profil
     location_strict: filters.location_strict,
     salary_min: filters.salary_min,
     salary_max: filters.salary_max,
+    salary_currency: filters.salary_currency,
     is_remote: filters.is_remote,
+    founding_only: filters.founding_only,
     posted_within_days: filters.posted_within_days,
     found_within_days: filters.found_within_days,
+    timezone_name:
+      filters.timezone_name ?? (filters.found_within_days ? localTimeZone() : undefined),
     source_category: filters.source_category,
+    sort_by: filters.sort_by,
     page: filters.page,
     page_size: filters.page_size,
   });

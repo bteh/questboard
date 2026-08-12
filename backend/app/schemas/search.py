@@ -42,6 +42,24 @@ class SearchRequest(BaseModel):
         return value
 
 
+class SourceCoverageItem(BaseModel):
+    source: str
+    display_name: str
+    state: Literal["ok", "zero", "partial", "failed"]
+    rows_found: int = 0
+    attempts: int = 0
+    failed_attempts: int = 0
+    error: str = ""
+
+class SourceCoverage(BaseModel):
+    total: int = 0
+    ok: int = 0
+    zero: int = 0
+    partial: int = 0
+    failed: int = 0
+    sources: list[SourceCoverageItem] = Field(default_factory=list)
+
+
 class RunStatus(BaseModel):
     run_id: str
     status: str  # pending | running | completed | failed
@@ -52,6 +70,7 @@ class RunStatus(BaseModel):
     new_jobs: int = 0
     jobs_scored: int = 0
     error: str | None = None
+    source_coverage: SourceCoverage | None = None
 
 
 class RunResult(BaseModel):
@@ -63,6 +82,7 @@ class RunResult(BaseModel):
     strong_matches: int = 0
     duration_seconds: float = 0.0
     error: str | None = None
+    source_coverage: SourceCoverage | None = None
 
 
 class FunnelStage(BaseModel):

@@ -1,7 +1,5 @@
-/* The posted-within filter both lanes share. The vocabulary is four fixed
-   windows (?days=1|3|7|30); anything else means any time. The labels stay
-   in the trade-paper register, and the hidden-dates clause only speaks
-   while the filter is on AND the shown count actually dropped. */
+/* The shared date filter: a local-calendar first-seen day plus three rolling
+   source-posted windows. Anything else means no additional date filter. */
 
 import { describe, expect, it } from 'vitest';
 import {
@@ -41,9 +39,9 @@ describe('the posted select options', () => {
     expect(POSTED_OPTIONS.map((o) => o.label)).toEqual([
       'any time',
       'new today',
-      'last 3 days',
-      'this week',
-      'this month',
+      'posted last 3 days',
+      'posted last 7 days',
+      'posted last 30 days',
     ]);
   });
 });
@@ -52,8 +50,8 @@ describe('postedChipLabel', () => {
   it('names the active window in plain words', () => {
     expect(postedChipLabel('found-1')).toBe('new today');
     expect(postedChipLabel('3')).toBe('posted in the last 3 days');
-    expect(postedChipLabel('7')).toBe('posted this week');
-    expect(postedChipLabel('30')).toBe('posted this month');
+    expect(postedChipLabel('7')).toBe('posted in the last 7 days');
+    expect(postedChipLabel('30')).toBe('posted in the last 30 days');
   });
 });
 
@@ -74,6 +72,10 @@ describe('the hidden-dates clause', () => {
 
   it('stays silent while the filter is off', () => {
     expect(hiddenDatesClause({ days: undefined, shown: 12, baseline: 66 })).toBeNull();
+  });
+
+  it('never blames missing post dates for the first-seen today filter', () => {
+    expect(hiddenDatesClause({ days: 'found-1', shown: 12, baseline: 66 })).toBeNull();
   });
 
   it('stays silent while nothing dropped', () => {

@@ -9,10 +9,12 @@
 
 import { PlainButton, Sheet, TextLink } from '@questboard/ui';
 import { DetailArtifacts } from '@/features/board/detail-artifacts';
+import { effortMarks, type QuestRequirements } from '@/features/board/quest-requirements';
+import { toPoster } from '@/features/board/poster-model';
 import { useApplication } from '@/hooks/use-applications';
 import { resolveSourceLabel } from '@/hooks/use-scrapers';
 import { cleanDescription } from '@/utils/format';
-import { formatStatedPay, payUnitFor, toBoardCard } from '@/utils/board-card';
+import { formatStatedPay, payUnitFor } from '@/utils/board-card';
 import { postedAgoLabel } from '@/utils/job-trust';
 import type { ApplicationResponse } from '@/types/application';
 
@@ -36,6 +38,18 @@ function FactRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+function questString(app: ApplicationResponse, key: string): string {
+  const value = app.quest?.[key];
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+function dateOnlyLabel(value: string): string | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (!match) return null;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 function Facts({ app, sourceLabel }: { app: ApplicationResponse; sourceLabel: string }) {
   const pay = formatStatedPay(app.salary_min, app.salary_max, app.salary_currency);
   const payUnit = payUnitFor(app);
@@ -47,11 +61,14 @@ function Facts({ app, sourceLabel }: { app: ApplicationResponse; sourceLabel: st
   const posted = postedAgoLabel(app.date_posted, app.date_confidence);
   const source = sourceLabel + (app.direct_from_company ? ', direct from the company' : '');
   const checked = checkedDate(app.last_checked_at);
+  const applyBy = questString(app, 'apply_by');
+  const deadline = applyBy ? dateOnlyLabel(applyBy) : app.is_rolling ? 'rolling' : null;
   return (
     <div className="qb-jd-facts">
       <FactRow label="pay" value={payValue} />
       {place && <FactRow label="place" value={place} />}
       {posted && <FactRow label="posted" value={posted.toLowerCase()} />}
+      {deadline && <FactRow label="apply by" value={deadline} />}
       <FactRow label="source" value={source} />
       {checked && (
         <FactRow
@@ -60,6 +77,51 @@ function Facts({ app, sourceLabel }: { app: ApplicationResponse; sourceLabel: st
         />
       )}
     </div>
+  );
+}
+
+function QuestRequirementsPanel({ requirements }: { requirements: QuestRequirements }) {
+  const marks = effortMarks(requirements.effort.level);
+  const effortBasis = requirements.effort.basis === 'listed'
+    ? 'Based on the steps listed for this quest.'
+    : 'Typical for this kind of quest; the posting did not state every step.';
+  const criteriaBasis = requirements.criteria.basis === 'listed'
+    ? 'These requirements are listed for this quest.'
+    : 'These are typical requirements for this kind of quest.';
+
+  return (
+    <section className="qb-jd-quest" aria-labelledby="qb-jd-quest-title">
+      <div className="qb-jd-quest-head">
+        <div>
+          <span className="qb-jd-quest-kicker">application effort</span>
+          <div className="qb-jd-effort-line">
+            <span className="qb-jd-effort-marks" aria-hidden="true">
+              {[1, 2, 3].map((mark) => (
+                <i key={mark} className={mark <= marks ? 'is-filled' : undefined} />
+              ))}
+            </span>
+            <strong id="qb-jd-quest-title">{requirements.effort.label}</strong>
+            <span>· {requirements.effort.time}</span>
+          </div>
+        </div>
+        <span className="qb-jd-basis">
+          {requirements.effort.basis === 'listed' ? 'listed steps' : 'typical estimate'}
+        </span>
+      </div>
+      <p className="qb-jd-effort-note">{requirements.effort.note}</p>
+      <p className="qb-jd-method">
+        {effortBasis} This estimates setup and application work—not your odds, approval time,
+        or the time needed to complete the quest.
+      </p>
+
+      <h4>Criteria</h4>
+      <ul className="qb-jd-criteria">
+        {requirements.criteria.items.map((item) => <li key={item}>{item}</li>)}
+      </ul>
+      <p className="qb-jd-method">
+        {criteriaBasis} Confirm the complete eligibility rules on the original posting.
+      </p>
+    </section>
   );
 }
 
@@ -74,7 +136,8 @@ export function JobDetailSheet({
 }) {
   const { data: app, isError } = useApplication(jobId ?? 0);
   const open = jobId !== null;
-  const card = open && app ? toBoardCard(app, resolveSourceLabel(app.source, labels)) : null;
+  const poster = open && app ? toPoster(app, resolveSourceLabel(app.source, labels)) : null;
+  const card = poster?.card ?? null;
   /* rows scraped before the pipeline cleaned text can carry markup junk;
      cleanDescription keeps the newlines, so pre-wrap still shows paragraphs */
   const desc = app ? cleanDescription(app.description) : '';
@@ -83,7 +146,7 @@ export function JobDetailSheet({
     <Sheet
       open={open}
       onClose={onClose}
-      label="Job details"
+      label={poster?.requirements ? 'Quest details' : 'Job details'}
       title={card?.title}
       meta={card?.meta}
     >
@@ -93,6 +156,7 @@ export function JobDetailSheet({
       {open && app && card && (
         <>
           <Facts app={app} sourceLabel={resolveSourceLabel(app.source, labels)} />
+          {poster?.requirements && <QuestRequirementsPanel requirements={poster.requirements} />}
           {desc ? (
             <div className="qb-jd-desc">{desc}</div>
           ) : (

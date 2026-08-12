@@ -100,10 +100,17 @@ export function PosterWall({
         newHere={cutoff ? isNewSince(app.date_found, cutoff) : false}
         desc={poster.desc}
         bring={bring}
+        bringLabel={poster.requirements ? 'criteria' : undefined}
         bringFree={poster.copy.bringFree && !poster.hasFit}
         catchLine={poster.copy.catchLine}
         disclosure={link.disclosure}
         tags={poster.tags}
+        effort={poster.requirements ? {
+          level: poster.requirements.effort.level,
+          label: poster.requirements.effort.label,
+          time: poster.requirements.effort.time,
+          typical: poster.requirements.effort.basis === 'typical',
+        } : undefined}
         fitBadge={poster.fitBadge}
         skillBadge={poster.skillBadge}
         pay={card.pay}

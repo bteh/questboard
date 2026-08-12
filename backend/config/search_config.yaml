@@ -1,45 +1,13 @@
-# Job Search Configuration
-# Customize these to match your target roles and preferences
-
-target_roles:
-  - "data platform engineer"
-  - "analytics engineer"
-  - "senior data engineer"
-  - "staff data engineer"
-  - "manager data engineering"
-  - "head of data"
-  - "director of data engineering"
-  - "founding data engineer"
-  - "principal data engineer"
-
-# Keyword-based searches (technologies/tools)
-keyword_searches:
-  - "dbt"
-  - "Trino"
-  - "lakehouse"
-  - "data platform"
-  - "iceberg data engineer"
-  - "founding engineer data"
-  - "build data team"
-  - "head of data"
-  - "data leader"
-  # Crypto / Web3
-  - "blockchain"
-  - "web3"
-  - "crypto"
-  - "defi"
-  - "onchain"
-
-locations:
-  - "Los Angeles, CA"
-  - "Remote"
+# Neutral fallback only. User intent belongs in workspace preferences or an
+# ignored per-user profile, never in a tracked file shipped to other people.
+target_roles: []
+keyword_searches: []
+locations: []
 
 # Job boards to scrape via JobSpy
 job_boards:
   - "indeed"
-  - "glassdoor"
-  - "zip_recruiter"
-  - "google"
+  - "linkedin"
 
 # Additional sources (custom scrapers)
 additional_sources:
@@ -61,6 +29,8 @@ additional_sources:
     enabled: true
   - name: "cryptojobslist"
     enabled: true
+  - name: "web3career"
+    enabled: true
   - name: "workday"
     enabled: true
   - name: "arbeitnow"
@@ -77,19 +47,21 @@ scoring:
   company_trajectory: 0.10
   culture_fit: 0.10
 
-# Compensation filters
+# Compensation filters stay unset until the user supplies them.
 compensation:
-  min_base: 190000
-  target_total_comp: 300000
+  currency: "USD"
+  pay_period: "annual"
+  target_total_comp: 0
   include_equity: true
 
 # Search frequency
 search_settings:
   results_per_board: 50
   results_per_additional_source: 100
-  max_days_old: 14
+  max_days_old: 45
   exclude_staffing_agencies: true
   country: "USA"
   max_parallel_searches: 6
-  max_unique_jobs: 500
+  max_unique_jobs: 500      # Per board; a prolific source cannot cancel the others
+  min_queries_per_source: 15
   max_search_tasks: 30

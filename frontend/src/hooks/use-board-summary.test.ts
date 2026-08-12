@@ -12,6 +12,7 @@ vi.mock('@tanstack/react-query', () => ({ useQuery: useQueryMock }));
 
 const getBoardSummaryMock = vi.hoisted(() => vi.fn());
 vi.mock('@/api/board', () => ({ getBoardSummary: getBoardSummaryMock }));
+vi.mock('@/lib/time-zone', () => ({ localTimeZone: () => 'America/Los_Angeles' }));
 
 import { useBoardSummary } from './use-board-summary';
 
@@ -21,17 +22,19 @@ describe('useBoardSummary', () => {
     useBoardSummary(filters);
 
     const options = useQueryMock.mock.calls.at(-1)![0];
-    expect(options.queryKey).toEqual(['board-summary', filters]);
+    const localFilters = { timezone_name: 'America/Los_Angeles', ...filters };
+    expect(options.queryKey).toEqual(['board-summary', localFilters]);
     options.queryFn();
-    expect(getBoardSummaryMock).toHaveBeenCalledWith(filters);
+    expect(getBoardSummaryMock).toHaveBeenCalledWith(localFilters);
   });
 
   it('stays the bare whole-board summary when no filters are given', () => {
     useBoardSummary();
 
     const options = useQueryMock.mock.calls.at(-1)![0];
-    expect(options.queryKey).toEqual(['board-summary', {}]);
+    const localFilters = { timezone_name: 'America/Los_Angeles' };
+    expect(options.queryKey).toEqual(['board-summary', localFilters]);
     options.queryFn();
-    expect(getBoardSummaryMock).toHaveBeenCalledWith({});
+    expect(getBoardSummaryMock).toHaveBeenCalledWith(localFilters);
   });
 });

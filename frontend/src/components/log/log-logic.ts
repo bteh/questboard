@@ -24,18 +24,17 @@ export const LOG_BOARD_STATUSES =
 /* The two log queries. Object identity does not matter for the cache key
    (TanStack hashes structurally), but sharing the definitions keeps every
    consumer on the same keys. */
-export function personalLogFilters(profile?: string): ApplicationFilters {
+export function personalLogFilters(): ApplicationFilters {
   return {
     vertical: 'personal',
     sort_by: 'updated_at',
     sort_order: 'desc',
     page: 1,
     page_size: 100,
-    profile,
   };
 }
 
-export function boardLogFilters(profile?: string): ApplicationFilters {
+export function boardLogFilters(): ApplicationFilters {
   return {
     // every registry lane: a clipped bank bonus belongs in the log too
     vertical: ALL_VERTICALS,
@@ -44,7 +43,6 @@ export function boardLogFilters(profile?: string): ApplicationFilters {
     sort_order: 'desc',
     page: 1,
     page_size: 100,
-    profile,
   };
 }
 

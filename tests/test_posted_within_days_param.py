@@ -122,6 +122,13 @@ def _seed_posted(jf_db) -> None:
         company="Acme",
         job_url="https://example.com/jobs/nodate",
     )
+    jf_db.save_application(
+        job_title="Future source date",
+        company="Acme",
+        job_url="https://example.com/jobs/future",
+        date_posted=(_now() + timedelta(hours=2)).isoformat(),
+        date_confidence="exact",
+    )
 
 
 def _titles(payload: dict) -> set[str]:
@@ -134,7 +141,7 @@ def test_no_window_returns_everything(api_client) -> None:
 
     resp = client.get("/api/v1/applications")
     assert resp.status_code == 200, resp.text
-    assert resp.json()["total"] == 7
+    assert resp.json()["total"] == 8
 
 
 def test_posted_within_one_day_counts_only_provable_rows(api_client) -> None:
@@ -171,6 +178,7 @@ def test_posted_window_never_guesses_junk_in(api_client) -> None:
     assert "Bare day count" not in titles
     assert "Missing confidence" not in titles
     assert "No date at all" not in titles
+    assert "Future source date" not in titles
 
 
 def test_posted_within_days_rejects_zero(api_client) -> None:

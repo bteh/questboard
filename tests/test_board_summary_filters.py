@@ -182,3 +182,23 @@ def test_summary_honors_posted_within_days(api_client) -> None:
     payload = _summary(client, posted_within_days=7)
     assert payload["total"] == 1
     assert _kind(payload, "think")["count"] == 1
+
+
+def test_new_today_summary_and_list_share_the_local_calendar_predicate(api_client) -> None:
+    client, jf_db = api_client
+    _seed(jf_db)
+
+    params = {"found_within_days": 1, "timezone_name": "America/Los_Angeles"}
+    summary = _summary(client, **params)
+    listed = client.get(
+        "/api/v1/applications",
+        params={
+            **params,
+            "vertical": "career,study,lookafter,house",
+            "scope": "board",
+            "page_size": 100,
+        },
+    )
+    assert listed.status_code == 200, listed.text
+    assert summary["total"] == listed.json()["total"] == 3
+    assert summary["new_today"] == summary["total"]

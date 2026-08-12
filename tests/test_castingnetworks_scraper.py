@@ -30,6 +30,23 @@ _HOST_URL = "https://www.castingnetworks.com/talent/project/16047383/role/674399
 _FEMALE_URL = "https://www.castingnetworks.com/talent/project/16047441/role/67440215"
 _ATLANTA_URL = "https://www.castingnetworks.com/talent/project/16048613/role/67446117"
 
+CURRENT_CARD = """
+<li class="casting-calls-card-mobile">
+  <div class="card" data-project-type="Commercial" project-id="351742" role-id="67455397">
+    <h3>Background students (ages 6-14)</h3>
+    <p>Abbott Elementary Season 6</p>
+    <small><img src="/icons/payment_cc.svg"><span>$231/8</span></small>
+    <small><img src="/icons/location_cc.svg"><span>Los Angeles</span></small>
+    <small><img src="/icons/birthday-cake.svg"><span>6 - 14</span></small>
+    <small><img src="/icons/union.svg"><span>SAG-AFTRA, Television</span></small>
+    <p class="fw-bold">About this role</p>
+    <p>No prior experience required. Work as a background student.</p>
+    <p><span>Due Date:</span> 09/04/2099</p>
+    <a href="/talent/project/16051353/role/67455397/">View</a>
+  </div>
+</li>
+"""
+
 # Real JobPosting from the Host role page (live probe 2026-07-08), description
 # trimmed. No jobLocation and no baseSalary: the page states neither.
 _HOST_POSTING: dict = {
@@ -107,6 +124,21 @@ class ListingParseTest(unittest.TestCase):
     def test_bad_html_returns_empty(self) -> None:
         for bad in ("", "<html></html>", '<script type="application/ld+json">nope</script>'):
             self.assertEqual(self.mod._listing_role_urls(bad), [])
+
+    def test_current_server_rendered_card_is_actionable_and_source_grounded(self) -> None:
+        rows = self.mod._card_rows(CURRENT_CARD)
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row["title"], "Background students (ages 6-14)")
+        self.assertEqual(row["company"], "Abbott Elementary Season 6")
+        self.assertEqual(row["location"], "Los Angeles")
+        self.assertEqual(row["salary_min"], 231.0)
+        self.assertEqual(row["salary_period"], "session")
+        self.assertEqual(row["event_end"], "2099-09-04")
+        self.assertTrue(row["first_quest_ok"])
+        self.assertEqual(row["quest"]["age_min"], 6)
+        self.assertEqual(row["quest"]["age_max"], 14)
+        self.assertEqual(row["quest"]["apply_by"], "2099-09-04")
 
 
 class RoleParseTest(unittest.TestCase):
@@ -254,6 +286,12 @@ class SearchFlowTest(unittest.TestCase):
     def test_listing_failure_returns_empty(self) -> None:
         with patch.object(self.mod, "_get_html", return_value=""):
             self.assertEqual(self.mod.search_castingnetworks(), [])
+
+    def test_blocked_canonical_listing_uses_public_same_page_fallback(self) -> None:
+        with patch.object(self.mod, "_get_html", side_effect=["", CURRENT_CARD]) as fetch:
+            rows = self.mod.search_castingnetworks()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(fetch.call_args_list[1].args[0], self.mod._LISTING_FALLBACK_URL)
 
     def test_all_role_pages_failing_returns_empty(self) -> None:
         pages = {self.mod._LISTING_URL.rstrip("/"): self.listing_html}

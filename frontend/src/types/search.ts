@@ -78,6 +78,28 @@ export interface RunStatus {
   new_jobs?: number;
   jobs_scored: number;
   error: string | null;
+  source_coverage?: SourceCoverage | null;
+}
+
+export type SourceCoverageState = 'ok' | 'zero' | 'partial' | 'failed';
+
+export interface SourceCoverageItem {
+  source: string;
+  display_name: string;
+  state: SourceCoverageState;
+  rows_found: number;
+  attempts: number;
+  failed_attempts: number;
+  error: string;
+}
+
+export interface SourceCoverage {
+  total: number;
+  ok: number;
+  zero: number;
+  partial: number;
+  failed: number;
+  sources: SourceCoverageItem[];
 }
 
 export interface RunResult {
@@ -91,6 +113,7 @@ export interface RunResult {
   duration_seconds: number;
   error: string | null;
   sources?: Record<string, number>;
+  source_coverage?: SourceCoverage | null;
 }
 
 export interface ProgressUpdate {

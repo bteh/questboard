@@ -74,6 +74,7 @@ datadog
 dataiku
 fivetran
 sigmacomputing
+yipitdata
 
 # --- Consumer / marketplace / social --------------------------------------
 airbnb
@@ -113,6 +114,7 @@ zoominfo
 
 # --- Healthcare / hardware / climate -------------------------------------
 ceribell
+diligentrobotics
 oscar
 samsara
 

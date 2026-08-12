@@ -229,7 +229,7 @@ const AGGREGATOR_HOSTS = [
   'greenhouse.io', 'lever.co', 'ashbyhq.com', 'workday.com', 'myworkdayjobs.com',
   'builtin.com', 'indeed.com', 'linkedin.com', 'remotive.com', 'himalayas.app',
   'weworkremotely.com', 'ycombinator.com', 'workatastartup.com', 'remoteok.com',
-  'remoteok.io', 'cryptojobslist.com', 'wellfound.com', 'angel.co', 'getro.com',
+  'remoteok.io', 'cryptojobslist.com', 'web3.career', 'wellfound.com', 'angel.co', 'getro.com',
   'consider.com', 'themuse.com', 'arbeitnow.com', 'jobs.gem.com', 'smartrecruiters.com',
   'bamboohr.com', 'workable.com', 'jobvite.com', 'icims.com', 'taleo.net',
   'google.com', 'bing.com', 'ziprecruiter.com', 'glassdoor.com', 'dice.com',

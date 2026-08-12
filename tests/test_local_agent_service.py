@@ -234,6 +234,79 @@ def test_work_search_rejects_description_only_role_matches(local_agent_db) -> No
     }
 
 
+def test_work_search_treats_saved_salary_as_a_hard_floor(local_agent_db) -> None:
+    """Match strictness must not silently lower a user's saved minimum."""
+    from app.models.workspace import WorkspacePreferences
+    from app.services import local_agent_service
+    from job_finder.models.database import ApplicationRecord
+
+    preferences = (
+        local_agent_db.query(WorkspacePreferences)
+        .filter(WorkspacePreferences.workspace_id == "configured")
+        .one()
+    )
+    preferences.min_base = 190_000
+    preferences.match_strictness = "balanced"
+    now = datetime.now(timezone.utc)
+    local_agent_db.add_all(
+        [
+            ApplicationRecord(
+                job_title="Senior Data Engineer",
+                company="Near Floor Co",
+                location="Remote, United States",
+                remote_scope="us",
+                is_remote=True,
+                work_type="remote",
+                salary_min_annualized=160_000,
+                salary_max_annualized=200_000,
+                salary_currency="USD",
+                salary_period="annual",
+                job_url="https://near-floor.example/jobs/data",
+                source="CryptoJobsList",
+                description="Build production data platforms and pipelines.",
+                vertical="career",
+                date_posted=now.isoformat(),
+                date_confidence="exact",
+                date_found=now,
+            ),
+            ApplicationRecord(
+                job_title="Senior Data Engineer",
+                company="Below Flex Co",
+                location="Remote, United States",
+                remote_scope="us",
+                is_remote=True,
+                work_type="remote",
+                salary_min_annualized=100_000,
+                salary_max_annualized=140_000,
+                salary_currency="USD",
+                salary_period="annual",
+                job_url="https://below-flex.example/jobs/data",
+                source="CryptoJobsList",
+                description="Build production data platforms and pipelines.",
+                vertical="career",
+                date_posted=now.isoformat(),
+                date_confidence="exact",
+                date_found=now,
+            ),
+        ]
+    )
+    local_agent_db.commit()
+
+    payload = local_agent_service.search_work(
+        local_agent_db,
+        queries=["Senior Data Engineer"],
+        page_size=20,
+    )
+
+    organizations = {row["organization"] for row in payload["results"]}
+    assert "Near Floor Co" not in organizations
+    assert "Below Flex Co" not in organizations
+    assert payload["filters_applied"]["compensation_floor"] == 190_000
+    assert payload["filters_applied"]["effective_compensation_floor"] == 190_000
+    assert payload["filters_applied"]["salary_flex"] == 1.0
+    assert payload["filters_applied"]["compensation_currency"] == "USD"
+
+
 def test_role_family_match_rejects_conflicting_occupations() -> None:
     from app.services.local_agent_service import _title_is_in_lane
 
@@ -259,6 +332,145 @@ def test_title_filter_keeps_adjacent_roles_for_the_agent_to_judge() -> None:
     assert _title_is_in_lane("Staff Data Engineer", q)  # shares "data"/"engineer"
     assert not _title_is_in_lane("Office Manager", q)  # only shares the seniority word
     assert not _title_is_in_lane("Registered Nurse", q)  # off lane
+
+
+def test_work_shortlist_keeps_older_exact_roles_ahead_of_newer_adjacent_noise(
+    local_agent_db,
+) -> None:
+    from app.services import local_agent_service
+    from job_finder.models.database import ApplicationRecord
+
+    now = datetime.now(timezone.utc)
+    local_agent_db.add_all([
+        ApplicationRecord(
+            job_title=f"Data Platform Engineer {index}",
+            company=f"New Adjacent {index}",
+            location="United States",
+            remote_scope="us",
+            is_remote=True,
+            work_type="remote",
+            job_url=f"https://adjacent.example/jobs/{index}",
+            source="LinkedIn",
+            description="Build data pipelines.",
+            vertical="career",
+            date_posted=now.isoformat(),
+            date_confidence="exact",
+            date_found=now - timedelta(minutes=index),
+        )
+        for index in range(60)
+    ])
+    local_agent_db.add_all([
+        ApplicationRecord(
+            job_title="Data Engineering Manager",
+            company="Older Exact Manager",
+            location="United States",
+            remote_scope="us",
+            is_remote=True,
+            work_type="remote",
+            job_url="https://exact.example/jobs/manager",
+            source="Greenhouse",
+            description="Manage the data engineering platform team.",
+            vertical="career",
+            date_posted=(now - timedelta(days=10)).isoformat(),
+            date_confidence="exact",
+            date_found=now - timedelta(days=10),
+        ),
+        ApplicationRecord(
+            job_title="Manager, Data Governance",
+            company="Older Exact Governance",
+            location="United States",
+            remote_scope="us",
+            is_remote=True,
+            work_type="remote",
+            job_url="https://exact.example/jobs/governance",
+            source="Lever",
+            description="Lead data governance and stewardship.",
+            vertical="career",
+            date_posted=(now - timedelta(days=9)).isoformat(),
+            date_confidence="exact",
+            date_found=now - timedelta(days=9),
+        ),
+    ])
+    local_agent_db.commit()
+
+    payload = local_agent_service.search_work(
+        local_agent_db,
+        queries=["Data Engineering Manager", "Manager, Data Governance", "Data Engineer"],
+        page_size=50,
+        use_saved_preferences=False,
+    )
+    companies = [row["organization"] for row in payload["results"]]
+    assert "Older Exact Manager" in companies
+    assert "Older Exact Governance" in companies
+    assert payload["total_matching"] > payload["result_count"] == 50
+
+
+def test_work_fit_review_state_reuses_current_and_invalidates_changed_content(
+    local_agent_db,
+) -> None:
+    from app.services import local_agent_service
+    from job_finder.models.database import ApplicationRecord
+
+    row = (
+        local_agent_db.query(ApplicationRecord)
+        .filter(ApplicationRecord.company == "Local Co")
+        .one()
+    )
+    before = local_agent_service.search_work(
+        local_agent_db, queries=["Data Engineering"], page_size=20
+    )
+    item = next(result for result in before["results"] if result["opportunity_id"] == row.id)
+    assert item["assistant_review"]["state"] == "needs_review"
+
+    local_agent_service.set_work_fit(local_agent_db, [{
+        "opportunity_id": row.id,
+        "rank": 1,
+        "verdict": "strong",
+        "why": "Exact scope",
+    }])
+    current = local_agent_service.search_work(
+        local_agent_db, queries=["Data Engineering"], page_size=20
+    )
+    item = next(result for result in current["results"] if result["opportunity_id"] == row.id)
+    assert item["assistant_review"] == {
+        "state": "current",
+        "reason": "current",
+        "prior_rank": 1,
+        "prior_verdict": "strong",
+    }
+
+    row.description += " Requirements changed."
+    local_agent_db.commit()
+    changed = local_agent_service.search_work(
+        local_agent_db, queries=["Data Engineering"], page_size=20
+    )
+    item = next(result for result in changed["results"] if result["opportunity_id"] == row.id)
+    assert item["assistant_review"]["state"] == "needs_review"
+    assert item["assistant_review"]["reason"] == "posting_changed"
+
+    # Once refreshed, a fit remains reusable until the user's matching context
+    # changes; preference edits invalidate it without deleting the annotation.
+    local_agent_service.set_work_fit(local_agent_db, [{
+        "opportunity_id": row.id,
+        "rank": 1,
+        "verdict": "strong",
+        "why": "Updated scope still fits",
+    }])
+    from app.models.workspace import WorkspacePreferences
+
+    preferences = local_agent_db.query(WorkspacePreferences).filter_by(
+        workspace_id="configured"
+    ).one()
+    preferences.keywords_json = json.dumps(["data platform", "Snowflake", "Iceberg"])
+    local_agent_db.commit()
+    profile_changed = local_agent_service.search_work(
+        local_agent_db, queries=["Data Engineering"], page_size=20
+    )
+    item = next(
+        result for result in profile_changed["results"] if result["opportunity_id"] == row.id
+    )
+    assert item["assistant_review"]["state"] == "needs_review"
+    assert item["assistant_review"]["reason"] == "profile_changed"
 
 
 def test_remote_only_profile_recovers_jurisdiction_from_the_same_resume(
@@ -314,7 +526,7 @@ def test_remote_only_profile_recovers_jurisdiction_from_the_same_resume(
     )
     local_agent_db.commit()
 
-    _, location, _, _, _ = local_agent_service._saved_search_defaults(
+    _, location, _, _, _, _ = local_agent_service._saved_search_defaults(
         local_agent_db, "configured"
     )
     assert location == "Los Angeles, CA"
@@ -414,6 +626,72 @@ def test_profile_work_api_returns_application_cards_for_the_active_profile(
     assert response.jurisdiction_configured is True
     assert [item.company for item in response.items] == ["Profile Match Co"]
     assert response.ranking_owner == "connected_agent"
+
+
+def test_profile_work_paginates_unreviewed_rows_before_current_skips(
+    local_agent_db,
+) -> None:
+    from app.api.applications import list_profile_work
+    from app.services import local_agent_service
+    from job_finder.models.database import ApplicationRecord
+
+    now = datetime.now(timezone.utc)
+    skipped = ApplicationRecord(
+        job_title="Data Engineering Manager",
+        company="Skip Me",
+        location="Los Angeles, CA",
+        state_codes=",CA,",
+        remote_scope="us",
+        job_url="https://skip.example/jobs/data",
+        source="Indeed",
+        description="Wrong scope after review.",
+        vertical="career",
+        date_posted=now.isoformat(),
+        date_confidence="exact",
+        date_found=now,
+    )
+    unreviewed = ApplicationRecord(
+        job_title="Data Engineering Manager",
+        company="Review Me",
+        location="Los Angeles, CA",
+        state_codes=",CA,",
+        remote_scope="us",
+        job_url="https://review.example/jobs/data",
+        source="Lever",
+        description="Manage the data platform team.",
+        vertical="career",
+        date_posted=now.isoformat(),
+        date_confidence="exact",
+        date_found=now - timedelta(minutes=1),
+    )
+    local_agent_db.add_all([skipped, unreviewed])
+    local_agent_db.commit()
+    local_agent_service.set_work_fit(local_agent_db, [{
+        "opportunity_id": skipped.id,
+        "verdict": "skip",
+        "why": "Wrong scope",
+    }])
+
+    response = list_profile_work(
+        search=None,
+        location=None,
+        location_strict=False,
+        salary_min=None,
+        salary_max=None,
+        is_remote=None,
+        posted_within_days=None,
+        source_category=None,
+        page=1,
+        page_size=24,
+        workspace=SimpleNamespace(workspace=SimpleNamespace(id="configured")),
+        db=local_agent_db,
+    )
+    companies = [item.company for item in response.items]
+    assert companies.index("Review Me") < companies.index("Skip Me")
+    assert companies[-1] == "Skip Me"
+    assert response.reviewed_count == 1
+    assert response.skipped_count == 1
+    assert response.unreviewed_count == response.total - 1
 
 
 def test_work_search_enforces_fuzzy_freshness_without_hiding_default_unknowns(
@@ -622,7 +900,7 @@ def test_set_career_preferences_refuses_to_clear_all_intent(local_agent_db) -> N
     assert prefs["keywords"] == ["data platform", "Snowflake"]
 
 
-def test_set_work_fit_writes_verdicts_and_replaces_prior(local_agent_db) -> None:
+def test_set_work_fit_writes_verdicts_and_preserves_current_prior(local_agent_db) -> None:
     from app.services import local_agent_service
     from job_finder.models.database import ApplicationRecord
 
@@ -648,10 +926,8 @@ def test_set_work_fit_writes_verdicts_and_replaces_prior(local_agent_db) -> None
     fit0 = json.loads(db.query(ApplicationRecord).get(ids[0]).agent_fit_json)
     assert fit0["verdict"] == "strong" and fit0["rank"] == 1 and "Exact" in fit0["why"]
 
-    # A second RUN replaces the prior verdicts (latest-run-only on the board).
-    # Runs write in batches now, so a bare second call joins this run rather
-    # than clearing it. What marks a new run is the app resetting the progress
-    # trail, exactly as POST /agent/run does before launching the assistant.
+    # A second run keeps unchanged judgments and inserts its requested global
+    # rank, shifting the prior row without another model pass.
     from app.services import agent_run_progress
 
     agent_run_progress.clear()
@@ -659,8 +935,10 @@ def test_set_work_fit_writes_verdicts_and_replaces_prior(local_agent_db) -> None
         db, [{"opportunity_id": ids[2], "rank": 1, "verdict": "good", "why": "Now this one."}]
     )
     assert out2["applied"] == 1
-    assert not db.query(ApplicationRecord).get(ids[0]).agent_fit_json  # cleared
-    assert json.loads(db.query(ApplicationRecord).get(ids[2]).agent_fit_json)["verdict"] == "good"
+    prior = json.loads(db.get(ApplicationRecord, ids[0]).agent_fit_json)
+    latest = json.loads(db.get(ApplicationRecord, ids[2]).agent_fit_json)
+    assert prior["verdict"] == "strong" and prior["rank"] == 2
+    assert latest["verdict"] == "good" and latest["rank"] == 1
 
 
 def test_set_work_fit_rejects_bad_verdict(local_agent_db) -> None:

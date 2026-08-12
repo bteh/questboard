@@ -33,6 +33,16 @@ async def lifespan(app: FastAPI):
     try:
         db = next(db_gen)
         workspace_service.cleanup_expired_workspaces(db)
+        if not settings.hosted_mode:
+            recovered = workspace_service.recover_abandoned_local_search_runs(db)
+            if recovered["recovered"] or recovered["failed"]:
+                import logging
+
+                logging.getLogger(__name__).info(
+                    "Recovered %d interrupted desktop searches; %d exhausted",
+                    recovered["recovered"],
+                    recovered["failed"],
+                )
     finally:
         try:
             next(db_gen)
@@ -44,7 +54,15 @@ async def lifespan(app: FastAPI):
     app.state.scheduler = scheduler
     if scheduler is not None:
         scheduler.start()
+    from app.services.search_run_worker import build_desktop_search_worker
+
+    search_worker = build_desktop_search_worker()
+    app.state.search_worker = search_worker
+    if search_worker is not None:
+        search_worker.start()
     yield
+    if search_worker is not None:
+        await search_worker.stop()
     if scheduler is not None:
         await scheduler.stop()
 

@@ -17,6 +17,7 @@ from app.schemas.workspace import (
     GeneratedProfileResponse,
     OnboardingState,
     WorkspacePreferences,
+    WorkspaceDataEraseResponse,
     WorkspaceResumeUploadResponse,
     WorkspaceSearchRunResponse,
 )
@@ -48,6 +49,11 @@ def _cache_get(workspace_id: str, resume_hash: str) -> dict | None:
 
 def _cache_put(workspace_id: str, resume_hash: str, payload: dict) -> None:
     _GENERATED_PROFILE_CACHE[(workspace_id, resume_hash)] = (time.time(), payload)
+
+
+def _cache_clear_workspace(workspace_id: str) -> None:
+    for key in [key for key in _GENERATED_PROFILE_CACHE if key[0] == workspace_id]:
+        _GENERATED_PROFILE_CACHE.pop(key, None)
 
 
 def _profile_from_canonical_analysis(analysis: dict) -> dict:
@@ -149,6 +155,21 @@ def save_preferences(
         db=db,
     )
     return workspace_service.save_workspace_preferences(db, context.workspace.id, body)
+
+
+@router.delete("/data", response_model=WorkspaceDataEraseResponse)
+def erase_my_data(
+    context = Depends(get_workspace_context_csrf),
+    db: Session = Depends(get_db),
+):
+    """Erase the current user's Questboard content and reset onboarding."""
+    result = workspace_service.erase_workspace_data(
+        db,
+        context.workspace.id,
+        preserve_session_id=context.session.id if context.session else None,
+    )
+    _cache_clear_workspace(context.workspace.id)
+    return WorkspaceDataEraseResponse(**result)
 
 
 @router.post("/search", response_model=WorkspaceSearchRunResponse)

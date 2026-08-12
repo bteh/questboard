@@ -6,15 +6,16 @@
 export function checkedAgoLabel(
   checkedAt: string | null | undefined,
   now: Date = new Date(),
+  subject = 'sources',
 ): string | null {
   if (!checkedAt) return null;
   const iso = /[zZ]|[+-]\d{2}:?\d{2}$/.test(checkedAt) ? checkedAt : `${checkedAt}Z`;
   const then = new Date(iso);
   if (Number.isNaN(then.getTime())) return null;
   const mins = Math.max(0, Math.round((now.getTime() - then.getTime()) / 60_000));
-  if (mins < 60) return 'sources checked minutes ago';
+  if (mins < 60) return `${subject} checked minutes ago`;
   const hours = Math.round(mins / 60);
-  if (hours <= 36) return `sources checked ${hours}h ago`;
+  if (hours <= 36) return `${subject} checked ${hours}h ago`;
   const days = Math.round(hours / 24);
-  return `sources checked ${days} day${days === 1 ? '' : 's'} ago`;
+  return `${subject} checked ${days} day${days === 1 ? '' : 's'} ago`;
 }

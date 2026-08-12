@@ -639,7 +639,7 @@ def _ensure_blank_preferences(db: Session, workspace_id: str) -> None:
         workplace_preference="remote_friendly",
         max_days_old=14,
         current_title="",
-        current_level="mid",
+        current_level="",
         compensation_currency="USD",
         compensation_period="annual",
         current_comp=None,

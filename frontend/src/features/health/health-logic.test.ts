@@ -15,6 +15,7 @@ describe('verdictMeta', () => {
     expect(verdictMeta('failing')).toEqual({ label: 'failing', tone: 'bad' });
     expect(verdictMeta('zero_rows')).toEqual({ label: 'went dark', tone: 'bad' });
     expect(verdictMeta('dropped')).toEqual({ label: 'volume dropped', tone: 'warn' });
+    expect(verdictMeta('degraded')).toEqual({ label: 'partial', tone: 'warn' });
     expect(verdictMeta('quiet')).toEqual({ label: 'quiet', tone: 'quiet' });
     expect(verdictMeta('ok')).toEqual({ label: 'ok', tone: 'ok' });
   });
@@ -28,6 +29,7 @@ describe('reasonMeta', () => {
   it('maps run outcomes', () => {
     expect(reasonMeta('exception')).toEqual({ label: 'error', tone: 'bad' });
     expect(reasonMeta('timeout')).toEqual({ label: 'timed out', tone: 'bad' });
+    expect(reasonMeta('partial')).toEqual({ label: 'partial', tone: 'warn' });
     expect(reasonMeta('zero_rows')).toEqual({ label: 'no rows', tone: 'quiet' });
     expect(reasonMeta('ok')).toEqual({ label: 'ok', tone: 'ok' });
   });

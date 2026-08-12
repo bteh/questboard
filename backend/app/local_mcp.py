@@ -255,7 +255,11 @@ def search_work(
     page_size: int = 20,
     use_saved_preferences: bool = True,
 ) -> dict[str, Any]:
-    """Retrieve recent career candidates with hard filters; performs no AI ranking."""
+    """Retrieve a compact relevance-first career shortlist with hard filters.
+
+    Each row carries assistant_review.state. Reuse rows marked current as rank
+    anchors; spend model work only on rows marked needs_review.
+    """
 
     with _database_session() as db:
         return _tool_error(
@@ -336,7 +340,11 @@ async def refresh_work(
         # dropped the tail of a 15-role list, and the assistant noticed the
         # pull never covered them; a run's own report is what caught this.
         effective_roles = local_agent_service.clean_terms(roles, limit=local_agent_service.ROLES_CAP)
-        effective_keywords = local_agent_service.clean_terms(keywords)
+        effective_keywords = (
+            local_agent_service.clean_terms(keywords)
+            if keywords is not None
+            else local_agent_service.clean_terms(preferences.keywords)
+        )
         if not effective_roles and not effective_keywords:
             effective_roles, effective_keywords = workspace_service.derive_search_terms_from_resume(
                 db, workspace.id, preferences
@@ -357,7 +365,7 @@ async def refresh_work(
         effective_workplace = workspace_service.effective_workplace_preference(
             effective_workplace, effective_places
         )
-        effective_days = max(1, min(int(max_days_old or preferences.max_days_old), 90))
+        effective_days = max(1, min(int(max_days_old or preferences.max_days_old), 365))
         merged = preferences.model_copy(
             update={
                 "roles": effective_roles,
@@ -385,6 +393,7 @@ async def refresh_work(
             config_override=config_override,
             llm_override=None,
             snapshot=snapshot,
+            durable=True,
         )
     return {
         "run_id": run.run_id,
@@ -401,9 +410,32 @@ async def refresh_work(
 def get_refresh_status(run_id: str) -> dict[str, Any]:
     """Poll a local career refresh started by refresh_work."""
 
+    # The persistent desktop backend owns durable refreshes. Read its shared
+    # record instead of this short-lived MCP process's stale in-memory object.
+    with _database_session() as db:
+        workspace = local_agent_service.resolve_local_workspace(db)
+        record = (
+            workspace_service.get_search_run(db, workspace.id, run_id)
+            if workspace is not None else None
+        )
+        if record is not None:
+            return {
+                "run_id": record.run_id,
+                "status": record.status,
+                "started_at": record.started_at.isoformat() if record.started_at else None,
+                "completed_at": record.completed_at.isoformat() if record.completed_at else None,
+                "jobs_found": record.jobs_found,
+                "jobs_scored": record.jobs_scored,
+                "error": record.error or None,
+                "recent_messages": workspace_service.get_progress_messages(
+                    db, workspace.id, run_id, limit=10,
+                ),
+                "questboard_funded_ai": False,
+            }
+
     run = pipeline_service.get_run(run_id)
     if run is None:
-        raise ToolError("Refresh run not found in this MCP session")
+        raise ToolError("Refresh run not found")
     return {
         "run_id": run.run_id,
         "status": run.status,
@@ -465,8 +497,10 @@ def set_work_fit(rankings: list[dict[str, Any]]) -> dict[str, Any]:
       - why (str): one or two sentences on why it fits (or, for a skip, why not)
       - caveat (str, optional): a real risk to check (level, comp floor, remote)
 
-    This REPLACES the previous run's verdicts. Local annotation only; it never
-    contacts anything external and does not apply to the job.
+    Current verdicts for unchanged jobs are preserved. Requested ranks are
+    global positions: inserting a new #2 shifts the old #2 down without making
+    the assistant rewrite it. Local annotation only; it never contacts
+    anything external and does not apply to the job.
     """
 
     with _database_session() as db:

@@ -61,6 +61,23 @@ class JobSalaryPassesTest(unittest.TestCase):
         job = {"salary_max": 80, "salary_max_annualized": annualize_amount(80, "hourly")}
         self.assertTrue(_job_salary_passes(job, 127500))
 
+    def test_same_currency_below_floor_drops(self) -> None:
+        self.assertFalse(_job_salary_passes(
+            {"salary_max": 90_000, "salary_currency": "USD"},
+            127_500,
+            "USD",
+        ))
+
+    def test_different_currency_is_not_compared_as_usd(self) -> None:
+        self.assertTrue(_job_salary_passes(
+            {"salary_max": 90_000, "salary_currency": "EUR"},
+            127_500,
+            "USD",
+        ))
+
+    def test_missing_currency_is_not_assumed(self) -> None:
+        self.assertTrue(_job_salary_passes({"salary_max": 90_000}, 127_500, "USD"))
+
 
 class JobSpyPeriodTest(unittest.TestCase):
     def test_jobspy_interval_populates_period_and_annualized(self) -> None:

@@ -1,13 +1,10 @@
-/* The posted-within filter both lanes share, pinned by
-   posted-filter.test.ts. The vocabulary is four fixed windows
-   (?days=1|3|7|30); absent means any time. Server-side the window is
-   conservative: rows without a verifiable ISO post date are dropped, never
-   guessed in, matching the board's date honesty. The clause below is how
-   the UI owns up to that. */
+/* The date filter both lanes share, pinned by posted-filter.test.ts. One
+   value is Questboard's local-calendar first-seen window (?days=found-1);
+   the others are rolling, source-stated post windows (?days=3|7|30).
+   Absent means no additional date filter. */
 
-/* 'found-1' is our own clock (date_found), not the source's posted date:
-   arrivals today, always dated, never hidden by an unverifiable post date.
-   The reader reached for "posted today" twice expecting exactly this. */
+/* 'found-1' is our own first-seen clock, bounded by local midnight. The
+   source date only gets a veto when it verifiably proves the row stale. */
 export const POSTED_DAYS = ['3', '7', '30', 'found-1'] as const;
 export type PostedDaysKey = (typeof POSTED_DAYS)[number];
 
@@ -24,16 +21,16 @@ export function normalizePostedDays(value: unknown): PostedDaysKey | undefined {
 export const POSTED_OPTIONS: ReadonlyArray<{ value: '' | PostedDaysKey; label: string }> = [
   { value: '', label: 'any time' },
   { value: 'found-1', label: 'new today' },
-  { value: '3', label: 'last 3 days' },
-  { value: '7', label: 'this week' },
-  { value: '30', label: 'this month' },
+  { value: '3', label: 'posted last 3 days' },
+  { value: '7', label: 'posted last 7 days' },
+  { value: '30', label: 'posted last 30 days' },
 ];
 
 const CHIP_WORDS: Record<PostedDaysKey, string> = {
   'found-1': 'new today',
   '3': 'posted in the last 3 days',
-  '7': 'posted this week',
-  '30': 'posted this month',
+  '7': 'posted in the last 7 days',
+  '30': 'posted in the last 30 days',
 };
 
 /** The removable chip's words ("posted this week"). */
@@ -67,6 +64,7 @@ export function hiddenDatesClause({
   baseline: number | undefined;
 }): string | null {
   if (!days) return null;
+  if (days.startsWith('found-')) return null;
   if (shown === undefined || baseline === undefined) return null;
   return shown < baseline ? 'postings without a verifiable date are hidden' : null;
 }

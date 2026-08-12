@@ -164,6 +164,15 @@ class HostedWorkspaceApiTest(unittest.TestCase):
         self.assertFalse(onboarding["has_started_search"])
         self.assertTrue(onboarding["needs_resume"])
         self.assertTrue(onboarding["needs_preferences"])
+        # A new hosted workspace must never inherit the server operator's
+        # ignored/default profile (roles, LA location, or compensation).
+        self.assertEqual(onboarding["preferences"]["roles"], [])
+        self.assertEqual(onboarding["preferences"]["preferred_places"], [])
+        self.assertEqual(onboarding["preferences"]["companies"], [])
+        self.assertIsNone(onboarding["preferences"]["compensation"]["min_base"])
+        self.assertIsNone(
+            onboarding["preferences"]["compensation"]["min_acceptable_tc"]
+        )
 
     def test_resume_upload_persists_workspace_asset_and_preferences(self) -> None:
         headers = self._auth_headers()
@@ -389,6 +398,121 @@ class HostedWorkspaceApiTest(unittest.TestCase):
 
         state = self.client.get("/api/v1/onboarding/state", headers=headers).json()
         self.assertEqual(state["workspace_id"], me["workspace"]["id"])
+
+    def test_legacy_empty_title_mid_level_no_longer_narrows_explicit_roles(self) -> None:
+        headers = self._auth_headers(user_id="legacy-mid", email="legacy-mid@example.com")
+        state = self.client.get("/api/v1/onboarding/state", headers=headers).json()
+        updated = {
+            **state["preferences"],
+            "roles": ["Data Engineering Manager", "Director of Data"],
+            "current_title": "",
+            "current_level": "mid",
+        }
+
+        saved = self.client.post(
+            "/api/v1/onboarding/preferences",
+            headers=headers,
+            json=updated,
+        )
+
+        self.assertEqual(saved.status_code, 200)
+        self.assertEqual(saved.json()["current_level"], "")
+        defaults = self.client.get("/api/v1/search/defaults", headers=headers).json()
+        self.assertEqual(defaults["current_level"], "")
+
+    def test_hosted_erase_is_scoped_and_keeps_public_and_other_user_data(self) -> None:
+        from app.models.application import ApplicationRecord
+        from app.models.workspace import FileAsset
+
+        headers_a = self._auth_headers(user_id="erase-a", email="erase-a@example.com")
+        headers_b = self._auth_headers(user_id="erase-b", email="erase-b@example.com")
+        workspace_a = self.client.get("/api/v1/me", headers=headers_a).json()["workspace"]["id"]
+        workspace_b = self.client.get("/api/v1/me", headers=headers_b).json()["workspace"]["id"]
+
+        preferences_a = self.client.get(
+            "/api/v1/onboarding/state", headers=headers_a
+        ).json()["preferences"]
+        save = self.client.post(
+            "/api/v1/onboarding/preferences",
+            headers=headers_a,
+            json={**preferences_a, "roles": ["Private target"]},
+        )
+        self.assertEqual(save.status_code, 200, save.text)
+
+        asset_a = Path(self.workspace_dir) / workspace_a / "resume-a.pdf"
+        asset_b = Path(self.workspace_dir) / workspace_b / "resume-b.pdf"
+        asset_a.parent.mkdir(parents=True, exist_ok=True)
+        asset_b.parent.mkdir(parents=True, exist_ok=True)
+        asset_a.write_bytes(b"private a")
+        asset_b.write_bytes(b"private b")
+
+        db = self._get_db()
+        db.add_all([
+            ApplicationRecord(
+                job_title="Private A",
+                company="A",
+                source="manual",
+                profile="workspace",
+                workspace_id=workspace_a,
+            ),
+            ApplicationRecord(
+                job_title="Private B",
+                company="B",
+                source="manual",
+                profile="workspace",
+                workspace_id=workspace_b,
+            ),
+            ApplicationRecord(
+                job_title="Public side quest",
+                company="Questboard",
+                source="public",
+                profile="default",
+                workspace_id=None,
+                vertical="scholarship",
+            ),
+            FileAsset(
+                workspace_id=workspace_a,
+                kind="resume",
+                storage_provider="local",
+                storage_path=str(asset_a),
+                original_filename="resume-a.pdf",
+            ),
+            FileAsset(
+                workspace_id=workspace_b,
+                kind="resume",
+                storage_provider="local",
+                storage_path=str(asset_b),
+                original_filename="resume-b.pdf",
+            ),
+        ])
+        db.commit()
+
+        erased = self.client.delete("/api/v1/onboarding/data", headers=headers_a)
+        self.assertEqual(erased.status_code, 200, erased.text)
+        self.assertTrue(erased.json()["complete"])
+        self.assertFalse(asset_a.exists())
+        self.assertTrue(asset_b.exists())
+
+        db.expire_all()
+        remaining = {
+            row.job_title
+            for row in db.query(ApplicationRecord).order_by(ApplicationRecord.id).all()
+        }
+        self.assertEqual(remaining, {"Private B", "Public side quest"})
+        self.assertEqual(
+            db.query(FileAsset).filter(FileAsset.workspace_id == workspace_a).count(),
+            0,
+        )
+        self.assertEqual(
+            db.query(FileAsset).filter(FileAsset.workspace_id == workspace_b).count(),
+            1,
+        )
+
+        reset = self.client.get("/api/v1/onboarding/state", headers=headers_a)
+        self.assertEqual(reset.status_code, 200, reset.text)
+        self.assertEqual(reset.json()["preferences"]["roles"], [])
+        still_there = self.client.get("/api/v1/me", headers=headers_b)
+        self.assertEqual(still_there.status_code, 200, still_there.text)
 
     def test_legacy_manual_place_is_normalized_in_defaults(self) -> None:
         headers = self._auth_headers()

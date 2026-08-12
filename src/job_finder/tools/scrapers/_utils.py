@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 import threading
@@ -40,8 +41,18 @@ def _load_seed_slugs(filename: str) -> list[str]:
     """Load a newline-delimited slug list from scrapers/data/<filename>.
 
     Lines starting with '#' and blank lines are ignored. Used by ATS scrapers
-    (Greenhouse, Lever, Ashby) to populate a default company list so that
-    fresh users get startup coverage without configuring a watchlist.
+    (Greenhouse, Lever, Ashby) to populate the *hot* company list so that fresh
+    users get high-signal startup coverage without configuring a watchlist.
+
+    The seed files also retain a historical ``Live-verified bulk expansion``
+    below the curated sections. Those same boards now live in
+    ``*_verified_full.txt`` and are covered by the bounded daily catalog
+    rotation. Loading the bulk tail here as well made every pull query 450-700
+    boards per ATS; Ashby and Greenhouse then missed the shared 60s deadline
+    and returned no rows at all. Stop at that marker: curated seeds run every
+    time, role-discovered boards stay warm in the cache, and the full catalog
+    still rotates without duplicate fan-out.
+
     Returns [] if the file is missing — scrapers fall back gracefully.
     """
     path = _SEED_DIR / filename
@@ -51,6 +62,8 @@ def _load_seed_slugs(filename: str) -> list[str]:
     slugs: list[str] = []
     for raw_line in path.read_text(encoding="utf-8").splitlines():
         line = raw_line.strip()
+        if line.startswith("# ---") and "live-verified bulk expansion" in line.lower():
+            break
         if not line or line.startswith("#"):
             continue
         if line not in seen:
@@ -846,9 +859,22 @@ _CRYPTO_COMPANY_KEYS: frozenset[str] = frozenset(
 
 
 def is_crypto_company(name_or_slug: str | None) -> bool:
-    """True if a company slug or display name is a known crypto/web3 employer."""
+    """True if a company slug or display name is a known crypto/web3 employer.
+
+    The bootstrap set is supplemented by the persistent company catalog that
+    ecosystem and portfolio sources grow at runtime.  That lets a company
+    learned from Solana/Getro be treated as crypto when its direct ATS board is
+    scanned on the next refresh.
+    """
     key = _norm_company_key(name_or_slug)
-    return bool(key) and key in _CRYPTO_COMPANY_KEYS
+    if bool(key) and key in _CRYPTO_COMPANY_KEYS:
+        return True
+    try:
+        from job_finder.company_taxonomy import is_known_crypto_company
+
+        return is_known_crypto_company(name_or_slug)
+    except Exception:
+        return False
 
 
 # Founding-role aliases bypass the role-matching gate by default.
@@ -1123,6 +1149,19 @@ _CRYPTO_WORD_TERMS: tuple[str, ...] = (
     "protocol", "token", "consensus", "zk", "l2", "wallet",
 )
 
+# At a confirmed crypto employer, these titles are useful technical adjacency
+# even when the title itself does not say blockchain.  Helius's "Staff
+# Platform Engineer, Observability" and Phantom's SRE openings are canonical
+# examples: rejecting them because the title lacks "crypto" hides exactly the
+# adjacent infrastructure work the Crypto shelf is meant to expose.
+_CRYPTO_ADJACENT_TECH_TERMS: frozenset[str] = frozenset({
+    "engineer", "engineering", "developer", "development", "backend",
+    "platform", "infrastructure", "infra", "reliability", "sre", "devops",
+    "data", "analytics", "database", "streaming", "distributed", "systems",
+    "machine", "ml", "ai", "protocol", "smart", "contract", "solidity",
+    "rust", "research", "architect", "architecture", "observability",
+})
+
 
 def _has_crypto_terms(text: str | None) -> bool:
     """True if ``text`` carries a crypto/web3/blockchain signal."""
@@ -1144,12 +1183,11 @@ def _match_roles_crypto(
 ) -> bool:
     """Role matching that also passes crypto/web3 roles.
 
-    After the normal role match, a job whose *title* carries a crypto signal
-    passes even when the title doesn't word-match the target roles. Used only
-    for jobs from crypto-domain sources/companies so non-crypto searches don't
-    pick up cross-domain noise. Matching is title-only on purpose: board/tag
-    metadata (e.g. cryptojobslist's category tags) is too noisy — it would let
-    every listing through and turn role filtering into a no-op.
+    After the normal role match, a crypto-specific title or a bounded technical
+    adjacent title can pass. This function is invoked only for confirmed
+    crypto-domain sources/companies, so a generic backend/platform/SRE role at
+    Helius is useful while the same title at an ordinary company does not gain
+    special treatment.
 
     The crypto rescue is scoped to eng/data/infra breadth, NOT sales/design:
     the off-family guard still applies, so a crypto SALES or DESIGNER title
@@ -1164,8 +1202,6 @@ def _match_roles_crypto(
         match_mode=match_mode,
     ):
         return True
-    if not _has_crypto_terms(title):
-        return False
     # Crypto rescue, but never into a different job family (sales/design/etc.).
     if roles:
         norm_title_words = {
@@ -1173,7 +1209,13 @@ def _match_roles_crypto(
         }
         if _is_off_family_title(norm_title_words, roles):
             return False
-    return True
+    else:
+        norm_title_words = {
+            _normalize_word(w) for w in _WORD_RE.findall(title.lower())
+        }
+    if _has_crypto_terms(title):
+        return True
+    return bool(norm_title_words & _CRYPTO_ADJACENT_TECH_TERMS)
 
 
 # ATS scrapers emit a clean, slug-derived company name and set the ``crypto``
@@ -1193,9 +1235,21 @@ def job_is_crypto_domain(job: dict) -> bool:
     search doesn't get crypto results mixed in.
     """
     source = (job.get("source") or "").lower()
-    if source == "cryptojobslist":
+    if source in {"cryptojobslist", "web3career"}:
+        return True
+    if source in {"getro", "consider"}:
         return True
     if job.get("crypto"):
+        return True
+    industry_tags = job.get("industry_tags")
+    if isinstance(industry_tags, str):
+        try:
+            industry_tags = json.loads(industry_tags)
+        except (TypeError, ValueError):
+            industry_tags = [industry_tags]
+    if isinstance(industry_tags, (list, tuple, set)) and any(
+        str(tag).strip().lower() == "crypto" for tag in industry_tags
+    ):
         return True
     # Company-name fallback only for ATS sources, where ``company`` is a curated
     # slug-derived name. This lets the DB purge — which can't see the in-memory

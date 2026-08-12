@@ -77,6 +77,14 @@ def revoke(workspace_id: str) -> None:
         logger.info("Resume consent revoked for workspace %s", workspace_id)
 
 
+def erase_all() -> None:
+    """Remove the local consent store during a full device-data erase."""
+    try:
+        _path().unlink(missing_ok=True)
+    except OSError:
+        logger.warning("Could not erase the resume consent store", exc_info=True)
+
+
 def is_granted(workspace_id: str) -> bool:
     entry = _load().get(workspace_id)
     if not isinstance(entry, dict) or not entry.get("granted_at"):

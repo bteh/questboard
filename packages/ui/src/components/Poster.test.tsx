@@ -46,3 +46,31 @@ describe('Poster clip stamp', () => {
     expect(screen.queryByText(/in your log/)).toBeNull();
   });
 });
+
+describe('Poster application effort', () => {
+  it('shows the compact effort and criteria treatment for a Side Quest', () => {
+    const { container } = render(
+      <Poster
+        {...base}
+        kind="scholarship"
+        bringLabel="criteria"
+        effort={{
+          level: 'involved',
+          label: 'More involved',
+          time: 'usually 45+ min or multiple steps',
+          typical: true,
+        }}
+      />,
+    );
+    expect(screen.getByLabelText(/Application effort: More involved/)).toBeTruthy();
+    expect(screen.getByText('criteria')).toBeTruthy();
+    expect(screen.getByText(/typical/)).toBeTruthy();
+    expect(container.querySelectorAll('.qb-p-effort-marks .is-filled')).toHaveLength(3);
+  });
+
+  it('leaves career posters unchanged when effort is absent', () => {
+    render(<Poster {...base} />);
+    expect(screen.queryByText('effort')).toBeNull();
+    expect(screen.getByText('bring')).toBeTruthy();
+  });
+});

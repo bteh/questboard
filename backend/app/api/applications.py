@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -10,6 +11,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from job_finder.job_trust import is_direct_source
+from job_finder.company_taxonomy import parse_tags
 from app.models.database import get_db
 from app.models.application import ApplicationRecord
 from app.schemas.application import (
@@ -48,15 +50,21 @@ def _parse_verticals(vertical: str | None) -> list[str] | None:
 
 
 def _source_category_map() -> dict[str, str]:
-    """Lowercased source name -> its scraper category (remote/startup/crypto/...)."""
+    """Lowercased source name -> its provenance category."""
     from job_finder.tools.scrapers import get_registry
 
     return {name.lower(): getattr(meta, "category", "") for name, meta in get_registry().items()}
 
 
-def _agent_rank(record) -> int:
+def _agent_rank(record, profile_hash: str | None = None) -> int:
     """The assistant's rank for this row (1 = best) from its last run, or a big
     number so unranked rows sort after ranked ones."""
+    if profile_hash is not None:
+        state = local_agent_service.fit_review_state(record, profile_hash)
+        if not state["current"]:
+            return 10_000
+        rank = state["fit"].get("rank")
+        return rank if isinstance(rank, int) else 10_000
     raw = getattr(record, "agent_fit_json", "") or ""
     if not raw:
         return 10_000
@@ -157,6 +165,8 @@ def _to_response(record) -> ApplicationResponse:
         location=record.location or "",
         job_url=record.job_url or "",
         source=record.source or "",
+        industry_tags=parse_tags(getattr(record, "industry_tags", "[]")),
+        ecosystem_tags=parse_tags(getattr(record, "ecosystem_tags", "[]")),
         description=record.description or "",
         is_remote=record.is_remote or False,
         work_type=getattr(record, "work_type", "") or "",
@@ -231,11 +241,12 @@ def list_applications(
     source: str | None = None,
     source_category: str | None = Query(
         None,
-        description="Browse by source kind: remote | ats | startup | crypto | community | jobspy | general",
+        description="Browse by source kind: remote | ats | startup | vc | crypto | community | jobspy | general",
     ),
     search: str | None = None,
     company_type: str | None = None,
     is_remote: bool | None = None,
+    founding_only: bool = False,
     work_type: str | None = None,
     location: str | None = Query(
         None,
@@ -264,6 +275,12 @@ def list_applications(
         None,
         ge=0,
         description="Annual pay ceiling; drops rows whose stated pay sits above it, keeps rows with no pay data",
+    ),
+    salary_currency: str | None = Query(
+        None,
+        min_length=3,
+        max_length=8,
+        description="Currency of the requested annual pay bounds; unlike or unstated currencies remain eligible",
     ),
     profile: str | None = None,
     search_run_id: str | None = None,
@@ -296,8 +313,9 @@ def list_applications(
         None,
         ge=1,
         le=365,
-        description="Keep rows the board itself first saw in the last N days; date_found is always set",
+        description="Keep rows the board first saw in the reader's current local calendar window",
     ),
+    timezone_name: str = "UTC",
     event_within_days: int | None = Query(
         None,
         ge=1,
@@ -335,12 +353,14 @@ def list_applications(
             search=search,
             company_type=company_type,
             is_remote=is_remote,
+            founding_only=founding_only,
             work_type=work_type,
             location=location,
             location_strict=location_strict,
             facet=facet,
             salary_min=salary_min,
             salary_max=salary_max,
+            salary_currency=salary_currency,
             profile=None if ws_scope else profile,
             workspace_id=ws_scope,
             shared_quest_workspace=ws_scope if scope == "board" else None,
@@ -351,6 +371,7 @@ def list_applications(
             first_quest_ok=first_quest_ok,
             posted_within_days=posted_within_days,
             found_within_days=found_within_days,
+            timezone_name=timezone_name,
             event_within_days=event_within_days,
             sort_by=sort_by,
             sort_dir=sort_dir,
@@ -379,13 +400,27 @@ def list_profile_work(
         ge=0,
         description="Annual pay ceiling; drops rows whose stated pay sits above it, keeps rows with no pay data",
     ),
+    salary_currency: str | None = Query(
+        None,
+        min_length=3,
+        max_length=8,
+        description="Currency of the requested annual pay bounds; unlike or unstated currencies remain eligible",
+    ),
     is_remote: bool | None = None,
+    founding_only: bool = False,
     posted_within_days: int | None = Query(None, ge=1, le=365),
-    found_within_days: int | None = Query(None, ge=1, le=365, description="Keep rows the board itself first saw in the last N days; date_found is always set"),
+    found_within_days: int | None = Query(
+        None,
+        ge=1,
+        le=365,
+        description="Keep rows the board first saw in the reader's current local calendar window",
+    ),
+    timezone_name: str = "UTC",
     source_category: str | None = Query(
         None,
-        description="Browse by source kind: remote | ats | startup | crypto | community | jobspy | general",
+        description="Browse by source kind: remote | ats | startup | vc | crypto | community | jobspy | general",
     ),
+    sort_by: str = "date_found",
     page: int = Query(1, ge=1),
     page_size: int = Query(24, ge=1, le=50),
     workspace = Depends(get_active_workspace_context),
@@ -397,12 +432,23 @@ def list_profile_work(
     user's connected agent owns requirement-level judgment after retrieval.
     """
 
+    # Unit-level callers invoke route functions directly, where FastAPI's
+    # Query default is not resolved into None. Keep the service boundary typed.
+    if not isinstance(salary_currency, str):
+        salary_currency = None
+
     reject_legacy_route_in_hosted_mode(
         "Profile Work retrieval is available through the local Questboard app"
     )
+    if sort_by not in {"date_found", "rank"}:
+        raise HTTPException(status_code=400, detail="sort_by must be date_found or rank")
     workspace_id = workspace.workspace.id if workspace is not None else None
     profile = local_agent_service.career_preferences(db, workspace_id)
+    profile_hash = local_agent_service.fit_profile_hash(db, workspace_id)
     preferences = profile.get("preferences") or {}
+    exclude_staffing_agencies = bool(
+        preferences.get("exclude_staffing_agencies", True)
+    )
     configured_roles = local_agent_service.clean_terms(preferences.get("roles"))
     if not configured_roles:
         return ProfileWorkListResponse(
@@ -422,8 +468,9 @@ def list_profile_work(
     cat_map = _source_category_map()
     category_counts: dict[str, int] = {}
     badge_query = (
-        db.query(ApplicationRecord.source)
+        db.query(ApplicationRecord.id)
         .filter(ApplicationRecord.vertical.in_(("career", "work")))
+        .filter(application_service.publishable_source_condition(ApplicationRecord))
         # confirmed-dead and expired tombstones stay out, like My roles
         .filter(ApplicationRecord.url_status.notin_(("dead", "expired")))
     )
@@ -434,19 +481,27 @@ def list_profile_work(
         location_strict=bool(location and location_strict),
         salary_min=salary_min,
         salary_max=salary_max,
+        salary_currency=salary_currency,
         is_remote=is_remote,
+        founding_only=founding_only,
+        exclude_staffing_agencies=exclude_staffing_agencies,
         posted_within_days=posted_within_days,
         found_within_days=found_within_days,
+        timezone_name=timezone_name,
     ):
         badge_query = badge_query.filter(condition)
-    for (src,) in badge_query.all():
-        cat = cat_map.get((src or "").lower())
-        if cat:
-            category_counts[cat] = category_counts.get(cat, 0) + 1
-
-    workplace = "remote_only" if is_remote else "saved"
-    if location and location_strict:
-        workplace = "location_only"
+    # Count with the exact predicate clicking the chip will use. This matters
+    # for identity shelves (Startup and Crypto), whose qualifying rows can be
+    # discovered through many different source categories.
+    for category in sorted({value for value in cat_map.values() if value}):
+        count = badge_query.filter(
+            application_service.source_category_condition(
+                ApplicationRecord,
+                category,
+            )
+        ).count()
+        if count:
+            category_counts[category] = count
 
     if source_category:
         # Browse everything available in this source kind, beyond the user's
@@ -465,9 +520,13 @@ def list_profile_work(
             location_strict=bool(location and location_strict),
             salary_min=salary_min,
             salary_max=salary_max,
+            salary_currency=salary_currency,
             is_remote=is_remote,
+            founding_only=founding_only,
+            exclude_staffing_agencies=exclude_staffing_agencies,
             posted_within_days=posted_within_days,
             found_within_days=found_within_days,
+            timezone_name=timezone_name,
             exclude_dead=True,
             sort_by="date_found",
             sort_dir="desc",
@@ -480,14 +539,11 @@ def list_profile_work(
     else:
         payload = local_agent_service.search_work(
             db,
-            location=location or "",
-            workplace_preference=workplace,
-            compensation_floor=salary_min,
-            posted_within_days=posted_within_days,
-            found_within_days=found_within_days,
-            # The human board browses the full in-lane set, not the agent's ~50.
-            page_size=300,
-            result_limit=300,
+            # The human board browses and paginates the full in-lane set. The
+            # connected-agent tool keeps its own compact 50-row sweep. Build
+            # the SAVED lane first; toolbar filters intersect it below rather
+            # than replacing saved pay/place/freshness with weaker values.
+            browse_all=True,
             use_saved_preferences=True,
             workspace_id=workspace_id,
         )
@@ -500,43 +556,80 @@ def list_profile_work(
         } if candidate_ids else {}
         ordered = [records_by_id[item_id] for item_id in candidate_ids if item_id in records_by_id]
 
-    # The server-side pay ceiling, applied before the total so the count and
-    # the pager can never promise rows the ceiling hides. The browse path
-    # already filtered in SQL; this mirror is the same semantics for the
-    # rows search_work handed back (no stated pay and session pay stay).
-    if salary_max is not None:
-        ordered = [
+    # My Roles starts from the saved eligible lane above. Every temporary
+    # toolbar value is an additional predicate on those ids, never a replacement
+    # for the saved search. This prevents a lower pay floor, longer date window,
+    # or different city from silently broadening what pull/ranking considered.
+    # Source shelves intentionally browse beyond My Roles and were already
+    # filtered in their get_applications call.
+    if not source_category and ordered:
+        ordered_ids = [record.id for record in ordered]
+        view_query = db.query(ApplicationRecord.id).filter(
+            ApplicationRecord.id.in_(ordered_ids)
+        )
+        for condition in application_service.board_filter_conditions(
+            ApplicationRecord,
+            search=search,
+            location=location or None,
+            location_strict=bool(location and location_strict),
+            salary_min=salary_min,
+            salary_max=salary_max,
+            salary_currency=salary_currency,
+            is_remote=is_remote,
+            founding_only=founding_only,
+            exclude_staffing_agencies=exclude_staffing_agencies,
+            posted_within_days=posted_within_days,
+            found_within_days=found_within_days,
+            timezone_name=timezone_name,
+        ):
+            view_query = view_query.filter(condition)
+        visible_ids = {item_id for (item_id,) in view_query.all()}
+        ordered = [record for record in ordered if record.id in visible_ids]
+
+    # Coherent global order BEFORE pagination: current ranked picks, reviewed
+    # non-skips without an integer rank, unreviewed/stale rows, then skips.
+    # The old two-way split treated a skip (rank=None) as ordinary unranked, so
+    # folded-away skips consumed page one while useful unreviewed rows waited on
+    # later pages. Declump each segment without crossing its semantic boundary.
+    fit_states = {
+        record.id: local_agent_service.fit_review_state(record, profile_hash)
+        for record in ordered
+    }
+    ranked = sorted(
+        (
             record
             for record in ordered
-            if application_service.stated_pay_within_ceiling(record, salary_max)
-        ]
-
-    if search:
-        needle = search.casefold().strip()
-        ordered = [
-            record
-            for record in ordered
-            if needle
-            in " ".join(
-                (
-                    record.job_title or "",
-                    record.company or "",
-                    record.description or "",
-                    record.location or "",
-                )
-            ).casefold()
-        ]
-
-    # Coherent order: in the roles view float the assistant's ranked picks to
-    # the top, then cap any one source to a short run so no board floods.
-    # Declump ranked and unranked separately so an unranked recency row never
-    # leapfrogs a deeper ranked pick.
-    if not source_category:
-        ranked = sorted((r for r in ordered if _agent_rank(r) < 10_000), key=_agent_rank)
-        unranked = [r for r in ordered if _agent_rank(r) >= 10_000]
-        ordered = _declump_by_source(ranked, max_run=3) + _declump_by_source(unranked, max_run=3)
-    else:
-        ordered = _declump_by_source(ordered, max_run=3)
+            if fit_states[record.id]["current"]
+            and fit_states[record.id]["fit"].get("verdict") != "skip"
+            and _agent_rank(record, profile_hash) < 10_000
+        ),
+        key=lambda record: _agent_rank(record, profile_hash),
+    )
+    reviewed_unranked = [
+        record
+        for record in ordered
+        if fit_states[record.id]["current"]
+        and fit_states[record.id]["fit"].get("verdict") != "skip"
+        and _agent_rank(record, profile_hash) >= 10_000
+    ]
+    unreviewed = [record for record in ordered if not fit_states[record.id]["current"]]
+    if sort_by == "date_found":
+        unreviewed.sort(key=lambda record: record.date_found or datetime.min, reverse=True)
+    skips = [
+        record
+        for record in ordered
+        if fit_states[record.id]["current"]
+        and fit_states[record.id]["fit"].get("verdict") == "skip"
+    ]
+    ordered = (
+        _declump_by_source(ranked, max_run=3)
+        + _declump_by_source(reviewed_unranked, max_run=3)
+        + _declump_by_source(unreviewed, max_run=3)
+        + _declump_by_source(skips, max_run=3)
+    )
+    reviewed_count = len(ranked) + len(reviewed_unranked) + len(skips)
+    ranked_count = len(ranked) + len(reviewed_unranked)
+    skipped_count = len(skips)
 
     total = len(ordered)
     offset = (page - 1) * page_size
@@ -552,6 +645,10 @@ def list_profile_work(
     page_items: list[ApplicationResponse] = []
     for record in page_records:
         resp = _to_response(record)
+        if not fit_states[record.id]["current"]:
+            # A resume, preference, or posting change invalidates the old
+            # judgment immediately; the next incremental run will replace it.
+            resp.agent_fit = None
         coverage = local_agent_service.local_relevance(record, skill_terms)
         if coverage:
             resp.local_fit = LocalFit(**coverage)
@@ -567,6 +664,10 @@ def list_profile_work(
         candidate_queries=payload["candidate_queries"],
         filters_applied=payload["filters_applied"],
         ranking_owner=payload["ranking_owner"],
+        reviewed_count=reviewed_count,
+        ranked_count=ranked_count,
+        skipped_count=skipped_count,
+        unreviewed_count=len(unreviewed),
         source_categories=category_counts,
         retrieval_note=(
             "Target-role candidates only. Use your connected agent for "

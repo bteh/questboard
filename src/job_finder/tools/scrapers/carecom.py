@@ -20,9 +20,10 @@ zero value means the poster left pay blank.
 as counterparty; the ``identifier`` PropertyValue carries the poster's
 name and rows credit "Becca B via Care.com" (fallback "Posted family
 via Care.com"). Rows whose ``validThrough`` has passed are dropped;
-otherwise it becomes the quest's apply_by. robots.txt sets
-Crawl-delay 1, so detail fetches sleep 1.5s apart and each run reads at
-most ~40 pages.
+otherwise it becomes the quest's apply_by. robots.txt sets Crawl-delay 1,
+so detail fetches sleep 1.5s apart. Each run reads at most 24 pages: enough
+daily turnover for this windowed source while still completing inside
+Questboard's 60-second source boundary on a slow day.
 """
 
 from __future__ import annotations
@@ -69,9 +70,11 @@ _HTML_ACCEPT = "text/html, application/xhtml+xml;q=0.9, */*;q=0.8"
 # robots.txt Crawl-delay is 1; stay comfortably above it.
 _CRAWL_DELAY_S = 1.5
 # One slow detail page must not stall the sweep.
-_DETAIL_TIMEOUT = 10
-# Politeness ceiling per run, independent of max_results.
-_DETAIL_FETCH_CAP = 40
+_DETAIL_TIMEOUT = 7
+# Politeness ceiling per run, independent of max_results. A wall-clock budget
+# below the shared 60-second boundary is the stronger stop on slow days.
+_DETAIL_FETCH_CAP = 24
+_RUN_BUDGET_S = 52.0
 
 
 def _fetch_text(url: str, accept: str, timeout: float) -> str | None:
@@ -271,9 +274,10 @@ def search_carecom(
 
     ``roles`` is ignored on purpose: sits are not career titles. Detail
     fetches sleep 1.5s apart (robots Crawl-delay 1) and are capped at
-    ~40 per run regardless of ``max_results``.
+    24 per run regardless of ``max_results`` so the source returns reliably.
     """
     logger.info("Fetching care postings from Care.com sitemaps...")
+    deadline = time.monotonic() + _RUN_BUDGET_S
     candidates = _newest_first(_fetch_job_urls())
 
     results: list[dict] = []
@@ -282,9 +286,14 @@ def search_carecom(
         if len(results) >= max_results or fetched >= _DETAIL_FETCH_CAP:
             break
         if fetched:
+            if time.monotonic() + _CRAWL_DELAY_S + 1 >= deadline:
+                break
             time.sleep(_CRAWL_DELAY_S)
+        remaining = deadline - time.monotonic()
+        if remaining <= 1:
+            break
         fetched += 1
-        html = _fetch_text(url, _HTML_ACCEPT, _DETAIL_TIMEOUT)
+        html = _fetch_text(url, _HTML_ACCEPT, min(_DETAIL_TIMEOUT, remaining))
         if not html:
             continue
         posting = _find_job_posting(html)

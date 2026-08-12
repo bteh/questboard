@@ -144,6 +144,40 @@ def test_floor_keeps_rows_with_no_pay_data(api_client) -> None:
     assert _titles(payload) == {"No pay stated"}
 
 
+def test_floor_only_compares_rows_in_the_requested_currency(api_client) -> None:
+    client, jf_db = api_client
+    jf_db.save_application(
+        job_title="Low USD",
+        company="Acme",
+        job_url="https://example.com/jobs/low-usd",
+        salary_min=90_000,
+        salary_max=90_000,
+        salary_currency="USD",
+    )
+    jf_db.save_application(
+        job_title="EUR not comparable",
+        company="Acme",
+        job_url="https://example.com/jobs/eur",
+        salary_min=90_000,
+        salary_max=90_000,
+        salary_currency="EUR",
+    )
+    jf_db.save_application(
+        job_title="Currency missing",
+        company="Acme",
+        job_url="https://example.com/jobs/currency-missing",
+        salary_min=90_000,
+        salary_max=90_000,
+    )
+
+    resp = client.get(
+        "/api/v1/applications",
+        params={"salary_min": 120_000, "salary_currency": "USD"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert _titles(resp.json()) == {"EUR not comparable", "Currency missing"}
+
+
 def test_negative_floor_rejected(api_client) -> None:
     client, jf_db = api_client
     _seed(jf_db)

@@ -112,11 +112,13 @@ def delete_object(*, bucket: str, storage_path: str, local_path: str = "") -> No
         return
     if not bucket or not storage_path or not uses_managed_storage():
         return
-    requests.delete(
+    response = requests.delete(
         f"{_storage_base_url()}/{bucket}/{storage_path}",
         headers=_storage_headers(),
         timeout=30,
-    ).raise_for_status()
+    )
+    if response.status_code != 404:
+        response.raise_for_status()
 
 
 def read_object_bytes(*, bucket: str, storage_path: str, local_path: str = "") -> bytes:

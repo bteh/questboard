@@ -242,5 +242,7 @@ describe('personal quests never leak into career surfaces', () => {
   it('only the personal log query opts into the personal lane', () => {
     expect(personalLogFilters().vertical).toBe('personal');
     expect(boardLogFilters().vertical).not.toContain('personal');
+    expect(personalLogFilters().profile).toBeUndefined();
+    expect(boardLogFilters().profile).toBeUndefined();
   });
 });

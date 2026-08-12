@@ -11,15 +11,47 @@ run worse than LinkedIn-only.
 """
 from __future__ import annotations
 
-from app.schemas.workspace import WorkspacePreferences
+from pathlib import Path
+
+from app.schemas.workspace import PlaceSelection, WorkspacePreferences
 from app.services.workspace_service import (
     _DEFAULT_JOBSPY_BOARDS,
     build_pipeline_config_override,
 )
+from job_finder.tools.scrapers._utils import _load_seed_slugs
 
 
 def test_default_boards_include_indeed():
     assert "indeed" in _DEFAULT_JOBSPY_BOARDS
+
+
+def test_high_signal_primary_ats_boards_are_in_the_hot_seed_lane():
+    data = Path(__file__).resolve().parents[1] / "src/job_finder/tools/scrapers/data"
+    ashby = {
+        line.strip().lower()
+        for line in (data / "ashby_seed.txt").read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    }
+    greenhouse = {
+        line.strip().lower()
+        for line in (data / "greenhouse_seed.txt").read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    }
+
+    assert {"confluent", "sentilink", "fabrion"} <= ashby
+    assert {"yipitdata", "diligentrobotics"} <= greenhouse
+
+
+def test_hot_seed_loader_leaves_bulk_catalog_to_daily_rotation():
+    ashby = {slug.lower() for slug in _load_seed_slugs("ashby_seed.txt")}
+    greenhouse = {slug.lower() for slug in _load_seed_slugs("greenhouse_seed.txt")}
+
+    assert {"confluent", "sentilink", "fabrion"} <= ashby
+    assert {"yipitdata", "diligentrobotics"} <= greenhouse
+    assert "0g" not in ashby
+    assert "103644278" not in greenhouse
+    assert len(ashby) < 100
+    assert len(greenhouse) < 150
 
 
 def test_default_prefs_include_indeed_and_linkedin():
@@ -42,3 +74,24 @@ def test_config_override_adds_linkedin_when_enabled():
     boards = build_pipeline_config_override(prefs, "ws1")["job_boards"]
     assert "linkedin" in boards
     assert "indeed" in boards
+
+
+def test_config_override_uses_the_users_country_for_each_place():
+    prefs = WorkspacePreferences(
+        preferred_places=[
+            PlaceSelection(
+                label="London, United Kingdom",
+                kind="city",
+                match_scope="metro",
+                city="London",
+                country="United Kingdom",
+                country_code="GB",
+            ),
+        ],
+    )
+    settings = build_pipeline_config_override(prefs, "ws1")["search_settings"]
+
+    assert settings["country"] == "United Kingdom"
+    assert settings["country_by_location"] == {
+        "london, united kingdom": "United Kingdom",
+    }

@@ -87,11 +87,15 @@ export function JobTable({ data, onRowClick, selectedId }: JobTableProps) {
           toSalaryPeriod(info.row.original.salary_period),
         );
         if (!salary) return <span className="text-xs text-text-muted">not stated</span>;
-        const estimated = info.row.original.salary_source === 'parsed_from_description';
+        const source = info.row.original.salary_source;
+        const estimated = source === 'parsed_from_description' || source === 'source_estimate';
+        const estimateTitle = source === 'source_estimate'
+          ? 'Estimated by the listing source, not employer-reported.'
+          : 'Estimated from the job description text, not structured employer-reported pay.';
         return (
           <span
             className="qb-num text-xs text-text-secondary whitespace-nowrap"
-            title={estimated ? 'Estimated from the job description text, not employer-reported.' : undefined}
+            title={estimated ? estimateTitle : undefined}
           >
             {salary}
             {estimated && <span className="ml-1 text-[10px] text-text-muted">(est.)</span>}

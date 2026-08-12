@@ -11,7 +11,8 @@ pin the new behavior:
 3. Unknown strictness values fall back to ``loose`` (typo safety).
 4. ``_match_roles`` honors the ``match_mode`` and ``include_founding`` kwargs.
 5. ``_filter_jobs_by_level`` honors the resolved tolerances.
-6. ``_job_salary_passes`` uses the salary_flex from the resolved settings.
+6. Salary comparison itself remains a hard boundary; strictness affects role
+   recall, not the number the user entered.
 """
 
 from __future__ import annotations
@@ -180,34 +181,26 @@ class LevelToleranceTest(unittest.TestCase):
         self.assertEqual(len(result), 2)
 
 
-class SalaryFlexTest(unittest.TestCase):
-    """The ``salary_flex`` multiplier from settings controls the floor."""
+class SalaryBoundaryTest(unittest.TestCase):
+    """The pay boundary is exact and currency-aware."""
 
     def setUp(self) -> None:
-        from job_finder.pipeline import _job_salary_passes, _resolve_filter_settings
+        from job_finder.pipeline import _job_salary_passes
 
         self.passes = _job_salary_passes
-        self.resolve = _resolve_filter_settings
 
-    def test_loose_70pct_floor_passes_a_75pct_job(self) -> None:
-        # User floor = 100k. Loose multiplier 0.70 → hard_floor = 70k.
-        # Job paying 75k → passes.
-        settings = self.resolve({"filters": {"strictness": "loose"}})
-        hard_floor = 100_000 * settings["salary_flex"]
-        self.assertTrue(self.passes({"salary_max": 75_000}, hard_floor))
+    def test_a_75pct_job_fails_the_full_floor(self) -> None:
+        self.assertFalse(self.passes({"salary_max": 75_000}, 100_000))
 
-    def test_strict_100pct_floor_rejects_a_75pct_job(self) -> None:
-        settings = self.resolve({"filters": {"strictness": "strict"}})
-        hard_floor = 100_000 * settings["salary_flex"]
-        self.assertFalse(self.passes({"salary_max": 75_000}, hard_floor))
+    def test_exact_floor_passes(self) -> None:
+        self.assertTrue(self.passes({"salary_max": 100_000}, 100_000))
 
-    def test_explicit_flex_override_wins(self) -> None:
-        settings = self.resolve({
-            "filters": {"strictness": "strict", "salary_flex": 0.5},
-        })
-        hard_floor = 100_000 * settings["salary_flex"]
-        # 60k passes with flex 0.5 (hard_floor 50k) but would fail under strict's 100k
-        self.assertTrue(self.passes({"salary_max": 60_000}, hard_floor))
+    def test_unlike_currency_is_not_compared(self) -> None:
+        self.assertTrue(self.passes(
+            {"salary_max": 60_000, "salary_currency": "EUR"},
+            100_000,
+            "USD",
+        ))
 
     def test_no_salary_data_always_passes(self) -> None:
         # Documented invariant — unknown salary never gets filtered out

@@ -47,6 +47,9 @@ class TestVerdicts:
         assert verdict_for("exception", 0, 40) == "failing"
         assert verdict_for("timeout", 0, 40) == "failing"
 
+    def test_partial_rows_are_degraded_not_failed(self) -> None:
+        assert verdict_for("partial", 1484, 1200) == "degraded"
+
 
 @pytest.fixture()
 def db(tmp_path, monkeypatch):
@@ -98,6 +101,45 @@ def test_run_scrapers_records_one_row_per_source(db, monkeypatch) -> None:
     finally:
         _registry._REGISTRY.pop("_test_finds", None)
         _registry._REGISTRY.pop("_test_breaks", None)
+
+
+def test_quest_source_at_result_cap_is_recorded_partial(db) -> None:
+    import importlib
+
+    registry = importlib.import_module("job_finder.tools.scrapers._registry")
+
+    @registry.register_scraper(
+        name="_test_capped_quest",
+        display_name="Capped quest",
+        url="https://q.example",
+        kind="odd",
+        full_snapshot=True,
+        enabled_by_default=False,
+    )
+    def _capped(**_kwargs):
+        return [
+            {
+                "title": f"Quest {i}",
+                "company": "Fixture",
+                "url": f"https://q.example/{i}",
+                "source": "_test_capped_quest",
+                "vertical": "odd",
+            }
+            for i in range(20)
+        ]
+
+    try:
+        outcomes: list[dict] = []
+        jobs = registry.run_scrapers(
+            names=["_test_capped_quest"],
+            max_results=20,
+            outcome_sink=outcomes,
+        )
+        assert len(jobs) == 20
+        assert outcomes[0]["finish_reason"] == "partial"
+        assert "result cap reached" in outcomes[0]["error_sample"]
+    finally:
+        registry._REGISTRY.pop("_test_capped_quest", None)
 
 
 def test_source_health_reads_the_log_worst_first(db) -> None:

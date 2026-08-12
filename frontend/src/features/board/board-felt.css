@@ -154,6 +154,16 @@
   font-size: 12.5px; color: var(--mute); min-height: 19px;
 }
 .qb-workline .qb-textlink { font-family: var(--sans); }
+.qb-receipt {
+  max-width: 860px;
+  padding-left: 10px;
+  border-left: 2px solid var(--hair);
+  line-height: 1.45;
+  white-space: normal;
+}
+.qb-receipt[data-tone="good"] { border-left-color: var(--sage); color: var(--soft); }
+.qb-receipt[data-tone="warn"],
+.qb-receipt[data-tone="bad"] { border-left-color: var(--clay); color: var(--soft); }
 .qb-workline-track {
   flex: 0 0 120px; height: 3px; border-radius: 2px;
   background: var(--step4); overflow: hidden;
@@ -285,7 +295,7 @@
   .qb-proposal-keep { min-height: 44px; }
 }
 
-/* the job detail sheet: stated facts, then the full stored description */
+/* the detail sheet: stated facts, Side Quest requirements, then the full text */
 .qb-jd-facts {
   border: 1px solid var(--hair); border-bottom-color: var(--edge);
   border-radius: 10px; background: var(--paper);
@@ -298,6 +308,38 @@
   font-family: var(--mono); font-size: 11px; letter-spacing: .03em; color: var(--mute);
 }
 .qb-jd-fact-value { font-size: 14px; color: var(--soft); }
+.qb-jd-quest {
+  border: 1px solid var(--hair); border-bottom-color: var(--edge);
+  border-radius: 10px; background: color-mix(in srgb, var(--paper) 88%, var(--ground));
+  padding: 14px 18px; margin-top: 10px;
+}
+.qb-jd-quest-head { display: flex; gap: 14px; align-items: flex-start; justify-content: space-between; }
+.qb-jd-quest-kicker,
+.qb-jd-basis {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .035em; color: var(--mute);
+  text-transform: lowercase;
+}
+.qb-jd-basis {
+  flex: none; border: 1px solid var(--hair); border-radius: 999px; padding: 3px 7px;
+  background: var(--paper);
+}
+.qb-jd-effort-line { display: flex; gap: 6px; align-items: center; margin-top: 4px; font-size: 14px; color: var(--soft); }
+.qb-jd-effort-line strong { color: var(--ink); font-weight: 650; }
+.qb-jd-effort-marks { display: inline-flex; gap: 3px; margin-right: 2px; }
+.qb-jd-effort-marks i {
+  display: block; width: 7px; height: 7px; border-radius: 50%;
+  border: 1px solid var(--step4);
+}
+.qb-jd-effort-marks i.is-filled { background: var(--sage); border-color: var(--sage); }
+.qb-jd-effort-note { margin: 10px 0 0; font-size: 14px; line-height: 1.5; color: var(--soft); }
+.qb-jd-method { margin: 5px 0 0; font-size: 11.5px; line-height: 1.45; color: var(--mute); }
+.qb-jd-quest h4 {
+  margin: 14px 0 5px; padding-top: 11px; border-top: 1px solid var(--hair);
+  font-family: var(--mono); font-size: 11px; letter-spacing: .035em; color: var(--mute);
+  text-transform: lowercase;
+}
+.qb-jd-criteria { margin: 0; padding-left: 19px; color: var(--soft); font-size: 14px; line-height: 1.5; }
+.qb-jd-criteria li + li { margin-top: 4px; }
 .qb-jd-desc {
   border: 1px dashed var(--step4); border-radius: 4px; background: var(--ground);
   padding: 12px 14px; margin-top: 10px;

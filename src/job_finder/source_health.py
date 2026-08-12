@@ -12,6 +12,7 @@ Verdicts:
             normally finds some (the classic silent-breakage signature)
 - dropped   the latest run found less than half the source's recent median
             (only when the median is big enough to make halving meaningful)
+- degraded  the source returned useful rows, but one or more requests failed
 - failing   the latest run raised or timed out
 - quiet     the source has found nothing recently, including now; honest
             low supply, not breakage
@@ -50,6 +51,8 @@ def verdict_for(last_finish_reason: str, last_rows: int, median_rows: int) -> st
     """The health verdict for a source's latest run against its history."""
     if last_finish_reason in ("exception", "timeout"):
         return "failing"
+    if last_finish_reason == "partial":
+        return "degraded"
     if last_rows == 0:
         return "zero_rows" if median_rows > 0 else "quiet"
     if median_rows >= MIN_MEDIAN_FOR_DROP_RULE and last_rows < median_rows * DROP_FRACTION:
@@ -69,7 +72,11 @@ def source_health(days: int = 14) -> list[SourceHealth]:
     out: list[SourceHealth] = []
     for source, rows in by_source.items():
         latest = rows[0]
-        history = [r.rows_found for r in rows[1:] if r.finish_reason not in ("exception", "timeout")]
+        history = [
+            r.rows_found
+            for r in rows[1:]
+            if r.finish_reason not in ("exception", "timeout")
+        ]
         med = int(median(history)) if history else 0
         out.append(
             SourceHealth(
@@ -86,6 +93,13 @@ def source_health(days: int = 14) -> list[SourceHealth]:
             )
         )
 
-    order = {"failing": 0, "zero_rows": 1, "dropped": 2, "quiet": 3, "ok": 4}
+    order = {
+        "failing": 0,
+        "zero_rows": 1,
+        "degraded": 2,
+        "dropped": 3,
+        "quiet": 4,
+        "ok": 5,
+    }
     out.sort(key=lambda h: (order.get(h.verdict, 9), h.source))
     return out

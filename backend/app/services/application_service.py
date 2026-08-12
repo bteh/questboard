@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+import re
+from datetime import datetime, time, timedelta, timezone
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from sqlalchemy import and_, case, func, literal, or_
 from sqlalchemy.orm import Session
@@ -8,6 +10,7 @@ from sqlalchemy.orm import Session
 # The mandatory vertical scope. Every list-level read of applications goes
 # through it so quest rows never leak into career surfaces by omission.
 from job_finder.models.database import APPLICATION_VERTICALS, scoped_applications
+from job_finder.staffing import STAFFING_AGENCY_NAMES
 from app.models.application import ApplicationRecord
 
 # A place filter keyed to a city name alone drops every metro-sibling city:
@@ -60,6 +63,83 @@ def _utcnow():
     return datetime.now(timezone.utc)
 
 
+def local_calendar_window_utc(
+    days: int = 1,
+    timezone_name: str = "UTC",
+    *,
+    now: datetime | None = None,
+) -> tuple[datetime, datetime]:
+    """UTC-naive bounds for the reader's current local calendar window.
+
+    ``date_found`` is stored as a naive UTC datetime. A label such as "new
+    today" therefore needs the browser's IANA timezone translated to UTC
+    before it can be compared honestly. Calendar days are intentional here:
+    one day starts at local midnight, not 24 hours before the request. ZoneInfo
+    also keeps the boundary correct across 23/25-hour DST days.
+    """
+    ref = now or _utcnow()
+    if ref.tzinfo is None:
+        ref = ref.replace(tzinfo=timezone.utc)
+    try:
+        zone = ZoneInfo(timezone_name or "UTC")
+    except (ZoneInfoNotFoundError, ValueError):
+        zone = timezone.utc
+    width = max(1, min(int(days), 365))
+    local_today = ref.astimezone(zone).date()
+    start_local = datetime.combine(
+        local_today - timedelta(days=width - 1),
+        time.min,
+        tzinfo=zone,
+    )
+    end_local = datetime.combine(
+        local_today + timedelta(days=1),
+        time.min,
+        tzinfo=zone,
+    )
+    return (
+        start_local.astimezone(timezone.utc).replace(tzinfo=None),
+        end_local.astimezone(timezone.utc).replace(tzinfo=None),
+    )
+
+
+def found_window_condition(
+    model,
+    days: int = 1,
+    timezone_name: str = "UTC",
+    *,
+    now: datetime | None = None,
+):
+    """Rows first seen in the reader's calendar window and not known stale.
+
+    First-seen time is the required clock. A newly changed source date cannot
+    resurrect a row Questboard already had. Conversely an undated arrival is
+    kept because the source has not proved it stale. A verifiable post date
+    older than seven calendar days is the one conservative exclusion retained
+    from the prior freshness contract.
+    """
+    ref = now or _utcnow()
+    if ref.tzinfo is None:
+        ref = ref.replace(tzinfo=timezone.utc)
+    current_utc = ref.astimezone(timezone.utc).replace(tzinfo=None)
+    start, end = local_calendar_window_utc(days, timezone_name, now=ref)
+    today_start, _ = local_calendar_window_utc(1, timezone_name, now=ref)
+    stale_floor = (today_start - timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%S")
+    posted = func.coalesce(model.date_posted, "")
+    return and_(
+        model.date_found >= start,
+        model.date_found < end,
+        # A bad scraper clock must not manufacture an arrival that has not
+        # happened yet, even when its timestamp falls later on the same local
+        # calendar day.
+        model.date_found <= current_utc,
+        ~and_(
+            posted >= "2000-01-01",
+            posted < stale_floor,
+            func.lower(func.coalesce(model.date_confidence, "")) != "missing",
+        ),
+    )
+
+
 # Casting / audition quests are short-lived, and their real audition date lives
 # only in the posting text (e.g. "auditions JUNE 15"), so event_start is NULL
 # and the upcoming-only filter can't expire them. Once the source's publish date
@@ -73,8 +153,9 @@ TIME_SENSITIVE_SHELF_DAYS = 30
 def time_sensitive_stale(model, now: datetime | None = None):
     """A SQLAlchemy condition that is TRUE for a stale time-sensitive quest.
 
-    Two prongs: any vertical whose event day (UTC) has already passed, and
-    the camera shelf life for casting calls that carry no event date at all.
+    Three prongs: any vertical whose event day (UTC) has already passed, any
+    quest whose stated end/deadline day has passed, and the camera shelf life
+    for casting calls that carry no event date at all.
     Negate with ``~`` to keep everything else. ``model`` is the caller's
     ApplicationRecord class (board_summary imports a different one), so the
     filter binds to that module's mapped columns.
@@ -89,6 +170,12 @@ def time_sensitive_stale(model, now: datetime | None = None):
         # NULL for free text; coalesce turns that NULL into "keep", so a value
         # that cannot prove the event passed never hides a row.
         func.coalesce(func.date(model.event_start) < today, False),
+        # Some quests are actionable throughout a window rather than on one
+        # event day: studies use event_end for the last session and scholarships
+        # use it for the application deadline.  Keep the whole stated day, then
+        # hide it on the next UTC calendar day.  Free text stays conservative
+        # because date() returns NULL and coalesce turns that into "keep".
+        func.coalesce(func.date(model.event_end) < today, False),
         and_(
             model.vertical.in_(TIME_SENSITIVE_VERTICALS),
             model.event_start.is_(None),
@@ -131,7 +218,12 @@ def _annual_pay_bounds(model):
     return lo, hi
 
 
-def stated_pay_filter(model, salary_min: float | None = None, salary_max: float | None = None):
+def stated_pay_filter(
+    model,
+    salary_min: float | None = None,
+    salary_max: float | None = None,
+    salary_currency: str | None = None,
+):
     """The annual pay floor/ceiling as one condition, or None when unset.
 
     Mirrors job_finder.pipeline._job_salary_passes: use the range midpoint
@@ -139,6 +231,8 @@ def stated_pay_filter(model, salary_min: float | None = None, salary_max: float 
     with no salary data (dropping them would hide most listings, and "no pay
     stated" is neither "below the floor" nor "above the ceiling"). Per-gig
     "session" pay is kept without comparison, like no-stated-pay.
+    A different or missing currency is kept as not-comparable. Questboard
+    does not guess exchange rates or silently treat every amount as USD.
     """
     if salary_min is None and salary_max is None:
         return None
@@ -156,18 +250,34 @@ def stated_pay_filter(model, salary_min: float | None = None, salary_max: float 
         checks.append(bounds_pass(lambda value: value >= salary_min))
     if salary_max is not None:
         checks.append(bounds_pass(lambda value: value <= salary_max))
+    keep_without_comparison = []
+    target_currency = (salary_currency or "").strip().upper()
+    if target_currency:
+        row_currency = func.upper(func.trim(func.coalesce(model.salary_currency, "")))
+        keep_without_comparison.append(
+            or_(row_currency == "", row_currency != target_currency)
+        )
     return or_(
+        *keep_without_comparison,
         and_(lo.is_(None), hi.is_(None)),
         func.lower(func.coalesce(model.salary_period, "")) == _SESSION_PERIOD,
         and_(*checks),
     )
 
 
-def stated_pay_within_ceiling(record, ceiling: float | None) -> bool:
+def stated_pay_within_ceiling(
+    record,
+    ceiling: float | None,
+    salary_currency: str | None = None,
+) -> bool:
     """Python mirror of stated_pay_filter's ceiling, for rows a service
     already fetched (the work lane's roles view orders in Python). Keep the
     two in sync: no stated pay and per-gig session pay always pass."""
     if ceiling is None:
+        return True
+    target_currency = (salary_currency or "").strip().upper()
+    listing_currency = str(getattr(record, "salary_currency", "") or "").strip().upper()
+    if target_currency and (not listing_currency or listing_currency != target_currency):
         return True
     period = (getattr(record, "salary_period", "") or "").lower()
     if period == _SESSION_PERIOD:
@@ -320,6 +430,42 @@ def place_filter(model, location: str | None, location_strict: bool = False):
     return or_(*reachable)
 
 
+def founding_role_condition(model):
+    """The single, narrow definition of a founding seat used by every shelf.
+
+    Company-origin prose often mentions a founding team without making the
+    advertised role one. These phrases describe the seat itself; keeping the
+    predicate here prevents Founding and Startup from quietly disagreeing.
+    """
+    title = func.lower(func.coalesce(model.job_title, ""))
+    description = func.lower(func.coalesce(model.description, ""))
+    explicit_founding_phrases = (
+        "join our founding team",
+        "join the founding team",
+        "part of our founding team",
+        "part of the founding team",
+        "member of our founding team",
+        "member of the founding team",
+        "as a founding team member",
+        "first data hire",
+        "first dedicated data hire",
+        "first data engineer",
+        "first analytics hire",
+        "first dedicated analytics hire",
+        "first analytics engineer",
+        "first engineering hire",
+        "first product hire",
+        "first design hire",
+        "first marketing hire",
+        "first sales hire",
+        "first finance hire",
+    )
+    return or_(
+        title.like("%founding%"),
+        *(description.like(f"%{phrase}%") for phrase in explicit_founding_phrases),
+    )
+
+
 def board_filter_conditions(
     model,
     *,
@@ -328,10 +474,14 @@ def board_filter_conditions(
     location_strict: bool = False,
     salary_min: float | None = None,
     salary_max: float | None = None,
+    salary_currency: str | None = None,
     is_remote: bool | None = None,
+    founding_only: bool = False,
+    exclude_staffing_agencies: bool = False,
     first_quest_ok: bool | None = None,
     posted_within_days: int | None = None,
     found_within_days: int | None = None,
+    timezone_name: str = "UTC",
 ) -> list:
     """The user-set board filters as reusable SQLAlchemy conditions.
 
@@ -344,10 +494,17 @@ def board_filter_conditions(
     conditions: list = []
     if is_remote is not None:
         conditions.append(model.is_remote == is_remote)
+    if founding_only:
+        conditions.append(founding_role_condition(model))
+    if exclude_staffing_agencies:
+        company = func.lower(func.coalesce(model.company, ""))
+        conditions.append(and_(
+            *(~company.like(f"%{name}%") for name in STAFFING_AGENCY_NAMES)
+        ))
     place = place_filter(model, location, location_strict)
     if place is not None:
         conditions.append(place)
-    pay = stated_pay_filter(model, salary_min, salary_max)
+    pay = stated_pay_filter(model, salary_min, salary_max, salary_currency)
     if pay is not None:
         conditions.append(pay)
     if first_quest_ok is not None:
@@ -376,40 +533,23 @@ def board_filter_conditions(
         # count even if a string survives.
         now = datetime.now(timezone.utc)
         lower = (now - timedelta(days=posted_within_days)).strftime("%Y-%m-%dT%H:%M:%S")
-        upper = (now + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S")
+        upper = now.strftime("%Y-%m-%dT%H:%M:%S")
         conditions.append(model.date_posted >= lower)
         conditions.append(model.date_posted <= upper)
         conditions.append(
             func.lower(func.coalesce(model.date_confidence, "")) != "missing"
         )
     if isinstance(found_within_days, int):
-        # "Arrived in the last N days", by OUR clock. date_found is stamped
-        # by the board on every insert, so unlike the posted window nothing
-        # is hidden for lacking a verifiable source date. isinstance, not a
-        # None check: tests call the endpoint functions directly and the
-        # FastAPI Query default object must read as "filter off".
-        # "New today", both clocks. Either the source provably posted it
-        # inside the window, or it arrived here inside the window and is not
-        # provably a stale repost (the Netflix case: found today, posted 19
-        # days earlier). The >= "2000-01-01" floor keeps free text and absent
-        # dates, which prove nothing either way.
-        now = datetime.now(timezone.utc)
-        stale_floor = (now - timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%S")
-        posted_lower = (now - timedelta(days=found_within_days)).strftime("%Y-%m-%dT%H:%M:%S")
-        posted_upper = (now + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S")
+        # "New today" is a calendar promise in the reader's timezone, using
+        # Questboard's first-seen clock. It is not a rolling 24-hour window,
+        # and a source changing its posted date cannot make an existing row
+        # newly found. Unknown source dates still pass; only a verifiably stale
+        # post is excluded.
         conditions.append(
-            or_(
-                and_(
-                    model.date_posted >= posted_lower,
-                    model.date_posted <= posted_upper,
-                ),
-                and_(
-                    model.date_found >= now - timedelta(days=found_within_days),
-                    ~and_(
-                        model.date_posted >= "2000-01-01",
-                        model.date_posted < stale_floor,
-                    ),
-                ),
+            found_window_condition(
+                model,
+                found_within_days,
+                timezone_name,
             )
         )
     if search:
@@ -426,6 +566,73 @@ def board_filter_conditions(
     return conditions
 
 
+def source_category_condition(model, source_category: str):
+    """Build the browse predicate for a source/category shelf.
+
+    Most shelves remain provenance-based. Crypto is an industry identity and
+    Startup is an employer/seat identity, so both work across ATS, remote
+    boards, and aggregators. Source fallbacks keep older pre-taxonomy rows
+    visible without treating a broad board itself as proof of startup status.
+    """
+    from job_finder.tools.scrapers import get_registry
+
+    wanted = {
+        name.lower()
+        for name, meta in get_registry().items()
+        if getattr(meta, "category", "") == source_category
+    }
+    source_predicate = (
+        func.lower(model.source).in_(wanted)
+        if wanted
+        else func.lower(model.source) == "\x00__none__"
+    )
+    if source_category == "crypto":
+        taxonomy_predicate = func.lower(
+            func.coalesce(model.industry_tags, "[]")
+        ).like('%"crypto"%')
+        return or_(taxonomy_predicate, source_predicate)
+    if source_category == "startup":
+        # Strict, auditable signals only. In particular, an Ashby/Greenhouse/
+        # BuiltIn row is not a startup merely because startups use that board.
+        company_type = func.lower(func.coalesce(model.company_type, ""))
+        funding_stage = func.lower(func.coalesce(model.funding_stage, ""))
+        early_funding = or_(
+            funding_stage.like("%pre-seed%"),
+            funding_stage.like("%pre seed%"),
+            funding_stage.like("%seed%"),
+            funding_stage.like("%angel%"),
+            funding_stage.like("%bootstrap%"),
+            funding_stage.like("%series a%"),
+        )
+        return or_(
+            source_predicate,
+            company_type == "early startup",
+            early_funding,
+            founding_role_condition(model),
+        )
+    return source_predicate
+
+
+def publishable_source_condition(model):
+    """Exclude sources explicitly registered as research, never content.
+
+    This is a read-time backstop for databases created before a source was
+    demoted. Refresh selection already refuses these sources; applying the
+    same contract here prevents their legacy rows from masquerading as live
+    opportunities before the versioned cleanup has run.
+    """
+    from job_finder.tools.scrapers import get_registry
+
+    research_only = {
+        name.lower()
+        for name, meta in get_registry().items()
+        if getattr(meta, "research_only", False)
+    }
+    if not research_only:
+        return model.id.isnot(None)
+    return ~func.lower(func.coalesce(model.source, "")).in_(research_only)
+
+
 def get_applications(
     db: Session,
     *,
@@ -439,12 +646,15 @@ def get_applications(
     title_token_groups: list[list[str]] | None = None,
     company_type: str | None = None,
     is_remote: bool | None = None,
+    founding_only: bool = False,
+    exclude_staffing_agencies: bool = False,
     work_type: str | None = None,
     location: str | None = None,
     location_strict: bool = False,
     facet: str | None = None,
     salary_min: float | None = None,
     salary_max: float | None = None,
+    salary_currency: str | None = None,
     profile: str | None = None,
     workspace_id: str | None = None,
     shared_quest_workspace: str | None = None,
@@ -455,6 +665,7 @@ def get_applications(
     first_quest_ok: bool | None = None,
     posted_within_days: int | None = None,
     found_within_days: int | None = None,
+    timezone_name: str = "UTC",
     event_within_days: int | None = None,
     sort_by: str = "overall_score",
     sort_dir: str = "desc",
@@ -468,6 +679,7 @@ def get_applications(
     # (which are unscored and would float to the top of the default
     # overall_score desc nullsfirst sort) unless a caller opts in.
     query = scoped_applications(db.query(ApplicationRecord), verticals)
+    query = query.filter(publishable_source_condition(ApplicationRecord))
 
     if status:
         # Single value or comma list, mirroring the vertical param: the log
@@ -487,21 +699,9 @@ def get_applications(
     if source:
         query = query.filter(ApplicationRecord.source == source)
     if source_category:
-        # Browse the board by the kind of source (remote / startup / crypto /
-        # company / big boards), resolving the category to its registered
-        # source names. Case-insensitive so stored "Himalayas" matches the
-        # registry key "himalayas".
-        from job_finder.tools.scrapers import get_registry
-
-        wanted = {
-            name.lower()
-            for name, meta in get_registry().items()
-            if getattr(meta, "category", "") == source_category
-        }
-        if wanted:
-            query = query.filter(func.lower(ApplicationRecord.source).in_(wanted))
-        else:
-            query = query.filter(func.lower(ApplicationRecord.source) == "\x00__none__")
+        query = query.filter(
+            source_category_condition(ApplicationRecord, source_category)
+        )
     if company_type:
         query = query.filter(ApplicationRecord.company_type == company_type)
     if work_type:
@@ -516,10 +716,14 @@ def get_applications(
         location_strict=location_strict,
         salary_min=salary_min,
         salary_max=salary_max,
+        salary_currency=salary_currency,
         is_remote=is_remote,
+        founding_only=founding_only,
+        exclude_staffing_agencies=exclude_staffing_agencies,
         first_quest_ok=first_quest_ok,
         posted_within_days=posted_within_days,
         found_within_days=found_within_days,
+        timezone_name=timezone_name,
     ):
         query = query.filter(condition)
     if facet:
@@ -810,20 +1014,28 @@ def check_urls(
     limit: int = 100,
     workspace_id: str | None = None,
     live_only: bool = False,
+    search_run_id: str | None = None,
 ) -> dict:
-    """HEAD-check job URLs and update url_status. Returns summary counts.
+    """Verify job URLs and update ``url_status``. Returns summary counts.
 
     ``live_only`` skips rows already off the board (dead/expired), so the
     scheduler's rolling re-verification never wastes its batch re-proving
-    what is already tombstoned.
+    what is already tombstoned. A plain HTTP 200 is not enough evidence:
+    several aggregators keep the article after its external application has
+    expired, and some ATSes redirect a removed ``/jobs/<id>`` URL to the
+    company's job index with ``?error=true``.
     """
     import requests as req
+    from threading import Lock
+    from urllib.parse import parse_qs, quote, unquote, urlparse
 
     query = db.query(ApplicationRecord).filter(ApplicationRecord.job_url.isnot(None))
     if live_only:
         query = query.filter(ApplicationRecord.url_status.notin_(("dead", "expired")))
     if workspace_id:
         query = query.filter(ApplicationRecord.workspace_id == workspace_id)
+    if search_run_id:
+        query = query.filter(ApplicationRecord.search_run_id == search_run_id)
     if ids:
         query = query.filter(ApplicationRecord.id.in_(ids))
     else:
@@ -831,28 +1043,307 @@ def check_urls(
         query = query.order_by(ApplicationRecord.last_checked_at.asc().nullsfirst())
     records = query.limit(limit).all()
 
-    # Classify ONE url. Only a definitive 404/410 means the posting is gone.
+    # Classify ONE url. Only high-confidence evidence means the posting is
+    # gone: 404/410, a source-specific dead redirect, or explicit closed-page
+    # prose. Bot blocks and transport errors remain unknown.
     # 403/405/429/5xx are usually bot-blocks or HEAD-not-supported, and
     # timeouts/connection errors are transient, none of those should mark a
     # live job dead (that would hide good postings). Those map to "unknown".
-    def _classify(url: str) -> str:
+    soft_dead_phrases = (
+        "job is no longer available",
+        "job posting is no longer available",
+        "position is no longer available",
+        "job you are looking for is no longer open",
+        "job posting has expired",
+        "this job has expired",
+        "position has been filled",
+        "opportunity is no longer available",
+        "no longer accepting applications",
+        "this job is closed",
+        "this position has been closed",
+        "this vacancy is no longer available",
+        "the job is no longer open",
+        "the job you requested was not found",
+    )
+    content_check_hosts = (
+        "ashbyhq.com",
+        "greenhouse.io",
+        "lever.co",
+        "myworkdayjobs.com",
+        "smartrecruiters.com",
+        # Web3.career deliberately keeps closed listing pages at HTTP 200 and
+        # renders an explicit "This job is closed" banner. A HEAD-only check
+        # therefore mistakes expired crypto roles for live opportunities.
+        "web3.career",
+        "workable.com",
+    )
+    request_headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml",
+    }
+    ashby_board_cache: dict[str, tuple[str, frozenset[str]]] = {}
+    ashby_board_locks: dict[str, Lock] = {}
+    ashby_cache_lock = Lock()
+    greenhouse_title_cache: dict[str, tuple[str, frozenset[str]]] = {}
+    greenhouse_title_locks: dict[str, Lock] = {}
+    greenhouse_cache_lock = Lock()
+
+    def _host_matches(host: str, suffixes: tuple[str, ...]) -> bool:
+        return any(host == suffix or host.endswith(f".{suffix}") for suffix in suffixes)
+
+    def _dead_redirect(requested_url: str, response) -> bool:
+        final_url = str(getattr(response, "url", "") or requested_url)
+        requested = urlparse(requested_url)
+        final = urlparse(final_url)
+        query_values = {
+            key.casefold(): [str(value).casefold() for value in values]
+            for key, values in parse_qs(final.query).items()
+        }
+        if "true" in query_values.get("error", []):
+            return True
+        requested_host = (requested.hostname or "").casefold()
+        final_host = (final.hostname or "").casefold()
+        if (
+            _host_matches(requested_host, ("greenhouse.io",))
+            and _host_matches(final_host, ("greenhouse.io",))
+            and "/jobs/" in requested.path.casefold()
+            and "/jobs/" not in final.path.casefold()
+        ):
+            return True
+        return False
+
+    def _get_page_status(url: str) -> str:
+        """Read only the beginning of a page, enough for closed-job banners."""
         try:
-            r = req.head(url, timeout=8, allow_redirects=True)
-            code = r.status_code
-            if code < 400:
+            headers = {**request_headers, "Range": "bytes=0-262143"}
+            with req.get(
+                url,
+                headers=headers,
+                timeout=8,
+                allow_redirects=True,
+                stream=True,
+            ) as response:
+                if response.status_code in (404, 410):
+                    return "dead"
+                if response.status_code >= 400:
+                    return "unknown"
+                if _dead_redirect(url, response):
+                    return "dead"
+                chunks: list[bytes] = []
+                size = 0
+                for chunk in response.iter_content(16_384, decode_unicode=False):
+                    if not chunk:
+                        continue
+                    chunks.append(chunk)
+                    size += len(chunk)
+                    if size >= 262_144:
+                        break
+                page = b"".join(chunks).decode("utf-8", "ignore").casefold()
+                if any(phrase in page for phrase in soft_dead_phrases):
+                    return "dead"
                 return "alive"
+        except Exception:
+            return "unknown"
+
+    def _classify_url(url: str, *, inspect_content: bool = False) -> str:
+        try:
+            r = req.head(
+                url,
+                timeout=8,
+                allow_redirects=True,
+            )
+            code = r.status_code
             if code in (404, 410):
                 return "dead"
+            if code < 400 and _dead_redirect(url, r):
+                return "dead"
+            if code < 400:
+                host = (urlparse(url).hostname or "").casefold()
+                if inspect_content or _host_matches(host, content_check_hosts):
+                    body_status = _get_page_status(url)
+                    # A blocked GET does not refute a successful HEAD.
+                    return "alive" if body_status == "unknown" else body_status
+                return "alive"
             return "unknown"
         except Exception:
             return "unknown"
+
+    def _ashby_board_jobs(slug: str) -> tuple[str, frozenset[str]]:
+        """Return a cached snapshot of one Ashby company's live job IDs.
+
+        Ashby's public posting pages are JavaScript shells that stay HTTP 200
+        after a job disappears. Its job-board API is the authoritative live
+        set. Per-slug locks prevent a refresh with several jobs from downloading
+        the same (sometimes large) board response more than once.
+        """
+        with ashby_cache_lock:
+            board_lock = ashby_board_locks.setdefault(slug, Lock())
+        with board_lock:
+            with ashby_cache_lock:
+                cached = ashby_board_cache.get(slug)
+            if cached is not None:
+                return cached
+            try:
+                response = req.get(
+                    "https://api.ashbyhq.com/posting-api/job-board/"
+                    f"{quote(slug, safe='')}?includeCompensation=false",
+                    headers={**request_headers, "Accept": "application/json"},
+                    timeout=8,
+                )
+                if response.status_code in (404, 410):
+                    result = ("dead", frozenset())
+                elif response.status_code >= 400:
+                    result = ("unknown", frozenset())
+                else:
+                    payload = response.json()
+                    jobs = payload.get("jobs") if isinstance(payload, dict) else None
+                    if not isinstance(jobs, list):
+                        result = ("unknown", frozenset())
+                    else:
+                        live_ids = frozenset(
+                            str(job.get("id") or "").strip().casefold()
+                            for job in jobs
+                            if isinstance(job, dict) and job.get("id")
+                        )
+                        result = ("alive", live_ids)
+            except Exception:
+                result = ("unknown", frozenset())
+            with ashby_cache_lock:
+                ashby_board_cache[slug] = result
+            return result
+
+    def _classify_ashby(url: str) -> str | None:
+        parsed = urlparse(url)
+        host = (parsed.hostname or "").casefold()
+        parts = [unquote(part).strip() for part in parsed.path.split("/") if part]
+        if not _host_matches(host, ("ashbyhq.com",)) or len(parts) < 2:
+            return None
+        slug, job_id = parts[0].casefold(), parts[1].casefold()
+        board_status, live_ids = _ashby_board_jobs(slug)
+        if board_status != "alive":
+            return board_status
+        return "alive" if job_id in live_ids else "dead"
+
+    def _title_key(value: str) -> str:
+        """Stable comparison key for an aggregator title vs an ATS title."""
+        words = re.findall(r"[a-z0-9]+", str(value or "").casefold())
+        aliases = {"sr": "senior", "jr": "junior", "mgr": "manager"}
+        return "".join(aliases.get(word, word) for word in words)
+
+    def _greenhouse_board_titles(slug: str) -> tuple[str, frozenset[str]]:
+        """Authoritative current title set for one known Greenhouse company."""
+        with greenhouse_cache_lock:
+            board_lock = greenhouse_title_locks.setdefault(slug, Lock())
+        with board_lock:
+            with greenhouse_cache_lock:
+                cached = greenhouse_title_cache.get(slug)
+            if cached is not None:
+                return cached
+            try:
+                response = req.get(
+                    "https://boards-api.greenhouse.io/v1/boards/"
+                    f"{quote(slug, safe='')}/jobs",
+                    headers={**request_headers, "Accept": "application/json"},
+                    timeout=8,
+                )
+                if response.status_code in (404, 410):
+                    result = ("dead", frozenset())
+                elif response.status_code >= 400:
+                    result = ("unknown", frozenset())
+                else:
+                    payload = response.json()
+                    jobs = payload.get("jobs") if isinstance(payload, dict) else None
+                    if not isinstance(jobs, list):
+                        result = ("unknown", frozenset())
+                    else:
+                        result = (
+                            "alive",
+                            frozenset(
+                                _title_key(str(job.get("title") or ""))
+                                for job in jobs
+                                if isinstance(job, dict) and job.get("title")
+                            ),
+                        )
+            except Exception:
+                result = ("unknown", frozenset())
+            with greenhouse_cache_lock:
+                greenhouse_title_cache[slug] = result
+            return result
+
+    def _classify_known_greenhouse_duplicate(record: ApplicationRecord) -> str | None:
+        """Cross-check aggregator copies against a known employer board.
+
+        Aggregators can preserve a 200 page for weeks after the employer has
+        removed the role. For cataloged Greenhouse companies, current board
+        membership is stronger evidence than the aggregator shell. A missing
+        exact title tombstones only the stale copy; blocked board requests are
+        inconclusive and never hide anything.
+        """
+        aggregator_sources = {
+            "arbeitnow", "builtin", "glassdoor", "google", "himalayas",
+            "indeed", "linkedin", "remoteok", "remotive", "themuse",
+            "weworkremotely", "zip_recruiter",
+        }
+        if (record.source or "").strip().casefold() not in aggregator_sources:
+            return None
+        try:
+            from job_finder.config.company_catalog import lookup_company
+
+            company = lookup_company(str(record.company or ""))
+        except Exception:
+            company = None
+        if not company or company.get("ats") != "greenhouse" or not company.get("slug"):
+            return None
+        board_status, live_titles = _greenhouse_board_titles(str(company["slug"]))
+        if board_status != "alive":
+            return None if board_status == "unknown" else board_status
+        title = _title_key(str(record.job_title or ""))
+        return "alive" if title and title in live_titles else "dead"
+
+    def _classify(record: ApplicationRecord) -> str:
+        url = str(record.job_url or "")
+        if (record.source or "").strip().casefold() == "ashby":
+            ashby_status = _classify_ashby(url)
+            if ashby_status is not None:
+                return ashby_status
+        primary = _classify_url(url)
+        if primary == "dead":
+            return primary
+        # BuiltIn preserves its editorial page after the employer removes the
+        # actual application. Verify the page's external Apply target; this is
+        # the exact failure a person encounters after clicking through.
+        if (record.source or "").strip().casefold() == "builtin":
+            try:
+                from job_finder.tools.scrapers.builtin import fetch_builtin_detail
+
+                direct_url = str(
+                    fetch_builtin_detail(url).get("direct_application_url") or ""
+                ).strip()
+            except Exception:
+                direct_url = ""
+            if direct_url and direct_url != url:
+                direct = _classify_url(direct_url, inspect_content=True)
+                if direct == "dead":
+                    return "dead"
+                if direct == "unknown":
+                    return "unknown"
+        official_duplicate = _classify_known_greenhouse_duplicate(record)
+        if official_duplicate is not None:
+            return official_duplicate
+        return primary
 
     now = _utcnow()
     statuses: dict[int, str] = {}
     if records:
         from concurrent.futures import ThreadPoolExecutor
-        with ThreadPoolExecutor(max_workers=min(len(records), 8)) as pool:
-            for rec, status in zip(records, pool.map(lambda r: _classify(r.job_url), records)):
+        # Posting URLs span many independent company/ATS hosts. A wider pool
+        # shortens this final verification stage without changing which URLs
+        # are checked or how any response is classified.
+        with ThreadPoolExecutor(max_workers=min(len(records), 16)) as pool:
+            for rec, status in zip(records, pool.map(_classify, records)):
                 statuses[rec.id] = status
 
     alive = dead = unknown = 0

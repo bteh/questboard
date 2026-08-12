@@ -14,12 +14,24 @@ use std::{
 
 use tauri::{App, Manager, RunEvent};
 
+#[cfg(unix)]
+use std::os::unix::process::CommandExt;
+
 const DESKTOP_API_HOST: &str = "127.0.0.1";
 const DESKTOP_API_PORT: u16 = 8765;
 
 #[derive(Default)]
 struct RuntimeState(Mutex<Option<Child>>);
 
+fn isolate_runtime_process(command: &mut Command) {
+    // PyInstaller's one-file bootloader starts the actual Python runtime as a
+    // child process. Give the sidecar its own process group so quitting the
+    // desktop shell can terminate both layers, including any scraper children.
+    #[cfg(unix)]
+    command.process_group(0);
+}
+
+#[cfg(debug_assertions)]
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("..")
@@ -76,35 +88,41 @@ fn spawn_runtime(app: &App) -> Result<Child, Box<dyn Error>> {
             .args(&runtime_args)
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit());
+        isolate_runtime_process(&mut command);
         return Ok(command.spawn()?);
     }
 
-    let repo_root = repo_root();
-    let dev_python_candidates = [
-        repo_root.join(".venv").join("bin").join("python"),
-        repo_root.join(".venv").join("Scripts").join("python.exe"),
-    ];
-    if let Some(dev_python) = dev_python_candidates
-        .iter()
-        .find(|candidate| candidate.exists())
+    // Source checkouts use the virtualenv only in debug builds. Release apps
+    // always exercise the exact sidecar shipped in Contents/Resources, so a
+    // developer machine cannot accidentally hide a broken friend build.
+    #[cfg(debug_assertions)]
     {
-        let mut command = Command::new(dev_python);
-        command
-            .current_dir(repo_root.join("backend"))
-            .env("PYTHONPATH", "../src")
-            .args(["-m", "app.desktop_runtime"])
-            .args(&runtime_args)
-            .stdout(Stdio::inherit())
-            .stderr(Stdio::inherit());
-        return Ok(command.spawn()?);
+        let repo_root = repo_root();
+        let dev_python_candidates = [
+            repo_root.join(".venv").join("bin").join("python"),
+            repo_root.join(".venv").join("Scripts").join("python.exe"),
+        ];
+        if let Some(dev_python) = dev_python_candidates
+            .iter()
+            .find(|candidate| candidate.exists())
+        {
+            let mut command = Command::new(dev_python);
+            command
+                .current_dir(repo_root.join("backend"))
+                .env("PYTHONPATH", "../src")
+                .args(["-m", "app.desktop_runtime"])
+                .args(&runtime_args)
+                .stdout(Stdio::inherit())
+                .stderr(Stdio::inherit());
+            isolate_runtime_process(&mut command);
+            return Ok(command.spawn()?);
+        }
     }
 
     let resource_dir = app.path().resource_dir()?;
     let packaged_runtime_candidates = [
         resource_dir.join("sidecars").join("questboard-runtime"),
-        resource_dir
-            .join("sidecars")
-            .join("questboard-runtime.exe"),
+        resource_dir.join("sidecars").join("questboard-runtime.exe"),
     ];
     if let Some(packaged_runtime) = packaged_runtime_candidates
         .iter()
@@ -115,6 +133,7 @@ fn spawn_runtime(app: &App) -> Result<Child, Box<dyn Error>> {
             .args(&runtime_args)
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit());
+        isolate_runtime_process(&mut command);
         return Ok(command.spawn()?);
     }
 
@@ -160,12 +179,40 @@ fn kill_runtime(app: &tauri::AppHandle) {
     if let Some(state) = app.try_state::<RuntimeState>() {
         if let Ok(mut child) = state.0.lock() {
             if let Some(child) = child.as_mut() {
-                let _ = child.kill();
-                let _ = child.wait();
+                terminate_runtime_process(child);
             }
             *child = None;
         }
     }
+}
+
+fn terminate_runtime_process(child: &mut Child) {
+    #[cfg(unix)]
+    {
+        let process_group = child.id() as i32;
+        // Negative PID targets the complete process group. SIGTERM gives
+        // Uvicorn a chance to close SQLite cleanly before the hard deadline.
+        unsafe {
+            libc::kill(-process_group, libc::SIGTERM);
+        }
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while Instant::now() < deadline {
+            let parent_exited = child.try_wait().ok().flatten().is_some();
+            let group_alive = unsafe { libc::kill(-process_group, 0) == 0 };
+            if parent_exited && !group_alive {
+                return;
+            }
+            thread::sleep(Duration::from_millis(50));
+        }
+        unsafe {
+            libc::kill(-process_group, libc::SIGKILL);
+        }
+    }
+
+    // This is also the complete implementation on Windows, where Child::kill
+    // handles the directly spawned runtime executable.
+    let _ = child.kill();
+    let _ = child.wait();
 }
 
 fn main() {
@@ -180,11 +227,16 @@ fn main() {
                 }
             }
 
-            if !wait_for_runtime(Duration::from_secs(20)) {
+            // A cold, signed PyInstaller sidecar can spend more than 20s
+            // loading pandas/scipy on macOS before Uvicorn binds its port.
+            // Keep the window hidden while it boots, but do not abort a
+            // healthy first launch merely because subsequent warm launches
+            // are much faster.
+            if !wait_for_runtime(Duration::from_secs(60)) {
                 kill_runtime(&app.handle());
                 return Err(io::Error::new(
                     io::ErrorKind::TimedOut,
-                    "Questboard desktop runtime did not become ready within 20 seconds.",
+                    "Questboard desktop runtime did not become ready within 60 seconds.",
                 )
                 .into());
             }

@@ -5,6 +5,7 @@ import { Route as appRoute } from './app';
 import { AssistantTab } from '@/components/settings/AssistantTab';
 import { CompaniesTab } from '@/components/settings/CompaniesTab';
 import { ResumeTab } from '@/components/settings/ResumeTab';
+import { PrivacyTab } from '@/components/settings/PrivacyTab';
 import { SearchPrefsTab } from '@/components/settings/SearchPrefsTab';
 import {
   SETTINGS_TABS,
@@ -34,6 +35,7 @@ const TAB_LABELS: Record<SettingsTab, string> = {
   assistant: 'Assistant',
   restock: 'Search defaults',
   companies: 'Companies',
+  privacy: 'Privacy & data',
 };
 
 function SettingsPage() {
@@ -51,6 +53,7 @@ function SettingsPage() {
     assistant: null,
     restock: null,
     companies: null,
+    privacy: null,
   });
   const handleTabKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, currentIndex: number) => {
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
@@ -110,6 +113,8 @@ function SettingsPage() {
         )}
 
         {activeTab === 'companies' && <CompaniesTab />}
+
+        {activeTab === 'privacy' && <PrivacyTab navigate={navigate} />}
       </div>
 
       <div className="qb-settings-foot">

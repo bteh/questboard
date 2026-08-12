@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import importlib
+import threading
+import time
 import unittest
 from unittest.mock import Mock, patch
 
@@ -56,7 +58,8 @@ class ScraperRegistryTest(unittest.TestCase):
         from job_finder.tools.scrapers import _ats_discovery
 
         with patch.dict(registry_module._REGISTRY, registry, clear=True), \
-             patch.object(_ats_discovery, "discover_and_cache", return_value=set()):
+             patch.object(_ats_discovery, "discover_and_cache", return_value=set()), \
+             patch.object(_ats_discovery, "verified_rotation_slugs", return_value=set()):
             jobs = run_scrapers(
                 names=["greenhouse", "lever", "builtin"],
                 roles=["data engineer"],
@@ -98,7 +101,8 @@ class ScraperRegistryTest(unittest.TestCase):
         from job_finder.tools.scrapers import _ats_discovery
 
         with patch.dict(registry_module._REGISTRY, registry, clear=True), \
-             patch.object(_ats_discovery, "discover_and_cache", return_value=set()):
+             patch.object(_ats_discovery, "discover_and_cache", return_value=set()), \
+             patch.object(_ats_discovery, "verified_rotation_slugs", return_value=set()):
             jobs = run_scrapers(
                 names=["greenhouse"],
                 roles=["research engineer"],
@@ -145,7 +149,8 @@ class ScraperRegistryTest(unittest.TestCase):
 
         with patch.dict(registry_module._REGISTRY, registry, clear=True), \
              patch.object(_ats_discovery, "discover_and_cache",
-                          return_value={"discovered-co", "openai"}):
+                          return_value={"discovered-co", "openai"}), \
+             patch.object(_ats_discovery, "verified_rotation_slugs", return_value=set()):
             run_scrapers(
                 names=["greenhouse"],
                 roles=["research engineer"],
@@ -195,6 +200,49 @@ class ScraperRegistryTest(unittest.TestCase):
             )
 
         mock_disc.assert_not_called()
+
+    def test_hung_source_cannot_block_healthy_source_or_run_log(self) -> None:
+        blocker = threading.Event()
+        progress: list[str] = []
+        recorded: list[dict] = []
+        receipt: list[dict] = []
+
+        def hung(**_kwargs):
+            blocker.wait(10)
+            return []
+
+        registry = {
+            "fast": ScraperMeta(
+                name="fast", display_name="Fast", url="https://fast.example",
+                description="", category="general", enabled_by_default=True,
+                search_fn=Mock(return_value=[{"title": "Fast job"}]),
+            ),
+            "hung": ScraperMeta(
+                name="hung", display_name="Hung", url="https://hung.example",
+                description="", category="general", enabled_by_default=True,
+                search_fn=hung,
+            ),
+        }
+
+        from job_finder.models import database as database_module
+
+        started = time.monotonic()
+        with patch.dict(registry_module._REGISTRY, registry, clear=True), \
+             patch.object(registry_module, "_SCRAPER_POOL_TIMEOUT_SECONDS", 0.05), \
+             patch.object(database_module, "record_scrape_runs", side_effect=recorded.extend):
+            jobs = run_scrapers(
+                names=["fast", "hung"],
+                progress=progress.append,
+                outcome_sink=receipt,
+            )
+
+        self.assertLess(time.monotonic() - started, 0.5)
+        self.assertEqual([job["title"] for job in jobs], ["Fast job"])
+        by_source = {row["source"]: row for row in recorded}
+        self.assertEqual(by_source["fast"]["finish_reason"], "ok")
+        self.assertEqual(by_source["hung"]["finish_reason"], "timeout")
+        self.assertEqual({row["source"] for row in receipt}, {"fast", "hung"})
+        self.assertTrue(any("Hung: timed out" in msg for msg in progress))
 
 
 if __name__ == "__main__":

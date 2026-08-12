@@ -11,6 +11,7 @@ import json
 import logging
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 
@@ -75,6 +76,19 @@ _DIRECT_JOB_HOSTS = (
     "smartrecruiters.com",
     "workable.com",
 )
+_AMBIGUOUS_LOCATION_RE = re.compile(
+    r"^\s*(?:\d+\s+locations?|multiple\s+locations?)\s*$",
+    re.IGNORECASE,
+)
+_COUNTRY_NAMES = {
+    "US": "United States",
+    "USA": "United States",
+    "UNITED STATES OF AMERICA": "United States",
+    "CA": "Canada",
+    "CAN": "Canada",
+}
+_DETAIL_WORKERS = 8
+_DETAIL_HYDRATION_LIMIT = 48
 
 
 def _fuzzy_date_to_iso(prose: str) -> str:
@@ -140,6 +154,87 @@ def _parse_jsonld_jobs(html: str) -> list[dict]:
     return jobs
 
 
+def _iter_job_postings(value):
+    """Yield JobPosting objects from flat, list, or ``@graph`` JSON-LD."""
+    if isinstance(value, dict):
+        raw_type = value.get("@type")
+        types = raw_type if isinstance(raw_type, list) else [raw_type]
+        if "JobPosting" in types:
+            yield value
+        for child in value.get("@graph", []):
+            yield from _iter_job_postings(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _iter_job_postings(child)
+
+
+def _country_name(value: object) -> str:
+    if isinstance(value, dict):
+        value = value.get("name") or value.get("addressCountry") or ""
+    raw = str(value or "").strip()
+    return _COUNTRY_NAMES.get(raw.upper(), raw)
+
+
+def _format_job_locations(posting: dict) -> str:
+    """Recover concrete locations that Built In collapses to ``N Locations``."""
+    raw_locations = posting.get("jobLocation") or []
+    if isinstance(raw_locations, dict):
+        raw_locations = [raw_locations]
+
+    rendered: list[str] = []
+    for raw in raw_locations if isinstance(raw_locations, list) else []:
+        if not isinstance(raw, dict):
+            continue
+        address = raw.get("address") or {}
+        if not isinstance(address, dict):
+            continue
+        city = str(address.get("addressLocality") or "").strip()
+        region = str(address.get("addressRegion") or "").strip()
+        country = _country_name(address.get("addressCountry"))
+        label = ", ".join(part for part in (city, region, country) if part)
+        if label and label not in rendered:
+            rendered.append(label)
+
+    # Fully remote postings sometimes omit jobLocation and publish only the
+    # countries whose residents may apply. Keep that scope so a US seeker does
+    # not inherit a Canada-only or Europe-only remote role.
+    if not rendered:
+        requirements = posting.get("applicantLocationRequirements") or []
+        if isinstance(requirements, dict):
+            requirements = [requirements]
+        for raw in requirements if isinstance(requirements, list) else []:
+            country = _country_name(raw)
+            if country and country not in rendered:
+                rendered.append(country)
+    return "; ".join(rendered)
+
+
+def _allowed_direct_url(value: object) -> str:
+    url = str(value or "").strip()
+    host = (urlparse(url).hostname or "").lower()
+    if url.startswith("https://") and any(
+        host == allowed or host.endswith(f".{allowed}")
+        for allowed in _DIRECT_JOB_HOSTS
+    ):
+        return url
+    return ""
+
+
+def _embedded_application_url(html: str) -> str:
+    """Read Built In's ``jobPostInit`` payload when no apply anchor exists."""
+    match = re.search(
+        r'"howToApply"\s*:\s*("(?:\\.|[^"\\])*")',
+        html,
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        return ""
+    try:
+        return _allowed_direct_url(json.loads(match.group(1)))
+    except (json.JSONDecodeError, TypeError):
+        return ""
+
+
 def fetch_builtin_detail(url: str) -> dict:
     """Fetch one BuiltIn finalist and recover the detail card omitted by search.
 
@@ -173,19 +268,92 @@ def fetch_builtin_detail(url: str) -> dict:
 
     direct_url = ""
     for link in soup.find_all("a", href=True):
-        href = str(link.get("href") or "").strip()
-        host = (urlparse(href).hostname or "").lower()
-        if any(host == allowed or host.endswith(f".{allowed}") for allowed in _DIRECT_JOB_HOSTS):
-            direct_url = href
+        direct_url = _allowed_direct_url(link.get("href"))
+        if direct_url:
             break
 
-    posted_on = _fuzzy_date_to_iso(date_posted)
+    posting: dict = {}
+    for script in soup.find_all("script", type="application/ld+json"):
+        try:
+            payload = json.loads(script.string or "")
+        except (json.JSONDecodeError, TypeError):
+            continue
+        posting = next(_iter_job_postings(payload), {})
+        if posting:
+            break
+
+    structured_date = str(posting.get("datePosted") or "").strip()
+    structured_location = _format_job_locations(posting)
+    location_type = str(posting.get("jobLocationType") or "").strip().lower()
+    reported_remote = location_type in {"telecommute", "remote"}
+
+    if not direct_url:
+        direct_url = _embedded_application_url(html)
+
+    posted_on = structured_date or _fuzzy_date_to_iso(date_posted)
     return {
         "description": description,
         "date_posted": posted_on,
-        "date_confidence": "fuzzy" if posted_on else "missing",
+        "date_confidence": (
+            "exact" if structured_date else ("fuzzy" if posted_on else "missing")
+        ),
         "direct_application_url": direct_url,
+        "location": structured_location,
+        "is_remote": reported_remote,
+        "remote_flag_reported": reported_remote,
     }
+
+
+def _hydrate_ambiguous_jobs(
+    jobs: list[dict],
+    *,
+    limit: int = _DETAIL_HYDRATION_LIMIT,
+) -> int:
+    """Hydrate role-matched Built In rows whose card hides their locations.
+
+    These are already cheap-card finalists: title, age, and role matching ran
+    before this point. Fetching only the ambiguous subset recovers structured
+    locations and official ATS URLs without paying one detail request for
+    every Built In result.
+    """
+    candidates = [
+        job for job in jobs
+        if _AMBIGUOUS_LOCATION_RE.fullmatch(str(job.get("location") or ""))
+        and str(job.get("url") or "").startswith("https://builtin.com/job/")
+    ][:max(0, int(limit))]
+    if not candidates:
+        return 0
+
+    hydrated = 0
+    workers = min(_DETAIL_WORKERS, len(candidates))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = {
+            pool.submit(fetch_builtin_detail, str(job.get("url") or "")): job
+            for job in candidates
+        }
+        for future in as_completed(futures):
+            job = futures[future]
+            try:
+                detail = future.result()
+            except Exception as exc:  # one bad detail must not cost the source
+                logger.debug("BuiltIn detail hydration failed: %s", exc)
+                continue
+            if not detail:
+                continue
+            for field in (
+                "description",
+                "date_posted",
+                "date_confidence",
+                "direct_application_url",
+                "location",
+            ):
+                if detail.get(field):
+                    job[field] = detail[field]
+            if detail.get("remote_flag_reported"):
+                job["is_remote"] = bool(detail.get("is_remote"))
+                job["remote_flag_reported"] = True
+            hydrated += 1
+    return hydrated
 
 
 def _icon_sibling_text(card, icon_class: str) -> str:
@@ -462,5 +630,9 @@ def search_builtin(
             if page < max_pages:
                 time.sleep(_PAGE_DELAY)
 
+    detail_limit = kwargs.get("detail_hydration_limit", _DETAIL_HYDRATION_LIMIT)
+    hydrated = _hydrate_ambiguous_jobs(all_jobs, limit=detail_limit)
+    if hydrated:
+        logger.info("BuiltIn: hydrated %d ambiguous multi-location jobs", hydrated)
     logger.info("BuiltIn: found %d matching jobs", len(all_jobs))
     return all_jobs[:max_results]

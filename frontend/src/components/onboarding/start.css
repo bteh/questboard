@@ -39,6 +39,7 @@
 
 .qb-start-remote { display: flex; align-items: center; gap: 9px; font-size: 13.5px; color: var(--soft); cursor: pointer; user-select: none; }
 .qb-start-remote input { accent-color: var(--sage); width: 16px; height: 16px; flex: none; }
+.qb-start-error { margin: 0; color: var(--danger); font-size: 12.5px; line-height: 1.4; }
 
 .qb-start-form .qb-btn-sage { margin-top: 4px; width: 100%; text-align: center; justify-content: center; }
 

@@ -63,6 +63,7 @@ keywords:
 
 enabled_scrapers:
   - cryptojobslist
+  - web3career
   - indeed
   - linkedin
   - greenhouse

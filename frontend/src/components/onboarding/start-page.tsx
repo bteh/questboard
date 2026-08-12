@@ -3,7 +3,10 @@ import { useNavigate } from '@tanstack/react-router';
 import { SageButton } from '@questboard/ui';
 import { PlacePicker } from '@/features/board/place-picker';
 import { World } from '@/components/landing/world';
+import { useOnboardingState, useSaveWorkspacePreferences } from '@/hooks/use-workspace';
 import { markEntered, markOnboarded } from '@/lib/entry';
+import { buildDefaultWorkspacePreferences } from '@/lib/profile-preferences';
+import { firstRunPreferences } from './start-page-logic';
 import './start.css';
 
 /* The whole first run: one question. Where are you? A place tunes the board
@@ -12,24 +15,34 @@ import './start.css';
    never asked again. */
 export function StartPage() {
   const navigate = useNavigate();
+  const { data: onboarding } = useOnboardingState();
+  const savePreferences = useSaveWorkspacePreferences();
   const [place, setPlace] = useState('');
   const [includeRemote, setIncludeRemote] = useState(true);
+  const [saveError, setSaveError] = useState('');
 
   useEffect(() => {
     document.title = 'Questboard, set your place';
   }, []);
 
-  const go = (withPlace: boolean) => {
-    markOnboarded();
-    markEntered();
+  const go = async (withPlace: boolean) => {
     const chosen = withPlace ? place.trim() : '';
-    void navigate({
-      to: '/board',
-      search: {
-        place: chosen || undefined,
-        near: chosen && !includeRemote ? '1' : undefined,
-      },
-    });
+    const current = onboarding?.preferences ?? buildDefaultWorkspacePreferences();
+    setSaveError('');
+    try {
+      await savePreferences.mutateAsync(firstRunPreferences(current, chosen, includeRemote));
+      markOnboarded();
+      markEntered();
+      await navigate({
+        to: '/board',
+        search: {
+          place: chosen || undefined,
+          near: chosen && !includeRemote ? '1' : undefined,
+        },
+      });
+    } catch {
+      setSaveError('Questboard could not save that search yet. Try again.');
+    }
   };
 
   return (
@@ -58,15 +71,16 @@ export function StartPage() {
           className="qb-start-form"
           onSubmit={(e) => {
             e.preventDefault();
-            go(true);
+            void go(true);
           }}
         >
           <PlacePicker
             value={place}
             onChange={setPlace}
-            placeholder="Your city or state"
-            ariaLabel="Your city or state"
+            placeholder="Your city, region, or country"
+            ariaLabel="Your city, region, or country"
             className="qb-start-field"
+            suggestionScope="global"
           />
 
           <label className="qb-start-remote">
@@ -78,12 +92,19 @@ export function StartPage() {
             <span>Include remote quests too</span>
           </label>
 
-          <SageButton big type="submit">
-            See my board →
+          {saveError && <p className="qb-start-error" role="alert">{saveError}</p>}
+
+          <SageButton big type="submit" disabled={savePreferences.isPending}>
+            {savePreferences.isPending ? 'Saving…' : 'See my board →'}
           </SageButton>
         </form>
 
-        <button type="button" className="qb-start-skip" onClick={() => go(false)}>
+        <button
+          type="button"
+          className="qb-start-skip"
+          onClick={() => void go(false)}
+          disabled={savePreferences.isPending}
+        >
           Skip, show me everything
         </button>
       </div>

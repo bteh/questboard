@@ -4,7 +4,14 @@
    "profile candidates") stays gone. */
 
 import { describe, expect, it } from 'vitest';
-import { filterPlaceholder, filterStatusText, primaryRunKind, pullReceipt } from './work-toolbar';
+import {
+  filterPlaceholder,
+  filterTrayCaption,
+  filterStatusText,
+  primaryRunKind,
+  pullReceipt,
+} from './work-toolbar-logic';
+import { reviewCoverageText, workSortLabel } from './review-coverage';
 
 describe('the filter box placeholder', () => {
   it('carries the loaded total', () => {
@@ -18,6 +25,37 @@ describe('the filter box placeholder', () => {
   it('skips the count when it cannot read as a group', () => {
     expect(filterPlaceholder(0)).toBe('Filter these jobs');
     expect(filterPlaceholder(1)).toBe('Filter these jobs');
+  });
+});
+
+describe('the filter tray contract', () => {
+  it('says filters apply automatically and separates them from the source pull', () => {
+    expect(filterTrayCaption(false)).toBe(
+      'Filters update this board automatically · Get new jobs checks sources and reranks using your saved search',
+    );
+  });
+
+  it('announces the in-place query while a changed filter is loading', () => {
+    expect(filterTrayCaption(true)).toBe(
+      'Applying filters… · Get new jobs checks sources and reranks using your saved search',
+    );
+  });
+});
+
+describe('assistant review coverage', () => {
+  it('states current coverage without pretending stale fits still count', () => {
+    expect(reviewCoverageText(51, 152)).toBe('51 of 203 reviewed');
+  });
+
+  it('stays quiet while loading or on an empty lane', () => {
+    expect(reviewCoverageText(undefined, undefined)).toBeNull();
+    expect(reviewCoverageText(0, 0)).toBeNull();
+  });
+
+  it('does not claim a global best match while jobs remain unreviewed', () => {
+    expect(workSortLabel(true, 152)).toBe('reviewed matches first');
+    expect(workSortLabel(true, 0)).toBe('best match');
+    expect(workSortLabel(false, 152)).toBe('newly found');
   });
 });
 

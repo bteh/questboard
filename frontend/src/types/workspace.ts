@@ -154,6 +154,14 @@ export interface WorkspaceResumeUploadResponse {
   derived_keywords?: string[];
 }
 
+export interface WorkspaceDataEraseResponse {
+  complete: boolean;
+  records_deleted: number;
+  files_deleted: number;
+  message: string;
+  retained: string[];
+}
+
 export interface WorkspaceSearchRunResponse {
   run_id: string;
   status: 'pending' | 'running' | 'completed' | 'failed';

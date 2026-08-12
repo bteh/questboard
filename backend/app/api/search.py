@@ -253,11 +253,20 @@ async def stream_run_progress(
             raise HTTPException(404, f"Run {run_id} not found")
         generator = pipeline_service.stream_persisted_progress(workspace.workspace.id, run_id)
     else:
-        run = pipeline_service.get_run(run_id)
-        if not run:
-            raise HTTPException(404, f"Run {run_id} not found")
-        _authorize_run_access(run, workspace)
-        generator = pipeline_service.stream_progress(run_id)
+        persisted = (
+            workspace_service.get_search_run(db, workspace.workspace.id, run_id)
+            if workspace else None
+        )
+        if persisted is not None:
+            generator = pipeline_service.stream_persisted_progress(
+                workspace.workspace.id, run_id,
+            )
+        else:
+            run = pipeline_service.get_run(run_id)
+            if not run:
+                raise HTTPException(404, f"Run {run_id} not found")
+            _authorize_run_access(run, workspace)
+            generator = pipeline_service.stream_progress(run_id)
     return StreamingResponse(
         generator,
         media_type="text/event-stream",
@@ -276,6 +285,7 @@ def _persisted_runstatus(db: Session, workspace_id: str, run) -> RunStatus:
     in-process ``_runs`` dict is cleared on every uvicorn --reload, but the run
     rows are persisted to workspace_search_runs.
     """
+    result = workspace_service.get_search_result(db, workspace_id, run.run_id)
     return RunStatus(
         run_id=run.run_id,
         status=run.status,
@@ -285,8 +295,10 @@ def _persisted_runstatus(db: Session, workspace_id: str, run) -> RunStatus:
             db, workspace_id, run.run_id, limit=20,
         ),
         jobs_found=run.jobs_found,
+        new_jobs=int(result.get("new_jobs") or 0),
         jobs_scored=run.jobs_scored,
         error=run.error or None,
+        source_coverage=result.get("source_coverage") or None,
     )
 
 
@@ -301,6 +313,7 @@ async def get_run_status(
         run = workspace_service.get_search_run(db, workspace.workspace.id, run_id)
         if not run:
             raise HTTPException(404, f"Run {run_id} not found")
+        result = workspace_service.get_search_result(db, workspace.workspace.id, run_id)
         return RunStatus(
             run_id=run.run_id,
             status=run.status,
@@ -312,8 +325,10 @@ async def get_run_status(
                 run_id,
             ),
             jobs_found=run.jobs_found,
+            new_jobs=int(result.get("new_jobs") or 0),
             jobs_scored=run.jobs_scored,
             error=run.error or None,
+            source_coverage=result.get("source_coverage") or None,
         )
 
     run = pipeline_service.get_run(run_id)
@@ -326,8 +341,10 @@ async def get_run_status(
             completed_at=run.completed_at,
             progress_messages=run.progress_messages,
             jobs_found=run.jobs_found,
+            new_jobs=run.new_jobs,
             jobs_scored=run.jobs_scored,
             error=run.error,
+            source_coverage=run.source_coverage or None,
         )
     # In-memory run gone (e.g. after a --reload/restart) — read the persisted row.
     if workspace:
@@ -351,22 +368,8 @@ async def list_runs(
             limit=limit,
         )
         return [
-            RunStatus(
-                run_id=r.run_id,
-                status=r.status,
-                started_at=r.started_at,
-                completed_at=r.completed_at,
-                progress_messages=workspace_service.get_progress_messages(
-                    db,
-                    workspace.workspace.id,
-                    r.run_id,
-                    limit=20,
-                ),
-                jobs_found=r.jobs_found,
-                jobs_scored=r.jobs_scored,
-                error=r.error or None,
-            )
-            for r in runs
+            _persisted_runstatus(db, workspace.workspace.id, run)
+            for run in runs
         ]
 
     ws_id = workspace.workspace.id if workspace else None
@@ -381,8 +384,10 @@ async def list_runs(
             completed_at=r.completed_at,
             progress_messages=r.progress_messages,
             jobs_found=r.jobs_found,
+            new_jobs=r.new_jobs,
             jobs_scored=r.jobs_scored,
             error=r.error,
+            source_coverage=r.source_coverage or None,
         )
         for r in pipeline_service.list_runs(limit=limit, workspace_id=ws_id)
     ]

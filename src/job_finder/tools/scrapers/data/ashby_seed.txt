@@ -67,7 +67,10 @@ unit
 
 # --- Data / analytics ----------------------------------------------------
 airbyte
+confluent
+fabrion
 hightouch
+sentilink
 
 # --- B2B SaaS / vertical -------------------------------------------------
 commonroom
@@ -83,6 +86,7 @@ phantom
 crusoe
 maven
 nuna
+serverobotics
 
 # --- Live-verified bulk expansion (2026-07, 450 companies) ------
 # Harvested via Common Crawl + Wayback, each validated live (returned >0 jobs).

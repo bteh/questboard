@@ -105,6 +105,7 @@ COMPANY_CATALOG: list[dict[str, str]] = [
     {"name": "Scandit", "ats": "greenhouse", "slug": "scandit"},
     {"name": "Cradle", "ats": "ashby", "slug": "cradlebio"},
     {"name": "Causaly", "ats": "ashby", "slug": "causaly"},
+    {"name": "Diligent Robotics", "ats": "greenhouse", "slug": "diligentrobotics"},
 
     # ── Data & Analytics ─────────────────────────────────────────────
     {"name": "Amplemarket", "ats": "greenhouse", "slug": "amplemarket"},

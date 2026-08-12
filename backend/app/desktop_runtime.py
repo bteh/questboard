@@ -72,6 +72,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Run the local stdio MCP server instead of the desktop HTTP API",
     )
+    parser.add_argument(
+        "--check-jobspy-import",
+        action="store_true",
+        help="Verify the packaged JobSpy dependency without contacting job boards",
+    )
     return parser.parse_args()
 
 
@@ -89,11 +94,33 @@ def main() -> None:
         # user installs one signed artifact rather than a second Python tool.
         from app.local_mcp import mcp
         from app.models.database import init_db
+        from job_finder.tools.job_search_tool import preload_jobspy
 
+        preload_jobspy()
         init_db()
         mcp.run(transport="stdio")
         return
-    uvicorn.run("app.main:app", host=args.host, port=args.port, reload=False, log_level="info")
+
+    # Import only after the runtime directories have been installed in the
+    # environment. This remains a real import (and is therefore visible to
+    # PyInstaller) while ensuring every backend module resolves paths against
+    # the user's app-data directory, never the build machine's checkout.
+    from app.main import app as fastapi_app
+
+    # Job pulls execute on background workers, but a frozen build must perform
+    # JobSpy's first import on the main thread.  A failure remains non-fatal so
+    # direct ATS/community sources still work; each JobSpy source will publish
+    # the exact import error in its coverage receipt instead of vanishing.
+    from job_finder.tools.job_search_tool import preload_jobspy
+
+    jobspy_error = preload_jobspy()
+    if args.check_jobspy_import:
+        if jobspy_error:
+            raise SystemExit(f"Packaged JobSpy import failed: {jobspy_error}")
+        print("Packaged JobSpy import: ok")
+        return
+
+    uvicorn.run(fastapi_app, host=args.host, port=args.port, reload=False, log_level="info")
 
 
 if __name__ == "__main__":

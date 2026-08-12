@@ -59,6 +59,7 @@ def agent_db(tmp_path, monkeypatch):
         WorkspacePreferences(
             workspace_id="local",
             roles_json=json.dumps(["Data Scientist"]),
+            keywords_json=json.dumps(["Snowflake"]),
             workplace_preference="remote_friendly",
             max_days_old=30,
         )
@@ -257,6 +258,51 @@ def test_refresh_work_spends_no_questboard_ai(agent_db, monkeypatch):
     monkeypatch.setattr(pipeline_service, "start_run", _stub_start_run)
     asyncio.run(local_mcp.refresh_work(roles=["Data Scientist"]))
     assert captured.get("use_ai") is False
+    assert captured.get("durable") is True
+    assert captured.get("keywords") == ["Snowflake"]
+
+
+def test_strict_ranking_matches_pull_freshness_and_level_filters(agent_db):
+    from app.models.workspace import WorkspacePreferences
+    from app.services import local_agent_service
+    from job_finder.models.database import ApplicationRecord
+
+    prefs = agent_db.query(WorkspacePreferences).filter_by(workspace_id="local").one()
+    prefs.match_strictness = "strict"
+    prefs.current_level = "manager"
+    now = datetime.now(timezone.utc)
+    agent_db.add_all([
+        ApplicationRecord(
+            job_title="Senior Data Scientist",
+            company="Known Date Co",
+            location="Remote, US",
+            is_remote=True,
+            vertical="career",
+            date_posted=now.isoformat(),
+            date_confidence="exact",
+            date_found=now,
+        ),
+        ApplicationRecord(
+            job_title="Junior Data Scientist",
+            company="Junior Co",
+            location="Remote, US",
+            is_remote=True,
+            vertical="career",
+            date_posted=now.isoformat(),
+            date_confidence="exact",
+            date_found=now,
+        ),
+    ])
+    agent_db.commit()
+
+    result = local_agent_service.search_work(agent_db, queries=["Data Scientist"])
+    companies = {row["organization"] for row in result["results"]}
+
+    assert "Known Date Co" in companies
+    assert "Junior Co" not in companies
+    assert "Local Co" not in companies  # source date is unverifiable
+    assert result["filters_applied"]["match_strictness"] == "strict"
+    assert result["filters_applied"]["unknown_freshness_policy"] == "exclude"
 
 
 def test_refresh_is_not_advertised_idempotent():
@@ -272,9 +318,38 @@ def test_conflict_rejection_covers_the_domain_tokens():
     assert not _title_is_in_lane("Data Science Manager", ["Data Manager"])
     assert not _title_is_in_lane("Program Manager, Data", ["Data Manager"])
     assert not _title_is_in_lane("Data Center Engineer", ["Data Engineer"])
+    assert not _title_is_in_lane(
+        "Manager, IT Infrastructure (Data Centers)",
+        ["Data Infrastructure Manager"],
+    )
     assert not _title_is_in_lane("Project Manager, Data", ["Data Manager"])
     # no conflict token -> keep
     assert _title_is_in_lane("Senior Data Engineer", ["Data Engineer"])
+
+
+def test_balanced_ranking_does_not_cross_into_product_occupation(agent_db):
+    from app.services import local_agent_service
+    from job_finder.models.database import ApplicationRecord
+
+    now = datetime.now(timezone.utc)
+    agent_db.add(
+        ApplicationRecord(
+            job_title="Product Manager, Data Science Platform",
+            company="Wrong Occupation Co",
+            location="Remote, US",
+            is_remote=True,
+            vertical="career",
+            date_posted=now.isoformat(),
+            date_confidence="exact",
+            date_found=now,
+        )
+    )
+    agent_db.commit()
+
+    result = local_agent_service.search_work(agent_db, queries=["Data Scientist"])
+    assert "Wrong Occupation Co" not in {
+        row["organization"] for row in result["results"]
+    }
 
 
 def test_source_age_days_parses_relative_and_unix():

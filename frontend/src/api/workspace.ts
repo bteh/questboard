@@ -1,10 +1,11 @@
-import { apiGet, apiPost, apiUpload } from '@/lib/api-client';
+import { apiDelete, apiGet, apiPost, apiUpload } from '@/lib/api-client';
 import type {
   GeneratedProfile,
   HostedBootstrap,
   LocationSuggestion,
   OnboardingState,
   WorkspacePreferences,
+  WorkspaceDataEraseResponse,
   WorkspaceResumeUploadResponse,
   WorkspaceSearchRunResponse,
   WorkspaceSession,
@@ -30,6 +31,10 @@ export function uploadWorkspaceResume(file: File): Promise<WorkspaceResumeUpload
 
 export function saveWorkspacePreferences(preferences: WorkspacePreferences): Promise<WorkspacePreferences> {
   return apiPost<WorkspacePreferences>('/onboarding/preferences', preferences);
+}
+
+export function eraseWorkspaceData(): Promise<WorkspaceDataEraseResponse> {
+  return apiDelete<WorkspaceDataEraseResponse>('/onboarding/data');
 }
 
 export function startOnboardingSearch(preferences: WorkspacePreferences): Promise<WorkspaceSearchRunResponse> {
