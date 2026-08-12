@@ -75,10 +75,12 @@ def _add(
     remote_scope: str = "",
     salary_min: float | None = None,
     salary_max: float | None = None,
+    salary_currency: str = "",
     salary_period: str = "",
     salary_min_annualized: float | None = None,
     salary_max_annualized: float | None = None,
     state_codes: str | None = None,
+    company: str = "Acme",
 ) -> ApplicationRecord:
     """Insert one generated row and return it (flushed, queryable)."""
     n = next(_COUNTER)
@@ -93,13 +95,14 @@ def _add(
         state_codes = state_codes_field(location) if location else ""
     row = ApplicationRecord(
         job_title=job_title,
-        company="Acme",
+        company=company,
         job_url=f"https://x.example/{n}",
         location=location,
         is_remote=is_remote,
         remote_scope=remote_scope,
         salary_min=salary_min,
         salary_max=salary_max,
+        salary_currency=salary_currency,
         salary_period=salary_period,
         salary_min_annualized=salary_min_annualized,
         salary_max_annualized=salary_max_annualized,
@@ -119,12 +122,36 @@ def _place_matches(s: Session, location, strict: bool = False) -> set[str]:
     return {r.job_title for r in q.all()}
 
 
-def _pay_passes(s: Session, title: str, salary_min=None, salary_max=None) -> bool:
-    cond = stated_pay_filter(ApplicationRecord, salary_min, salary_max)
+def _pay_passes(
+    s: Session,
+    title: str,
+    salary_min=None,
+    salary_max=None,
+    salary_currency=None,
+) -> bool:
+    cond = stated_pay_filter(
+        ApplicationRecord,
+        salary_min,
+        salary_max,
+        salary_currency,
+    )
     q = s.query(ApplicationRecord).filter(ApplicationRecord.job_title == title)
     if cond is not None:
         q = q.filter(cond)
     return q.count() >= 1
+
+
+def test_staffing_preference_uses_the_same_board_predicate() -> None:
+    s = _fresh_session()
+    _add(s, company="Jobgether", job_title="Data Engineering Manager")
+    _add(s, company="Eleven Recruiting", job_title="Data Engineering Manager")
+    _add(s, company="Stripe", job_title="Data Engineering Manager")
+    conditions = board_filter_conditions(
+        ApplicationRecord,
+        exclude_staffing_agencies=True,
+    )
+    rows = s.query(ApplicationRecord).filter(*conditions).all()
+    assert {row.company for row in rows} == {"Stripe"}
 
 
 # --------------------------------------------------------------------------- #
@@ -369,6 +396,34 @@ def test_invariant_5_unknown_pay_is_always_kept():
                 )
     # 29 floor/ceiling combos x 4 unknown rows = 116 assertions
     assert combos == (len(PAY_FLOORS) * len(PAY_CEILINGS) - 1) * len(unknown_rows)
+
+
+def test_invariant_5_unlike_or_missing_currency_is_not_compared_as_usd():
+    s = _fresh_session()
+    usd = _add(
+        s,
+        job_title="usd-low",
+        salary_min=90_000,
+        salary_max=90_000,
+        salary_currency="USD",
+    )
+    eur = _add(
+        s,
+        job_title="eur-not-comparable",
+        salary_min=90_000,
+        salary_max=90_000,
+        salary_currency="EUR",
+    )
+    unstated = _add(
+        s,
+        job_title="currency-unstated",
+        salary_min=90_000,
+        salary_max=90_000,
+    )
+
+    assert not _pay_passes(s, usd.job_title, 120_000, None, "USD")
+    assert _pay_passes(s, eur.job_title, 120_000, None, "USD")
+    assert _pay_passes(s, unstated.job_title, 120_000, None, "USD")
 
 
 # --------------------------------------------------------------------------- #
@@ -666,3 +721,36 @@ def test_invariant_9_title_lane_recall_and_conflicts():
         )
     # 9 roles x 5 levels = 45 level assertions
     assert combos == len(LANE_ROLES) * len(LEVEL_WORDS)
+
+
+def test_invariant_9b_team_name_suffix_does_not_poison_the_lane():
+    """Big companies format titles as "Role, Team - Org". The Aug 2026 audit
+    found "Principal Data Engineer, Personalization - Central Product
+    Insights" (Netflix) hidden from every saved role because "Product" in the
+    TEAM name read as a Product Manager conflict, and "Data Engineer (Cleared)
+    - DoD Program - Remote" hidden by "Program". An occupation word only
+    conflicts in the segment that names the role, not in an org qualifier."""
+    q = ["Staff Data Engineer"]
+    for hidden_real_match in (
+        "Principal Data Engineer, Personalization - Central Product Insights",
+        "Data Engineer (Cleared) - DoD Program - Remote",
+        "Staff Software Engineer, Data Products",
+    ):
+        assert _title_is_in_lane(hidden_real_match, q), (
+            f"{hidden_real_match!r} is a real data-engineering role"
+        )
+    for still_conflicting in (
+        # The occupation word IS the role here.
+        "Senior Staff Product Manager, AI Platform",
+        "Program Manager, Foundation Data and Operations",
+        # Generic-only first segment: the next segment names the discipline.
+        "Senior Manager, Clinical Engineering & Data Analytics",
+        # Role-last format: the trailing segment names the role.
+        "Data Platform - Senior Product Manager",
+        # Center/centre poison the word "data" itself (facilities work), so
+        # they conflict anywhere in the title, qualifier or not.
+        "Electrical Engineering Lead, Data Centers - Remote (U.S.)",
+    ):
+        assert not _title_is_in_lane(still_conflicting, q), (
+            f"{still_conflicting!r} is not a data-engineering role"
+        )

@@ -103,9 +103,70 @@ def _content_hash(record: ApplicationRecord) -> str:
             record.description,
             record.date_posted,
             record.job_url,
+            record.work_type,
+            record.remote_scope,
+            record.salary_min,
+            record.salary_max,
+            record.salary_min_annualized,
+            record.salary_max_annualized,
         )
     )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def fit_profile_hash(db: Session, workspace_id: str | None = None) -> str:
+    """Fingerprint only the resume and preferences that can change a Work fit.
+
+    Fit annotations use this together with the posting content hash. Keeping
+    the fingerprint structural (rather than keying on ``updated_at``) means an
+    unrelated settings save does not make every judgment stale.
+    """
+
+    profile = career_preferences(db, workspace_id)
+    preferences = profile.get("preferences") or {}
+    resume = profile.get("resume") or {}
+    relevant = {
+        "roles": preferences.get("roles") or [],
+        "keywords": preferences.get("keywords") or [],
+        "companies": preferences.get("companies") or [],
+        "preferred_places": preferences.get("preferred_places") or [],
+        "workplace_preference": preferences.get("workplace_preference") or "",
+        "max_days_old": preferences.get("max_days_old"),
+        "current_title": preferences.get("current_title") or "",
+        "current_level": preferences.get("current_level") or "",
+        "compensation": preferences.get("compensation") or {},
+        "exclude_staffing_agencies": preferences.get("exclude_staffing_agencies"),
+        "match_strictness": preferences.get("match_strictness") or "",
+        "resume_sha256": resume.get("sha256") or "",
+        "resume_updated_at": resume.get("updated_at") or "",
+    }
+    encoded = json.dumps(relevant, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _parsed_fit(record: ApplicationRecord) -> dict[str, Any]:
+    raw = record.agent_fit_json or ""
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, json.JSONDecodeError):
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def fit_review_state(record: ApplicationRecord, profile_hash: str) -> dict[str, Any]:
+    """Whether a stored assistant verdict still describes this job/profile."""
+
+    fit = _parsed_fit(record)
+    if fit.get("verdict") not in _FIT_VERDICTS:
+        return {"current": False, "reason": "not_reviewed", "fit": fit}
+    if fit.get("profile_hash") != profile_hash:
+        reason = "legacy_fit" if not fit.get("profile_hash") else "profile_changed"
+        return {"current": False, "reason": reason, "fit": fit}
+    if fit.get("content_hash") != _content_hash(record):
+        return {"current": False, "reason": "posting_changed", "fit": fit}
+    return {"current": True, "reason": "current", "fit": fit}
 
 
 def _requested_workspace(db: Session, workspace_id: str | None = None) -> Workspace | None:
@@ -341,6 +402,28 @@ def propose_career_preferences(
             )
             return payload
 
+    # "Keep mine" answers "should my roles change?", not one specific list.
+    # The run after a rejection proposed a slightly different trio and the
+    # card came straight back (Aug 2026), so a rejection quiets every
+    # proposal for a week. Editing the saved roles reopens the door early:
+    # the base captured at proposal time no longer matching the saved list
+    # is the signal the user gave the assistant something new to react to.
+    last_rejection = next((p for p in recent if p.status == "rejected"), None)
+    if (
+        last_rejection is not None
+        and last_rejection.decided_at
+        and (now - _as_utc(last_rejection.decided_at)).days < 7
+        and {r.lower() for r in _json_list(last_rejection.base_roles_json, limit=ROLES_CAP)}
+        == {r.lower() for r in current.roles}
+    ):
+        payload = _proposal_payload(last_rejection)
+        payload["note"] = (
+            "The user chose to keep their roles within the last week and has "
+            "not changed them since, so no new proposal was recorded. Mention "
+            "this in at most one sentence and move on."
+        )
+        return payload
+
     # A guarded UPDATE, not loaded objects: a row this session read as pending
     # may have been accepted by the user mid-run, and writing "superseded"
     # over "accepted" by primary key would erase their decision.
@@ -507,10 +590,10 @@ def resume_for_matching(
 
 def _saved_search_defaults(
     db: Session, workspace_id: str | None = None
-) -> tuple[list[str], str, str, int, float | None]:
+) -> tuple[list[str], str, str, int, float | None, float]:
     workspace = resolve_local_workspace(db, workspace_id)
     if workspace is None:
-        return [], "", "remote_friendly", 14, None
+        return [], "", "remote_friendly", 14, None, 1.0
     preferences = workspace_service.get_workspace_preferences(db, workspace.id)
     place = next(
         (
@@ -553,7 +636,10 @@ def _saved_search_defaults(
                 )
                 if place:
                     break
-    floor = preferences.compensation.min_base or preferences.compensation.min_acceptable_tc
+    floor = preferences.compensation.min_acceptable_tc or preferences.compensation.min_base
+    # Saved minimum means minimum. Role-match strictness may change recall,
+    # but it must not lower this number behind the user's back.
+    salary_flex = 1.0
     role_queries = list(preferences.roles)
     if not role_queries and preferences.current_title:
         role_queries.append(preferences.current_title)
@@ -563,6 +649,7 @@ def _saved_search_defaults(
         preferences.workplace_preference,
         preferences.max_days_old,
         floor,
+        salary_flex,
     )
 
 
@@ -660,6 +747,8 @@ def clean_terms(values: list[str] | None, *, limit: int = 12) -> list[str]:
 _ROLE_TOKEN_ALIASES = {
     "architectural": "architect",
     "engineering": "engineer",
+    "centers": "center",
+    "centres": "centre",
     "mgr": "manager",
     "operations": "ops",
     "products": "product",
@@ -674,6 +763,38 @@ _ROLE_FILLER_TOKENS = frozenset({"a", "an", "and", "of", "the"})
 _OCCUPATION_CONFLICT_TOKENS = frozenset(
     {"center", "centre", "clinical", "product", "program", "project", "science"}
 )
+# "Data Center/Centre" poisons the word "data" itself (facilities work), so
+# these conflict anywhere in the title. The other occupation words only
+# conflict in a segment that names the role: as an org qualifier
+# ("..., Personalization - Central Product Insights", "- DoD Program") they
+# describe the team, not the person.
+_GLOBAL_CONFLICT_TOKENS = frozenset({"center", "centre"})
+
+_TITLE_SEGMENT_SPLIT = re.compile(r"[,:|()/]|\s[-–—]\s")
+
+
+def _conflict_scope_tokens(title: str | None) -> set[str]:
+    """Tokens allowed to carry an occupation conflict: the first segment (the
+    role itself) plus any later segment that names a role of its own
+    ("Data Platform - Senior Product Manager")."""
+    segments = [
+        seg for seg in (s.strip() for s in _TITLE_SEGMENT_SPLIT.split(str(title or ""))) if seg
+    ]
+    if not segments:
+        return set()
+    segment_tokens = [_role_tokens(seg) for seg in segments]
+    scope = set(segment_tokens[0])
+    rest = segment_tokens[1:]
+    if rest and not (scope - _ROLE_GENERIC_TOKENS):
+        # "Senior Manager, Clinical Engineering": a generic-only first segment
+        # means the next segment names the discipline, so its words are the
+        # role's own, not a team qualifier.
+        scope |= rest[0]
+        rest = rest[1:]
+    for tokens in rest:
+        if tokens & _ROLE_GENERIC_TOKENS:
+            scope |= tokens
+    return scope
 
 
 def _role_tokens(value: str | None) -> set[str]:
@@ -715,7 +836,9 @@ def _title_is_in_lane(title: str | None, queries: list[str]) -> bool:
     title_tokens = _role_tokens(title)
     if not title_tokens:
         return False
-    title_conflicts = title_tokens & _OCCUPATION_CONFLICT_TOKENS
+    title_conflicts = (title_tokens & _GLOBAL_CONFLICT_TOKENS) | (
+        _conflict_scope_tokens(title) & _OCCUPATION_CONFLICT_TOKENS
+    )
     for query in queries:
         query_tokens = _role_tokens(query)
         if not query_tokens:
@@ -768,6 +891,148 @@ def local_relevance(record: ApplicationRecord, skill_terms: list[str]) -> dict[s
     else:
         band = "weak"
     return {"band": band, "skill_count": count, "matched_skills": matched[:8]}
+
+
+def _annual_pay(record: ApplicationRecord) -> tuple[float | None, float | None]:
+    return (
+        record.salary_min_annualized
+        if record.salary_min_annualized is not None
+        else record.salary_min,
+        record.salary_max_annualized
+        if record.salary_max_annualized is not None
+        else record.salary_max,
+    )
+
+
+def _work_retrieval_priority(
+    record: ApplicationRecord,
+    *,
+    roles: list[str],
+    skill_terms: list[str],
+    target_companies: list[str],
+    compensation_floor: float | None,
+    compensation_currency: str | None = None,
+) -> tuple[tuple[Any, ...], int | None, bool]:
+    """Auditable, model-free priority for the assistant's compact shortlist.
+
+    The old order was newest-only, so a weak new title evicted an exact saved
+    role before the assistant could judge either. This key keeps role/title
+    intent first and freshness as a tie-breaker; it is retrieval, never fit.
+    """
+
+    title_tokens = _role_tokens(record.job_title)
+    best: tuple[int, int, float, int] = (0, 0, 0.0, -len(roles))
+    best_role_index: int | None = None
+    exact_role = False
+    for index, role in enumerate(roles):
+        role_tokens = _role_tokens(role)
+        if not role_tokens:
+            continue
+        exact = int(role_tokens.issubset(title_tokens))
+        role_levels = role_tokens & _ROLE_GENERIC_TOKENS
+        same_level = int(bool(role_levels and role_levels & title_tokens))
+        overlap = len(role_tokens & title_tokens) / max(1, len(role_tokens))
+        candidate = (exact, same_level, overlap, -index)
+        if candidate > best:
+            best = candidate
+            best_role_index = index
+            exact_role = bool(exact)
+
+    normalized_company = " ".join((record.company or "").casefold().split())
+    target_company = int(bool(normalized_company) and any(
+        company.casefold().strip() in normalized_company
+        or normalized_company in company.casefold().strip()
+        for company in target_companies
+        if company.strip()
+    ))
+    pay_min, pay_max = _annual_pay(record)
+    listing_currency = (record.salary_currency or "").strip().upper()
+    target_currency = (compensation_currency or "").strip().upper()
+    currencies_comparable = not target_currency or (
+        bool(listing_currency) and listing_currency == target_currency
+    )
+    if compensation_floor is None or compensation_floor <= 0:
+        pay_band = 1
+    elif not currencies_comparable:
+        pay_band = 1  # missing/unlike currency is unknown, never assumed USD
+    elif pay_min is None and pay_max is None:
+        pay_band = 1  # unknown stays eligible, but stated-above-floor wins
+    elif max(value for value in (pay_min, pay_max) if value is not None) >= compensation_floor:
+        pay_band = 2
+    else:
+        pay_band = 0
+    relevance = local_relevance(record, skill_terms)
+    skill_count = int((relevance or {}).get("skill_count") or 0)
+    age_days = _source_age_days(record.date_posted, record.date_found)
+    freshness = -age_days if age_days is not None else -10_000.0
+    found_at = record.date_found
+    if found_at is None:
+        found = float("-inf")
+    else:
+        if found_at.tzinfo is None:
+            found_at = found_at.replace(tzinfo=timezone.utc)
+        found = found_at.timestamp()
+    priority = (
+        best[0],                 # exact saved-role token set
+        best[1],                 # same seniority/role-type signal
+        target_company,          # company the user explicitly watches
+        pay_band,                # stated pay clears the saved floor
+        skill_count,             # posting names saved stack terms
+        best[2],                 # title-token coverage
+        int(is_direct_source(record.source or "")),
+        freshness,
+        found,
+    )
+    return priority, best_role_index, exact_role
+
+
+def _select_work_shortlist(
+    records: list[ApplicationRecord],
+    *,
+    roles: list[str],
+    skill_terms: list[str],
+    target_companies: list[str],
+    compensation_floor: float | None,
+    compensation_currency: str | None = None,
+    limit: int,
+) -> list[ApplicationRecord]:
+    """Select the best compact page while guaranteeing saved-role coverage."""
+
+    scored = [
+        (
+            record,
+            *_work_retrieval_priority(
+                record,
+                roles=roles,
+                skill_terms=skill_terms,
+                target_companies=target_companies,
+                compensation_floor=compensation_floor,
+                compensation_currency=compensation_currency,
+            ),
+        )
+        for record in records
+    ]
+    scored.sort(key=lambda item: item[1], reverse=True)
+
+    selected_ids: set[int] = set()
+    # One exact title for each saved role prevents common broad families from
+    # consuming all 50 slots. A row may cover only one quota even if two saved
+    # titles normalize to the same token set; the global fill handles the rest.
+    for role_index in range(len(roles)):
+        for record, _priority, matched_role, exact in scored:
+            if exact and matched_role == role_index and record.id not in selected_ids:
+                selected_ids.add(record.id)
+                break
+        if len(selected_ids) >= limit:
+            break
+
+    for record, _priority, _matched_role, _exact in scored:
+        if len(selected_ids) >= limit:
+            break
+        selected_ids.add(record.id)
+
+    # Keep the delivered page in priority order, not quota-collection order.
+    return [record for record, *_ in scored if record.id in selected_ids][:limit]
 
 
 def _dedupe_work_key(record: ApplicationRecord) -> tuple[str, tuple[str, ...]]:
@@ -888,23 +1153,50 @@ def search_work(
     location: str = "",
     workplace_preference: str = "saved",
     compensation_floor: float | None = None,
+    compensation_currency: str | None = None,
+    founding_only: bool = False,
     posted_within_days: int | None = None,
     # Arrived-in-the-last-N-days by the board's own date_found stamp; unlike
     # the posted window it can never hide a row for lacking a source date.
     found_within_days: int | None = None,
+    timezone_name: str = "UTC",
     page_size: int = 20,
     use_saved_preferences: bool = True,
     workspace_id: str | None = None,
     result_limit: int | None = None,
+    browse_all: bool = False,
 ) -> dict[str, Any]:
-    # The human browse board asks for the full in-lane set (result_limit); the
-    # agent's MCP path leaves it None and stays capped at _MAX_RESULTS.
-    saved_terms, saved_location, saved_workplace, saved_days, saved_floor = (
+    # The MCP path stays compact. The human board opts into browse_all so its
+    # total and pagination describe every eligible row rather than a shortlist.
+    (
+        saved_terms,
+        saved_location,
+        saved_workplace,
+        saved_days,
+        saved_floor,
+        saved_salary_flex,
+    ) = (
         _saved_search_defaults(db, workspace_id)
     )
-    terms = clean_terms(queries)
+    profile = career_preferences(db, workspace_id)
+    preferences = (profile.get("preferences") or {}) if use_saved_preferences else {}
+    saved_compensation = preferences.get("compensation") or {}
+    skill_terms = clean_terms(preferences.get("keywords"), limit=ROLES_CAP)
+    target_companies = clean_terms(preferences.get("companies"), limit=ROLES_CAP)
+    match_strictness = str(preferences.get("match_strictness") or "balanced")
+    exclude_staffing_agencies = bool(
+        use_saved_preferences and preferences.get("exclude_staffing_agencies", True)
+    )
+    from job_finder.pipeline import _filter_jobs_by_level, _resolve_filter_settings
+    from job_finder.tools.scrapers._utils import job_passes_role_filter
+
+    filter_settings = _resolve_filter_settings({
+        "filters": {"strictness": match_strictness},
+    })
+    profile_hash = fit_profile_hash(db, workspace_id)
+    terms = clean_terms(queries, limit=ROLES_CAP)
     if not terms and use_saved_preferences:
-        terms = clean_terms(saved_terms)
+        terms = clean_terms(saved_terms, limit=ROLES_CAP)
     effective_location = " ".join(location.split())[:120] or (
         saved_location if use_saved_preferences else ""
     )
@@ -913,17 +1205,24 @@ def search_work(
     )
     if effective_workplace not in {"remote_friendly", "remote_only", "location_only"}:
         raise ValueError("workplace_preference must be saved, remote_friendly, remote_only, or location_only")
+    requested_floor = compensation_floor
     effective_floor = compensation_floor
+    effective_currency = (compensation_currency or "").strip().upper()
+    if not effective_currency and use_saved_preferences:
+        effective_currency = str(saved_compensation.get("currency") or "").strip().upper()
+    salary_flex = 1.0
     if effective_floor is None and use_saved_preferences:
+        requested_floor = saved_floor
+        salary_flex = saved_salary_flex
         effective_floor = saved_floor
     if posted_within_days is not None:
         posted_within_days = max(1, min(int(posted_within_days), 365))
     effective_freshness_window = posted_within_days
     if effective_freshness_window is None and use_saved_preferences:
         effective_freshness_window = max(1, min(int(saved_days), 365))
-    effective_cap = max(1, min(int(result_limit), 400)) if result_limit else _MAX_RESULTS
+    effective_cap = max(1, int(result_limit)) if result_limit else _MAX_RESULTS
     page_size = max(1, min(int(page_size), effective_cap))
-    candidate_page_size = min(1000, max(page_size * 10, 200))
+    candidate_page_size = 1000 if browse_all else min(1000, max(page_size * 10, 200))
 
     # Saved role families are token groups, not exact phrases. This retrieves
     # "Manager, Data Engineering" for "Data Engineering Manager" while the
@@ -936,15 +1235,20 @@ def search_work(
         for term in terms
     ]
     role_groups = [group for group in role_groups if group]
-    rows, _ = application_service.get_applications(
-        db,
+    candidate_query = dict(
         title_token_groups=role_groups or None,
         is_remote=True if effective_workplace == "remote_only" else None,
+        # Apply this before the bounded retrieval/shortlist. Filtering the
+        # final 300 rows instead made a real founding role disappear whenever
+        # ordinary exact-title matches consumed every shortlist slot.
+        founding_only=founding_only,
+        exclude_staffing_agencies=exclude_staffing_agencies,
         location=effective_location or None,
         location_strict=bool(
             effective_location and effective_workplace == "location_only"
         ),
         salary_min=effective_floor,
+        salary_currency=effective_currency or None,
         exclude_dead=True,
         # Source dates are a mixture of ISO timestamps and labels such as
         # "Reposted 8 Days Ago". Filter them consistently after retrieval.
@@ -955,31 +1259,102 @@ def search_work(
         page_size=candidate_page_size,
         verticals=["career", "work"],
     )
+    rows, candidate_total = application_service.get_applications(db, **candidate_query)
+    if browse_all and candidate_total > len(rows):
+        # The old 1,000-row prefilter ceiling made the later Python title,
+        # freshness, and dedupe pass incapable of seeing the tail. Fetch the
+        # exact SQL total for the human board; the MCP shortlist stays bounded.
+        candidate_query["page_size"] = candidate_total
+        rows, _ = application_service.get_applications(db, **candidate_query)
 
     stale_excluded = 0
     unknown_freshness_excluded = 0
     title_mismatch_excluded = 0
+    level_mismatch_excluded = 0
     duplicate_records_excluded = 0
 
     # Apply title + freshness BEFORE dedup. Deduping first let a stale-known
     # record win its key and then get freshness-excluded, silently evicting a
     # still-live unknown-date duplicate that shared the key.
-    found_cutoff = None
+    found_bounds = None
+    found_now = None
     if isinstance(found_within_days, int):
-        found_cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(
-            days=max(1, min(found_within_days, 365))
+        found_now = datetime.now(timezone.utc)
+        found_bounds = application_service.local_calendar_window_utc(
+            max(1, min(found_within_days, 365)),
+            timezone_name,
+            now=found_now,
         )
 
     survivors: list[ApplicationRecord] = []
+    intent_text = " ".join(terms + skill_terms).casefold()
+    wants_founding = founding_only or any(
+        term in intent_text
+        for term in ("founding", "startup", "early-stage", "early stage", "first hire")
+    )
+    wants_crypto = any(
+        term in intent_text
+        for term in ("crypto", "web3", "blockchain", "defi", "solidity", "ethereum")
+    )
+    include_founding = bool(filter_settings.get("include_founding_titles", True)) and wants_founding
+    match_mode = str(filter_settings.get("role_match_mode", "all_significant"))
+    strictness = str(filter_settings.get("strictness", "balanced"))
+    career_baseline = {
+        "current_title": preferences.get("current_title") or "",
+        "current_level": preferences.get("current_level") or "",
+    }
     for row in rows:
-        if terms and not _title_is_in_lane(row.job_title, terms):
+        filter_job = {
+            "title": row.job_title or "",
+            "company": row.company or "",
+            "source": row.source or "",
+            "is_remote": bool(row.is_remote),
+            "industry_tags": getattr(row, "industry_tags", "[]") or "[]",
+        }
+        primary_role_match = job_passes_role_filter(
+            filter_job,
+            terms,
+            match_mode=match_mode,
+            include_founding=include_founding,
+            strictness=strictness,
+            allow_crypto_rescue=False,
+        )
+        crypto_role_match = wants_crypto and job_passes_role_filter(
+            filter_job,
+            terms,
+            match_mode=match_mode,
+            include_founding=include_founding,
+            strictness=strictness,
+            allow_crypto_rescue=True,
+        )
+        # Two independent gates are deliberate. job_passes_role_filter mirrors
+        # the pull's loose/balanced/strict vocabulary; _title_is_in_lane keeps
+        # profession conflicts out (Product Manager, AI Platform and Data
+        # Center Engineer must not become data-engineering matches merely by
+        # sharing "platform" or "data").
+        if terms and (
+            not _title_is_in_lane(row.job_title, terms)
+            or not (primary_role_match or crypto_role_match)
+        ):
             title_mismatch_excluded += 1
             continue
-        if found_cutoff is not None:
-            # Same rule as board_filter_conditions, both clocks: provably
-            # posted inside the window counts however long ago it arrived,
-            # and an arrival inside the window counts unless a parseable ISO
-            # date proves it a stale repost. Free text proves nothing.
+        if not _filter_jobs_by_level(
+            [filter_job],
+            career_baseline,
+            filters=filter_settings,
+        ):
+            level_mismatch_excluded += 1
+            continue
+        if found_bounds is not None:
+            # Same first-seen calendar rule as board_filter_conditions. A
+            # recent source date cannot resurrect an older board row; a
+            # verifiably old source date can still prove today's arrival stale.
+            found_start, found_end = found_bounds
+            today_start, _ = application_service.local_calendar_window_utc(
+                1,
+                timezone_name,
+                now=found_now,
+            )
             posted_at = None
             posted_raw = (row.date_posted or "")[:19]
             if posted_raw.startswith("2"):
@@ -987,19 +1362,24 @@ def search_work(
                     posted_at = datetime.fromisoformat(posted_raw)
                 except ValueError:
                     posted_at = None
-            posted_fresh = posted_at is not None and posted_at >= found_cutoff
-            arrived = row.date_found is not None and row.date_found >= found_cutoff
-            provably_stale = posted_at is not None and posted_at < found_cutoff.replace(
-                hour=0, minute=0, second=0, microsecond=0
-            ) - timedelta(days=6)
-            if not (posted_fresh or (arrived and not provably_stale)):
+            arrived = (
+                row.date_found is not None
+                and found_start <= row.date_found < found_end
+                and row.date_found <= found_now.replace(tzinfo=None)
+            )
+            provably_stale = (
+                posted_at is not None
+                and posted_at < today_start - timedelta(days=7)
+                and (row.date_confidence or "").lower() != "missing"
+            )
+            if not (arrived and not provably_stale):
                 continue
         age_days = _source_age_days(row.date_posted, row.date_found)
         if effective_freshness_window is not None and age_days is not None:
             if age_days > effective_freshness_window:
                 stale_excluded += 1
                 continue
-        elif posted_within_days is not None:
+        elif posted_within_days is not None or filter_settings.get("drop_missing_dates", False):
             # An explicit freshness request is a hard constraint. Saved
             # defaults stay recall-friendly and let the agent demote unknowns.
             unknown_freshness_excluded += 1
@@ -1017,36 +1397,115 @@ def search_work(
         if _dedupe_work_priority(row) > _dedupe_work_priority(existing):
             unique[key] = row
 
-    rows = sorted(
-        unique.values(),
-        key=lambda item: item.date_found or datetime.min,
-        reverse=True,
-    )[:page_size]
+    matching_count = len(unique)
+    review_states = {
+        row.id: fit_review_state(row, profile_hash)
+        for row in unique.values()
+    }
+    current_records = [
+        row for row in unique.values() if review_states[row.id]["current"]
+    ]
+    needs_review_records = [
+        row for row in unique.values() if not review_states[row.id]["current"]
+    ]
+    shortlist_args = dict(
+        roles=terms,
+        skill_terms=skill_terms,
+        target_companies=target_companies,
+        compensation_floor=requested_floor,
+        compensation_currency=effective_currency or None,
+    )
+    if browse_all:
+        rows = _select_work_shortlist(
+            list(unique.values()),
+            **shortlist_args,
+            limit=max(matching_count, 1),
+        )
+    elif needs_review_records:
+        # A static top-50 page permanently stranded row 51 onward once the
+        # first page had judgments. Retain a few current rows as global rank
+        # anchors and spend the rest of every tool page on the best unseen
+        # candidates. Repeated calls therefore resume the sweep.
+        anchor_limit = min(len(current_records), min(10, page_size // 5))
+        anchors = _select_work_shortlist(
+            current_records,
+            **shortlist_args,
+            limit=max(anchor_limit, 1),
+        )[:anchor_limit]
+        unseen = _select_work_shortlist(
+            needs_review_records,
+            **shortlist_args,
+            limit=max(page_size - len(anchors), 1),
+        )[: page_size - len(anchors)]
+        rows = anchors + unseen
+    else:
+        rows = _select_work_shortlist(
+            current_records,
+            **shortlist_args,
+            limit=page_size,
+        )
+    results: list[dict[str, Any]] = []
+    reviewed_current = 0
+    shortlist_needs_review = 0
+    for row in rows:
+        review = review_states[row.id]
+        if review["current"]:
+            reviewed_current += 1
+        else:
+            shortlist_needs_review += 1
+        prior = review["fit"]
+        # The route only needs ids to reconstruct ORM rows. Avoid building a
+        # multi-hundred-row MCP-shaped payload for ordinary board pagination.
+        item = {"opportunity_id": row.id} if browse_all else _candidate_payload(row)
+        item["assistant_review"] = {
+            "state": "current" if review["current"] else "needs_review",
+            "reason": review["reason"],
+            # Compact anchors only. The explanation already lives on the board;
+            # repeating it across 50 tool rows would waste the payload budget.
+            "prior_rank": prior.get("rank") if isinstance(prior.get("rank"), int) else None,
+            "prior_verdict": prior.get("verdict") if prior.get("verdict") in _FIT_VERDICTS else None,
+        }
+        results.append(item)
     return {
-        "results": [_candidate_payload(row) for row in rows],
+        "results": results,
         "result_count": len(rows),
+        "total_matching": matching_count,
+        "reviewed_current_total": len(current_records),
+        "needs_review_total": len(needs_review_records),
+        "reviewed_current_in_shortlist": reviewed_current,
+        "needs_review_in_shortlist": shortlist_needs_review,
         "candidate_queries": terms,
         "filters_applied": {
             "location": effective_location or None,
             "workplace_preference": effective_workplace,
-            "compensation_floor": effective_floor,
+            "compensation_floor": requested_floor,
+            "effective_compensation_floor": effective_floor,
+            "compensation_currency": effective_currency or None,
+            "salary_flex": salary_flex,
+            "match_strictness": strictness,
+            "exclude_staffing_agencies": exclude_staffing_agencies,
             "posted_within_days": effective_freshness_window,
             "saved_max_days_old": saved_days if use_saved_preferences else None,
             "unknown_freshness_policy": (
-                "exclude" if posted_within_days is not None else "keep_for_agent_review"
+                "exclude"
+                if posted_within_days is not None
+                or filter_settings.get("drop_missing_dates", False)
+                else "keep_for_agent_review"
             ),
         },
         "freshness_filter_summary": {
             "known_stale_excluded": stale_excluded,
             "unknown_date_excluded": unknown_freshness_excluded,
             "title_mismatch_excluded": title_mismatch_excluded,
+            "level_mismatch_excluded": level_mismatch_excluded,
             "duplicate_records_excluded": duplicate_records_excluded,
         },
         "ranking_owner": "connected_agent",
         "questboard_funded_ai": False,
         "note": (
-            "These are source-grounded candidates in newest-first order. "
-            "Retrieval signals are not a resume-fit verdict."
+            "These are source-grounded candidates prioritized by saved-role, "
+            "constraint, skill, source, and freshness signals. Retrieval order "
+            "is not a resume-fit verdict; judge only rows marked needs_review."
         ),
     }
 
@@ -1164,13 +1623,70 @@ def set_opportunity_status(
 _FIT_VERDICTS = {"strong", "good", "reach", "skip"}
 
 
+def _rebalance_current_fit_ranks(
+    db: Session,
+    *,
+    profile_hash: str,
+    changed: list[tuple[ApplicationRecord, dict[str, Any]]],
+) -> None:
+    """Insert changed rows at their requested global positions, then compact.
+
+    Existing current judgments are anchors. A new row assigned rank 2 is
+    inserted at position 2 and shifts the old #2 downward; unchanged rows do
+    not need another model pass merely to receive their new integer.
+    """
+
+    changed_ids = {record.id for record, _ in changed}
+    existing: list[tuple[int, ApplicationRecord]] = []
+    for record in db.query(ApplicationRecord).filter(
+        ApplicationRecord.vertical.in_(("career", "work")),
+        ApplicationRecord.agent_fit_json.isnot(None),
+        ApplicationRecord.agent_fit_json != "",
+    ).all():
+        if record.id in changed_ids:
+            continue
+        state = fit_review_state(record, profile_hash)
+        fit = state["fit"]
+        if not state["current"] or fit.get("verdict") == "skip":
+            continue
+        rank = fit.get("rank")
+        existing.append((rank if isinstance(rank, int) and rank > 0 else 1_000_000, record))
+    sequence = [record for _rank, record in sorted(existing, key=lambda item: (item[0], item[1].id))]
+
+    insertions: list[tuple[int, int, ApplicationRecord]] = []
+    for order, (record, item) in enumerate(changed):
+        if item["verdict"] == "skip":
+            continue
+        requested = item.get("rank")
+        desired = requested if isinstance(requested, int) and requested > 0 else 1_000_000
+        insertions.append((desired, order, record))
+
+    same_position_count: dict[int, int] = {}
+    for desired, _order, record in sorted(insertions, key=lambda item: (item[0], item[1])):
+        if desired >= 1_000_000:
+            position = len(sequence)
+        else:
+            offset = same_position_count.get(desired, 0)
+            position = min(max(desired - 1 + offset, 0), len(sequence))
+            same_position_count[desired] = offset + 1
+        sequence.insert(position, record)
+
+    for rank, record in enumerate(sequence, 1):
+        fit = _parsed_fit(record)
+        if fit.get("rank") == rank:
+            continue
+        fit["rank"] = rank
+        record.agent_fit_json = json.dumps(fit)
+
+
 def set_work_fit(db: Session, rankings: list[dict[str, Any]]) -> dict[str, Any]:
     """Record the connected assistant's own fit verdict for work rows, keyed by
     opportunity_id, so the board and the results panel can show it.
 
-    This REPLACES any prior run's verdicts (clears them first), so the board
-    only ever reflects the latest run. It writes nothing but a local annotation
-    on rows the agent already retrieved; it performs no external action.
+    Current verdicts for unchanged jobs are retained. Each write stamps the
+    posting and profile fingerprints, so changed jobs, resumes, or preferences
+    become reviewable without throwing away still-valid work. It writes only a
+    local annotation and performs no external action.
     """
     if not isinstance(rankings, list) or not rankings:
         raise ValueError("Provide a non-empty list of {opportunity_id, verdict} rankings.")
@@ -1222,58 +1738,22 @@ def set_work_fit(db: Session, rankings: list[dict[str, Any]]) -> dict[str, Any]:
             "external_action_performed": False,
         }
 
-    # Batches of one run share its id and only the FIRST clears.
+    # Batches of one run share its id. Unlike the old latest-run-only model,
+    # starting a run does not clear unchanged judgments: the shortlist tells
+    # the assistant which rows are stale, and only those rows need model work.
     #
     # Scoring ~50 jobs in a single write took longer than the run's own
     # timeout and the whole run was thrown away: the pull had finished, the
     # shortlist was in hand, and not one verdict reached the board. Writing in
     # batches means a run that dies late keeps what it already decided.
     #
-    # Clearing per batch would leave only the last one, so the run boundary
-    # decides instead. The app clears the progress trail when it launches the
-    # assistant, so a run's first write is the one with no set_work_fit behind
-    # it. The assistant needs no flag it could get wrong.
     prior = agent_run_progress.work_fit_run_id()
     run_id = prior or uuid.uuid4().hex[:12]
     stamped_at = _iso(datetime.now(timezone.utc))
+    profile_hash = fit_profile_hash(db)
 
     if not prior:
         agent_run_progress.set_work_fit_run_id(run_id)
-        db.query(ApplicationRecord).filter(
-            ApplicationRecord.vertical.in_(("career", "work")),
-            ApplicationRecord.agent_fit_json.isnot(None),
-            ApplicationRecord.agent_fit_json != "",
-        ).update({ApplicationRecord.agent_fit_json: ""}, synchronize_session=False)
-
-    if prior:
-        # A later batch of the same run (the end-of-run sweep) restarted its
-        # numbering at 1 and the board showed two #1 strong fits. Within one
-        # run a rank is an order, so a colliding rank renumbers to continue
-        # after the highest already written, preserving the batch's own order.
-        used: set[int] = set()
-        existing = db.query(ApplicationRecord.agent_fit_json).filter(
-            ApplicationRecord.vertical.in_(("career", "work")),
-            ApplicationRecord.agent_fit_json.isnot(None),
-            ApplicationRecord.agent_fit_json != "",
-        ).all()
-        for (raw,) in existing:
-            try:
-                rank = json.loads(raw).get("rank")
-            except (json.JSONDecodeError, TypeError):
-                continue
-            if isinstance(rank, int):
-                used.add(rank)
-        if used:
-            next_rank = max(used) + 1
-            in_rank_order = sorted(
-                (item for _, item in matched if isinstance(item["rank"], int)),
-                key=lambda item: item["rank"],
-            )
-            for item in in_rank_order:
-                if item["rank"] in used:
-                    item["rank"] = next_rank
-                used.add(item["rank"])
-                next_rank = max(next_rank, item["rank"] + 1)
 
     for record, item in matched:
         record.agent_fit_json = json.dumps({
@@ -1283,7 +1763,11 @@ def set_work_fit(db: Session, rankings: list[dict[str, Any]]) -> dict[str, Any]:
             "caveat": item["caveat"],
             "run_id": run_id,
             "at": stamped_at,
+            "content_hash": _content_hash(record),
+            "profile_hash": profile_hash,
+            "schema_version": 1,
         })
+    _rebalance_current_fit_ranks(db, profile_hash=profile_hash, changed=matched)
     applied = len(matched)
 
     db.commit()

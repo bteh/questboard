@@ -410,13 +410,61 @@ def test_a_recently_rejected_list_is_not_reproposed(role_proposal_db) -> None:
     assert pending["proposals"] == []
 
 
-def test_a_genuinely_new_list_still_proposes_after_a_rejection(role_proposal_db) -> None:
+def test_any_new_list_waits_out_a_recent_keep_mine(role_proposal_db) -> None:
+    """"Keep mine" answers the question "should my roles change?", not one
+    specific trio. The run after a rejection proposed a slightly different
+    list and the card came straight back (Aug 2026); a rejection now quiets
+    every proposal for a week, not just the identical list."""
     from app.services import local_agent_service as svc
 
     first = svc.propose_career_preferences(
         role_proposal_db, roles=["Head of Data Platform"], rationale="wider net"
     )
     svc.decide_role_proposal(role_proposal_db, first["id"], accept=False)
+
+    fresh = svc.propose_career_preferences(
+        role_proposal_db, roles=["VP, Data Engineering"], rationale="different idea"
+    )
+    assert fresh["status"] == "rejected", "the keep-mine stands for the week"
+    assert "note" in fresh
+    assert svc.list_role_proposals(role_proposal_db, status="pending")["proposals"] == []
+
+
+def test_editing_saved_roles_reopens_the_door_early(role_proposal_db) -> None:
+    """The cooldown holds only while nothing changed. A user who edits their
+    saved roles has given the assistant new information to react to."""
+    import json as _json
+
+    from app.models.workspace import WorkspacePreferences
+    from app.services import local_agent_service as svc
+
+    first = svc.propose_career_preferences(
+        role_proposal_db, roles=["Head of Data Platform"], rationale="wider net"
+    )
+    svc.decide_role_proposal(role_proposal_db, first["id"], accept=False)
+
+    prefs = role_proposal_db.query(WorkspacePreferences).one()
+    prefs.roles_json = _json.dumps(["Analytics Engineering Manager"])
+    role_proposal_db.commit()
+
+    fresh = svc.propose_career_preferences(
+        role_proposal_db, roles=["VP, Data Engineering"], rationale="different idea"
+    )
+    assert fresh["status"] == "pending"
+    assert fresh["id"] != first["id"]
+
+
+def test_a_genuinely_new_list_still_proposes_after_the_week(role_proposal_db) -> None:
+    from app.models.workspace import AgentRoleProposal
+    from app.services import local_agent_service as svc
+
+    first = svc.propose_career_preferences(
+        role_proposal_db, roles=["Head of Data Platform"], rationale="wider net"
+    )
+    svc.decide_role_proposal(role_proposal_db, first["id"], accept=False)
+    row = role_proposal_db.get(AgentRoleProposal, first["id"])
+    row.decided_at = datetime.now(timezone.utc) - timedelta(days=8)
+    role_proposal_db.commit()
 
     fresh = svc.propose_career_preferences(
         role_proposal_db, roles=["VP, Data Engineering"], rationale="different idea"
