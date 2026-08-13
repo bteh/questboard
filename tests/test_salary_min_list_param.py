@@ -144,7 +144,11 @@ def test_floor_keeps_rows_with_no_pay_data(api_client) -> None:
     assert _titles(payload) == {"No pay stated"}
 
 
-def test_floor_only_compares_rows_in_the_requested_currency(api_client) -> None:
+def test_floor_exempts_only_a_stated_foreign_currency(api_client) -> None:
+    """Only a row NAMING a different currency skips the comparison. A blank
+    currency compares numerically: nearly all scraped rows carry no currency
+    tag, and exempting them let sub-floor listings flood a $190K+ board
+    (2026-08-13 audit, 94 of 460 rows)."""
     client, jf_db = api_client
     jf_db.save_application(
         job_title="Low USD",
@@ -163,11 +167,18 @@ def test_floor_only_compares_rows_in_the_requested_currency(api_client) -> None:
         salary_currency="EUR",
     )
     jf_db.save_application(
-        job_title="Currency missing",
+        job_title="Currency missing low",
         company="Acme",
-        job_url="https://example.com/jobs/currency-missing",
+        job_url="https://example.com/jobs/currency-missing-low",
         salary_min=90_000,
         salary_max=90_000,
+    )
+    jf_db.save_application(
+        job_title="Currency missing high",
+        company="Acme",
+        job_url="https://example.com/jobs/currency-missing-high",
+        salary_min=150_000,
+        salary_max=200_000,
     )
 
     resp = client.get(
@@ -175,7 +186,7 @@ def test_floor_only_compares_rows_in_the_requested_currency(api_client) -> None:
         params={"salary_min": 120_000, "salary_currency": "USD"},
     )
     assert resp.status_code == 200, resp.text
-    assert _titles(resp.json()) == {"EUR not comparable", "Currency missing"}
+    assert _titles(resp.json()) == {"EUR not comparable", "Currency missing high"}
 
 
 def test_negative_floor_rejected(api_client) -> None:

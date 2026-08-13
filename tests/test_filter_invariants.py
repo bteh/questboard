@@ -79,6 +79,7 @@ def _add(
     salary_period: str = "",
     salary_min_annualized: float | None = None,
     salary_max_annualized: float | None = None,
+    salary_source: str = "",
     state_codes: str | None = None,
     company: str = "Acme",
 ) -> ApplicationRecord:
@@ -106,6 +107,7 @@ def _add(
         salary_period=salary_period,
         salary_min_annualized=salary_min_annualized,
         salary_max_annualized=salary_max_annualized,
+        salary_source=salary_source,
         state_codes=state_codes,
         vertical="career",
     )
@@ -398,7 +400,10 @@ def test_invariant_5_unknown_pay_is_always_kept():
     assert combos == (len(PAY_FLOORS) * len(PAY_CEILINGS) - 1) * len(unknown_rows)
 
 
-def test_invariant_5_unlike_or_missing_currency_is_not_compared_as_usd():
+def test_invariant_5_a_stated_foreign_currency_is_not_compared_as_usd():
+    """A row that NAMES a different currency is kept as not-comparable:
+    Questboard does not guess exchange rates. A row that states no currency
+    at all is a different animal; see invariant 5b."""
     s = _fresh_session()
     usd = _add(
         s,
@@ -414,16 +419,63 @@ def test_invariant_5_unlike_or_missing_currency_is_not_compared_as_usd():
         salary_max=90_000,
         salary_currency="EUR",
     )
-    unstated = _add(
-        s,
-        job_title="currency-unstated",
-        salary_min=90_000,
-        salary_max=90_000,
-    )
 
     assert not _pay_passes(s, usd.job_title, 120_000, None, "USD")
     assert _pay_passes(s, eur.job_title, 120_000, None, "USD")
-    assert _pay_passes(s, unstated.job_title, 120_000, None, "USD")
+
+
+def test_invariant_5b_blank_currency_still_obeys_the_pay_floor():
+    """2026-08-13 audit: 94 of 460 rows on a $190K+ board stated sub-floor
+    pay (Kroll's Senior Data Engineer listed $60K-150K) and were shown
+    anyway, because a blank salary_currency was treated as not-comparable.
+    96% of priced rows carry no currency tag, so that reading disabled the
+    floor almost everywhere. Blank currency compares numerically; only a
+    STATED different currency is exempt (invariant 5a)."""
+    s = _fresh_session()
+    below = _add(
+        s,
+        job_title="blank-currency-below-floor",
+        salary_min=60_000,
+        salary_max=150_000,
+    )
+    above = _add(
+        s,
+        job_title="blank-currency-above-floor",
+        salary_min=180_000,
+        salary_max=220_000,
+    )
+
+    assert not _pay_passes(s, below.job_title, 190_000, None, "USD")
+    assert _pay_passes(s, above.job_title, 190_000, None, "USD")
+    # The same reading holds when no target currency is named at all.
+    assert not _pay_passes(s, below.job_title, 190_000, None, None)
+    assert _pay_passes(s, above.job_title, 190_000, None, None)
+
+
+def test_invariant_5c_an_aggregator_estimate_never_hides_a_row():
+    """Alpaca's Senior Data Engineer carried a web3career-modeled $122K-123K
+    band (salary_source=source_estimate) and vanished behind a $190K floor
+    the moment blank currencies started comparing (invariant 5b). The
+    pipeline's _job_salary_passes already rules that modeled estimates are
+    context, not grounds for exclusion; the board predicate must agree."""
+    s = _fresh_session()
+    estimated = _add(
+        s,
+        job_title="estimate-below-floor",
+        salary_min=122_000,
+        salary_max=123_000,
+        salary_source="source_estimate",
+    )
+    reported = _add(
+        s,
+        job_title="reported-below-floor",
+        salary_min=122_000,
+        salary_max=123_000,
+        salary_source="reported",
+    )
+
+    assert _pay_passes(s, estimated.job_title, 190_000, None, "USD")
+    assert not _pay_passes(s, reported.job_title, 190_000, None, "USD")
 
 
 # --------------------------------------------------------------------------- #

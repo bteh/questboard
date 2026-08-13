@@ -231,8 +231,14 @@ def stated_pay_filter(
     with no salary data (dropping them would hide most listings, and "no pay
     stated" is neither "below the floor" nor "above the ceiling"). Per-gig
     "session" pay is kept without comparison, like no-stated-pay.
-    A different or missing currency is kept as not-comparable. Questboard
-    does not guess exchange rates or silently treat every amount as USD.
+    A row that NAMES a different currency is kept as not-comparable:
+    Questboard does not guess exchange rates. A BLANK currency compares
+    numerically. 96% of scraped rows carry no currency tag, so exempting
+    them turned the pay floor off almost everywhere (2026-08-13 audit: 94
+    of 460 rows on a $190K+ board stated sub-floor pay). Aggregator-modeled
+    bands (salary_source=source_estimate) are kept without comparison, the
+    same ruling _job_salary_passes makes: an estimate is context, not
+    grounds for exclusion.
     """
     if salary_min is None and salary_max is None:
         return None
@@ -255,12 +261,14 @@ def stated_pay_filter(
     if target_currency:
         row_currency = func.upper(func.trim(func.coalesce(model.salary_currency, "")))
         keep_without_comparison.append(
-            or_(row_currency == "", row_currency != target_currency)
+            and_(row_currency != "", row_currency != target_currency)
         )
     return or_(
         *keep_without_comparison,
         and_(lo.is_(None), hi.is_(None)),
         func.lower(func.coalesce(model.salary_period, "")) == _SESSION_PERIOD,
+        func.lower(func.trim(func.coalesce(model.salary_source, "")))
+        == "source_estimate",
         and_(*checks),
     )
 
@@ -272,12 +280,18 @@ def stated_pay_within_ceiling(
 ) -> bool:
     """Python mirror of stated_pay_filter's ceiling, for rows a service
     already fetched (the work lane's roles view orders in Python). Keep the
-    two in sync: no stated pay and per-gig session pay always pass."""
+    two in sync: no stated pay and per-gig session pay always pass; only a
+    STATED different currency skips the comparison, a blank one compares."""
     if ceiling is None:
+        return True
+    if (
+        str(getattr(record, "salary_source", "") or "").strip().lower()
+        == "source_estimate"
+    ):
         return True
     target_currency = (salary_currency or "").strip().upper()
     listing_currency = str(getattr(record, "salary_currency", "") or "").strip().upper()
-    if target_currency and (not listing_currency or listing_currency != target_currency):
+    if target_currency and listing_currency and listing_currency != target_currency:
         return True
     period = (getattr(record, "salary_period", "") or "").lower()
     if period == _SESSION_PERIOD:
