@@ -86,9 +86,6 @@ interface WorkToolbarProps {
   /** Named founding roles plus source-stated first functional hires. */
   foundingOnly: boolean;
   onFoundingOnly: () => void;
-  /** which source chip is open, if any. A chip browses past the saved search,
-      so the saved pay floor stops applying and the status line says so. */
-  sourceCategory?: string | null;
 }
 
 interface FilterChip {
@@ -239,7 +236,6 @@ export function WorkToolbar({
   onPostedDays,
   foundingOnly,
   onFoundingOnly,
-  sourceCategory = null,
 }: WorkToolbarProps) {
   const { runId: searchRunId } = useSearchContext();
   const { run, ready, running } = useRunWorkSearch();

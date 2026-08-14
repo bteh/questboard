@@ -947,7 +947,6 @@ function BoardPage() {
               onPostedDays={setPostedDays}
               foundingOnly={activeKeys.has('founding')}
               onFoundingOnly={() => toggle('founding')}
-              sourceCategory={sourceCategory}
             />
             <SourceCategoryChips
               counts={workMeta?.source_categories}
