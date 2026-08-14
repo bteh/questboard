@@ -354,8 +354,12 @@ def test_my_roles_view_filters_can_only_narrow_saved_eligibility(work_db) -> Non
     assert "Paying Co" not in {item.company for item in other_city.items}
 
 
-def test_source_shelf_browses_inventory_beyond_saved_role_constraints(work_db) -> None:
-    """Source chips remain discovery shelves, while their own filters bite."""
+def test_source_chips_narrow_the_saved_lane_never_widen_it(work_db) -> None:
+    """2026-08-14 board: the Startups chip showed founding sales, design, and
+    intern roles to a data engineering search, with a banner admitting "your
+    $190K floor is off while browsing". Chips are filters over the jobs the
+    saved search pulled; a row the lane hides (wrong role, below the floor)
+    must stay hidden on every shelf."""
     from app.models.workspace import WorkspacePreferences
     from job_finder.models.database import ApplicationRecord
 
@@ -365,51 +369,88 @@ def test_source_shelf_browses_inventory_beyond_saved_role_constraints(work_db) -
     ).one()
     prefs.min_base = 190000
     prefs.compensation_currency = "USD"
-    work_db.add(
-        ApplicationRecord(
-            job_title="Data Engineering Manager",
-            company="Shelf Discovery Co",
-            job_url="https://filters.example/jobs/shelf",
-            source="Greenhouse",
-            vertical="career",
-            location="Remote, United States",
-            remote_scope="us",
-            is_remote=True,
-            salary_min=120000,
-            salary_max=120000,
-            salary_currency="USD",
-            salary_period="annual",
-            date_posted=now.isoformat(),
-            date_confidence="exact",
-            date_found=now,
-        )
+    work_db.add_all(
+        [
+            # In-lane title, but stated pay is under the saved floor.
+            ApplicationRecord(
+                job_title="Data Engineering Manager",
+                company="Below Floor Co",
+                job_url="https://filters.example/jobs/below-floor",
+                source="Greenhouse",
+                vertical="career",
+                location="Remote, United States",
+                remote_scope="us",
+                is_remote=True,
+                salary_min=120000,
+                salary_max=120000,
+                salary_currency="USD",
+                salary_period="annual",
+                date_posted=now.isoformat(),
+                date_confidence="exact",
+                date_found=now,
+            ),
+            # Startup provenance, but nowhere near the saved roles (the real
+            # 2026-08-14 case was "Founding Account Executive").
+            ApplicationRecord(
+                job_title="Founding Account Executive",
+                company="Wrong Role Startup Co",
+                job_url="https://workatastartup.com/jobs/ae",
+                source="workatastartup",
+                vertical="career",
+                location="Remote, United States",
+                remote_scope="us",
+                is_remote=True,
+                date_posted=now.isoformat(),
+                date_confidence="exact",
+                date_found=now,
+            ),
+            # Startup provenance AND an in-lane title: the shelf's one job.
+            ApplicationRecord(
+                job_title="Data Engineering Manager",
+                company="Right Role Startup Co",
+                job_url="https://workatastartup.com/jobs/dem",
+                source="workatastartup",
+                vertical="career",
+                location="Remote, United States",
+                remote_scope="us",
+                is_remote=True,
+                date_posted=now.isoformat(),
+                date_confidence="exact",
+                date_found=now,
+            ),
+        ]
     )
     work_db.commit()
 
-    assert "Shelf Discovery Co" not in {
-        item.company for item in _list_profile_work(work_db).items
-    }
-    shelf = _list_profile_work(work_db, source_category="ats")
-    assert "Shelf Discovery Co" in {item.company for item in shelf.items}
-    filtered_shelf = _list_profile_work(
-        work_db,
-        source_category="ats",
-        salary_min=190000,
-        salary_currency="USD",
+    lane = _list_profile_work(work_db)
+    assert "Below Floor Co" not in {item.company for item in lane.items}
+    assert "Wrong Role Startup Co" not in {item.company for item in lane.items}
+
+    shelf = _list_profile_work(work_db, source_category="startup")
+    shelf_companies = {item.company for item in shelf.items}
+    assert "Right Role Startup Co" in shelf_companies
+    assert "Wrong Role Startup Co" not in shelf_companies, (
+        "a chip must filter the lane, not browse past the saved roles"
     )
-    assert "Shelf Discovery Co" not in {
-        item.company for item in filtered_shelf.items
-    }
+    assert "Below Floor Co" not in shelf_companies, (
+        "the saved pay floor stays on while browsing a shelf"
+    )
+    # The chip promises exactly what clicking it shows.
+    assert shelf.source_categories.get("startup", 0) == shelf.total == len(shelf.items)
 
 
 def test_crypto_shelf_uses_industry_identity_across_sources(work_db) -> None:
+    """Crypto identity comes from industry tags or crypto-native sources, not
+    the scraper the row arrived through. Titles here stay in-lane: shelves
+    filter the saved lane, so identity is only visible on rows the lane keeps.
+    """
     from job_finder.models.database import ApplicationRecord
 
     now = datetime.now(timezone.utc)
     work_db.add_all(
         [
             ApplicationRecord(
-                job_title="Staff Platform Engineer",
+                job_title="Data Engineering Manager",
                 company="Helius",
                 job_url="https://jobs.ashbyhq.com/helius/platform",
                 source="Ashby",
@@ -424,7 +465,7 @@ def test_crypto_shelf_uses_industry_identity_across_sources(work_db) -> None:
             # Legacy crypto-source row: the source fallback keeps it visible
             # until startup taxonomy backfill runs.
             ApplicationRecord(
-                job_title="Senior Data Engineer",
+                job_title="Senior Data Engineering Manager",
                 company="Portfolio Crypto Co",
                 job_url="https://portfolio.example/crypto-data",
                 source="Getro",
@@ -472,7 +513,7 @@ def test_startup_shelf_uses_strict_company_or_founding_identity_across_sources(
                 date_found=now,
             ),
             ApplicationRecord(
-                job_title="Founding Data Engineer",
+                job_title="Founding Data Engineering Manager",
                 company="Founding Seat Co",
                 job_url="https://builtin.example/founding-data",
                 source="BuiltIn",
@@ -509,7 +550,7 @@ def test_startup_shelf_uses_strict_company_or_founding_identity_across_sources(
                 date_found=now,
             ),
             ApplicationRecord(
-                job_title="Founding Data Engineer",
+                job_title="Founding Data Engineering Manager",
                 company="Expired Founding Co",
                 job_url="https://builtin.example/expired-founding",
                 source="BuiltIn",

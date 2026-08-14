@@ -218,9 +218,9 @@ describe('filterStatusText scope note', () => {
         laneTotal: 632,
         filtered: false,
         checkedAgo: 'sources checked minutes ago',
-        scopeNote: 'your $190K floor is off while browsing',
+        scopeNote: '$190K+ base from your search',
       }),
-    ).toBe('632 jobs · sources checked minutes ago · your $190K floor is off while browsing');
+    ).toBe('632 jobs · sources checked minutes ago · $190K+ base from your search');
   });
 
   it('keeps the posted confession last when both notes are set', () => {

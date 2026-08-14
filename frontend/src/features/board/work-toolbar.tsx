@@ -459,7 +459,6 @@ export function WorkToolbar({
             baseline: laneTotal,
           }),
           scopeNote: payScopeNote({
-            browsingCategory: Boolean(sourceCategory),
             savedFloor: prefs?.compensation?.min_base,
             typedFloor: payFloor,
           }),

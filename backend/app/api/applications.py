@@ -461,108 +461,36 @@ def list_profile_work(
             retrieval_note="Add target roles to your local profile before browsing Work.",
         )
 
-    # Category counts across the whole career inventory the board's active
-    # filters keep (not just the role-matched set), through the SAME shared
-    # predicates as the results: place, pay, search, and the dead-link rule
-    # all apply here, so a chip never promises rows the view below hides.
-    cat_map = _source_category_map()
-    category_counts: dict[str, int] = {}
-    badge_query = (
-        db.query(ApplicationRecord.id)
-        .filter(ApplicationRecord.vertical.in_(("career", "work")))
-        .filter(application_service.publishable_source_condition(ApplicationRecord))
-        # confirmed-dead and expired tombstones stay out, like My roles
-        .filter(ApplicationRecord.url_status.notin_(("dead", "expired")))
+    # ONE eligible pool: the saved lane (roles, place, pay floor, freshness,
+    # staffing). Every chip and toolbar value below only narrows it. Source
+    # chips used to switch into an unfiltered browse of the whole inventory
+    # with the saved floor and roles silently off; the 2026-08-14 board showed
+    # a Startups shelf full of founding sales and design roles to a data
+    # engineering search, which reads as noise, not discovery.
+    payload = local_agent_service.search_work(
+        db,
+        # The human board browses and paginates the full in-lane set. The
+        # connected-agent tool keeps its own compact 50-row sweep. Build
+        # the SAVED lane first; toolbar filters intersect it below rather
+        # than replacing saved pay/place/freshness with weaker values.
+        browse_all=True,
+        use_saved_preferences=True,
+        workspace_id=workspace_id,
     )
-    for condition in application_service.board_filter_conditions(
-        ApplicationRecord,
-        search=search,
-        location=location or None,
-        location_strict=bool(location and location_strict),
-        salary_min=salary_min,
-        salary_max=salary_max,
-        salary_currency=salary_currency,
-        is_remote=is_remote,
-        founding_only=founding_only,
-        exclude_staffing_agencies=exclude_staffing_agencies,
-        posted_within_days=posted_within_days,
-        found_within_days=found_within_days,
-        timezone_name=timezone_name,
-    ):
-        badge_query = badge_query.filter(condition)
-    # Count with the exact predicate clicking the chip will use. This matters
-    # for identity shelves (Startup and Crypto), whose qualifying rows can be
-    # discovered through many different source categories.
-    for category in sorted({value for value in cat_map.values() if value}):
-        count = badge_query.filter(
-            application_service.source_category_condition(
-                ApplicationRecord,
-                category,
-            )
-        ).count()
-        if count:
-            category_counts[category] = count
+    candidate_ids = [row["opportunity_id"] for row in payload["results"]]
+    records_by_id = {
+        record.id: record
+        for record in db.query(ApplicationRecord)
+        .filter(ApplicationRecord.id.in_(candidate_ids))
+        .all()
+    } if candidate_ids else {}
+    ordered = [records_by_id[item_id] for item_id in candidate_ids if item_id in records_by_id]
 
-    if source_category:
-        # Browse everything available in this source kind, beyond the user's
-        # configured roles. Honors the board's place / pay / remote filters,
-        # and hides confirmed-dead links exactly like My roles does.
-        # workspace_id stays None: local career rows live in the unscoped pool.
-        #
-        # Ask for exactly as many rows as the chip just promised. A fixed cap
-        # here (it was 400) silently truncated any category above it: the real
-        # board showed "Remote 632" and returned 400, hiding 232 rows with no
-        # sign in the UI. Deriving the size from the count cannot drift.
-        records, _ = application_service.get_applications(
-            db,
-            source_category=source_category,
-            location=location or None,
-            location_strict=bool(location and location_strict),
-            salary_min=salary_min,
-            salary_max=salary_max,
-            salary_currency=salary_currency,
-            is_remote=is_remote,
-            founding_only=founding_only,
-            exclude_staffing_agencies=exclude_staffing_agencies,
-            posted_within_days=posted_within_days,
-            found_within_days=found_within_days,
-            timezone_name=timezone_name,
-            exclude_dead=True,
-            sort_by="date_found",
-            sort_dir="desc",
-            page=1,
-            page_size=max(category_counts.get(source_category, 0), 1),
-            verticals=["career", "work"],
-        )
-        ordered = list(records)
-        payload = {"candidate_queries": [], "filters_applied": {}, "ranking_owner": "connected_agent"}
-    else:
-        payload = local_agent_service.search_work(
-            db,
-            # The human board browses and paginates the full in-lane set. The
-            # connected-agent tool keeps its own compact 50-row sweep. Build
-            # the SAVED lane first; toolbar filters intersect it below rather
-            # than replacing saved pay/place/freshness with weaker values.
-            browse_all=True,
-            use_saved_preferences=True,
-            workspace_id=workspace_id,
-        )
-        candidate_ids = [row["opportunity_id"] for row in payload["results"]]
-        records_by_id = {
-            record.id: record
-            for record in db.query(ApplicationRecord)
-            .filter(ApplicationRecord.id.in_(candidate_ids))
-            .all()
-        } if candidate_ids else {}
-        ordered = [records_by_id[item_id] for item_id in candidate_ids if item_id in records_by_id]
-
-    # My Roles starts from the saved eligible lane above. Every temporary
-    # toolbar value is an additional predicate on those ids, never a replacement
-    # for the saved search. This prevents a lower pay floor, longer date window,
-    # or different city from silently broadening what pull/ranking considered.
-    # Source shelves intentionally browse beyond My Roles and were already
-    # filtered in their get_applications call.
-    if not source_category and ordered:
+    # Every temporary toolbar value is an additional predicate on the lane's
+    # ids, never a replacement for the saved search. This prevents a lower pay
+    # floor, longer date window, or different city from silently broadening
+    # what pull/ranking considered, on shelves exactly as on My roles.
+    if ordered:
         ordered_ids = [record.id for record in ordered]
         view_query = db.query(ApplicationRecord.id).filter(
             ApplicationRecord.id.in_(ordered_ids)
@@ -585,6 +513,44 @@ def list_profile_work(
             view_query = view_query.filter(condition)
         visible_ids = {item_id for (item_id,) in view_query.all()}
         ordered = [record for record in ordered if record.id in visible_ids]
+
+    # Chip counts over the same narrowed lane the rows come from, with the
+    # exact predicate clicking the chip will use (identity shelves like
+    # Startup and Crypto qualify rows from many source categories), so a chip
+    # never promises rows the view below hides.
+    cat_map = _source_category_map()
+    category_counts: dict[str, int] = {}
+    if ordered:
+        visible_lane_ids = [record.id for record in ordered]
+        for category in sorted({value for value in cat_map.values() if value}):
+            count = (
+                db.query(ApplicationRecord.id)
+                .filter(ApplicationRecord.id.in_(visible_lane_ids))
+                .filter(
+                    application_service.source_category_condition(
+                        ApplicationRecord,
+                        category,
+                    )
+                )
+                .count()
+            )
+            if count:
+                category_counts[category] = count
+
+    if source_category and ordered:
+        shelf_ids = {
+            item_id
+            for (item_id,) in db.query(ApplicationRecord.id)
+            .filter(ApplicationRecord.id.in_([record.id for record in ordered]))
+            .filter(
+                application_service.source_category_condition(
+                    ApplicationRecord,
+                    source_category,
+                )
+            )
+            .all()
+        }
+        ordered = [record for record in ordered if record.id in shelf_ids]
 
     # Coherent global order BEFORE pagination: current ranked picks, reviewed
     # non-skips without an integer rank, unreviewed/stale rows, then skips.
