@@ -152,7 +152,14 @@ export function PosterWall({
           <div className="qb-wall qb-wall-ranked">{wall.unranked.map(renderPoster)}</div>
         )}
         {wall.skips.length > 0 && (
-          <details className="qb-skip-fold">
+          /* The fold keeps skips out of the way of real picks. With nothing
+             above it (a narrowed view whose every row was skipped), a closed
+             fold hides the entire wall behind one line and the filter reads
+             as broken, so it arrives open. */
+          <details
+            className="qb-skip-fold"
+            open={wall.groups.length === 0 && wall.unranked.length === 0}
+          >
             <summary>Skipped by your assistant ({wall.skips.length})</summary>
             <div className="qb-skip-posters">{wall.skips.map(renderPoster)}</div>
           </details>

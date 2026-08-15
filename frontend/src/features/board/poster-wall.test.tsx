@@ -130,6 +130,41 @@ describe('PosterWall fit grouping', () => {
     expect(fold!.textContent).toContain('Job 3');
   });
 
+  it('opens the skip fold when skips are the only content', () => {
+    /* 2026-08-14: the Startups chip held exactly 2 jobs, both previously
+       skipped. The collapsed fold left the wall visually empty and the
+       filter read as broken. With nothing above it, the fold arrives open;
+       the reader can still collapse it. */
+    render(
+      <PosterWall
+        items={[withFit(1, 'skip', null), withFit(2, 'skip', null)]}
+        labels={{}}
+        fitGrouped
+        onOpenSheet={() => {}}
+        onExplain={() => {}}
+      />,
+    );
+    const summary = screen.getByText('Skipped by your assistant (2)');
+    const fold = summary.closest('details');
+    expect(fold!.open).toBe(true);
+    expect(fold!.textContent).toContain('Job 1');
+    expect(fold!.textContent).toContain('Job 2');
+  });
+
+  it('keeps the fold collapsed while ranked rows are on the wall', () => {
+    render(
+      <PosterWall
+        items={[withFit(1, 'strong', 1), withFit(2, 'skip', null)]}
+        labels={{}}
+        fitGrouped
+        onOpenSheet={() => {}}
+        onExplain={() => {}}
+      />,
+    );
+    const summary = screen.getByText('Skipped by your assistant (1)');
+    expect(summary.closest('details')!.open).toBe(false);
+  });
+
   it('keeps the plain wall exactly as today when fit grouping is off', () => {
     render(
       <PosterWall
