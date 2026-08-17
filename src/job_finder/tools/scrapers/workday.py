@@ -23,6 +23,16 @@ from pathlib import Path
 import requests
 
 from job_finder.tools.scrapers._registry import register_scraper
+from job_finder.tools.scrapers.workday_builtin_employers import _BUILTIN_EMPLOYERS
+from job_finder.tools.scrapers._utils import (
+    PROTECTED_ROW_KEY,
+    WATCHLIST_TIMEOUT,
+    _clean_company_name,
+    _match_roles,
+    _norm_company_key,
+    cap_with_protected,
+    rank_by_relevance,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -75,164 +85,6 @@ def _load_employers() -> dict[str, dict]:
     return _EMPLOYERS
 
 
-# Built-in fallback if YAML is missing — US tech companies
-_BUILTIN_EMPLOYERS: dict[str, dict] = {
-    # Big Tech / FAANG+
-    "nvidia": {
-        "name": "NVIDIA",
-        "tenant": "nvidia",
-        "site_id": "NVIDIAExternalCareerSite",
-        "base_url": "https://nvidia.wd5.myworkdayjobs.com",
-    },
-    "salesforce": {
-        "name": "Salesforce",
-        "tenant": "salesforce",
-        "site_id": "External_Career_Site",
-        "base_url": "https://salesforce.wd12.myworkdayjobs.com",
-    },
-    "netflix": {
-        "name": "Netflix",
-        "tenant": "netflix",
-        "site_id": "Netflix",
-        "base_url": "https://netflix.wd1.myworkdayjobs.com",
-    },
-    "adobe": {
-        "name": "Adobe",
-        "tenant": "adobe",
-        "site_id": "external_experienced",
-        "base_url": "https://adobe.wd5.myworkdayjobs.com",
-    },
-    "cisco": {
-        "name": "Cisco",
-        "tenant": "cisco",
-        "site_id": "Cisco_Careers",
-        "base_url": "https://cisco.wd5.myworkdayjobs.com",
-    },
-    "paypal": {
-        "name": "PayPal",
-        "tenant": "paypal",
-        "site_id": "jobs",
-        "base_url": "https://paypal.wd1.myworkdayjobs.com",
-    },
-    "intel": {
-        "name": "Intel",
-        "tenant": "intel",
-        "site_id": "External",
-        "base_url": "https://intel.wd1.myworkdayjobs.com",
-    },
-    "workday": {
-        "name": "Workday",
-        "tenant": "workday",
-        "site_id": "Workday",
-        "base_url": "https://workday.wd5.myworkdayjobs.com",
-    },
-    "mastercard": {
-        "name": "Mastercard",
-        "tenant": "mastercard",
-        "site_id": "CorporateCareers",
-        "base_url": "https://mastercard.wd1.myworkdayjobs.com",
-    },
-    # Tech / Enterprise
-    "servicenow": {
-        "name": "ServiceNow",
-        "tenant": "servicenow",
-        "site_id": "Careers",
-        "base_url": "https://servicenow.wd1.myworkdayjobs.com",
-    },
-    "vmware": {
-        "name": "VMware (Broadcom)",
-        "tenant": "broadcom",
-        "site_id": "Broadcom",
-        "base_url": "https://broadcom.wd1.myworkdayjobs.com",
-    },
-    "uber": {
-        "name": "Uber",
-        "tenant": "uber",
-        "site_id": "Uber_Careers",
-        "base_url": "https://uber.wd5.myworkdayjobs.com",
-    },
-    "snap": {
-        "name": "Snap",
-        "tenant": "snap",
-        "site_id": "Snap",
-        "base_url": "https://snap.wd5.myworkdayjobs.com",
-    },
-    "target": {
-        "name": "Target",
-        "tenant": "target",
-        "site_id": "TargetCareers",
-        "base_url": "https://target.wd5.myworkdayjobs.com",
-    },
-    "capitalone": {
-        "name": "Capital One",
-        "tenant": "capitalone",
-        "site_id": "Capital_One",
-        "base_url": "https://capitalone.wd12.myworkdayjobs.com",
-    },
-    "jpmorgan": {
-        "name": "JPMorgan Chase",
-        "tenant": "jpmorgan",
-        "site_id": "JPMorgan_Careers",
-        "base_url": "https://jpmc.wd5.myworkdayjobs.com",
-    },
-    "visa": {
-        "name": "Visa",
-        "tenant": "visa",
-        "site_id": "Visa_Careers",
-        "base_url": "https://visa.wd12.myworkdayjobs.com",
-    },
-    "square": {
-        "name": "Block (Square)",
-        "tenant": "block",
-        "site_id": "Block",
-        "base_url": "https://block.wd1.myworkdayjobs.com",
-    },
-    "motorola": {
-        "name": "Motorola Solutions",
-        "tenant": "motorolasolutions",
-        "site_id": "Careers",
-        "base_url": "https://motorolasolutions.wd5.myworkdayjobs.com",
-    },
-    # Ride-hailing / Delivery / Marketplace
-    "lyft": {
-        "name": "Lyft",
-        "tenant": "lyft",
-        "site_id": "Lyft",
-        "base_url": "https://lyft.wd5.myworkdayjobs.com",
-    },
-    "pinterest": {
-        "name": "Pinterest",
-        "tenant": "pinterestinc",
-        "site_id": "PinterestCareers",
-        "base_url": "https://pinterestinc.wd1.myworkdayjobs.com",
-    },
-    "instacart": {
-        "name": "Instacart",
-        "tenant": "instacart",
-        "site_id": "Instacart",
-        "base_url": "https://instacart.wd5.myworkdayjobs.com",
-    },
-    "doordash": {
-        "name": "DoorDash",
-        "tenant": "doordash",
-        "site_id": "DoorDash",
-        "base_url": "https://doordash.wd5.myworkdayjobs.com",
-    },
-    # Media / Entertainment
-    "spotify": {
-        "name": "Spotify",
-        "tenant": "spotify",
-        "site_id": "Spotify",
-        "base_url": "https://spotify.wd5.myworkdayjobs.com",
-    },
-    # Banking / Finance — slug needs verification
-    "goldmansachs": {
-        "name": "Goldman Sachs",
-        "tenant": "gsjobs",
-        "site_id": "GOLDMANSACHSJOBS",
-        "base_url": "https://gs.wd5.myworkdayjobs.com",
-    },
-}
 
 
 # ---------------------------------------------------------------------------
@@ -286,7 +138,13 @@ def _html_to_text(html: str) -> str:
 # Workday CXS API
 # ---------------------------------------------------------------------------
 
-def _api_search(employer: dict, query: str, limit: int = 20, offset: int = 0) -> dict | None:
+def _api_search(
+    employer: dict,
+    query: str,
+    limit: int = 20,
+    offset: int = 0,
+    timeout: int | float | None = None,
+) -> dict | None:
     """POST to the Workday CXS search endpoint. Returns parsed JSON or None."""
     url = f"{employer['base_url']}/wday/cxs/{employer['tenant']}/{employer['site_id']}/jobs"
     payload = {
@@ -305,7 +163,7 @@ def _api_search(employer: dict, query: str, limit: int = 20, offset: int = 0) ->
                 "Accept": "application/json",
                 "User-Agent": _UA,
             },
-            timeout=_TIMEOUT,
+            timeout=timeout if timeout is not None else _TIMEOUT,
         )
         resp.raise_for_status()
         return resp.json()
@@ -322,14 +180,18 @@ def _api_search(employer: dict, query: str, limit: int = 20, offset: int = 0) ->
         return None
 
 
-def _api_detail(employer: dict, external_path: str) -> dict | None:
+def _api_detail(
+    employer: dict,
+    external_path: str,
+    timeout: int | float | None = None,
+) -> dict | None:
     """GET full job detail from the Workday CXS endpoint."""
     url = f"{employer['base_url']}/wday/cxs/{employer['tenant']}/{employer['site_id']}{external_path}"
     try:
         resp = requests.get(
             url,
             headers={"Accept": "application/json", "User-Agent": _UA},
-            timeout=_TIMEOUT,
+            timeout=timeout if timeout is not None else _TIMEOUT,
         )
         resp.raise_for_status()
         return resp.json()
@@ -342,14 +204,25 @@ def _api_detail(employer: dict, external_path: str) -> dict | None:
 # Role matching
 # ---------------------------------------------------------------------------
 
-def _matches_roles(title: str, roles: list[str] | None) -> bool:
-    """Check if a job title is relevant to the target roles."""
+def _matches_roles(
+    title: str,
+    roles: list[str] | None,
+    match_mode: str = "all_significant",
+    include_founding: bool = True,
+) -> bool:
+    """Check if a job title is relevant to the target roles.
+
+    Shares `_match_roles` semantics with the other ATS scrapers, then keeps
+    the historical broad fallback so recall never drops below the old gate;
+    rank_by_relevance decides who survives the caps.
+    """
     if not roles:
         return True
+    if _match_roles(
+        title, roles, match_mode=match_mode, include_founding=include_founding,
+    ):
+        return True
     t = title.lower()
-    for role in roles:
-        if role.lower() in t:
-            return True
     # Broad fallback — universal seniority and role keywords (cross-industry)
     broad = [
         "senior", "staff", "principal", "lead", "junior", "associate",
@@ -373,6 +246,10 @@ def _search_employer(
     employer: dict,
     roles: list[str] | None,
     max_results: int,
+    *,
+    match_mode: str = "all_significant",
+    include_founding: bool = True,
+    watchlist: bool = False,
 ) -> list[dict]:
     """Search a single Workday employer and return Questboard job dicts."""
     # Build search queries from roles — pick diverse representative terms
@@ -391,15 +268,15 @@ def _search_employer(
                 break
     else:
         queries = ["software engineer"]
+    timeout = WATCHLIST_TIMEOUT if watchlist else None
     seen_paths: set[str] = set()
-    jobs: list[dict] = []
+    candidates: list[dict] = []
 
     for query in queries:
-        if len(jobs) >= max_results:
-            break
-
-        data = _api_search(employer, query, limit=min(max_results, 20))
+        data = _api_search(employer, query, limit=20, timeout=timeout)
         if not data:
+            if watchlist:
+                logger.warning("Workday/%s: watchlist board fetch failed", key)
             continue
 
         for posting in data.get("jobPostings", []):
@@ -409,46 +286,174 @@ def _search_employer(
             seen_paths.add(path)
 
             title = posting.get("title", "")
-            if not _matches_roles(title, roles):
+            if not _matches_roles(title, roles, match_mode, include_founding):
                 continue
 
-            location = posting.get("locationsText", "")
-            posted = posting.get("postedOn", "")
-
-            # Build the public-facing URL
-            job_url = f"{employer['base_url']}/{employer['site_id']}{path}"
-
-            # Fetch full detail for description
-            description = ""
-            detail = _api_detail(employer, path)
-            if detail:
-                info = detail.get("jobPostingInfo", {})
-                raw_desc = info.get("jobDescription", "")
-                description = _html_to_text(raw_desc)
-
-            is_remote = bool(
-                re.search(r"remote|anywhere|work from home", location, re.IGNORECASE)
-                or (detail and detail.get("jobPostingInfo", {}).get("remoteType"))
-            )
-
-            jobs.append({
+            candidates.append({
                 "title": title,
-                "company": employer["name"],
-                "location": location,
-                "description": description[:5000],
-                "url": job_url,
-                "source": "workday",
-                "is_remote": is_remote,
-                "date_posted": posted,
-                "salary_min": None,
-                "salary_max": None,
-                "company_size": "",
+                "location": posting.get("locationsText", ""),
+                "date_posted": posting.get("postedOn", ""),
+                "_path": path,
             })
 
-            if len(jobs) >= max_results:
-                break
+    # Rank BEFORE the per-employer cap: fetch-order truncation used to cut
+    # exact role matches a query happened to return late. Detail GETs run
+    # only for survivors. A watchlist employer skips the per-employer cap:
+    # the user named it (its rows also survive the final cap, flagged below).
+    ranked = rank_by_relevance(candidates, roles)
+    if not watchlist:
+        ranked = ranked[:max_results]
+
+    jobs: list[dict] = []
+    for cand in ranked:
+        path = cand.pop("_path")
+        location = cand["location"]
+
+        description = ""
+        detail = _api_detail(employer, path, timeout=timeout)
+        if detail:
+            info = detail.get("jobPostingInfo", {})
+            description = _html_to_text(info.get("jobDescription", ""))
+
+        is_remote = bool(
+            re.search(r"remote|anywhere|work from home", location, re.IGNORECASE)
+            or (detail and detail.get("jobPostingInfo", {}).get("remoteType"))
+        )
+
+        job = {
+            "title": cand["title"],
+            "company": employer["name"],
+            "location": location,
+            "description": description[:5000],
+            "url": f"{employer['base_url']}/{employer['site_id']}{path}",
+            "source": "workday",
+            "is_remote": is_remote,
+            "date_posted": cand["date_posted"],
+            "salary_min": None,
+            "salary_max": None,
+            "company_size": "",
+        }
+        if watchlist:
+            job[PROTECTED_ROW_KEY] = True
+        jobs.append(job)
 
     return jobs
+
+
+# ---------------------------------------------------------------------------
+# Watchlist token resolution
+# ---------------------------------------------------------------------------
+
+_WD_HOST_RE = re.compile(r"^([a-z0-9-]+)\.wd\d+\.myworkdayjobs\.com$", re.IGNORECASE)
+_WD_LOCALE_RE = re.compile(r"^[a-z]{2}-[A-Za-z]{2,4}$")
+
+
+def _employer_from_url(token: str) -> dict | None:
+    """Derive {name, tenant, site_id, base_url} from a myworkdayjobs URL."""
+    from urllib.parse import urlsplit
+
+    raw = token.strip()
+    if "://" not in raw:
+        raw = "https://" + raw
+    try:
+        parts = urlsplit(raw)
+    except ValueError:
+        return None
+    host = parts.netloc.lower().rsplit("@", 1)[-1].split(":")[0]
+    m = _WD_HOST_RE.match(host)
+    if not m:
+        return None
+    segments = [seg for seg in parts.path.split("/") if seg]
+    if len(segments) >= 4 and segments[0].lower() == "wday" and segments[1].lower() == "cxs":
+        site_id = segments[3]
+    else:
+        site_id = next(
+            (seg for seg in segments if not _WD_LOCALE_RE.match(seg)), "",
+        )
+    if not site_id:
+        return None
+    tenant = m.group(1).lower()
+    return {
+        "name": _clean_company_name(tenant),
+        "tenant": tenant,
+        "site_id": site_id,
+        "base_url": f"https://{host}",
+    }
+
+
+def _resolve_watchlist(
+    tokens: list[str],
+    employers: dict[str, dict],
+) -> tuple[dict[str, dict], set[str]]:
+    """Resolve watchlist tokens into queryable employers.
+
+    Three token shapes, in resolution order: a full myworkdayjobs careers URL
+    (tenant, wd host, and site come straight from it), the paste path's
+    ``tenant/site_id`` token (the wd host comes from the YAML entry for that
+    tenant), and a bare company name (fuzzy match on YAML key/tenant/name).
+    Anything else is refused with a warning: ``{tenant}.myworkdayjobs.com``
+    without the wd number does not resolve in DNS, so a bare name for an
+    unregistered tenant cannot reach the CXS API and guessing hosts would
+    query the wrong company.
+    """
+    resolved = dict(employers)
+    watchlist_keys: set[str] = set()
+    by_tenant = {
+        str(emp.get("tenant", "")).lower(): key
+        for key, emp in employers.items()
+        if emp.get("tenant")
+    }
+    by_norm: dict[str, str] = {}
+    for emp_key, emp in employers.items():
+        for alias in (emp_key, emp.get("tenant", ""), emp.get("name", "")):
+            norm = _norm_company_key(str(alias))
+            if norm:
+                by_norm.setdefault(norm, emp_key)
+
+    unresolved_msg = (
+        "Workday watchlist token %r has no employer match; paste the full "
+        "myworkdayjobs careers URL or add it to workday_employers.yaml"
+    )
+    for raw_token in tokens:
+        token = str(raw_token or "").strip()
+        if not token:
+            continue
+        cfg = (
+            _employer_from_url(token)
+            if "myworkdayjobs.com" in token.lower()
+            else None
+        )
+        if cfg:
+            known = by_tenant.get(cfg["tenant"])
+            if known and resolved[known].get("site_id") == cfg["site_id"]:
+                watchlist_keys.add(known)
+            else:
+                new_key = (
+                    cfg["tenant"] if cfg["tenant"] not in resolved
+                    else f"{cfg['tenant']}/{cfg['site_id']}"
+                )
+                resolved[new_key] = cfg
+                watchlist_keys.add(new_key)
+            continue
+        if "/" in token:
+            tenant, _, site_id = token.partition("/")
+            known = by_tenant.get(tenant.strip().lower())
+            if known:
+                if site_id and site_id != resolved[known].get("site_id"):
+                    # Same tenant means same wd host; honor the pasted site.
+                    resolved[token] = dict(resolved[known], site_id=site_id)
+                    watchlist_keys.add(token)
+                else:
+                    watchlist_keys.add(known)
+            else:
+                logger.warning(unresolved_msg, token)
+            continue
+        known = by_norm.get(_norm_company_key(token))
+        if known:
+            watchlist_keys.add(known)
+        else:
+            logger.warning(unresolved_msg, token)
+    return resolved, watchlist_keys
 
 
 # ---------------------------------------------------------------------------
@@ -466,17 +471,25 @@ def _search_employer(
 def search_workday(
     roles: list[str] | None = None,
     max_results: int = 50,
+    watchlist_companies: list[str] | None = None,
+    match_mode: str = "all_significant",
+    include_founding: bool = True,
     **kwargs,
 ) -> list[dict]:
     """Search all configured Workday employers in parallel.
 
     Each employer's career portal is queried via the public Workday CXS
     JSON API. Results include full job descriptions fetched from detail
-    endpoints. No browser or authentication required.
+    endpoints. No browser or authentication required. Watchlist tokens
+    resolve via ``_resolve_watchlist``; those employers get the watchlist
+    timeout and cap-protected rows, consistent with the other ATS scrapers.
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     employers = _load_employers()
+    watchlist_keys: set[str] = set()
+    if watchlist_companies:
+        employers, watchlist_keys = _resolve_watchlist(watchlist_companies, employers)
     if not employers:
         logger.warning("No Workday employers configured")
         return []
@@ -487,7 +500,12 @@ def search_workday(
     def _run(item: tuple[str, dict]) -> list[dict]:
         key, emp = item
         try:
-            return _search_employer(key, emp, roles, per_employer)
+            return _search_employer(
+                key, emp, roles, per_employer,
+                match_mode=match_mode,
+                include_founding=include_founding,
+                watchlist=key in watchlist_keys,
+            )
         except Exception as e:
             logger.warning("Workday scraper failed for %s: %s", emp.get("name", key), e)
             return []
@@ -506,4 +524,5 @@ def search_workday(
                 logger.warning("Workday/%s failed: %s", employer_key, e)
 
     logger.info("Workday total: %d jobs from %d employers", len(all_jobs), len(employers))
-    return all_jobs[:max_results]
+    # Rank before the source cap; a user-named employer's rows are exempt.
+    return cap_with_protected(all_jobs, roles, max_results)

@@ -184,3 +184,23 @@ employers:
     tenant: "modernatx"
     site_id: "M_tx"
     base_url: "https://modernatx.wd1.myworkdayjobs.com"
+
+  # ── Consumer / Data ────────────────────────────────────────────────────
+
+  prodege:
+    name: "Prodege"
+    tenant: "prodege"
+    site_id: "Prodege_Careers"
+    base_url: "https://prodege.wd108.myworkdayjobs.com"
+
+  workiva:
+    name: "Workiva"
+    tenant: "workiva"
+    site_id: "careers"
+    base_url: "https://workiva.wd503.myworkdayjobs.com"
+
+  collectors:
+    name: "Collectors"
+    tenant: "collectorsuniverse"
+    site_id: "collectors"
+    base_url: "https://collectorsuniverse.wd1.myworkdayjobs.com"
