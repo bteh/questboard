@@ -1409,6 +1409,7 @@ def _search_work_uncached(
             [filter_job],
             career_baseline,
             filters=filter_settings,
+            target_roles=terms,
         ):
             level_mismatch_excluded += 1
             continue

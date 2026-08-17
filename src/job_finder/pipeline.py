@@ -50,6 +50,7 @@ from job_finder.company_classifier import (
 from job_finder.scoring import score_job_basic, get_company_baselines, normalize_company_key
 from job_finder.scoring.dimensions import (
     _extract_level,
+    _match_level,
     resolve_current_level,
 )  # re-export for tests/consumers
 from job_finder.scoring.helpers import annualize_amount
@@ -941,7 +942,11 @@ def watchlist_tokens_by_ats(raw_watchlist: list, resolve) -> dict[str, list[str]
     unresolved: list[str] = []
     for entry in raw_watchlist:
         if isinstance(entry, dict) and entry.get("slug") and entry.get("ats", "unknown") != "unknown":
-            _add(entry["ats"], entry["slug"])
+            token = entry["slug"]
+            if entry["ats"] == "workday" and entry.get("careers_url"):
+                # workday tokens need the wd host; only the careers_url keeps it
+                token = entry["careers_url"]
+            _add(entry["ats"], token)
         else:
             name = entry.get("name", "") if isinstance(entry, dict) else str(entry)
             if name:
@@ -1090,9 +1095,17 @@ def _filter_jobs_by_level(
     career_cfg: dict | None,
     *,
     filters: dict | None = None,
+    target_roles: list[str] | None = None,
     progress: Callable[[str], None] | None = None,
 ) -> list[dict]:
-    """Filter jobs that are too far above or below the configured level."""
+    """Filter jobs that are too far above or below the configured level.
+
+    A target role that names a level ("Staff Data Engineer", "Director, Data
+    Platform") is a stronger statement of intent than the band derived from
+    current_title: a matching title at that role's level always survives.
+    Level-agnostic roles ("Data Scientist") don't widen the band; the level
+    filter is exactly how a broad role gets refined.
+    """
     career_cfg = career_cfg or {}
     current_title = str(career_cfg.get("current_title", "") or "").strip()
     current_level_label = str(career_cfg.get("current_level", "") or "").strip()
@@ -1103,17 +1116,45 @@ def _filter_jobs_by_level(
     tol_senior = float(resolved.get("level_tolerance_senior", 1.5))
     tol_junior = float(resolved.get("level_tolerance_junior", 2.0))
 
+    level_pinned_roles: list[tuple[str, float]] = []
+    for role in target_roles or []:
+        role = str(role).strip()
+        role_level = _match_level(role) if role else None
+        if role_level is not None:
+            level_pinned_roles.append((role, role_level))
+
+    def _explicitly_wanted(job: dict) -> bool:
+        if not level_pinned_roles:
+            return False
+        from job_finder.tools.scrapers._utils import job_passes_role_filter
+
+        job_level = _extract_level(job.get("title", ""))
+        for role, role_level in level_pinned_roles:
+            if abs(job_level - role_level) > 0.5:
+                continue
+            if job_passes_role_filter(
+                job, [role],
+                match_mode=str(resolved.get("role_match_mode", "all_significant")),
+                include_founding=False,
+                strictness=str(resolved.get("strictness", _DEFAULT_STRICTNESS)),
+                allow_crypto_rescue=False,
+            ):
+                return True
+        return False
+
     current_level = resolve_current_level(career_cfg)
     pre_count = len(jobs)
     if current_level >= 3:
         filtered = [
             job for job in jobs
             if _extract_level(job.get("title", "")) >= current_level - tol_senior
+            or _explicitly_wanted(job)
         ]
     else:
         filtered = [
             job for job in jobs
             if _extract_level(job.get("title", "")) <= current_level + tol_junior
+            or _explicitly_wanted(job)
         ]
 
     dropped = pre_count - len(filtered)
@@ -1918,6 +1959,7 @@ class JobFinderPipeline:
                     remote_only=remote_only,
                     preferred_countries=pref_countries,
                     profile=self.profile_name,
+                    workspace_id=(self.config.get("workspace") or {}).get("workspace_id"),
                 )
                 if purged and progress:
                     progress(f"Purged {purged} existing jobs outside preferred locations")
@@ -2021,6 +2063,7 @@ class JobFinderPipeline:
             deduped,
             self.config.get("career_baseline", {}),
             filters=filter_settings,
+            target_roles=list(self.config.get("target_roles", []) or []),
             progress=progress,
         )
         career_cfg = self.config.get("career_baseline") or {}

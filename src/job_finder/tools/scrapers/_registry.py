@@ -177,7 +177,10 @@ def run_scrapers(
     if not active:
         return []
 
-    _ats_scrapers = {"greenhouse", "lever", "ashby", "workable"}
+    # Workday has no seed .txt or DDG discovery (its universe is the employer
+    # YAML); _ats_discovery guards unknown hosts, so it only receives the
+    # watchlist_companies kwarg here.
+    _ats_scrapers = {"greenhouse", "lever", "ashby", "workable", "workday"}
     # Defensive copy — we may extend this dict with discovered slugs below.
     ats_watchlist: dict[str, list[str]] = {
         k: list(v) for k, v in (watchlist_by_ats or {}).items()

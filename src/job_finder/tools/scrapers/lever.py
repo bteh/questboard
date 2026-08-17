@@ -9,12 +9,14 @@ from job_finder.tools.scrapers._ats_discovery import DeadBoards
 from job_finder.tools.scrapers._registry import register_scraper
 from job_finder.tools.scrapers._utils import (
     ATS_FETCH_WORKERS,
+    PROTECTED_ROW_KEY,
+    WATCHLIST_TIMEOUT,
     _clean_company_name,
     _get_json,
     _load_seed_slugs,
     _match_roles,
     _match_roles_crypto,
-    rank_by_relevance,
+    cap_with_protected,
     _strip_html,
     date_confidence_for,
     is_crypto_company,
@@ -34,16 +36,20 @@ def _fetch_company_postings(
     match_mode: str = "all_significant",
     include_founding: bool = True,
     on_status=None,
+    watchlist: bool = False,
 ) -> list[dict]:
     """Fetch matching postings for a single Lever company."""
-    # Tight per-board timeout — see ashby.py for rationale.
+    # Tight per-board timeout, see ashby.py for rationale. Watchlist boards
+    # get longer: a user-named company must not vanish on a slow payload.
     data = _get_json(
         f"https://api.lever.co/v0/postings/{slug}",
         quiet_statuses={404},
-        timeout=5,
+        timeout=WATCHLIST_TIMEOUT if watchlist else 5,
         on_status=on_status,
     )
     if not data or not isinstance(data, list):
+        if watchlist:
+            logger.warning("Lever/%s: watchlist board fetch failed", slug)
         return []
 
     # Crypto/web3 companies use crypto-aware role matching (see ashby.py).
@@ -100,6 +106,9 @@ def _fetch_company_postings(
             "crypto": crypto,
         })
 
+    if watchlist:
+        for row in results:
+            row[PROTECTED_ROW_KEY] = True
     return results
 
 
@@ -121,6 +130,7 @@ def search_lever(
 ) -> list[dict]:
     """Fetch jobs directly from Lever postings API for known companies."""
     company_list = list(companies or _LEVER_COMPANIES)
+    watchlist = set(watchlist_companies or [])
     if watchlist_companies:
         company_list.extend(s for s in watchlist_companies if s not in company_list)
     if not company_list:
@@ -138,6 +148,7 @@ def search_lever(
                 _fetch_company_postings, slug, roles,
                 match_mode=match_mode, include_founding=include_founding,
                 on_status=dead.watch(slug),
+                watchlist=slug in watchlist,
             ): slug
             for slug in company_list
         }
@@ -150,7 +161,7 @@ def search_lever(
                 logger.warning("Lever/%s failed: %s", slug, e)
 
     dead.prune()
-    results = rank_by_relevance(results, roles)[:max_results]
+    results = cap_with_protected(results, roles, max_results)
     logger.info("Lever: found %d matching jobs across %d companies",
                 len(results), len(company_list))
     return results

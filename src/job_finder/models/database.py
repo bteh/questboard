@@ -1411,8 +1411,9 @@ def purge_non_matching_locations(
 
     Remote jobs are kept unless ``preferred_countries`` scopes them to a
     country (then explicitly-foreign remote is dropped, matching the live
-    filter). When ``profile`` is provided, only records for that profile are
-    considered. Returns the number of deleted records.
+    filter). Scoped like save_application: a ``workspace_id`` owns exactly
+    its rows; without one, only legacy NULL-workspace rows for ``profile``
+    are considered. Returns the number of deleted records.
     """
     if (
         not preferred_states and not preferred_cities and not preferred_locations
@@ -1431,10 +1432,15 @@ def purge_non_matching_locations(
         # Career rows only: this purge runs on every pipeline run, and a NYC
         # taping or study session must never be deleted by SF job preferences.
         query = scoped_applications(session)
-        if profile:
-            query = query.filter(ApplicationRecord.profile == profile)
+        # Workspaces share profile names ("workspace"), so a missing
+        # workspace_id must mean the legacy NULL-workspace rows, never
+        # every workspace with this profile.
         if workspace_id:
             query = query.filter(ApplicationRecord.workspace_id == workspace_id)
+        else:
+            query = query.filter(ApplicationRecord.workspace_id.is_(None))
+            if profile:
+                query = query.filter(ApplicationRecord.profile == profile)
         records = query.all()
         deleted = 0
         for rec in records:
@@ -1485,7 +1491,9 @@ def purge_non_matching_roles(
     delete a crypto/founding/place-bound record the live search just kept.
     Pass the resolved filter settings (match_mode/include_founding/strictness)
     from the caller; the defaults mirror the 'balanced' preset.
-    Returns the number of deleted records.
+    Scoped like save_application: a ``workspace_id`` owns exactly its rows;
+    without one, only legacy NULL-workspace rows for ``profile`` are
+    considered. Returns the number of deleted records.
     """
     if not target_roles:
         return 0
@@ -1496,10 +1504,12 @@ def purge_non_matching_roles(
     try:
         # Career rows only: quest titles never match job roles and must survive.
         query = scoped_applications(session)
-        if profile:
-            query = query.filter(ApplicationRecord.profile == profile)
         if workspace_id:
             query = query.filter(ApplicationRecord.workspace_id == workspace_id)
+        else:
+            query = query.filter(ApplicationRecord.workspace_id.is_(None))
+            if profile:
+                query = query.filter(ApplicationRecord.profile == profile)
         records = query.all()
         deleted = 0
         for rec in records:

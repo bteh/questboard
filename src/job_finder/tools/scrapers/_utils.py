@@ -34,6 +34,12 @@ logger = logging.getLogger(__name__)
 # speed. Raise this only with the same before/after row counts in hand.
 ATS_FETCH_WORKERS = 12
 
+# Per-board timeout for user-watchlist boards. The seeded bulk lists run at
+# 5s so one dead board can't stall the pool, but a board the user named must
+# not silently vanish on a slow or large payload (Alo Yoga's board is 24.9MB
+# with content and can blow a 5s budget).
+WATCHLIST_TIMEOUT = 30
+
 _SEED_DIR = Path(__file__).parent / "data"
 
 
@@ -1122,16 +1128,50 @@ def _relevance_score(title: str, roles: list[str] | None) -> int:
 
 
 def rank_by_relevance(jobs: list[dict], roles: list[str] | None) -> list[dict]:
-    """Stable-sort scraped jobs by title relevance to the target roles, best
-    first, so a downstream ``[:max_results]`` cap keeps the strongest matches
-    instead of arbitrary completion-order ones. A no-op without roles."""
+    """Sort scraped jobs by title relevance to the target roles, best first,
+    so a downstream ``[:max_results]`` cap keeps the strongest matches instead
+    of arbitrary completion-order ones. Within a tier, newer postings sort
+    first and undated rows last; the final tie-break is the row itself
+    (title, company, url), so two runs of the same scrape rank identically
+    no matter which fetch thread finished first. A no-op without roles."""
     if not roles or not jobs:
         return jobs
-    return sorted(
-        jobs,
-        key=lambda job: _relevance_score(str(job.get("title") or job.get("job_title") or ""), roles),
-        reverse=True,
-    )
+
+    def sort_key(job: dict) -> tuple:
+        title = str(job.get("title") or job.get("job_title") or "")
+        posted = _parse_posted_date(job.get("date_posted"))
+        return (
+            -_relevance_score(title, roles),
+            1 if posted is None else 0,
+            -posted.timestamp() if posted is not None else 0.0,
+            title.lower(),
+            str(job.get("company") or "").lower(),
+            str(job.get("url") or ""),
+        )
+
+    return sorted(jobs, key=sort_key)
+
+
+# Transient row flag set by ATS scrapers on rows fetched from a board the
+# user put on their watchlist. cap_with_protected strips it on the way out.
+PROTECTED_ROW_KEY = "_watchlist_protected"
+
+
+def cap_with_protected(
+    jobs: list[dict], roles: list[str] | None, max_results: int,
+) -> list[dict]:
+    """Rank then cap, but rows flagged with PROTECTED_ROW_KEY always survive.
+
+    The per-source cap exists to bound bulk seed-list noise. A company the
+    user explicitly named must never lose rows to it: Alo Yoga's 771-posting
+    board alone can eat a 500-row cap, and which rows died was thread timing.
+    """
+    ranked = rank_by_relevance(jobs, roles)
+    kept = ranked[:max_results]
+    kept.extend(j for j in ranked[max_results:] if j.get(PROTECTED_ROW_KEY))
+    for job in kept:
+        job.pop(PROTECTED_ROW_KEY, None)
+    return kept
 
 
 # High-precision crypto/web3 signals — matched as substrings. These rarely
