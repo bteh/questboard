@@ -20,12 +20,14 @@ from job_finder.tools.scrapers._ats_discovery import DeadBoards
 from job_finder.tools.scrapers._registry import register_scraper
 from job_finder.tools.scrapers._utils import (
     ATS_FETCH_WORKERS,
+    PROTECTED_ROW_KEY,
+    WATCHLIST_TIMEOUT,
     _clean_company_name,
     _get_json,
     _load_seed_slugs,
     _match_roles,
     _match_roles_crypto,
-    rank_by_relevance,
+    cap_with_protected,
     _strip_html,
     date_confidence_for,
     is_crypto_company,
@@ -62,18 +64,22 @@ def _fetch_company_jobs(
     match_mode: str = "all_significant",
     include_founding: bool = True,
     on_status=None,
+    watchlist: bool = False,
 ) -> list[dict]:
     """Fetch matching jobs for a single Workable account board."""
     # Tight per-board timeout — see ashby.py for rationale. A single slow
-    # board must not block the whole search.
+    # board must not block the whole search. Watchlist boards get longer:
+    # a user-named company must not vanish on a slow or large payload.
     data = _get_json(
         f"https://apply.workable.com/api/v1/widget/accounts/{slug}",
         params={"details": "true"},
         quiet_statuses={404},
-        timeout=6,
+        timeout=WATCHLIST_TIMEOUT if watchlist else 6,
         on_status=on_status,
     )
     if not isinstance(data, dict) or "jobs" not in data:
+        if watchlist:
+            logger.warning("Workable/%s: watchlist board fetch failed", slug)
         return []
 
     company = data.get("name") or _clean_company_name(slug)
@@ -121,6 +127,9 @@ def _fetch_company_jobs(
             "crypto": crypto,
         })
 
+    if watchlist:
+        for job in jobs:
+            job[PROTECTED_ROW_KEY] = True
     return jobs
 
 
@@ -142,6 +151,7 @@ def search_workable(
 ) -> list[dict]:
     """Fetch jobs directly from Workable widget API for known companies."""
     company_list = list(companies or _WORKABLE_COMPANIES)
+    watchlist = set(watchlist_companies or [])
     if watchlist_companies:
         company_list.extend(s for s in watchlist_companies if s not in company_list)
     if not company_list:
@@ -159,6 +169,7 @@ def search_workable(
                 _fetch_company_jobs, slug, roles,
                 match_mode=match_mode, include_founding=include_founding,
                 on_status=dead.watch(slug),
+                watchlist=slug in watchlist,
             ): slug
             for slug in company_list
         }
@@ -171,7 +182,7 @@ def search_workable(
                 logger.warning("Workable/%s failed: %s", slug, e)
 
     dead.prune()
-    results = rank_by_relevance(results, roles)[:max_results]
+    results = cap_with_protected(results, roles, max_results)
     logger.info("Workable: found %d matching jobs across %d companies",
                 len(results), len(company_list))
     return results
