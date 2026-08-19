@@ -620,7 +620,12 @@ def source_category_condition(model, source_category: str):
         )
         return or_(
             source_predicate,
-            company_type == "early startup",
+            # The classifier's startup tiers. "Growth Stage" needs a real
+            # funding_stage behind it: the classifier also stamps it as the
+            # default for unknown companies from Greenhouse/Lever/Ashby, and
+            # board membership alone must not make a startup.
+            company_type.in_(("early startup", "elite startup")),
+            and_(company_type == "growth stage", funding_stage != ""),
             early_funding,
             founding_role_condition(model),
         )
