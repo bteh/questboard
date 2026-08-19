@@ -39,7 +39,7 @@ _WORK_KIND = "work"
 # One cap for every list the assistant hands us: saved roles, proposals, and
 # the pull. 15 blocked all additions once the saved list filled; 18 leaves
 # room to propose while keeping the pull fan-out bounded.
-ROLES_CAP = 18
+ROLES_CAP = workspace_service.ROLES_CAP
 _EXCERPT_CHARS = 1200
 # A list row carries only enough body text to decide whether a posting is worth
 # opening; `get_opportunity` serves the long excerpt for finalists. A full page

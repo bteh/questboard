@@ -78,6 +78,10 @@ logger = logging.getLogger(__name__)
 # CAPTCHA-walls, so it can't slow a run down. Glassdoor stays off — it returns
 # HTTP 400 "location not parsed" for "City, ST" inputs.
 _DEFAULT_JOBSPY_BOARDS: list[str] = ["indeed"]
+# Single source of truth for the saved-roles cap. local_agent_service
+# advertises it on the MCP surface; the save below must trim to the same
+# number or a within-cap save silently loses its tail.
+ROLES_CAP = 18
 _LINKEDIN_JOBSPY_BOARD = "linkedin"
 _DESKTOP_SESSION_HEADER = "X-Questboard-Session"
 
@@ -513,7 +517,7 @@ def _seed_preferences_from_default() -> WorkspacePreferencesSchema:
     preferred_places = [_default_place(label) for label in _clean_string_list(preferred_locations, 10)]
     job_boards = [str(board).strip().lower() for board in cfg.get("job_boards", []) if str(board).strip()]
     return WorkspacePreferencesSchema(
-        roles=_clean_string_list(cfg.get("target_roles"), 15),
+        roles=_clean_string_list(cfg.get("target_roles"), ROLES_CAP),
         keywords=_clean_string_list(cfg.get("keyword_searches"), 20),
         companies=_clean_string_list(
             [entry.get("name", "") for entry in watchlist if isinstance(entry, dict)],
@@ -571,7 +575,7 @@ def _prefs_to_schema(prefs: WorkspacePreferences | None) -> WorkspacePreferences
         current_level = ""
 
     return WorkspacePreferencesSchema(
-        roles=_clean_string_list(roles, 15),
+        roles=_clean_string_list(roles, ROLES_CAP),
         keywords=_clean_string_list(keywords, 20),
         companies=cleaned_companies,
         company_targets=company_targets,
@@ -1120,7 +1124,7 @@ def save_workspace_preferences(
         record = WorkspacePreferences(workspace_id=workspace_id)
         db.add(record)
 
-    record.roles_json = json.dumps(_clean_string_list(preferences.roles, 15))
+    record.roles_json = json.dumps(_clean_string_list(preferences.roles, ROLES_CAP))
     record.keywords_json = json.dumps(_clean_string_list(preferences.keywords, 20))
     cleaned_companies = _clean_string_list(preferences.companies, 60)
     # The resolved-board cache is owned by the Companies endpoints, not this
@@ -1854,7 +1858,7 @@ def derive_search_terms_from_resume(
     if not keywords and record and record.extracted_text:
         keywords.extend(_extract_keywords_from_text(record.extracted_text))
 
-    return roles[:15], keywords[:20]
+    return roles[:ROLES_CAP], keywords[:20]
 
 
 def _extract_keywords_from_text(text: str) -> list[str]:
