@@ -7,6 +7,10 @@ export interface RefreshReceiptCopy {
   text: string;
   tone: RefreshReceiptTone;
   provesNoNewJobs: boolean;
+  /* Raw backend error text, present only when the sentence had to
+     summarize it. For a renderer's "details" affordance; never for the
+     main line. */
+  detail?: string;
 }
 
 export type RefreshReceiptLike = Pick<
@@ -32,6 +36,34 @@ export function completeSourceCoverage(coverage: SourceCoverage | null | undefin
       coverage.failed === 0 &&
       coverage.ok + coverage.zero === coverage.total,
   );
+}
+
+/* receipt.error is either one of the backend's own fixed interruption
+   sentences (workspace_service.py) or str(e) of an arbitrary exception
+   from the pipeline. The fixed ones map to plain sentences; raw exception
+   text never reaches the receipt line, only the detail field. */
+const KNOWN_FAILURES: [RegExp, string][] = [
+  [/superseded by a newer/i, 'A newer refresh took over before this one finished.'],
+  [/interrupted and exhausted/i, 'The refresh was interrupted and gave up after several tries.'],
+  [/interrupted/i, 'The refresh was interrupted partway.'],
+];
+const RATE_LIMIT_SHAPE = /(\b429\b|rate.?limit|too many requests)/i;
+const NETWORK_SHAPE =
+  /(timed?[\s-]?out|timeout|connection|network|unreachable|refused|resolve|dns|ssl|certificate|proxy|offline|reach|max retries|econn|enotfound)/i;
+
+function plainRefreshFailure(raw: string | null | undefined): { sentence: string; detail?: string } | null {
+  const text = raw?.trim();
+  if (!text) return null;
+  for (const [shape, sentence] of KNOWN_FAILURES) {
+    if (shape.test(text)) return { sentence };
+  }
+  if (RATE_LIMIT_SHAPE.test(text)) {
+    return { sentence: 'A source rate-limited the refresh.', detail: text };
+  }
+  if (NETWORK_SHAPE.test(text)) {
+    return { sentence: 'A source could not be reached.', detail: text };
+  }
+  return { sentence: 'A source failed.', detail: text };
 }
 
 function jobsLabel(count: number): string {
@@ -70,10 +102,14 @@ export function refreshReceiptCopy(receipt: RefreshReceiptLike): RefreshReceiptC
     };
   }
   if (receipt.status === 'failed') {
+    const failure = plainRefreshFailure(receipt.error);
     return {
-      text: `Refresh did not finish${receipt.error ? `: ${receipt.error}` : ''}. This is not an all-clear.`,
+      text: failure
+        ? `Refresh did not finish. ${failure.sentence} This is not an all-clear.`
+        : 'Refresh did not finish. This is not an all-clear.',
       tone: 'bad',
       provesNoNewJobs: false,
+      ...(failure?.detail ? { detail: failure.detail } : {}),
     };
   }
 

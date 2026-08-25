@@ -90,7 +90,19 @@ export function AssistantTab() {
           </p>
 
           <div className="space-y-2">
-            {clientsQuery.isLoading ? (
+            {clientsQuery.isError ? (
+              <div className="space-y-2 rounded-xl border border-border-default bg-bg-subtle/40 p-3">
+                <p className="text-sm text-text-secondary">
+                  Questboard could not check this Mac for assistants.
+                  {clientsQuery.error instanceof Error && clientsQuery.error.message
+                    ? ` ${clientsQuery.error.message}`
+                    : ''}
+                </p>
+                <Button variant="outline" size="sm" onClick={() => void clientsQuery.refetch()}>
+                  Try again
+                </Button>
+              </div>
+            ) : clientsQuery.isLoading ? (
               <p className="text-sm text-text-muted">Checking for assistants…</p>
             ) : (
               clients.map((client) => (

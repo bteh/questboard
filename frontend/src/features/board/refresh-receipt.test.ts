@@ -87,6 +87,56 @@ describe('refresh receipt copy', () => {
   });
 });
 
+describe('failed-refresh copy stays in plain words', () => {
+  const failed = (error: string | null) =>
+    refreshReceiptCopy({
+      status: 'failed',
+      jobs_found: 0,
+      new_jobs: 0,
+      error,
+      source_coverage: null,
+    });
+
+  it('translates a raw network stack line instead of splicing it in', () => {
+    const raw = "HTTPSConnectionPool(host='api.remotive.com', port=443): Max retries exceeded with url: /api/remote-jobs";
+    const copy = failed(raw);
+    expect(copy.text).not.toContain('HTTPSConnectionPool');
+    expect(copy.text).toContain('A source could not be reached.');
+    expect(copy.text).toContain('not an all-clear');
+    expect(copy.detail).toBe(raw);
+  });
+
+  it('summarizes unknown error text as a source failure and keeps the raw behind detail', () => {
+    const raw = "KeyError: 'source_coverage'";
+    const copy = failed(raw);
+    expect(copy.text).not.toContain('KeyError');
+    expect(copy.text).toContain('A source failed.');
+    expect(copy.text).toContain('not an all-clear');
+    expect(copy.detail).toBe(raw);
+  });
+
+  it('maps the backend interruption sentences to plain ones with no leftover detail', () => {
+    const copy = failed('Refresh was interrupted and exhausted its retry limit');
+    expect(copy.text).toContain('interrupted and gave up');
+    expect(copy.text).toContain('not an all-clear');
+    expect(copy.detail).toBeUndefined();
+  });
+
+  it('says a newer refresh took over when superseded', () => {
+    const copy = failed('Superseded by a newer queued refresh after restart');
+    expect(copy.text).toContain('A newer refresh took over');
+    expect(copy.detail).toBeUndefined();
+  });
+
+  it('still fails honestly with no error text at all', () => {
+    const copy = failed(null);
+    expect(copy.text).toBe('Refresh did not finish. This is not an all-clear.');
+    expect(copy.tone).toBe('bad');
+    expect(copy.provesNoNewJobs).toBe(false);
+    expect(copy.detail).toBeUndefined();
+  });
+});
+
 describe('refresh-aware new-since line', () => {
   it('never leaves the old nothing-new line visible during a run', () => {
     expect(

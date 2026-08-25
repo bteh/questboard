@@ -52,6 +52,35 @@ class ApiError extends Error {
   }
 }
 
+/* A fetch that never resolved: no HTTP status exists, so this is NOT an
+   ApiError. Callers that read error.message get a plain sentence instead
+   of WKWebView's raw "Load failed". */
+class NetworkError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NetworkError';
+  }
+}
+
+function networkFailureMessage(): string {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+    return "You're offline. Questboard needs the internet to check sources; your board still works.";
+  }
+  if (shouldPersistLocalWorkspaceSession()) {
+    return 'Questboard could not reach its background service. Quit and reopen the app if this keeps happening.';
+  }
+  return 'Questboard could not reach the server. Check your connection and try again.';
+}
+
+async function networkFetch(url: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') throw err;
+    throw new NetworkError(networkFailureMessage());
+  }
+}
+
 function parseErrorMessage(body: string, fallback: string): string {
   if (!body) return fallback;
   try {
@@ -140,7 +169,7 @@ export async function apiGet<T>(path: string, params?: Record<string, string | n
     const qs = searchParams.toString();
     if (qs) url += `?${qs}`;
   }
-  const response = await fetch(url, {
+  const response = await networkFetch(url, {
     credentials: requestCredentials(),
     headers: authHeaders(),
   });
@@ -149,7 +178,7 @@ export async function apiGet<T>(path: string, params?: Record<string, string | n
 
 /** GET a file (e.g. the ledger's CSV export) with the same auth as apiGet. */
 export async function apiGetBlob(path: string): Promise<Blob> {
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const response = await networkFetch(`${BASE_URL}${path}`, {
     credentials: requestCredentials(),
     headers: authHeaders(),
   });
@@ -161,7 +190,7 @@ export async function apiGetBlob(path: string): Promise<Blob> {
 }
 
 export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const response = await networkFetch(`${BASE_URL}${path}`, {
     method: 'POST',
     credentials: requestCredentials(),
     headers: jsonHeaders(),
@@ -171,7 +200,7 @@ export async function apiPost<T>(path: string, body?: unknown): Promise<T> {
 }
 
 export async function apiPut<T>(path: string, body: unknown): Promise<T> {
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const response = await networkFetch(`${BASE_URL}${path}`, {
     method: 'PUT',
     credentials: requestCredentials(),
     headers: jsonHeaders(),
@@ -181,7 +210,7 @@ export async function apiPut<T>(path: string, body: unknown): Promise<T> {
 }
 
 export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const response = await networkFetch(`${BASE_URL}${path}`, {
     method: 'PATCH',
     credentials: requestCredentials(),
     headers: jsonHeaders(),
@@ -191,7 +220,7 @@ export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
 }
 
 export async function apiDelete<T = void>(path: string): Promise<T> {
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const response = await networkFetch(`${BASE_URL}${path}`, {
     method: 'DELETE',
     credentials: requestCredentials(),
     headers: uploadHeaders(),
@@ -206,7 +235,7 @@ export async function apiDelete<T = void>(path: string): Promise<T> {
 }
 
 export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const response = await networkFetch(`${BASE_URL}${path}`, {
     method: 'POST',
     credentials: requestCredentials(),
     headers: uploadHeaders(),
@@ -251,7 +280,7 @@ export async function streamSse(
   },
   signal?: AbortSignal,
 ) {
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const response = await networkFetch(`${BASE_URL}${path}`, {
     method: 'GET',
     credentials: requestCredentials(),
     headers: {
@@ -307,4 +336,4 @@ export async function streamSse(
   }
 }
 
-export { ApiError };
+export { ApiError, NetworkError };
