@@ -30,3 +30,24 @@ export function firstRunPreferences(
         : 'location_only',
   };
 }
+
+/** Fire the first-run save without gating the door. The caller navigates
+ * immediately; this retries quietly in the background and never throws.
+ * Losing the write costs the saved place, never the app, and the board URL
+ * still carries the chosen place either way. */
+export async function persistFirstRun(
+  save: (prefs: WorkspacePreferences) => Promise<unknown>,
+  prefs: WorkspacePreferences,
+  retries = 2,
+  delayMs = 4000,
+): Promise<boolean> {
+  for (let left = retries; ; left--) {
+    try {
+      await save(prefs);
+      return true;
+    } catch {
+      if (left <= 0) return false;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+}

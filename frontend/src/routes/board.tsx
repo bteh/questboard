@@ -18,7 +18,8 @@ import { useSourceLabels, resolveSourceLabel } from '@/hooks/use-scrapers';
 import { ExplainSheet } from '@/components/board/explain-sheet';
 import { RestockLine } from '@/components/board/restock-line';
 import { QuestRestockButton } from '@/components/board/quest-restock';
-import { boardEmptyState, boardFiltersActive } from '@/features/board/board-empty';
+import { boardEmptyState, boardFiltersActive, trulyEmptyLines } from '@/features/board/board-empty';
+import { backendDownLine } from '@/features/board/backend-down';
 import {
   dismissNotice,
   hasBoardParams,
@@ -679,7 +680,9 @@ function BoardPage() {
   }, [searchState, careerLane]);
 
   /* which empty board is this: the filters cut everything, or nothing has
-     been fetched yet? The message must match the cause. */
+     been fetched yet? The message must match the cause. Before this lane's
+     first-ever source run there was nothing to filter, so the place a new
+     user answered at /start never counts as a chip to clear. */
   const visibleFiltersActive = boardFiltersActive({
     search,
     place,
@@ -690,7 +693,9 @@ function BoardPage() {
     sourceCategory,
     postedDays,
   });
-  const emptyState = boardEmptyState(total, visibleFiltersActive);
+  const laneCheckedAt = careerLane ? summary?.career_checked_at : summary?.side_quest_checked_at;
+  const neverChecked = summary !== undefined && laneCheckedAt === null;
+  const emptyState = boardEmptyState(total, visibleFiltersActive, neverChecked);
 
   const newSince = careerLane
     ? countNewSince(visibleItems, workCutoff, {
@@ -1035,7 +1040,7 @@ function BoardPage() {
 
         {firstPage.isError && (
           <p style={{ marginTop: 40, fontSize: 14.5, color: 'var(--soft)' }}>
-            The board could not reach the backend. Start it with make dev and reload.
+            {backendDownLine()}
           </p>
         )}
         {firstPage.isLoading && (
@@ -1045,7 +1050,7 @@ function BoardPage() {
         )}
         {emptyState === 'filtered-empty' && (
           <p style={{ marginTop: 40, fontSize: 14.5, color: 'var(--soft)' }}>
-            Nothing on the board matches these filters. They are already applied—clear a filter
+            Nothing on the board matches these filters. They are already applied. Clear a filter
             or choose another value.
           </p>
         )}
@@ -1053,8 +1058,8 @@ function BoardPage() {
             The career lane keeps its own empty state below. */}
         {emptyState === 'truly-empty' && !careerLane && (
           <div className="qb-board-empty" role="status">
-            <p className="qb-board-empty-lead">The board is empty right now.</p>
-            <p>No quests have come in yet. One check fills it from the live sources.</p>
+            <p className="qb-board-empty-lead">{trulyEmptyLines(neverChecked).lead}</p>
+            <p>{trulyEmptyLines(neverChecked).body}</p>
             <div style={{ marginTop: 14 }}>
               <QuestRestockButton big />
             </div>

@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { buildDefaultWorkspacePreferences } from '@/lib/profile-preferences';
-import { firstRunPreferences } from './start-page-logic';
+import { firstRunPreferences, persistFirstRun } from './start-page-logic';
 
 describe('firstRunPreferences', () => {
   it('saves a known international city as structured discovery intent', () => {
@@ -56,5 +56,29 @@ describe('firstRunPreferences', () => {
 
     expect(next.preferred_places).toEqual([]);
     expect(next.workplace_preference).toBe('remote_only');
+  });
+});
+
+describe('persistFirstRun', () => {
+  /* The audit's trap: a failed preference write kept the user on /start
+     forever. The write now fires behind the door, so its only jobs are to
+     retry quietly and to never throw. */
+  const prefs = buildDefaultWorkspacePreferences();
+
+  it('retries a failed write and reports when it lands', async () => {
+    const save = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('backend down'))
+      .mockResolvedValueOnce(undefined);
+
+    await expect(persistFirstRun(save, prefs, 2, 1)).resolves.toBe(true);
+    expect(save).toHaveBeenCalledTimes(2);
+  });
+
+  it('gives up quietly after the retries, never throwing', async () => {
+    const save = vi.fn().mockRejectedValue(new Error('still down'));
+
+    await expect(persistFirstRun(save, prefs, 2, 1)).resolves.toBe(false);
+    expect(save).toHaveBeenCalledTimes(3);
   });
 });

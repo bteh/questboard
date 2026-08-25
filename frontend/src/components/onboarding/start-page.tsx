@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { SageButton } from '@questboard/ui';
 import { PlacePicker } from '@/features/board/place-picker';
 import { World } from '@/components/landing/world';
 import { useOnboardingState, useSaveWorkspacePreferences } from '@/hooks/use-workspace';
 import { markEntered, markOnboarded } from '@/lib/entry';
 import { buildDefaultWorkspacePreferences } from '@/lib/profile-preferences';
-import { firstRunPreferences } from './start-page-logic';
+import { markFirstRunPending } from './first-run';
+import { firstRunPreferences, persistFirstRun } from './start-page-logic';
 import './start.css';
 
 /* The whole first run: one question. Where are you? A place tunes the board
@@ -19,30 +20,31 @@ export function StartPage() {
   const savePreferences = useSaveWorkspacePreferences();
   const [place, setPlace] = useState('');
   const [includeRemote, setIncludeRemote] = useState(true);
-  const [saveError, setSaveError] = useState('');
 
   useEffect(() => {
     document.title = 'Questboard, set your place';
   }, []);
 
-  const go = async (withPlace: boolean) => {
+  /* The door never waits on the network. The flags land first and the
+     board opens on the URL alone, while the preference write retries in
+     the background. A lost write costs the saved place, never the app. */
+  const go = (withPlace: boolean) => {
     const chosen = withPlace ? place.trim() : '';
     const current = onboarding?.preferences ?? buildDefaultWorkspacePreferences();
-    setSaveError('');
-    try {
-      await savePreferences.mutateAsync(firstRunPreferences(current, chosen, includeRemote));
-      markOnboarded();
-      markEntered();
-      await navigate({
-        to: '/board',
-        search: {
-          place: chosen || undefined,
-          near: chosen && !includeRemote ? '1' : undefined,
-        },
-      });
-    } catch {
-      setSaveError('Questboard could not save that search yet. Try again.');
-    }
+    markOnboarded();
+    markFirstRunPending();
+    markEntered();
+    void persistFirstRun(
+      (prefs) => savePreferences.mutateAsync(prefs),
+      firstRunPreferences(current, chosen, includeRemote),
+    );
+    void navigate({
+      to: '/board',
+      search: {
+        place: chosen || undefined,
+        near: chosen && !includeRemote ? '1' : undefined,
+      },
+    });
   };
 
   return (
@@ -71,7 +73,7 @@ export function StartPage() {
           className="qb-start-form"
           onSubmit={(e) => {
             e.preventDefault();
-            void go(true);
+            go(true);
           }}
         >
           <PlacePicker
@@ -92,21 +94,33 @@ export function StartPage() {
             <span>Include remote quests too</span>
           </label>
 
-          {saveError && <p className="qb-start-error" role="alert">{saveError}</p>}
-
-          <SageButton big type="submit" disabled={savePreferences.isPending}>
-            {savePreferences.isPending ? 'Saving…' : 'See my board →'}
+          <SageButton big type="submit">
+            See my board →
           </SageButton>
         </form>
 
-        <button
-          type="button"
-          className="qb-start-skip"
-          onClick={() => void go(false)}
-          disabled={savePreferences.isPending}
-        >
+        <button type="button" className="qb-start-skip" onClick={() => go(false)}>
           Skip, show me everything
         </button>
+
+        {/* The wizard's only other door is a small link in Settings, which
+            a new user never finds. This one stays a text link: /start keeps
+            its one question. Taking it counts as finishing here, so /start
+            never asks again. */}
+        <p className="qb-start-guided">
+          Or take the{' '}
+          <Link
+            to="/settings"
+            search={{ tab: undefined }}
+            onClick={() => {
+              markOnboarded();
+              markEntered();
+            }}
+          >
+            guided setup
+          </Link>
+          , which adds your resume and target roles.
+        </p>
       </div>
     </div>
   );

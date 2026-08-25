@@ -39,8 +39,6 @@
 
 .qb-start-remote { display: flex; align-items: center; gap: 9px; font-size: 13.5px; color: var(--soft); cursor: pointer; user-select: none; }
 .qb-start-remote input { accent-color: var(--sage); width: 16px; height: 16px; flex: none; }
-.qb-start-error { margin: 0; color: var(--danger); font-size: 12.5px; line-height: 1.4; }
-
 .qb-start-form .qb-btn-sage { margin-top: 4px; width: 100%; text-align: center; justify-content: center; }
 
 .qb-start-skip {
@@ -48,3 +46,7 @@
   color: var(--mute); font-size: 13px; cursor: pointer; font-family: inherit;
 }
 .qb-start-skip:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 2px; }
+
+.qb-start-guided { margin: 10px 0 0; color: var(--mute); font-size: 13px; line-height: 1.5; }
+.qb-start-guided a { color: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.qb-start-guided a:hover { color: var(--ink); }

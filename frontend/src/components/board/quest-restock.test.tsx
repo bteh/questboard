@@ -79,6 +79,31 @@ describe('the quest restock button', () => {
       await screen.findByText('The board restocks itself here; fresh quests land on their own.'),
     ).toBeTruthy();
   });
+
+  /* The audit case: a failed check replaced the button with its own error
+     and the reader had no way to try again without a remount. The trigger
+     stays; the message lands beside it. */
+  it('keeps the door open for a retry after a failed check', async () => {
+    (apiPost as Mock).mockRejectedValueOnce(new Error('The sources timed out.'));
+    renderWithClient(<QuestRestockButton />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Check for new quests' }));
+    expect(await screen.findByText('The sources timed out.')).toBeTruthy();
+
+    (apiPost as Mock).mockResolvedValueOnce(summary);
+    fireEvent.click(screen.getByRole('button', { name: 'Check for new quests' }));
+    expect(await screen.findByText('2 new quests pinned.')).toBeTruthy();
+    expect(apiPost).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the button through a success so another check stays one tap away', async () => {
+    (apiPost as Mock).mockResolvedValue(summary);
+    renderWithClient(<QuestRestockButton />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Check for new quests' }));
+    expect(await screen.findByText('2 new quests pinned.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Check for new quests' })).toBeTruthy();
+  });
 });
 
 describe('the done line', () => {

@@ -3,7 +3,7 @@
    "clear a chip" never shows to a user who has no chips to clear. */
 
 import { describe, expect, it } from 'vitest';
-import { boardEmptyState, boardFiltersActive } from './board-empty';
+import { boardEmptyState, boardFiltersActive, trulyEmptyLines } from './board-empty';
 
 describe('the board empty state', () => {
   it('reads as loaded while the count is unknown or positive', () => {
@@ -19,6 +19,41 @@ describe('the board empty state', () => {
 
   it('reads as truly empty when nothing is fetched and nothing is set', () => {
     expect(boardEmptyState(0, false)).toBe('truly-empty');
+  });
+});
+
+describe('the first-run place answer on an empty database', () => {
+  /* The audit's blocker: /start writes ?place=Austin, the database has zero
+     rows and no source has ever run. The place is the ONE answer the app
+     asked for, so it must not read back as a chip to clear. */
+  it('never blames a filter before any source has been checked', () => {
+    expect(boardEmptyState(0, true, true)).toBe('truly-empty');
+  });
+
+  it('still blames the filters once the sources have run', () => {
+    expect(boardEmptyState(0, true, false)).toBe('filtered-empty');
+  });
+
+  it('never overrides a loaded board', () => {
+    expect(boardEmptyState(12, true, true)).toBe('loaded');
+    expect(boardEmptyState(undefined, false, true)).toBe('loaded');
+  });
+});
+
+describe('the truly-empty board copy', () => {
+  /* The backend fires its first sweep about 90 seconds after boot. Before
+     that sweep the board is not broken, it is stocking itself, and the
+     empty state must say so instead of staring back blank. */
+  it('says the board is stocking itself before the first sweep', () => {
+    const lines = trulyEmptyLines(true);
+    expect(lines.lead).toContain('stocking itself');
+    expect(lines.body).toContain('about a minute');
+  });
+
+  it('offers the manual check once a sweep has already run', () => {
+    const lines = trulyEmptyLines(false);
+    expect(lines.lead).toBe('The board is empty right now.');
+    expect(lines.body).toContain('One check fills it');
   });
 });
 

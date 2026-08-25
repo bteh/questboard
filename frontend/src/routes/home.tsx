@@ -6,6 +6,7 @@ import { useBoardSummary } from '@/hooks/use-board-summary';
 import { useSourceLabels, resolveSourceLabel } from '@/hooks/use-scrapers';
 import { CLIP_STATUS } from '@/utils/board-card';
 import { ALL_VERTICALS, verticalParams } from '@/utils/board-verticals';
+import { backendDownLine } from '@/features/board/backend-down';
 import { checkedAgoLabel } from '@/features/board/freshness';
 import { toPoster } from '@/features/board/poster-model';
 import { logStripTiles, pickBounty } from '@/components/home/home-logic';
@@ -170,13 +171,25 @@ function HomePage() {
     <>
       <div className="qb-mast">
         <div className="qb-hwrap qb-mast-inner">
+          {/* a fresh install has zero rows, and "0 quests. 0 pay $500."
+              reads as a broken product. Before the first sweep the honest
+              lede is that the board is stocking itself. */}
           <h1 className="qb-lede">
-            {boardTotal !== undefined && pay500Total !== undefined && (
-              <>
-                <span className="qb-num">{boardTotal}</span> quests on the board.{' '}
-                <span className="qb-num">{pay500Total}</span> pay <span className="qb-num">$500</span>{' '}
-                or more.
-              </>
+            {boardTotal === 0 ? (
+              summary?.checked_at ? (
+                'The board is empty right now. Open it to check the sources.'
+              ) : (
+                'The board is stocking itself. The first quests land in about a minute.'
+              )
+            ) : (
+              boardTotal !== undefined &&
+              pay500Total !== undefined && (
+                <>
+                  <span className="qb-num">{boardTotal}</span> quests on the board.{' '}
+                  <span className="qb-num">{pay500Total}</span> pay{' '}
+                  <span className="qb-num">$500</span> or more.
+                </>
+              )
             )}
           </h1>
           <p className="qb-msub">
@@ -229,7 +242,7 @@ function HomePage() {
           </Link>
           {newest.isError && (
             <p style={{ fontSize: 14.5, color: 'var(--soft)', margin: '16px 0 0' }}>
-              The board could not reach the backend. Start it with make dev and reload.
+              {backendDownLine()}
             </p>
           )}
         </section>
