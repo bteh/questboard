@@ -196,6 +196,20 @@ def smoke_packaged_runtime(sidecar: Path) -> None:
                 process.wait(timeout=5)
 
 
+_ALLOWED_SIDECAR_NAMES = {"questboard-runtime", "questboard-runtime.exe"}
+
+
+def unexpected_sidecar_files(sidecars_dir: Path) -> list[Path]:
+    """Anything staged next to the runtime ships in the DMG, so a stray
+    file here (a stale launchboard-runtime, a test binary) is a packaging
+    failure, not noise."""
+    if not sidecars_dir.exists():
+        return []
+    return sorted(
+        path for path in sidecars_dir.iterdir() if path.name not in _ALLOWED_SIDECAR_NAMES
+    )
+
+
 def resolve_bundle_root(bundle_root: Path) -> Path:
     candidates: list[Path] = []
     if bundle_root.exists():
@@ -228,6 +242,13 @@ def verify_macos_bundle(bundle_root: Path) -> None:
         raise SystemExit(f"Missing packaged sidecar: {sidecar}")
     if not dmg_dir.exists():
         raise SystemExit(f"Missing DMG output directory: {dmg_dir}")
+
+    strays = unexpected_sidecar_files(sidecar.parent)
+    if strays:
+        raise SystemExit(
+            "Desktop bundle ships unexpected sidecar files: "
+            + ", ".join(path.name for path in strays)
+        )
 
     app_arches = _arch_set(app_binary)
     sidecar_arches = _arch_set(sidecar)

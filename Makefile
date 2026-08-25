@@ -206,13 +206,28 @@ desktop-build: .venv ## Build the Tauri desktop app
 		exit 1; \
 	fi; \
 	export PATH="$$(dirname "$$CARGO_BIN"):$${PATH}"; \
+	$(PYTHON) scripts/clean_dmg_artifacts.py; \
 	cd frontend && pnpm run desktop:build
 
 desktop-install: .venv desktop-build ## Install the latest built Questboard.app into /Applications
 	$(PYTHON) scripts/install_desktop_app.py
 
 desktop-smoke: .venv ## Run the desktop UX smoke test against the local runtime + web UI
-	cd frontend && pnpm run desktop:smoke
+	@describe_pids() { for pid in $$*; do cmd=$$(ps -o command= -p "$$pid" 2>/dev/null | head -n 1); [ -n "$$cmd" ] || cmd="(process exited)"; echo "    $$pid $$cmd"; done; }; \
+	busy=0; \
+	for port in 5173 8765; do \
+		pids=$$(lsof -tiTCP:$$port -sTCP:LISTEN 2>/dev/null | sort -u | xargs 2>/dev/null || true); \
+		if [ -n "$$pids" ]; then \
+			busy=1; \
+			echo "  Port $$port is busy; the smoke needs it free. Held by:"; \
+			describe_pids $$pids; \
+		fi; \
+	done; \
+	if [ $$busy -eq 1 ]; then \
+		echo "  Run 'make stop-dev' or quit those processes, then retry."; \
+		exit 1; \
+	fi; \
+	cd frontend && pnpm exec playwright install chromium && pnpm run desktop:smoke
 
 agent-mcp: .venv ## Run the local Questboard MCP server over stdio
 	@.venv/bin/questboard-mcp --data-dir "$(CURDIR)/backend/data"

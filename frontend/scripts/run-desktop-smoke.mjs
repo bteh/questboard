@@ -18,7 +18,7 @@ const frontendUrl = 'http://127.0.0.1:5173';
 const headless = process.env.QUESTBOARD_SMOKE_HEADLESS !== 'false';
 const verbose = process.env.QUESTBOARD_SMOKE_VERBOSE === 'true';
 const outputDir = path.join(repoRoot, 'test-results', 'desktop-smoke');
-const uploadedResumeName = 'desktop-smoke-resume.pdf';
+const smokePlace = 'Los Angeles, CA';
 
 function log(message) {
   console.log(`desktop-smoke: ${message}`);
@@ -241,7 +241,7 @@ function attachPageMonitors(page, apiIssues, pageIssues) {
     ) {
       // Expected bootstrap handshake: the app probes onboarding state before
       // the workspace session is established, gets 401, bootstraps the session,
-      // then retries (200). Benign — don't flag the first probe.
+      // then retries (200). Benign, so don't flag the first probe.
       return;
     }
     let detail = '';
@@ -256,28 +256,6 @@ function attachPageMonitors(page, apiIssues, pageIssues) {
   });
 }
 
-async function prepareFixture(tempRoot) {
-  // Prefer the committed CI fixture; fall back to a local-dev resume so
-  // contributors with a real default_resume.pdf can still run smoke locally.
-  const candidates = [
-    path.join(repoRoot, 'tests', 'fixtures', 'smoke_resume.pdf'),
-    path.join(repoRoot, 'knowledge', 'default_resume.pdf'),
-  ];
-  let resumeSource;
-  for (const candidate of candidates) {
-    if (await fileExists(candidate)) {
-      resumeSource = candidate;
-      break;
-    }
-  }
-  if (!resumeSource) {
-    throw new Error(`Resume fixture missing. Tried: ${candidates.join(', ')}`);
-  }
-  const resumeTarget = path.join(tempRoot, uploadedResumeName);
-  await fs.copyFile(resumeSource, resumeTarget);
-  return resumeTarget;
-}
-
 async function prepareOutputDirectory() {
   await fs.rm(outputDir, { recursive: true, force: true });
   await fs.mkdir(outputDir, { recursive: true });
@@ -290,102 +268,65 @@ async function launchPersistentContext(userDataDir) {
     baseURL: frontendUrl,
   });
   context.setDefaultTimeout(20_000);
+  // isDesktopApp() (frontend/src/lib/platform.ts) only checks that the key
+  // exists on window, so an empty stub is enough to route / down the desktop
+  // entry path (/start on first run, /home after) instead of the marketing
+  // landing a plain browser would get.
+  await context.addInitScript(() => {
+    window.__TAURI_INTERNALS__ = window.__TAURI_INTERNALS__ ?? {};
+  });
   await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
   const page = context.pages()[0] ?? (await context.newPage());
   return { context, page };
 }
 
-async function verifySettings(page) {
-  await page.goto(`${frontendUrl}/settings`, { waitUntil: 'domcontentloaded' });
-  await page.getByRole('heading', { name: 'Settings' }).waitFor();
-  // The resume persisted across the runtime restart. (The old flow also typed a
-  // "Los Angeles, CA" location in the guided wizard; the shipped first-run flow
-  // is resume-derived and remote by default, so there's no city to assert.)
-  await page.getByText(uploadedResumeName).waitFor();
-  const welcomeHeading = page.getByRole('heading', { name: 'Welcome to Questboard' });
-  assert.equal(await welcomeHeading.count(), 0, 'Onboarding should not reopen once the desktop workspace is established.');
-}
-
-async function waitForVisible(page, candidates, timeoutMs = 35_000) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    for (const candidate of candidates) {
-      if (await candidate.isVisible().catch(() => false)) {
-        return candidate;
-      }
-    }
-    await page.waitForTimeout(250);
-  }
-  throw new Error(`Timed out waiting for one of: ${candidates.map((candidate) => candidate.toString()).join(', ')}`);
-}
-
-async function clickWhenStable(page, locator, timeoutMs = 30_000) {
-  const deadline = Date.now() + timeoutMs;
-  let lastError = null;
-
-  while (Date.now() < deadline) {
-    try {
-      await locator.waitFor({ state: 'visible', timeout: Math.min(2_000, timeoutMs) });
-      await locator.click();
-      return;
-    } catch (error) {
-      lastError = error;
-      await page.waitForTimeout(500);
-    }
-  }
-
-  throw lastError || new Error(`Timed out clicking ${locator.toString()}`);
+async function verifyBoard(page) {
+  await page.getByRole('heading', { name: 'The board' }).waitFor({ timeout: 35_000 });
+  // "N live" renders only after the board's own API query answered, so this
+  // is the real backend-is-serving assertion, not just a shell render.
+  await page.waitForFunction(
+    () => /\d+ live$/.test(document.querySelector('.qb-live')?.textContent || ''),
+    undefined,
+    { timeout: 35_000 },
+  );
 }
 
 async function completeFirstRun(page) {
-  log('Running first-launch onboarding flow');
+  log('Running desktop first run: /start place picker');
 
-  // First-run UX (post resume-accuracy overhaul): the Dashboard renders the
-  // FirstRunHero ("Let's start your job search") with a resume drop zone.
-  // Uploading a resume navigates to /search, which renders the
-  // ReadyToLaunchHero ("You're ready to launch") summarising a resume-derived
-  // search; a single click starts the first run. The upload unmounts the older
-  // guided wizard, so we drive this primary hero path rather than the wizard.
-  await page.goto(frontendUrl, { waitUntil: 'domcontentloaded' });
-  await page.getByRole('heading', { name: "Let's start your job search" }).waitFor({ timeout: 35_000 });
-
-  // The hero's file input is hidden; setInputFiles drives it directly. The
-  // wizard's own file input only mounts while its dialog is open, so this
-  // selector is unambiguous on the first-run dashboard.
-  await page
-    .locator('input[type="file"]')
-    .first()
-    .setInputFiles(process.env.QUESTBOARD_SMOKE_RESUME_PATH);
-
-  // The upload navigates to the /search configuration screen.
-  await page.waitForURL(/\/search/, { timeout: 35_000 });
-
-  // CI has no LLM, so the resume derives no roles; add a target role to enable
-  // the run. The roles Textarea is the only one matching this placeholder
-  // (the Keywords Textarea uses a different one).
-  const rolesField = page.getByPlaceholder(/Marketing Manager/);
-  await rolesField.waitFor({ timeout: 35_000 });
-  await rolesField.fill('Data Platform Engineering Manager');
-
-  const searchResponsePromise = page.waitForResponse(
-    (response) =>
-      /\/search\/run$/.test(response.url()) && response.request().method() === 'POST',
-    { timeout: 30_000 },
-  ).catch(() => null);
-
-  // Start-button label varies with LLM + resume state (Start Basic Ranking /
-  // Start Resume Ranking / Search & Rank / Rank from Resume) — match any.
-  await clickWhenStable(
-    page,
-    page.getByRole('button', {
-      name: /Start Basic Ranking|Start Resume Ranking|Rank from Resume|Search & Rank/,
-    }),
+  // Desktop first run: / redirects to /start, which asks one question
+  // ("Where are you?"). Answering routes to /board. Wait for the session
+  // bootstrap to land before moving on so the board's queries carry a token.
+  const bootstrapDone = page.waitForResponse(
+    (response) => response.url().includes('/session/bootstrap') && response.ok(),
+    { timeout: 35_000 },
   );
+  await page.goto(frontendUrl, { waitUntil: 'domcontentloaded' });
+  await page.waitForURL(/\/start/, { timeout: 35_000 });
+  await page.getByRole('heading', { name: 'Where are you?' }).waitFor({ timeout: 35_000 });
+  await bootstrapDone;
 
-  const searchResponse = await searchResponsePromise;
-  if (searchResponse) {
-    assert.equal(searchResponse.status(), 200, 'Onboarding search should start successfully.');
-  }
+  await page.getByLabel('Your city, region, or country').fill(smokePlace);
+  // Typing opens the suggestion menu; close it so nothing overlays the button.
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: /See my board/ }).click();
+
+  await page.waitForURL(/\/board/, { timeout: 35_000 });
+  await verifyBoard(page);
+}
+
+async function verifyAfterRestart(page) {
+  // The onboarded flag persisted: the desktop entry goes to /home, never
+  // back to /start.
+  await page.goto(frontendUrl, { waitUntil: 'domcontentloaded' });
+  await page.waitForURL(/\/home/, { timeout: 35_000 });
+  await page.locator('.qb-lede').waitFor({ timeout: 35_000 });
+
+  // The workspace session persisted across the runtime restart: the board
+  // still renders with a live total and zero auth failures (a dead session
+  // would surface as 401s, which fail the run via the API monitor).
+  await page.goto(`${frontendUrl}/board`, { waitUntil: 'domcontentloaded' });
+  await verifyBoard(page);
 }
 
 async function main() {
@@ -425,8 +366,6 @@ async function main() {
     await ensurePortAvailable(8765);
 
     const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'questboard-desktop-smoke-'));
-    const resumePath = await prepareFixture(tempRoot);
-    process.env.QUESTBOARD_SMOKE_RESUME_PATH = resumePath;
     const userDataDir = path.join(tempRoot, 'browser-profile');
     const runtimeDataDir = path.join(tempRoot, 'runtime-data');
     const workspaceDir = path.join(runtimeDataDir, 'workspaces');
@@ -486,7 +425,6 @@ async function main() {
     attachPageMonitors(initial.page, apiIssues, pageIssues);
 
     await completeFirstRun(initial.page);
-    await verifySettings(initial.page);
     await context.tracing.stop({ path: path.join(outputDir, 'desktop-smoke-first-run-trace.zip') });
     await context.close();
     context = null;
@@ -503,7 +441,7 @@ async function main() {
     const secondPass = await launchPersistentContext(userDataDir);
     restartedContext = secondPass.context;
     attachPageMonitors(secondPass.page, apiIssues, pageIssues);
-    await verifySettings(secondPass.page);
+    await verifyAfterRestart(secondPass.page);
     await restartedContext.tracing.stop({ path: path.join(outputDir, 'desktop-smoke-restart-trace.zip') });
     await restartedContext.close();
     restartedContext = null;

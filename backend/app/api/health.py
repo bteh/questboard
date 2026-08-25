@@ -17,7 +17,13 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 @router.get("/health")
 def health():
-    return {"status": "ok"}
+    # Echo the sidecar's own launch nonce so the desktop shell can prove a
+    # healthy answer came from its child, not a stranger on the same port.
+    payload = {"status": "ok"}
+    nonce = os.environ.get("QUESTBOARD_LAUNCH_NONCE")
+    if nonce:
+        payload["launch_nonce"] = nonce
+    return payload
 
 
 @router.get("/health/worker")
@@ -98,7 +104,13 @@ def health_ready(db: Session = Depends(get_db)):
         "resume_file": resume_hint or None,
         "profiles": profiles,
         "setup_complete": bool(llm_provider or resume_found or profiles),
-        "tips": _get_tips(llm_provider, llm_available, resume_found, profiles),
+        "tips": _get_tips(
+            llm_provider,
+            llm_available,
+            resume_found,
+            profiles,
+            desktop=os.environ.get("QUESTBOARD_DESKTOP_MODE", "").strip().lower() == "true",
+        ),
     }
     if settings.hosted_mode:
         from app.services import workspace_service
@@ -113,10 +125,30 @@ def health_ready(db: Session = Depends(get_db)):
 
 
 def _get_tips(
-    llm_provider: str, llm_available: bool, resume_found: bool, profiles: list[str],
+    llm_provider: str,
+    llm_available: bool,
+    resume_found: bool,
+    profiles: list[str],
+    *,
+    desktop: bool = False,
 ) -> list[str]:
-    """Generate actionable tips for things that need setup."""
+    """Generate actionable tips for things that need setup.
+
+    The packaged desktop app has no make, no .env, and no visible
+    knowledge/ dir, so its tips point at Settings instead.
+    """
     tips = []
+    if desktop:
+        if not resume_found or not profiles:
+            tips.append("Add your resume and roles in Settings")
+        if not llm_provider:
+            tips.append("Connect an assistant in Settings, Assistant tab. Optional.")
+        elif not llm_available:
+            tips.append(
+                f"Your assistant ({llm_provider}) is set up but not answering. "
+                "Check Settings, Assistant tab."
+            )
+        return tips
     if not profiles:
         tips.append("Run 'questboard-setup' or 'make setup' to create your first profile")
     if not resume_found:

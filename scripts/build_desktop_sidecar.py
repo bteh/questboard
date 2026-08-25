@@ -67,11 +67,23 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def reset_staging_dir(path: Path) -> None:
+    """Empty the sidecar staging dir before staging a new build.
+
+    tauri.conf.json bundles the whole ``tauri-sidecars/*`` glob, so any
+    leftover file here (like the pre-rename launchboard-runtime) ships
+    inside the DMG. Unlinking only the current target name is not enough.
+    """
+    if path.exists():
+        shutil.rmtree(path)
+    path.mkdir(parents=True)
+
+
 def build_sidecar(*, target_arch: str = "") -> Path:
     root = repo_root()
     output_dir = sidecar_dir()
     work_dir = pyinstaller_work_dir()
-    output_dir.mkdir(parents=True, exist_ok=True)
+    reset_staging_dir(output_dir)
     work_dir.mkdir(parents=True, exist_ok=True)
 
     pyinstaller_module = subprocess.run(
@@ -87,8 +99,6 @@ def build_sidecar(*, target_arch: str = "") -> Path:
         )
 
     target_path = output_dir / sidecar_name()
-    if target_path.exists():
-        target_path.unlink()
 
     command = [
         sys.executable,
