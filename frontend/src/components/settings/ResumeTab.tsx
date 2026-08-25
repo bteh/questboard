@@ -126,7 +126,7 @@ export function ResumeTab({ onboarding, navigate }: ResumeTabProps) {
 
         {onboarding?.resume.exists && (
           <div className="rounded-xl border border-success/20 bg-success/5 p-3 text-sm text-text-secondary">
-            Resume saved on this machine. Next, restock the board to find matching jobs.{' '}
+            Resume saved on this machine. Next, get new jobs on the board.{' '}
             <button
               type="button"
               onClick={() => navigate({ to: '/board', search: { v: 'work' } })}

@@ -716,7 +716,7 @@ export function LandingPage() {
               <div>
                 <b>Connect an assistant, if you want the reading help.</b>
                 <p>
-                  Link an app you may already use (Claude, Codex, or Cursor). It reads postings with
+                  Link an app you may already use (Claude Code or Codex). It reads postings with
                   you, checks them against your resume when you ask, and drafts notes. We never charge
                   for it and never see your key.
                 </p>
@@ -726,7 +726,7 @@ export function LandingPage() {
           <div className="qb-fears qb-scene-obj">
             <div className="qb-fear">
               <b>Do I need to be a programmer?</b>
-              <p>No. It’s a Mac app you download. Connecting an assistant is a one-time step with a guided setup.</p>
+              <p>No. It’s a Mac app you download. Connecting an assistant is one click in Settings once the assistant is installed.</p>
             </div>
             <div className="qb-fear">
               <b>Do I need to pay for AI?</b>
@@ -818,7 +818,7 @@ export function LandingPage() {
                 <li>Freshness receipts and direct source links</li>
                 <li>Your local board, log, and workflow history</li>
                 <li>Connect your own AI assistant</li>
-                <li>A signed Mac app that installs clean</li>
+                <li>The Mac app itself, free to keep</li>
               </ul>
             </div>
             <div className="qb-price-card qb-price-pro">
@@ -851,7 +851,7 @@ export function LandingPage() {
           <div className="qb-faq qb-scene-obj">
             <div className="qb-faq-q">
               <b>Which Macs?</b>
-              <p>Apple Silicon and Intel, on recent macOS. The build is universal.</p>
+              <p>Apple Silicon on recent macOS. An Intel build is planned.</p>
             </div>
             <div className="qb-faq-q">
               <b>Which AI assistants?</b>

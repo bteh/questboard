@@ -25,7 +25,8 @@ export function JobsSetupStrip({
     <div className="qb-jobs-setup">
       {step === 'resume' && (
         <span>
-          <b>Add your resume</b> to compare finalists against your experience.{' '}
+          <b>Add your resume</b> (optional) so your assistant can compare finalists against your
+          experience.{' '}
           <Link to="/settings" search={{ tab: 'resume' }} className="qb-jobs-cta">
             Add it →
           </Link>

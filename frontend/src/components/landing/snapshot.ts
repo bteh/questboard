@@ -14,7 +14,7 @@
 
 import type { ApplicationResponse } from '@/types/application';
 
-export const SNAPSHOT_AS_OF = 'July 18, 2026';
+export const SNAPSHOT_AS_OF = 'July 2026';
 
 /** Real totals from /board/summary on the snapshot date. quests = side-quest
  *  total (questTotal, career excluded); addedToday = side-quest new_today. */

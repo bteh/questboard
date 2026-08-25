@@ -55,7 +55,7 @@ export function useRunWorkSearch() {
       onError: (error) => {
         const message = error instanceof Error ? error.message : 'The search did not start';
         if (message.includes('At least one role or keyword')) {
-          toast.error('Nothing to search for yet. Add your resume, or set roles on the Restock page.');
+          toast.error('Nothing to search for yet. Set roles in Settings under Search defaults, or add your resume.');
           return;
         }
         if (message.includes('At least one location')) {

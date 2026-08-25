@@ -27,7 +27,11 @@ export function DownloadOrNotify({ big = false }: { big?: boolean }) {
         <SageButton big={big} onClick={() => void openExternal(DOWNLOAD_URL)}>
           Download for Mac
         </SageButton>
-        <span className="qb-lnote">Free. Universal build, no account.</span>
+        <span className="qb-lnote">Free. Apple Silicon, no account.</span>
+        <span className="qb-lnote">
+          If macOS warns on first open, allow it under System Settings, Privacy &amp; Security.
+          It asks once.
+        </span>
       </div>
     );
   }
@@ -54,6 +58,9 @@ function NotifyMe({ big }: { big: boolean }) {
           Email me when the Mac build is ready
         </SageButton>
         <span className="qb-lnote">{NOT_OUT_YET}</span>
+        <span className="qb-lnote">
+          No mail app? Write to <span className="qb-lnote-email">{NOTIFY_EMAIL}</span>
+        </span>
       </div>
     );
   }
