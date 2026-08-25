@@ -14,13 +14,15 @@
     "windows": [
       {
         "label": "main",
+        "create": false,
         "title": "Questboard",
         "width": 1480,
-        "height": 980,
+        "height": 900,
         "minWidth": 1180,
-        "minHeight": 760,
+        "minHeight": 640,
         "resizable": true,
         "fullscreen": false,
+        "center": true,
         "visible": false
       }
     ],
@@ -42,7 +44,8 @@
     "targets": "all",
     "macOS": {
       "signingIdentity": "-",
-      "entitlements": null
+      "entitlements": null,
+      "minimumSystemVersion": "12.0"
     }
   }
 }

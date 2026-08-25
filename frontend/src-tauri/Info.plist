@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSDocumentsFolderUsageDescription</key>
+  <string>Questboard reads the resume file you choose.</string>
+  <key>NSDesktopFolderUsageDescription</key>
+  <string>Questboard reads the resume file you choose.</string>
+  <key>NSDownloadsFolderUsageDescription</key>
+  <string>Questboard reads the resume file you choose.</string>
+</dict>
+</plist>

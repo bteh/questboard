@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { height: 100%; margin: 0; }
+  body {
+    display: flex; align-items: center; justify-content: center;
+    background: #faf6ef; color: #3d3229;
+    font: 15px/1.4 -apple-system, system-ui, sans-serif;
+    -webkit-user-select: none; user-select: none; cursor: default;
+  }
+  .wrap { text-align: center; }
+  .name { font-size: 19px; font-weight: 600; letter-spacing: 0.2px; }
+  .hint { color: #8a7d6d; font-size: 13px; margin-top: 8px; }
+  .bar {
+    width: 180px; height: 3px; border-radius: 2px; background: #e7ddcf;
+    margin: 16px auto 0; overflow: hidden; position: relative;
+  }
+  .bar::after {
+    content: ""; position: absolute; left: -40%; width: 40%; height: 100%;
+    border-radius: 2px; background: #d97b3f;
+    animation: slide 1.2s ease-in-out infinite;
+  }
+  @keyframes slide { to { left: 100%; } }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="name">Questboard</div>
+    <div class="hint">Starting up. The first launch can take about 20 seconds.</div>
+    <div class="bar"></div>
+  </div>
+</body>
+</html>
