@@ -212,6 +212,38 @@ desktop-build: .venv ## Build the Tauri desktop app
 desktop-install: .venv desktop-build ## Install the latest built Questboard.app into /Applications
 	$(PYTHON) scripts/install_desktop_app.py
 
+desktop-release: .venv ## Build, sign, and notarize the public Questboard DMG
+	@IDENTITY=$$(security find-identity -v -p codesigning | sed -n 's/.*"\(Developer ID Application: [^"]*\)".*/\1/p' | head -1); \
+	if [ -z "$$IDENTITY" ]; then \
+		echo "  No 'Developer ID Application' certificate in the keychain."; \
+		echo "  Create one: Xcode > Settings > Accounts > Manage Certificates > + > Developer ID Application."; \
+		exit 1; \
+	fi; \
+	TEAM_ID=$$(printf '%s' "$$IDENTITY" | sed -n 's/.*(\([A-Z0-9]\{10\}\))$$/\1/p'); \
+	NOTARY_PW=$$(security find-generic-password -s questboard-notarize -w 2>/dev/null || true); \
+	NOTARY_ID=$$(security find-generic-password -s questboard-notarize 2>/dev/null | sed -n 's/.*"acct"<blob>="\(.*\)"$$/\1/p'); \
+	if [ -z "$$NOTARY_PW" ] || [ -z "$$NOTARY_ID" ]; then \
+		echo "  Notarization credentials missing. Store them once with:"; \
+		echo "  security add-generic-password -a YOUR_APPLE_ID_EMAIL -s questboard-notarize -w APP_SPECIFIC_PASSWORD"; \
+		exit 1; \
+	fi; \
+	echo "  Signing as: $$IDENTITY (team $$TEAM_ID, notarizing as $$NOTARY_ID)"; \
+	QUESTBOARD_SIGN_IDENTITY="$$IDENTITY" APPLE_ID="$$NOTARY_ID" APPLE_PASSWORD="$$NOTARY_PW" APPLE_TEAM_ID="$$TEAM_ID" $(MAKE) desktop-build; \
+	APP=$$(ls -d frontend/src-tauri/target/*/release/bundle/macos/Questboard.app 2>/dev/null | head -1); \
+	if [ -z "$$APP" ]; then echo "  Build produced no Questboard.app"; exit 1; fi; \
+	VERDICT=$$(spctl -a -vv -t install "$$APP" 2>&1); \
+	echo "$$VERDICT"; \
+	case "$$VERDICT" in \
+		*"Notarized Developer ID"*) echo "  Gatekeeper (app): accepted."; ;; \
+		*) echo "  FAIL: app did not verify as Notarized Developer ID."; exit 1; ;; \
+	esac; \
+	DMG=$$(ls -t frontend/src-tauri/target/*/release/bundle/dmg/*.dmg 2>/dev/null | head -1); \
+	if [ -z "$$DMG" ]; then echo "  Build produced no DMG"; exit 1; fi; \
+	echo "  Notarizing the DMG itself (Tauri signs it after notarizing the app, so it has no ticket yet)"; \
+	xcrun notarytool submit "$$DMG" --apple-id "$$NOTARY_ID" --password "$$NOTARY_PW" --team-id "$$TEAM_ID" --wait || exit 1; \
+	xcrun stapler staple "$$DMG" || exit 1; \
+	$(PYTHON) scripts/verify_release_dmg.py "$$DMG"
+
 desktop-smoke: .venv ## Run the desktop UX smoke test against the local runtime + web UI
 	@describe_pids() { for pid in $$*; do cmd=$$(ps -o command= -p "$$pid" 2>/dev/null | head -n 1); [ -n "$$cmd" ] || cmd="(process exited)"; echo "    $$pid $$cmd"; done; }; \
 	busy=0; \

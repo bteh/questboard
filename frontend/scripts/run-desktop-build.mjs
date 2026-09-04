@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -122,7 +122,28 @@ if (pyinstallerTargetArch) {
 }
 runOrExit(commandName('pnpm'), prepareArgs, { cwd: path.join(repoRoot, 'frontend') })
 
+// Release signing: Tauri only signs binaries it knows about, and the sidecar
+// ships as a resource, so an unsigned sidecar fails notarization.
+const signIdentity = process.env.QUESTBOARD_SIGN_IDENTITY
+if (signIdentity && process.platform === 'darwin') {
+  const sidecarDir = path.join(repoRoot, '.desktop-build', 'tauri-sidecars')
+  const entitlements = path.join(repoRoot, 'frontend', 'src-tauri', 'entitlements.plist')
+  for (const entry of readdirSync(sidecarDir)) {
+    runOrExit('codesign', [
+      '--force',
+      '--options', 'runtime',
+      '--timestamp',
+      '--entitlements', entitlements,
+      '--sign', signIdentity,
+      path.join(sidecarDir, entry),
+    ])
+  }
+}
+
 const tauriArgs = ['exec', 'tauri', 'build']
+if (signIdentity) {
+  tauriArgs.push('--config', JSON.stringify({ bundle: { macOS: { signingIdentity: signIdentity } } }))
+}
 if (tauriTarget) {
   tauriArgs.push('--target', tauriTarget)
 }
