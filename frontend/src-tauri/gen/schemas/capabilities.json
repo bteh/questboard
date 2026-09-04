@@ -1,1 +1,1 @@
-{"default":{"identifier":"default","description":"Default desktop capability for Questboard.","local":true,"windows":["main"],"permissions":["core:default",{"identifier":"shell:allow-open","allow":[{"url":"https://**"},{"url":"http://**"}]}]}}
+{"default":{"identifier":"default","description":"Default desktop capability for Questboard.","local":true,"windows":["main"],"permissions":["core:default","updater:default","process:allow-restart",{"identifier":"shell:allow-open","allow":[{"url":"https://**"},{"url":"http://**"}]}]}}

@@ -15,6 +15,7 @@ import { ErrorBoundary } from '@/components/shared/error-boundary';
 import { BrandMark } from '@/components/shared/brand-mark';
 import { cx } from '@questboard/ui';
 import { Drawer } from './drawer';
+import { UpdatePill } from './update-pill';
 import './app-shell.css';
 
 const PAGE_TITLES: Record<string, string> = {
@@ -108,6 +109,7 @@ export function AppShell() {
               <b>Questboard</b>
             </Link>
             <SearchBox />
+            <UpdatePill />
           </div>
           <ErrorBoundary resetKey={matches[matches.length - 1]?.fullPath}>
             <Outlet />

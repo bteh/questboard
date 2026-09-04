@@ -511,10 +511,22 @@ fn boot_runtime(app: AppHandle) {
     }
 }
 
+/// Stop the backend before an update overwrites the app bundle.
+///
+/// The runtime holds an open SQLite file and a listening port; leaving it
+/// to die on its own during the relaunch races the new instance for both.
+#[tauri::command]
+fn shutdown_runtime_for_update(app: AppHandle) {
+    kill_runtime(&app);
+}
+
 fn main() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
+        .invoke_handler(tauri::generate_handler![shutdown_runtime_for_update])
         .manage(RuntimeState::default())
         .register_uri_scheme_protocol("qbsplash", |_ctx, _request| {
             tauri::http::Response::builder()

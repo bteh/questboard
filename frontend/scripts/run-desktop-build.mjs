@@ -140,10 +140,10 @@ if (signIdentity && process.platform === 'darwin') {
   }
 }
 
+// The identity travels as APPLE_SIGNING_IDENTITY, not --config: a --config
+// override replaces the bundle object wholesale, which silently dropped
+// createUpdaterArtifacts and shipped a build with no update archive.
 const tauriArgs = ['exec', 'tauri', 'build']
-if (signIdentity) {
-  tauriArgs.push('--config', JSON.stringify({ bundle: { macOS: { signingIdentity: signIdentity } } }))
-}
 if (tauriTarget) {
   tauriArgs.push('--target', tauriTarget)
 }

@@ -227,8 +227,17 @@ desktop-release: .venv ## Build, sign, and notarize the public Questboard DMG
 		echo "  security add-generic-password -a YOUR_APPLE_ID_EMAIL -s questboard-notarize -w APP_SPECIFIC_PASSWORD"; \
 		exit 1; \
 	fi; \
+	UPDATER_KEY=$$(security find-generic-password -s questboard-updater-key -w 2>/dev/null || true); \
+	if [ -z "$$UPDATER_KEY" ]; then \
+		echo "  Updater signing key missing. Installed copies could not verify this build."; \
+		echo "  Generate once: pnpm -C frontend exec tauri signer generate -w /tmp/qb.key -p ''"; \
+		echo "  then: security add-generic-password -a questboard -s questboard-updater-key -w \"\$$(cat /tmp/qb.key)\""; \
+		exit 1; \
+	fi; \
 	echo "  Signing as: $$IDENTITY (team $$TEAM_ID, notarizing as $$NOTARY_ID)"; \
-	QUESTBOARD_SIGN_IDENTITY="$$IDENTITY" APPLE_ID="$$NOTARY_ID" APPLE_PASSWORD="$$NOTARY_PW" APPLE_TEAM_ID="$$TEAM_ID" $(MAKE) desktop-build; \
+	QUESTBOARD_SIGN_IDENTITY="$$IDENTITY" APPLE_SIGNING_IDENTITY="$$IDENTITY" \
+	APPLE_ID="$$NOTARY_ID" APPLE_PASSWORD="$$NOTARY_PW" APPLE_TEAM_ID="$$TEAM_ID" \
+	TAURI_SIGNING_PRIVATE_KEY="$$UPDATER_KEY" TAURI_SIGNING_PRIVATE_KEY_PASSWORD="" $(MAKE) desktop-build || exit 1; \
 	APP=$$(ls -d frontend/src-tauri/target/*/release/bundle/macos/Questboard.app 2>/dev/null | head -1); \
 	if [ -z "$$APP" ]; then echo "  Build produced no Questboard.app"; exit 1; fi; \
 	VERDICT=$$(spctl -a -vv -t install "$$APP" 2>&1); \
@@ -242,7 +251,12 @@ desktop-release: .venv ## Build, sign, and notarize the public Questboard DMG
 	echo "  Notarizing the DMG itself (Tauri signs it after notarizing the app, so it has no ticket yet)"; \
 	xcrun notarytool submit "$$DMG" --apple-id "$$NOTARY_ID" --password "$$NOTARY_PW" --team-id "$$TEAM_ID" --wait || exit 1; \
 	xcrun stapler staple "$$DMG" || exit 1; \
-	$(PYTHON) scripts/verify_release_dmg.py "$$DMG"
+	$(PYTHON) scripts/verify_release_dmg.py "$$DMG"; \
+	VERSION=$$($(PYTHON) -c "import json;print(json.load(open('frontend/src-tauri/tauri.conf.json'))['version'])"); \
+	$(PYTHON) scripts/build_update_manifest.py \
+		--bundle-dir "$$(dirname "$$APP")" \
+		--version "$$VERSION" \
+		--out "$$(dirname "$$DMG")/latest.json"
 
 desktop-smoke: .venv ## Run the desktop UX smoke test against the local runtime + web UI
 	@describe_pids() { for pid in $$*; do cmd=$$(ps -o command= -p "$$pid" 2>/dev/null | head -n 1); [ -n "$$cmd" ] || cmd="(process exited)"; echo "    $$pid $$cmd"; done; }; \

@@ -13,6 +13,19 @@
   border-bottom: 1px solid var(--hair);
   background: var(--paper);
 }
+.qb-update-pill {
+  flex: none;
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px;
+  background: var(--paper);
+  border: 1px solid var(--hair); border-bottom-color: var(--edge);
+  border-radius: 999px;
+  color: var(--soft); font-family: inherit; font-size: 12px;
+  cursor: pointer;
+  transition: transform .12s cubic-bezier(.22, 1, .36, 1);
+}
+.qb-update-pill:hover { transform: translateY(-1px); color: var(--ink); }
+.qb-update-pill b { color: var(--ink); font-weight: 600; }
 .qb-fold, .qb-xbtn {
   width: 34px; height: 34px; flex: none;
   display: grid; place-items: center;

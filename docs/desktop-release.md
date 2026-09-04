@@ -1,184 +1,112 @@
 # Desktop Release
 
-Questboard now has a real desktop packaging path built around:
+Questboard ships as a signed, notarized macOS app that updates itself.
 
 - `Tauri v2` for the native shell
 - a bundled Python sidecar for the local runtime
-- GitHub Actions workflows for native macOS bundle validation and tag-based release artifacts
+- Developer ID signing + Apple notarization
+- `tauri-plugin-updater` reading a signed manifest from GitHub Releases
 
-This document focuses on what is automated today and what still needs credentials before it becomes a polished public release pipeline.
-
-## Current Release Flow
-
-Local build:
+## Cutting a release
 
 ```bash
-make desktop-build
+make desktop-release
 ```
 
-What that does:
+That one command:
 
-1. Detects the desktop target from the Python architecture in your repo `.venv`
-2. Builds the Python sidecar with PyInstaller for the matching architecture
-3. Builds the Tauri app for the matching Rust target
-4. Verifies that the packaged app binary and packaged sidecar have the same architecture
+1. Finds your `Developer ID Application` certificate in the keychain
+2. Reads the notarization password and the updater signing key from the keychain
+3. Builds the sidecar and the app, signing the sidecar itself (see below)
+4. Signs the app, sends it to Apple, waits for the verdict, staples the ticket
+5. Notarizes and staples the DMG separately (see below)
+6. Verifies the DMG the way a stranger's Mac would, and fails if Gatekeeper objects
+7. Writes `latest.json` next to the DMG
 
-On macOS, this means:
+It refuses to finish on any failure rather than shipping a half-signed build.
 
-- `arm64` Python -> `aarch64-apple-darwin` desktop bundle
-- `x86_64` Python under Rosetta -> `x86_64-apple-darwin` desktop bundle
+### Three things that are easy to get wrong
 
-This avoids shipping mixed-architecture app bundles.
+**The sidecar is a resource, so Tauri never signs it.** The PyInstaller runtime
+ships under `Contents/Resources/sidecars/`, outside the set of binaries Tauri
+signs on its own. Notarization fails on it. `run-desktop-build.mjs` signs the
+sidecars first, with the entitlements in `src-tauri/entitlements.plist` that the
+PyInstaller extractor needs (`disable-library-validation`,
+`allow-unsigned-executable-memory`).
 
-## CI / CD
+**The DMG needs its own notarization.** Tauri notarizes and staples the `.app`,
+then builds and signs the DMG afterwards, so the DMG carries no ticket. A
+downloaded copy is rejected as `Unnotarized Developer ID` even though the app
+inside is fine. The release target submits and staples the DMG too.
 
-The repo now has two desktop workflows:
+**Never pass `--config` to override the signing identity.** A `--config`
+override replaces the whole `bundle` object, which silently drops
+`createUpdaterArtifacts` and ships a build with no update archive. The identity
+travels as `APPLE_SIGNING_IDENTITY` instead.
 
-- [CI](/Users/briantehsayy/Desktop/questboard/.github/workflows/ci.yml)
-  - Linux scaffold check
-  - macOS native bundle build and verification
-- [Desktop Release](/Users/briantehsayy/Desktop/questboard/.github/workflows/desktop-release.yml)
-  - runs on tags like `v0.2.0`
-  - builds a macOS app bundle and DMG
-  - uploads release artifacts to GitHub
+### One-time credential setup
 
-Current release artifacts:
-
-- `Questboard.app.zip`
-- `Questboard_*.dmg`
-
-## Signing And Notarization
-
-We intentionally did **not** fake code signing in this repo.
-
-The official Tauri docs are clear that for macOS direct distribution, code signing is required and notarization is also required for distribution outside the App Store:
-
-- [Tauri distribute docs](https://v2.tauri.app/distribute/)
-- [Tauri macOS signing / notarization docs](https://v2.tauri.app/distribute/sign/macos/)
-
-So the current state is:
-
-- local `make desktop-build` works
-- GitHub release artifacts build
-- these artifacts are **not a fully production-grade macOS distribution story yet** until Apple signing credentials are wired in
-
-That is the right tradeoff for open-source readiness: real builds now, trustable signing later.
-
-## Updater Status
-
-We also intentionally did **not** enable the Tauri updater plugin yet.
-
-Official reason:
-
-- Tauri’s updater flow depends on signed update artifacts and a public verification key
-- official docs: [Updater plugin](https://v2.tauri.app/plugin/updater/)
-
-Because we do not have the signing/notarization credentials configured yet, enabling updater now would create a half-finished release story.
-
-So the repo is currently:
-
-- `desktop build`: ready
-- `desktop release artifacts`: ready
-- `signed production macOS release`: not yet wired
-- `auto-update`: intentionally deferred until signing keys exist
-
-## GitHub Secrets To Add
-
-The release workflow is now prepared to use these secrets if you provide them:
-
-- `APPLE_CERTIFICATE`
-  - base64-encoded `.p12` certificate
-- `APPLE_CERTIFICATE_PASSWORD`
-  - password used when exporting the `.p12`
-- `APPLE_SIGNING_IDENTITY`
-  - optional explicit signing identity
-- `APPLE_API_KEY`
-  - App Store Connect API key ID
-- `APPLE_API_ISSUER`
-  - App Store Connect issuer ID
-- `APPLE_API_KEY_P8`
-  - contents of the downloaded `AuthKey_<KEYID>.p8` file
-
-Alternative notarization path if you prefer Apple ID auth instead of App Store Connect:
-
-- `APPLE_ID`
-- `APPLE_PASSWORD`
-- `APPLE_TEAM_ID`
-
-Optional:
-
-- `APPLE_PROVIDER_SHORT_NAME`
-  - useful if your Apple account belongs to multiple teams
-
-These map directly to the official Tauri environment variable interface documented here:
-
-- [Tauri environment variables](https://v2.tauri.app/reference/environment-variables/)
-- [Tauri macOS signing / notarization](https://v2.tauri.app/distribute/sign/macos/)
-
-## For Users Downloading Unsigned Builds
-
-Until Apple signing credentials are configured, macOS Gatekeeper will block the app.
-Users downloading an unsigned build should do one of the following after dragging
-Questboard.app to /Applications:
-
-**Option A — Right-click workaround (easiest):**
-
-1. Right-click (or Control-click) Questboard.app in /Applications
-2. Click "Open" from the context menu
-3. Click "Open" again in the dialog that appears
-4. macOS remembers this choice — subsequent launches work normally
-
-**Option B — Terminal workaround:**
+Three secrets live in the login keychain, never in the repo or a `.env`:
 
 ```bash
-xattr -cr /Applications/Questboard.app
+# Apple notarization (app-specific password from account.apple.com)
+security add-generic-password -a YOUR_APPLE_ID -s questboard-notarize -w APP_SPECIFIC_PASSWORD
+
+# Updater signing key (generate once; losing it means installed copies
+# can never verify another update)
+pnpm -C frontend exec tauri signer generate -w /tmp/qb.key -p ''
+security add-generic-password -a questboard -s questboard-updater-key -w "$(cat /tmp/qb.key)"
+rm /tmp/qb.key
 ```
 
-This clears the quarantine flag. The app will launch normally after this.
+The certificate comes from Xcode > Settings > Accounts > Manage Certificates >
+**+** > Developer ID Application.
 
-**Note:** Both workarounds are standard for open-source macOS apps that aren't
-signed with an Apple Developer certificate. Once signing is configured, users
-won't need to do either of these.
+The first notarization of a new Apple team takes up to an hour or so because
+Apple runs a one-time review. Every later one takes about two minutes.
 
-## Tauri Signing Config
+## Publishing so the updater can see it
 
-`tauri.conf.json` sets `signingIdentity: "-"` (ad-hoc signing) for local dev
-builds. In CI, Tauri automatically uses the `APPLE_SIGNING_IDENTITY` environment
-variable when present, overriding this value. No additional config changes are
-needed once the GitHub secrets are populated.
+The app polls
+`https://github.com/bteh/questboard/releases/latest/download/latest.json`.
+Upload three files to a release tagged `v<version>`:
 
-## What You Need To Do
+```bash
+gh release create v0.2.0 \
+  frontend/src-tauri/target/*/release/bundle/dmg/Questboard_0.2.0_aarch64.dmg \
+  frontend/src-tauri/target/*/release/bundle/macos/Questboard.app.tar.gz \
+  frontend/src-tauri/target/*/release/bundle/dmg/latest.json
+```
 
-1. Enroll in the Apple Developer Program if you have not already.
-2. Create or export a `Developer ID Application` certificate.
-3. Add the GitHub secrets listed above.
-4. Push a tag like `v0.2.0`.
-5. Let [Desktop Release](/Users/briantehsayy/Desktop/questboard/.github/workflows/desktop-release.yml) build and upload the artifacts.
+The DMG is what people download. The `.app.tar.gz` is what installed copies
+download. `latest.json` points at it and carries the signature.
 
-## What I Can And Cannot Do
+**The repository must be public for this to work.** Release assets on a private
+repo need authentication, so the updater gets a 404 and every installed copy
+silently stays on its current version.
 
-I can:
+## How updates behave
 
-- prepare the repo and workflows
-- validate unsigned and optionally signed build logic
-- document the exact secret contract
+`useAppUpdate` checks four seconds after the board paints, then every six hours.
+It downloads in the background and shows a small pill in the topbar only once a
+new version is on disk. Clicking it shuts the backend down cleanly (it holds an
+open SQLite file and a port), installs, and relaunches.
 
-I cannot:
+A failed check is silent on purpose: no endpoint, no network, or a
+half-published release are all things the user did not ask about and cannot act
+on. Updates fail closed. A manifest with a bad signature is refused and the app
+keeps running the version it has.
 
-- create your Apple Developer account
-- export your signing certificate
-- generate your App Store Connect key
-- add your GitHub secrets for you
+## Version bumps
 
-Those steps depend on your Apple account and your GitHub repository permissions.
+The version lives in `frontend/src-tauri/tauri.conf.json`. Tauri compares it
+against the running app, so a release whose version did not change is invisible
+to the updater.
 
-## Next Production Step
+## Still open
 
-When you are ready for polished desktop distribution, the next work should be:
-
-1. Add Apple Developer signing + notarization credentials to the release workflow
-2. Enable updater artifact signing
-3. Publish a stable release feed for Tauri updater
-4. Add in-app update checks
-
-That sequence follows current Tauri guidance and avoids shipping a misleading “updater-ready” build before the signing foundation exists.
+- Intel Macs. The build is Apple Silicon only; `targetInfo` in
+  `run-desktop-build.mjs` already handles `x86_64`, but no Intel build ships.
+- Windows and Linux. `latest.json` carries a `darwin-aarch64` entry only.
+- CI signing. Releases are cut from a local machine using the login keychain.
+  `.github/workflows/desktop-release.yml` still builds unsigned artifacts.

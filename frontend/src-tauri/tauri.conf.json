@@ -30,6 +30,14 @@
       "csp": null
     }
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENFNjYzOTk0NEQ3Rjg0MkMKUldRc2hIOU5sRGxtempDYmZhY0k4c0psbFk0UUlKVDlBU3FVdndsVCtkVzJtK2FqN3BvZ29xd2UK",
+      "endpoints": [
+        "https://github.com/bteh/questboard/releases/latest/download/latest.json"
+      ]
+    }
+  },
   "bundle": {
     "active": true,
     "icon": [
@@ -42,6 +50,7 @@
       "../../.desktop-build/tauri-sidecars/*": "sidecars/"
     },
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "macOS": {
       "signingIdentity": "-",
       "entitlements": "entitlements.plist",
