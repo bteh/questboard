@@ -23,9 +23,17 @@ def upgrade() -> None:
         "workspace_preferences",
         sa.Column("include_linkedin_jobs", sa.Boolean(), nullable=True, server_default=sa.false()),
     )
+    # Raw `COALESCE(col, 0)` is SQLite-only: Postgres refuses to match a
+    # boolean against an integer literal. Let SQLAlchemy render the literal
+    # for whichever dialect is running.
+    prefs = sa.table(
+        "workspace_preferences",
+        sa.column("include_linkedin_jobs", sa.Boolean()),
+    )
     op.execute(
-        "UPDATE workspace_preferences "
-        "SET include_linkedin_jobs = COALESCE(include_linkedin_jobs, 0)"
+        prefs.update()
+        .where(prefs.c.include_linkedin_jobs.is_(None))
+        .values(include_linkedin_jobs=False)
     )
 
 

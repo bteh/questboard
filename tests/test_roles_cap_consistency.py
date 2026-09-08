@@ -21,7 +21,10 @@ for _path in (BACKEND_PATH, SRC_PATH):
 sys.path.insert(0, BACKEND_PATH)
 sys.path.insert(1, SRC_PATH)
 
-from tests.test_local_agent_service import local_agent_db  # noqa: F401
+# pytest puts tests/ itself on sys.path (rootdir import mode), so the bare
+# module name works under both `pytest` and `python -m pytest`; `tests.` only
+# resolves when the cwd happens to be on sys.path.
+from test_local_agent_service import local_agent_db  # noqa: F401
 
 
 def test_save_honors_the_full_advertised_roles_cap(local_agent_db) -> None:  # noqa: F811
