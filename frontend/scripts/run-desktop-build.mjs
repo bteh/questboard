@@ -140,10 +140,16 @@ if (signIdentity && process.platform === 'darwin') {
   }
 }
 
-// The identity travels as APPLE_SIGNING_IDENTITY, not --config: a --config
-// override replaces the bundle object wholesale, which silently dropped
-// createUpdaterArtifacts and shipped a build with no update archive.
+// The signing identity travels as APPLE_SIGNING_IDENTITY, the env var Tauri
+// documents for it.
 const tauriArgs = ['exec', 'tauri', 'build']
+// createUpdaterArtifacts is on in tauri.conf.json because releases need the
+// archive, but with a public key configured Tauri refuses to build without
+// the private key. CI and dev builds have no key, so they skip the archive.
+if (!process.env.TAURI_SIGNING_PRIVATE_KEY && !process.env.TAURI_SIGNING_PRIVATE_KEY_PATH) {
+  console.log('No updater signing key in the environment; building without the update archive.')
+  tauriArgs.push('--config', JSON.stringify({ bundle: { createUpdaterArtifacts: false } }))
+}
 if (tauriTarget) {
   tauriArgs.push('--target', tauriTarget)
 }

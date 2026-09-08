@@ -39,10 +39,14 @@ then builds and signs the DMG afterwards, so the DMG carries no ticket. A
 downloaded copy is rejected as `Unnotarized Developer ID` even though the app
 inside is fine. The release target submits and staples the DMG too.
 
-**Never pass `--config` to override the signing identity.** A `--config`
-override replaces the whole `bundle` object, which silently drops
-`createUpdaterArtifacts` and ships a build with no update archive. The identity
-travels as `APPLE_SIGNING_IDENTITY` instead.
+**Builds without the updater key must turn the archive off.** With
+`createUpdaterArtifacts` on and a public key in the config, Tauri refuses to
+build at all unless `TAURI_SIGNING_PRIVATE_KEY` is set. CI and dev builds have
+no key, so `run-desktop-build.mjs` passes
+`--config '{"bundle":{"createUpdaterArtifacts":false}}'` for them (`--config`
+is a recursive merge; the rest of the bundle config survives). Only
+`make desktop-release`, which reads the key from the keychain, produces the
+archive.
 
 ### One-time credential setup
 
