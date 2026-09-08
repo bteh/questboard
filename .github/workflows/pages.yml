@@ -1,0 +1,61 @@
+name: Landing
+
+# The public site at questboard.io is the frontend's landing route built as
+# static files. It needs no backend, so it deploys to GitHub Pages on every
+# change to the frontend.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - frontend/**
+      - packages/**
+      - pnpm-lock.yaml
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build the landing
+        working-directory: frontend
+        env:
+          # A stably named copy of the current DMG, uploaded with every release.
+          VITE_DOWNLOAD_URL: https://github.com/bteh/questboard/releases/latest/download/Questboard_aarch64.dmg
+        run: pnpm run build
+      - name: Serve the app shell for any deep link
+        # Pages has no rewrite rules; its 404 page is the only fallback.
+        run: cp frontend/dist/index.html frontend/dist/404.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

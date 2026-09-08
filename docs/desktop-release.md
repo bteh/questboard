@@ -72,18 +72,35 @@ Apple runs a one-time review. Every later one takes about two minutes.
 ## Publishing so the updater can see it
 
 The app polls
-`https://github.com/bteh/questboard/releases/latest/download/latest.json`.
-Upload three files to a release tagged `v<version>`:
+`https://github.com/bteh/questboard/releases/latest/download/latest.json`,
+and the landing page links to
+`.../releases/latest/download/Questboard_aarch64.dmg`. Upload four files to a
+release tagged `v<version>` (the release target prints the exact command):
 
 ```bash
 gh release create v0.2.0 \
   frontend/src-tauri/target/*/release/bundle/dmg/Questboard_0.2.0_aarch64.dmg \
+  frontend/src-tauri/target/*/release/bundle/dmg/Questboard_aarch64.dmg \
   frontend/src-tauri/target/*/release/bundle/macos/Questboard.app.tar.gz \
   frontend/src-tauri/target/*/release/bundle/dmg/latest.json
 ```
 
-The DMG is what people download. The `.app.tar.gz` is what installed copies
-download. `latest.json` points at it and carries the signature.
+The versioned DMG is the record. `Questboard_aarch64.dmg` is the same file
+under a name that never changes, so the landing's download link keeps working
+across releases. The `.app.tar.gz` is what installed copies download;
+`latest.json` points at it and carries the signature.
+
+Upload straight from a fresh `make desktop-release`. The bundle directory is
+overwritten by any later build, including unsigned dev builds, so a file
+copied from it later may not be the signed one.
+
+## The landing page
+
+`questboard.io` is the frontend's `/` route built as static files and served
+by GitHub Pages from `.github/workflows/pages.yml`, which runs on every push
+that touches the frontend. It needs no backend. DNS lives at Namecheap: the
+apex has the four GitHub Pages A records and `www` is a CNAME to
+`bteh.github.io`.
 
 **The repository must be public for this to work.** Release assets on a private
 repo need authentication, so the updater gets a 404 and every installed copy

@@ -27,11 +27,8 @@ export function DownloadOrNotify({ big = false }: { big?: boolean }) {
         <SageButton big={big} onClick={() => void openExternal(DOWNLOAD_URL)}>
           Download for Mac
         </SageButton>
-        <span className="qb-lnote">Free. Apple Silicon, no account.</span>
-        <span className="qb-lnote">
-          If macOS warns on first open, allow it under System Settings, Privacy &amp; Security.
-          It asks once.
-        </span>
+        <span className="qb-lnote">Free. Apple Silicon, macOS 12 or newer. No account.</span>
+        <span className="qb-lnote">Signed and notarized, so it opens like any other app.</span>
       </div>
     );
   }

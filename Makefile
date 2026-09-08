@@ -256,7 +256,10 @@ desktop-release: .venv ## Build, sign, and notarize the public Questboard DMG
 	$(PYTHON) scripts/build_update_manifest.py \
 		--bundle-dir "$$(dirname "$$APP")" \
 		--version "$$VERSION" \
-		--out "$$(dirname "$$DMG")/latest.json"
+		--out "$$(dirname "$$DMG")/latest.json"; \
+	cp "$$DMG" "$$(dirname "$$DMG")/Questboard_aarch64.dmg"; \
+	echo "  Publish with:"; \
+	echo "  gh release create v$$VERSION $$DMG $$(dirname "$$DMG")/Questboard_aarch64.dmg $$(dirname "$$APP")/Questboard.app.tar.gz $$(dirname "$$DMG")/latest.json"
 
 desktop-smoke: .venv ## Run the desktop UX smoke test against the local runtime + web UI
 	@describe_pids() { for pid in $$*; do cmd=$$(ps -o command= -p "$$pid" 2>/dev/null | head -n 1); [ -n "$$cmd" ] || cmd="(process exited)"; echo "    $$pid $$cmd"; done; }; \
