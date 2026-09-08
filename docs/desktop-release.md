@@ -109,4 +109,5 @@ to the updater.
   `run-desktop-build.mjs` already handles `x86_64`, but no Intel build ships.
 - Windows and Linux. `latest.json` carries a `darwin-aarch64` entry only.
 - CI signing. Releases are cut from a local machine using the login keychain.
-  `.github/workflows/desktop-release.yml` still builds unsigned artifacts.
+  CI's tag-gated "Desktop macOS Bundle" job only proves the bundle builds; it
+  does not sign or publish anything.
