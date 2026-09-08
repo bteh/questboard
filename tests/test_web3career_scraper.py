@@ -195,7 +195,9 @@ def test_registry_and_default_configs_enable_web3career() -> None:
     root = Path(__file__).resolve().parents[1]
     for path in (
         root / "src/job_finder/config/search_config.yaml",
-        root / "src/job_finder/config/profiles/default.yaml",
+        # default.yaml is a personal, gitignored copy of the template; the
+        # template is what a fresh install actually gets.
+        root / "src/job_finder/config/profiles/_template.yaml",
         root / "backend/config/search_config.yaml",
     ):
         text = path.read_text(encoding="utf-8")

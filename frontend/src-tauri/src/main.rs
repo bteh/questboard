@@ -342,7 +342,10 @@ fn fail_launch(app: &AppHandle, headline: &str, log_path: Option<&Path>) {
     kill_runtime(app);
     let mut message = format!("{headline}\n\nQuit and reopen Questboard to try again.");
     if let Some(path) = log_path {
-        message.push_str(&format!("\n\nIf it keeps happening, this log says why:\n{}", path.display()));
+        message.push_str(&format!(
+            "\n\nIf it keeps happening, this log says why:\n{}",
+            path.display()
+        ));
     }
     app.dialog()
         .message(message)

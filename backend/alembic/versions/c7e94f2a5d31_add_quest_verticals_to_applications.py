@@ -32,11 +32,11 @@ def upgrade() -> None:
     op.add_column("applications", sa.Column("event_end", sa.DateTime(), nullable=True))
     op.add_column(
         "applications",
-        sa.Column("is_rolling", sa.Boolean(), nullable=True, server_default=sa.text("0")),
+        sa.Column("is_rolling", sa.Boolean(), nullable=True, server_default=sa.false()),
     )
     op.add_column(
         "applications",
-        sa.Column("first_quest_ok", sa.Boolean(), nullable=True, server_default=sa.text("0")),
+        sa.Column("first_quest_ok", sa.Boolean(), nullable=True, server_default=sa.false()),
     )
     op.add_column(
         "applications",
