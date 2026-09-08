@@ -42,7 +42,11 @@ const routeTree = rootRoute.addChildren([
   designRoute,
 ]);
 
-export const router = createRouter({ routeTree });
+// Vite's BASE_URL is "/" for the desktop app and the dev server, and a
+// sub-path for the GitHub Pages landing, so the router follows the build.
+const basepath = import.meta.env.BASE_URL.replace(/\/$/, '') || undefined;
+
+export const router = createRouter({ routeTree, basepath });
 
 declare module '@tanstack/react-router' {
   interface Register {

@@ -15,8 +15,10 @@ import { openExternal } from '@/lib/open-external';
 
 const DOWNLOAD_URL = import.meta.env.VITE_DOWNLOAD_URL as string | undefined;
 const NOTIFY_ENDPOINT = import.meta.env.VITE_NOTIFY_ENDPOINT as string | undefined;
-const NOTIFY_EMAIL =
-  (import.meta.env.VITE_NOTIFY_EMAIL as string | undefined) ?? 'hello@questboard.io';
+// No default address: a made-up one would route strangers' mail to whoever
+// owns that domain. Without one, the fallback is the GitHub releases page.
+const NOTIFY_EMAIL = import.meta.env.VITE_NOTIFY_EMAIL as string | undefined;
+const RELEASES_URL = 'https://github.com/bteh/questboard/releases';
 
 const NOT_OUT_YET = 'The signed Mac build isn’t out yet. One email when it lands, nothing else.';
 
@@ -38,6 +40,17 @@ export function DownloadOrNotify({ big = false }: { big?: boolean }) {
 function NotifyMe({ big }: { big: boolean }) {
   const [email, setEmail] = useState('');
   const [state, setState] = useState<'idle' | 'sending' | 'done' | 'error'>('idle');
+
+  if (!NOTIFY_ENDPOINT && !NOTIFY_EMAIL) {
+    return (
+      <div className="qb-cta-stack">
+        <SageButton big={big} onClick={() => void openExternal(RELEASES_URL)}>
+          Get the Mac build on GitHub
+        </SageButton>
+        <span className="qb-lnote">Every release is signed and notarized. Apple Silicon, macOS 12 or newer.</span>
+      </div>
+    );
+  }
 
   if (!NOTIFY_ENDPOINT) {
     const href =

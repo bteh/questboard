@@ -11,17 +11,14 @@ import { DownloadOrNotify } from './download-cta';
 afterEach(cleanup);
 
 describe('DownloadOrNotify (no env configured)', () => {
-  it('offers a real notify action, never a dead email field', () => {
+  it('offers a real action, never a dead email field or a made-up address', () => {
     render(<DownloadOrNotify big />);
     // A clickable action exists...
-    expect(screen.getByRole('button', { name: /mac build is ready/i })).toBeTruthy();
-    // ...and it is NOT a bare form input that goes nowhere.
+    expect(screen.getByRole('button', { name: /on github/i })).toBeTruthy();
+    // ...it is NOT a bare form input that goes nowhere...
     expect(screen.queryByRole('textbox')).toBeNull();
-  });
-
-  it('states honestly that the signed build is not out yet', () => {
-    render(<DownloadOrNotify />);
-    expect(screen.getByText(/isn.t out yet/i)).toBeTruthy();
+    // ...and it never invents an email address on a domain we do not own.
+    expect(screen.queryByText(/questboard\.io/i)).toBeNull();
   });
 
   it('does not render a Download button when no release URL is set', () => {

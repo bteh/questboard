@@ -96,11 +96,15 @@ copied from it later may not be the signed one.
 
 ## The landing page
 
-`questboard.io` is the frontend's `/` route built as static files and served
-by GitHub Pages from `.github/workflows/pages.yml`, which runs on every push
-that touches the frontend. It needs no backend. DNS lives at Namecheap: the
-apex has the four GitHub Pages A records and `www` is a CNAME to
-`bteh.github.io`.
+The landing is the frontend's `/` route built as static files and served by
+GitHub Pages from `.github/workflows/pages.yml`, which runs on every push that
+touches the frontend. It needs no backend. It lives at
+`https://bteh.github.io/questboard/` for now; the workflow builds with
+`--base=/questboard/` and the router reads that base, so both the assets and
+the routes resolve under the sub-path. When a domain is attached later, set
+the Pages custom domain and change the base to `/`.
+
+There is no questboard.io. That domain belongs to someone else.
 
 **The repository must be public for this to work.** Release assets on a private
 repo need authentication, so the updater gets a 404 and every installed copy

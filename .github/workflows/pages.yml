@@ -1,8 +1,9 @@
 name: Landing
 
-# The public site at questboard.io is the frontend's landing route built as
-# static files. It needs no backend, so it deploys to GitHub Pages on every
-# change to the frontend.
+# The public landing is the frontend's "/" route built as static files. It
+# needs no backend, so it deploys to GitHub Pages on every frontend change.
+# It is served under /questboard/ until a domain is attached; LANDING_BASE
+# becomes "/" at that point.
 
 on:
   push:
@@ -40,9 +41,10 @@ jobs:
       - name: Build the landing
         working-directory: frontend
         env:
+          LANDING_BASE: /questboard/
           # A stably named copy of the current DMG, uploaded with every release.
           VITE_DOWNLOAD_URL: https://github.com/bteh/questboard/releases/latest/download/Questboard_aarch64.dmg
-        run: pnpm run build
+        run: pnpm exec tsc -b && pnpm exec vite build --base="$LANDING_BASE"
       - name: Serve the app shell for any deep link
         # Pages has no rewrite rules; its 404 page is the only fallback.
         run: cp frontend/dist/index.html frontend/dist/404.html
