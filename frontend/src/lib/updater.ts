@@ -35,9 +35,13 @@ export async function fetchAndStageUpdate(
   if (!isDesktopApp()) return;
 
   try {
+    onState({ kind: 'checking' });
     const { check } = await import('@tauri-apps/plugin-updater');
     const update = await check();
-    if (!update) return;
+    if (!update) {
+      onState({ kind: 'up_to_date' });
+      return;
+    }
 
     let downloaded = 0;
     let total: number | null = null;
@@ -77,4 +81,15 @@ export async function installAndRestart(): Promise<void> {
   await invoke('shutdown_runtime_for_update');
   await update.install();
   await relaunch();
+}
+
+/** The version this build carries, for the Settings row. */
+export async function currentAppVersion(): Promise<string> {
+  if (!isDesktopApp()) return '';
+  try {
+    const { getVersion } = await import('@tauri-apps/api/app');
+    return await getVersion();
+  } catch {
+    return '';
+  }
 }

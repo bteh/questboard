@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   CHECK_INTERVAL_MS,
+  checkStatusText,
   downloadPercent,
   shouldCheck,
   updateBannerText,
@@ -57,5 +58,20 @@ describe('downloadPercent', () => {
 
   it('rounds to a whole percent', () => {
     expect(downloadPercent(333, 1000)).toBe(33);
+  });
+});
+
+describe('checkStatusText (the explicit Settings row)', () => {
+  it('says plainly when there is nothing to do, which the pill never does', () => {
+    expect(updateBannerText({ kind: 'up_to_date' })).toBeNull();
+    expect(checkStatusText({ kind: 'up_to_date' }, '0.2.3')).toBe('You have the latest version, 0.2.3.');
+  });
+
+  it('names the downloaded version and the restart', () => {
+    expect(checkStatusText({ kind: 'ready', version: '0.2.4' }, '0.2.3')).toMatch(/0\.2\.4.*Restart/);
+  });
+
+  it('turns a failed check into something a person can act on', () => {
+    expect(checkStatusText({ kind: 'failed' }, '0.2.3')).toMatch(/connection/i);
   });
 });

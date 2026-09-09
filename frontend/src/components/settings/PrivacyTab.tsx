@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { UpdateCheckRow } from './update-check-row';
 import type { useNavigate } from '@tanstack/react-router';
 import { Loader2, ShieldCheck, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -86,6 +87,7 @@ export function PrivacyTab({ navigate }: PrivacyTabProps) {
           </Button>
         </CardContent>
       </Card>
+      <UpdateCheckRow />
     </div>
   );
 }
