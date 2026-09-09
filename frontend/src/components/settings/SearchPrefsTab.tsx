@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSaveWorkspacePreferences } from '@/hooks/use-workspace';
+import { SuggestRolesPanel } from './suggest-roles-panel';
 import { buildDefaultWorkspacePreferences, LEVEL_OPTIONS } from '@/lib/profile-preferences';
 import { cn } from '@/lib/utils';
 import type { OnboardingState, WorkspacePreferences } from '@/types/workspace';
@@ -80,6 +81,10 @@ export function SearchPrefsTab({ onboarding, navigate }: SearchPrefsTabProps) {
             value={prefsForm.roles}
             onChange={(roles) => setPrefsForm((prev) => ({ ...prev, roles }))}
             placeholder="The title you want next, then press Enter"
+          />
+          <SuggestRolesPanel
+            resumeExists={onboarding?.needs_resume === false}
+            onAccepted={(roles) => setPrefsForm((prev) => ({ ...prev, roles }))}
           />
         </div>
 

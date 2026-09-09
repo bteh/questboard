@@ -40,6 +40,23 @@ router = APIRouter(prefix="/agent", tags=["agent"])
 # an arbitrary prompt or widen the tool allow-list. Each entry says whether the
 # task needs the resume (and therefore resume consent).
 _AGENT_TASKS: dict[str, dict[str, object]] = {
+    "propose_roles": {
+        "needs_resume": True,
+        "prompt": (
+            "Use the Questboard MCP tools. First call read_resume_for_matching to read my "
+            "resume, then get_career_preferences for my saved target roles. Then call "
+            "propose_career_preferences ONCE with 6 to 10 target roles I should search: "
+            "keep the saved roles that fit my resume, add adjacent titles and variants I "
+            "might not think to search for, and drop nothing I added myself. Calibrate to "
+            "my resume's ACTUAL seniority: at most one level up from titles I have held. "
+            "If my resume shows no professional title in the field I am aiming at, I am "
+            "breaking in: propose entry-level and adjacent titles that hire people from my "
+            "background, never senior, staff, lead, or manager titles. Give a rationale of "
+            "two or three plain sentences. Proposing records a suggestion for me to accept "
+            "in the app; do NOT call set_career_preferences, refresh_work, or search_work, "
+            "and do not save anything yourself. Stop after the proposal."
+        ),
+    },
     "find_and_rank": {
         "needs_resume": True,
         "prompt": (

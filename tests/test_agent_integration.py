@@ -324,3 +324,29 @@ def test_proposals_are_calibrated_to_the_users_actual_level() -> None:
     assert "one level" in prompt.lower()
     assert "vp" in prompt.lower() or "two levels" in prompt.lower()
     assert "do not propose dropping" in prompt.lower()
+
+
+def _propose_roles_task() -> dict[str, object]:
+    from app.api.local_agent import _AGENT_TASKS
+
+    return _AGENT_TASKS["propose_roles"]
+
+
+def test_propose_roles_task_reads_the_resume_and_only_proposes() -> None:
+    """Search defaults has a "suggest roles from my resume" button. It runs the
+    connected assistant headlessly; the assistant may propose, never save, and
+    must not kick off a source pull on the side."""
+    task = _propose_roles_task()
+    prompt = str(task["prompt"])
+    assert task["needs_resume"] is True
+    assert "read_resume_for_matching" in prompt
+    assert "propose_career_preferences" in prompt
+    assert "do NOT call set_career_preferences, refresh_work, or search_work" in prompt
+
+
+def test_propose_roles_task_calibrates_for_people_breaking_in() -> None:
+    """Real case, Sep 8 2026: a career switcher with no tech title got a board of
+    Staff and Senior engineers. The proposal prompt must steer entry-level."""
+    prompt = str(_propose_roles_task()["prompt"])
+    assert "breaking in" in prompt
+    assert "never senior, staff, lead, or manager titles" in prompt
