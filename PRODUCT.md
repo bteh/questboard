@@ -9,7 +9,7 @@ Questboard is a local opportunity radar with two distinct workflows:
 - **Find Work** finds fresh career opportunities, enforces hard constraints, and lets a user-owned agent compare the best candidates with the user's resume.
 - **Side Quests** finds paid studies, freelance work, auditions, grants, events, bonuses, and other worthwhile opportunities from interests and practical constraints. A resume is not part of this workflow unless the user explicitly asks for it.
 
-The desktop app owns discovery, source receipts, local data, filters, and workflow memory. Codex, Claude Code, or another MCP client can supply the optional reasoning. Questboard does not sell, fund, proxy, or meter AI tokens.
+The desktop app owns discovery, source receipts, local data, filters, and workflow memory. The Claude app, Claude Code, Codex, or another MCP client can supply the optional reasoning. Questboard does not sell, fund, proxy, or meter AI tokens.
 
 The website is the public front door for the story, download, documentation, source status, and eventually a limited public opportunity preview. It is not the primary personalized product.
 

@@ -6,6 +6,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 
 const clientsQuery = { data: { clients: [{ id: 'claude', name: 'Claude Code', installed: true, connected: true, restart_required: false }] } };
+const claudeCode = clientsQuery.data.clients[0];
 const proposalsQuery = { data: { proposals: [] as { id: number; status: string; proposed_roles: string[]; rationale: string }[] } };
 const runMutate = vi.fn();
 const decideMutate = vi.fn();
@@ -33,12 +34,21 @@ import { SuggestRolesPanel } from './suggest-roles-panel';
 
 afterEach(() => {
   cleanup();
+  clientsQuery.data = { clients: [claudeCode] };
   proposalsQuery.data = { proposals: [] };
   runMutate.mockReset();
   decideMutate.mockReset();
 });
 
 describe('SuggestRolesPanel', () => {
+  it('offers a paste prompt instead of a run when only Claude Desktop is connected', () => {
+    clientsQuery.data = { clients: [{ id: 'claude_desktop', name: 'Claude Desktop', installed: true, connected: true, restart_required: false }] };
+    render(<SuggestRolesPanel resumeExists onAccepted={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /copy prompt for claude desktop/i })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /suggest roles from my resume/i })).toBeNull();
+    expect(screen.getByText(/paste it into claude desktop/i)).toBeTruthy();
+  });
+
   it('runs the propose_roles task with the connected assistant', () => {
     render(<SuggestRolesPanel resumeExists onAccepted={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: /suggest roles from my resume with claude code/i }));

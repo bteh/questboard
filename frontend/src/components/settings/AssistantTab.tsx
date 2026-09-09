@@ -20,6 +20,8 @@ import type { AgentClientStatus } from '@/types/resume';
    applies, so the prompt itself must carry the proposal contract: judged
    roles are used for the run and recorded as a proposal, never saved.
    Exported so a test can pin that. */
+import { assistantNote, installUrlFor } from './assistant-links';
+
 export const SETUP_PROMPT =
   'Use my local Questboard MCP tools: read my resume, sharpen my target roles and broaden them with adjacent titles I might not think to search for, but do NOT save them, my saved search is mine to change. Refresh work with those roles for this run, and record your suggested list with propose_career_preferences so I can accept it later. Then find me matching work and tell me which postings fit my experience best and why.';
 
@@ -119,9 +121,16 @@ export function AssistantTab() {
                           ? 'Connected. Restart it to pick up changes.'
                           : 'Installed, not connected yet'}
                     </p>
+                    <p className="text-xs text-text-tertiary">{assistantNote(client.id)}</p>
                   </div>
                   {!client.installed ? (
-                    <span className="text-xs text-text-tertiary">Install it first</span>
+                    <button
+                      type="button"
+                      className="text-xs font-medium text-brand underline underline-offset-2"
+                      onClick={() => void openExternal(installUrlFor(client.id))}
+                    >
+                      Get it
+                    </button>
                   ) : client.connected ? (
                     <div className="flex items-center gap-2">
                       <span className="flex items-center gap-1 text-xs font-medium text-brand">
@@ -163,15 +172,15 @@ export function AssistantTab() {
             )}
             {noneInstalled && (
               <p className="text-xs text-text-muted">
-                No assistant found on this Mac. Questboard works with{' '}
+                No assistant found on this Mac. The easy one is the{' '}
                 <button
                   type="button"
                   className="font-medium text-brand underline underline-offset-2"
-                  onClick={() => void openExternal('https://claude.ai/code')}
+                  onClick={() => void openExternal(installUrlFor('claude_desktop'))}
                 >
-                  Claude Code
-                </button>{' '}
-                or Codex. Install one, then come back.
+                  Claude app
+                </button>
+                , which works on a free account. Claude Code and Codex work too. Install one, then come back.
               </p>
             )}
           </div>

@@ -23,6 +23,8 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from app.services import claude_desktop_service
+
 logger = logging.getLogger(__name__)
 
 SERVER_NAME = "questboard"
@@ -50,7 +52,14 @@ RUN_ALLOWED_TOOLS: tuple[str, ...] = (
 RUN_DISALLOWED_TOOLS: tuple[str, ...] = ("set_career_preferences",)
 
 # id -> display name, in the order we show them.
-CLIENTS: dict[str, str] = {"claude": "Claude Code", "codex": "Codex"}
+# Claude Desktop first: it is the one a person who only knows Claude in a
+# window can use, and it needs no Terminal and no paid plan.
+CLIENTS: dict[str, str] = {
+    claude_desktop_service.CLIENT_ID: claude_desktop_service.CLIENT_NAME,
+    "claude": "Claude Code",
+    "codex": "Codex",
+}
+HEADLESS_CLIENTS: frozenset[str] = frozenset({"claude"})
 
 # Where CLI agents commonly install, beyond whatever PATH the app inherited.
 _EXTRA_BIN_DIRS = [
@@ -154,6 +163,8 @@ def _is_connected(client: str, binary: str) -> bool:
 
 
 def client_status(client: str) -> dict[str, Any]:
+    if client == claude_desktop_service.CLIENT_ID:
+        return claude_desktop_service.status(runtime_command())
     binary = resolve_binary(client)
     return {
         "id": client,
@@ -170,6 +181,8 @@ def list_clients() -> list[dict[str, Any]]:
 def connect(client: str) -> dict[str, Any]:
     if client not in CLIENTS:
         raise ValueError(f"Unknown assistant: {client}")
+    if client == claude_desktop_service.CLIENT_ID:
+        return claude_desktop_service.connect(runtime_command())
     binary = resolve_binary(client)
     if binary is None:
         raise ValueError(
@@ -201,6 +214,8 @@ def connect(client: str) -> dict[str, Any]:
 def disconnect(client: str) -> dict[str, Any]:
     if client not in CLIENTS:
         raise ValueError(f"Unknown assistant: {client}")
+    if client == claude_desktop_service.CLIENT_ID:
+        return claude_desktop_service.disconnect(runtime_command())
     binary = resolve_binary(client)
     if binary is None:
         return client_status(client)
@@ -273,6 +288,14 @@ def run_headless(
         raise RuntimeError("Headless agent runs are not available in hosted mode")
     if client not in CLIENTS:
         raise ValueError(f"Unknown assistant: {client}")
+    if client == claude_desktop_service.CLIENT_ID:
+        # The desktop app has no print mode to drive; the person pastes the
+        # prompt into a chat and the proposal lands in Questboard the same way.
+        return {
+            "ok": False, "result": "",
+            "error": "Claude Desktop runs from its own chat window. Copy the prompt, paste it there, and the suggestion shows up here.",
+            "cost_usd": None, "num_turns": None,
+        }
     binary = resolve_binary(client)
     if binary is None:
         return {"ok": False, "result": "", "error": f"{CLIENTS[client]} is not installed.", "cost_usd": None, "num_turns": None}
@@ -312,10 +335,57 @@ def run_headless(
             pass
 
     if result.returncode != 0:
-        detail = (result.stderr or result.stdout or "").strip()[:400]
-        return {"ok": False, "result": "", "error": detail or f"{CLIENTS[client]} exited with an error.", "cost_usd": None, "num_turns": None}
+        raw = (result.stdout or "").strip() or (result.stderr or "").strip()
+        return {
+            "ok": False,
+            "result": "",
+            "error": plain_agent_error(raw, CLIENTS[client]) if raw else f"{CLIENTS[client]} exited with an error.",
+            "cost_usd": None,
+            "num_turns": None,
+        }
 
     return _parse_claude_json(result.stdout)
+
+
+def plain_agent_error(text: str, client_label: str) -> str:
+    """Turn whatever the CLI printed into one sentence a person can act on.
+
+    A signed-out Claude Code exits 1 and prints its result JSON to stdout with
+    zero tokens used; that JSON must never reach a toast. Unknown text is kept
+    only when it reads like prose.
+    """
+    raw = (text or "").strip()
+    payload: dict[str, Any] | None = None
+    if raw.startswith("{"):
+        try:
+            loaded = json.loads(raw)
+            payload = loaded if isinstance(loaded, dict) else None
+        except (json.JSONDecodeError, TypeError):
+            payload = None
+    detail = str(payload.get("result") or "").strip() if payload is not None else raw
+    lowered = detail.lower()
+    usage = payload.get("usage") if payload else None
+    no_model_call = bool(payload) and (
+        str(payload.get("terminal_reason") or "") == "api_error"
+        or (isinstance(usage, dict) and not usage.get("input_tokens") and not usage.get("output_tokens"))
+    )
+    if no_model_call or any(
+        hint in lowered for hint in ("api key", "/login", "not logged in", "log in", "sign in", "authenticat")
+    ):
+        return (
+            f"{client_label} isn't signed in on this Mac. Open Terminal, type `claude`, "
+            "and sign in with your Claude account. Then try again."
+        )
+    if "subscription" in lowered or "pro or max" in lowered or "requires a paid" in lowered:
+        return f"{client_label} needs a Claude Pro or Max plan on the account it is signed in with."
+    if "rate limit" in lowered or "usage limit" in lowered or "overloaded" in lowered:
+        return f"{client_label} is rate-limited right now. Try again in a few minutes."
+    if detail and "{" not in detail and "}" not in detail:
+        return detail[:300]
+    return (
+        f"{client_label} stopped with an error it did not explain. Open Terminal, type `claude`, "
+        "and try the same request there to see it."
+    )
 
 
 def _parse_claude_json(stdout: str) -> dict[str, Any]:
@@ -329,7 +399,7 @@ def _parse_claude_json(stdout: str) -> dict[str, Any]:
     return {
         "ok": not is_error and bool(text),
         "result": text,
-        "error": "" if (not is_error and text) else (text or "The assistant returned no answer."),
+        "error": "" if (not is_error and text) else plain_agent_error(stdout, "Claude Code"),
         "cost_usd": payload.get("total_cost_usd"),
         "num_turns": payload.get("num_turns"),
     }

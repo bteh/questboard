@@ -6,6 +6,8 @@ edit the developer's actual client config.
 """
 from __future__ import annotations
 
+import json
+
 import sys
 from pathlib import Path
 
@@ -20,9 +22,9 @@ from app.services import agent_run_progress  # noqa: E402
 def test_list_clients_shape() -> None:
     clients = svc.list_clients()
     ids = {c["id"] for c in clients}
-    assert ids == {"claude", "codex"}
+    assert ids == {"claude_desktop", "claude", "codex"}
     for c in clients:
-        assert set(c) == {"id", "name", "installed", "connected"}
+        assert {"id", "name", "installed", "connected"} <= set(c)
         assert isinstance(c["installed"], bool)
         assert isinstance(c["connected"], bool)
         # A client that isn't installed can never read as connected.
@@ -350,3 +352,65 @@ def test_propose_roles_task_calibrates_for_people_breaking_in() -> None:
     prompt = str(_propose_roles_task()["prompt"])
     assert "breaking in" in prompt
     assert "never senior, staff, lead, or manager titles" in prompt
+
+
+NOT_SIGNED_IN_PAYLOAD = (
+    '{"duration_api_ms":0,"stop_reason":"stop_sequence","session_id":"4dd95861","total_cost_usd":0,'
+    '"usage":{"input_tokens":0,"output_tokens":0},"terminal_reason":"api_error","is_error":true,'
+    '"result":"","num_turns":0}'
+)
+
+
+def test_run_headless_explains_a_not_signed_in_claude_in_plain_words(monkeypatch) -> None:
+    """Real case, Sep 8 2026: a first-time user's Claude Code was not signed in.
+    The CLI exits 1 and prints its result JSON to stdout, and the app showed
+    that JSON, braces and all, in a toast. The user must get a sentence that
+    names the fix."""
+    import subprocess as sp
+
+    monkeypatch.setattr(svc, "resolve_binary", lambda client: "/usr/local/bin/claude")
+    monkeypatch.setattr(
+        svc.subprocess,
+        "run",
+        lambda *a, **k: sp.CompletedProcess(a[0], 1, stdout=NOT_SIGNED_IN_PAYLOAD, stderr=""),
+    )
+    outcome = svc.run_headless("claude", "propose roles")
+    assert outcome["ok"] is False
+    assert "{" not in outcome["error"]
+    assert "sign" in outcome["error"].lower()
+    assert "claude" in outcome["error"].lower()
+
+
+def test_plain_agent_error_never_leaks_json() -> None:
+    message = svc.plain_agent_error('{"some":"payload","is_error":true}', "Claude Code")
+    assert "{" not in message
+    assert "Claude Code" in message
+
+
+def test_claude_desktop_is_listed_first_and_connects_through_its_config(monkeypatch, tmp_path) -> None:
+    """A person who only knows Claude in a window must see that option first,
+    and connecting must write the same MCP command Claude Code gets, into the
+    desktop app's config file."""
+    from app.services import claude_desktop_service
+
+    config = tmp_path / "claude_desktop_config.json"
+    monkeypatch.setenv("CLAUDE_DESKTOP_CONFIG", str(config))
+    (tmp_path / "Claude.app").mkdir()
+    monkeypatch.setattr(claude_desktop_service, "_APP_BUNDLES", (tmp_path / "Claude.app",))
+    monkeypatch.setattr(claude_desktop_service, "_changed_this_session", False)
+
+    ids = [c["id"] for c in svc.list_clients()]
+    assert ids[0] == "claude_desktop"
+
+    result = svc.connect("claude_desktop")
+    assert result["connected"] is True
+    assert result["restart_required"] is True
+    written = json.loads(config.read_text())["mcpServers"]["questboard"]
+    assert written["command"] == svc.runtime_command()[0]
+    assert "--data-dir" in written["args"]
+
+
+def test_claude_desktop_cannot_run_headless_and_says_what_to_do_instead() -> None:
+    outcome = svc.run_headless("claude_desktop", "propose roles")
+    assert outcome["ok"] is False
+    assert "Copy the prompt" in outcome["error"]

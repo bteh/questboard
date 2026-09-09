@@ -1,6 +1,6 @@
 # Questboard
 
-**A local opportunity radar for work and Side Quests.** Questboard watches real sources, keeps receipts and freshness facts, filters out opportunities you cannot actually do, and stores everything on your machine. Connect Codex or Claude Code when you want an agent to compare career postings with your resume. The agent uses your account; Questboard never provides or meters AI credits.
+**A local opportunity radar for work and Side Quests.** Questboard watches real sources, keeps receipts and freshness facts, filters out opportunities you cannot actually do, and stores everything on your machine. Connect the Claude app, Claude Code, or Codex when you want an assistant to compare career postings with your resume. The Claude app works on a free Claude account. The agent uses your account; Questboard never provides or meters AI credits.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![CI](https://github.com/bteh/questboard/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/bteh/questboard/actions/workflows/ci.yml)
 

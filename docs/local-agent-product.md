@@ -4,7 +4,7 @@ _Decision date: July 16, 2026_
 
 ## Decision
 
-Questboard's primary personalized product is a local desktop app plus a local stdio MCP server. The user may connect Codex, Claude Code, or another compatible client. That client supplies the model, subscription, context window, and reasoning cost.
+Questboard's primary personalized product is a local desktop app plus a local stdio MCP server. The user may connect the Claude desktop app, Claude Code, Codex, or another compatible client. That client supplies the model, subscription, context window, and reasoning cost.
 
 Questboard supplies:
 
