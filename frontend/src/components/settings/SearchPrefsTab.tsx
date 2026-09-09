@@ -75,11 +75,11 @@ export function SearchPrefsTab({ onboarding, navigate }: SearchPrefsTabProps) {
       <CardContent className="space-y-5">
         <div className="space-y-1.5">
           <Label>Target roles</Label>
-          <p className="text-xs text-text-muted">The kind of work you want. This is what the board matches jobs against.</p>
+          <p className="text-xs text-text-muted">Titles you want next, not the ones you had. This is what the board matches jobs against. Breaking in? Try Data Analyst, IT Support Specialist, Sales Development Representative, Customer Success Associate.</p>
           <TagListInput
             value={prefsForm.roles}
             onChange={(roles) => setPrefsForm((prev) => ({ ...prev, roles }))}
-            placeholder="e.g. Data Engineering Manager, then press Enter"
+            placeholder="The title you want next, then press Enter"
           />
         </div>
 

@@ -198,26 +198,24 @@ async def start_onboarding_search(
             detail="Add at least one preferred location, or switch to Remote + selected places / Remote only.",
         )
 
-    # When no roles/keywords, try to derive from the uploaded resume
-    if not prefs.roles and not prefs.keywords:
+    if not prefs.roles:
         resume_record = workspace_service.get_workspace_resume(db, context.workspace.id)
         if resume_record and resume_record.extracted_text:
             fallback_roles, fallback_keywords = workspace_service.derive_search_terms_from_resume(
                 db, context.workspace.id, prefs,
             )
-            if fallback_roles or fallback_keywords:
-                prefs = prefs.model_copy(update={
-                    "roles": fallback_roles,
-                    "keywords": fallback_keywords,
-                })
-        if not prefs.roles and not prefs.keywords:
-            raise HTTPException(status_code=400, detail="Add at least one role or keyword, or upload a resume")
+            prefs = prefs.model_copy(update={
+                "roles": fallback_roles,
+                "keywords": prefs.keywords or fallback_keywords,
+            })
+    if not workspace_service.has_search_target(prefs.roles):
+        raise HTTPException(status_code=400, detail=workspace_service.NEEDS_TARGET_ROLE)
 
     snapshot = workspace_service.build_search_snapshot(prefs)
     llm = workspace_service.get_workspace_llm(db, context.workspace.id, fallback_to_global=True)
 
     run = pipeline_service.start_run(
-        roles=prefs.roles or prefs.keywords,
+        roles=prefs.roles,
         locations=labels,
         keywords=prefs.keywords,
         companies=prefs.companies,

@@ -5,6 +5,18 @@ side-effects bleeding between runs (e.g. on-disk caches).
 """
 from __future__ import annotations
 
+
+import sys
+from pathlib import Path
+
+# Tests import repo-level packages ("scripts.x", "tests.y") by name. Under
+# `python -m pytest` the cwd is on sys.path so this works by accident; under
+# bare `pytest` (CI) it only works if an earlier test happened to insert it.
+# Put the repo root first so import order never decides a test's fate.
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 import os
 
 import pytest

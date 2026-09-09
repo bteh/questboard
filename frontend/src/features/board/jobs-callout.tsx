@@ -34,7 +34,7 @@ export function JobsSetupStrip({
       )}
       {step === 'roles' && (
         <span>
-          <b>Choose your target roles</b> to pull matching jobs.{' '}
+          <b>Choose your target roles</b>, the titles you want next, not the ones you had.{' '}
           <Link to="/settings" search={{ tab: 'restock' }} className="qb-jobs-cta">
             Choose roles →
           </Link>

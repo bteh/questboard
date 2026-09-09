@@ -1652,6 +1652,19 @@ def get_onboarding_state(db: Session, workspace_id: str) -> OnboardingState:
     )
 
 
+NEEDS_TARGET_ROLE = (
+    "Add at least one target role: the title you want next, not the one you had. "
+    "Keywords on their own are not a search."
+)
+
+
+def has_search_target(roles: list[str]) -> bool:
+    """Every run entry point gates on this. Keywords never count as a target:
+    a switcher's resume yields skills like "Tableau" and no title, and a run
+    on those alone filled the board with Staff and Senior engineers."""
+    return any(str(role).strip() for role in roles)
+
+
 def derive_search_terms_from_resume(
     db: Session,
     workspace_id: str,

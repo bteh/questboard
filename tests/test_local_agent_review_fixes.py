@@ -262,6 +262,93 @@ def test_refresh_work_spends_no_questboard_ai(agent_db, monkeypatch):
     assert captured.get("keywords") == ["Snowflake"]
 
 
+SWITCHER_RESUME = """Kevin Teh
+Los Angeles, CA | kevin@example.com
+
+OBJECTIVE
+Looking to start a career in tech.
+
+EXPERIENCE
+Shift Supervisor, Target, Los Angeles, CA (2022 - present)
+- Built the store's weekly sales tracking sheet in Excel with pivot tables.
+
+Customer Service Representative, Spectrum, Los Angeles, CA (2020 - 2022)
+- Walked customers through router setup and Wi-Fi troubleshooting.
+
+SKILLS
+Excel, Google Sheets, basic SQL, Tableau (beginner), Zendesk
+"""
+
+
+def test_refresh_work_refuses_career_switcher_keywords_only_fallback(agent_db, monkeypatch):
+    """Real case, Sep 8 2026: saved keywords but no roles, and a switcher's
+    resume with no tech title. The fallback used to run the search on
+    "Tableau" as a job title and fill the board with Staff and Senior
+    engineers. The tool must ask for a target role and start nothing."""
+    import asyncio
+    from app import local_mcp
+    from app.models.workspace import WorkspacePreferences, WorkspaceResume
+    from app.services import pipeline_service
+    from mcp.server.fastmcp.exceptions import ToolError
+
+    prefs = agent_db.query(WorkspacePreferences).filter_by(workspace_id="local").one()
+    prefs.roles_json = "[]"
+    prefs.keywords_json = json.dumps(["Tableau"])
+    resume = agent_db.query(WorkspaceResume).filter_by(workspace_id="local").one()
+    resume.extracted_text = SWITCHER_RESUME
+    agent_db.commit()
+
+    started: list[dict] = []
+    monkeypatch.setattr(pipeline_service, "start_run", lambda **kwargs: started.append(kwargs))
+
+    with pytest.raises(ToolError) as excinfo:
+        asyncio.run(local_mcp.refresh_work())
+    assert "target role" in str(excinfo.value).lower()
+    assert started == []
+
+
+def test_refresh_work_falls_back_to_saved_roles_when_the_call_omits_them(agent_db, monkeypatch):
+    """The assistant usually calls refresh_work() bare. Saved keywords already
+    fill in for an omitted argument; saved roles must too, or the new
+    target-role gate refuses a user who set roles in Settings."""
+    import asyncio
+    from types import SimpleNamespace
+    from app import local_mcp
+    from app.models.workspace import WorkspacePreferences, WorkspaceResume
+    from app.services import pipeline_service
+
+    prefs = agent_db.query(WorkspacePreferences).filter_by(workspace_id="local").one()
+    prefs.roles_json = json.dumps(["Data Analyst"])
+    prefs.keywords_json = "[]"
+    resume = agent_db.query(WorkspaceResume).filter_by(workspace_id="local").one()
+    resume.extracted_text = SWITCHER_RESUME
+    agent_db.commit()
+
+    started: list[dict] = []
+
+    def fake_start_run(**kwargs):
+        started.append(kwargs)
+        return SimpleNamespace(
+            run_id="run-saved-roles", status="pending", started_at=None, completed_at=None,
+            jobs_found=0, new_jobs=0, jobs_scored=0, error=None, progress_messages=[],
+        )
+
+    monkeypatch.setattr(pipeline_service, "start_run", fake_start_run)
+
+    result = asyncio.run(local_mcp.refresh_work())
+    assert result["run_id"] == "run-saved-roles"
+    assert started and started[0]["roles"] == ["Data Analyst"]
+
+
+def test_has_search_target_counts_only_real_roles():
+    from app.services.workspace_service import has_search_target
+
+    assert has_search_target([]) is False
+    assert has_search_target(["", "   "]) is False
+    assert has_search_target(["Data Analyst"]) is True
+    assert has_search_target(["  ", "Data Analyst"]) is True
+
+
 def test_strict_ranking_matches_pull_freshness_and_level_filters(agent_db):
     from app.models.workspace import WorkspacePreferences
     from app.services import local_agent_service

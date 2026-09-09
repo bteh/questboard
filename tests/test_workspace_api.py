@@ -921,6 +921,97 @@ class HostedWorkspaceApiTest(unittest.TestCase):
         self.assertEqual(captured["roles"], ["Nurse Practitioner"])
         self.assertEqual(captured["keywords"], [])
 
+    SWITCHER_RESUME = """Kevin Teh
+Los Angeles, CA | kevin@example.com
+
+OBJECTIVE
+Looking to start a career in tech.
+
+EXPERIENCE
+Shift Supervisor, Target, Los Angeles, CA (2022 - present)
+- Built the store's weekly sales tracking sheet in Excel with pivot tables.
+
+Customer Service Representative, Spectrum, Los Angeles, CA (2020 - 2022)
+- Walked customers through router setup and Wi-Fi troubleshooting.
+
+SKILLS
+Excel, Google Sheets, basic SQL, Tableau (beginner), Zendesk
+"""
+
+    def _upload_switcher_resume(self, headers) -> None:
+        """A career switcher: no tech title anywhere, a couple of tool names."""
+        with patch(
+            "job_finder.tools.resume_parser_tool.parse_resume",
+            return_value=self.SWITCHER_RESUME,
+        ), patch.object(self.workspace_service, "get_workspace_llm", return_value=None):
+            upload = self.client.post(
+                "/api/v1/onboarding/resume",
+                headers=headers,
+                files={"file": ("resume.pdf", b"%PDF-1.4\nmock", "application/pdf")},
+            )
+        self.assertEqual(upload.status_code, 200, upload.text)
+
+    def test_onboarding_search_refuses_to_run_on_keywords_alone(self) -> None:
+        """Real case, Sep 8 2026: a switcher's resume yields no title, so the
+        fallback searched the skill "Tableau" as if it were a job title and
+        filled the board with Staff and Senior engineers. Keywords are not a
+        job target; the search must ask for a role instead."""
+        headers = self._auth_headers()
+        self.client.get("/api/v1/me", headers=headers)
+        self._upload_switcher_resume(headers)
+
+        started: list[dict[str, object]] = []
+
+        def fake_start_run(**kwargs):
+            started.append(kwargs)
+            return SimpleNamespace(run_id="should-not-run", status="pending", started_at=None, completed_at=None)
+
+        with patch("app.services.pipeline_service.start_run", side_effect=fake_start_run):
+            response = self.client.post(
+                "/api/v1/onboarding/search",
+                headers=headers,
+                json={
+                    "preferred_places": [{"label": "Los Angeles, CA", "kind": "city", "match_scope": "metro"}],
+                    "workplace_preference": "remote_friendly",
+                    "max_days_old": 14,
+                },
+            )
+        self.assertEqual(response.status_code, 400, response.text)
+        self.assertIn("target role", response.json()["detail"].lower())
+        self.assertEqual(started, [], "search must not start on keywords alone")
+
+    def test_search_run_refuses_to_run_on_keywords_alone(self) -> None:
+        headers = self._auth_headers()
+        self.client.get("/api/v1/me", headers=headers)
+        self._upload_switcher_resume(headers)
+
+        started: list[dict[str, object]] = []
+
+        def fake_start_run(**kwargs):
+            started.append(kwargs)
+            return SimpleNamespace(run_id="should-not-run", status="pending", started_at=None, completed_at=None)
+
+        with patch("app.services.pipeline_service.start_run", side_effect=fake_start_run):
+            response = self.client.post(
+                "/api/v1/search/run",
+                headers=headers,
+                json={
+                    "roles": [],
+                    "locations": ["Los Angeles, CA"],
+                    "keywords": [],
+                    "companies": [],
+                    "include_remote": True,
+                    "workplace_preference": "remote_friendly",
+                    "max_days_old": 14,
+                    "use_ai": False,
+                    "profile": "default",
+                    "mode": "search_score",
+                },
+            )
+        self.assertEqual(response.status_code, 400, response.text)
+        self.assertIn("target role", response.json()["detail"].lower())
+        self.assertEqual(started, [], "search must not start on keywords alone")
+
     def test_search_suggest_times_out_falls_back_to_resume_terms(self) -> None:
         headers = self._auth_headers()
         self.client.get("/api/v1/me", headers=headers)

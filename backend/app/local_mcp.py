@@ -339,18 +339,23 @@ async def refresh_work(
         # ROLES_CAP matches the saved-roles cap. The default of 12 silently
         # dropped the tail of a 15-role list, and the assistant noticed the
         # pull never covered them; a run's own report is what caught this.
-        effective_roles = local_agent_service.clean_terms(roles, limit=local_agent_service.ROLES_CAP)
+        effective_roles = local_agent_service.clean_terms(
+            roles if roles is not None else preferences.roles,
+            limit=local_agent_service.ROLES_CAP,
+        )
         effective_keywords = (
             local_agent_service.clean_terms(keywords)
             if keywords is not None
             else local_agent_service.clean_terms(preferences.keywords)
         )
-        if not effective_roles and not effective_keywords:
-            effective_roles, effective_keywords = workspace_service.derive_search_terms_from_resume(
+        if not effective_roles:
+            derived_roles, derived_keywords = workspace_service.derive_search_terms_from_resume(
                 db, workspace.id, preferences
             )
-        if not effective_roles and not effective_keywords:
-            raise ToolError("Add at least one target role or keyword before refreshing work")
+            effective_roles = derived_roles
+            effective_keywords = effective_keywords or derived_keywords
+        if not workspace_service.has_search_target(effective_roles):
+            raise ToolError(workspace_service.NEEDS_TARGET_ROLE)
 
         effective_places = list(preferences.preferred_places)
         if locations:

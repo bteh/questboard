@@ -168,19 +168,18 @@ async def start_search_run(
         db=db if workspace else None,
     )
 
-    if workspace:
-        if not effective_roles and not effective_keywords:
-            prefs = workspace_service.get_workspace_preferences(db, workspace.workspace.id)
-            fallback_roles, fallback_keywords = workspace_service.derive_search_terms_from_resume(
-                db,
-                workspace.workspace.id,
-                prefs,
-            )
-            effective_roles = fallback_roles
-            effective_keywords = fallback_keywords
+    if workspace and not effective_roles:
+        prefs = workspace_service.get_workspace_preferences(db, workspace.workspace.id)
+        fallback_roles, fallback_keywords = workspace_service.derive_search_terms_from_resume(
+            db,
+            workspace.workspace.id,
+            prefs,
+        )
+        effective_roles = fallback_roles
+        effective_keywords = effective_keywords or fallback_keywords
 
-    if not effective_roles and not effective_keywords:
-        raise HTTPException(400, "At least one role or keyword is required")
+    if not workspace_service.has_search_target(effective_roles):
+        raise HTTPException(400, workspace_service.NEEDS_TARGET_ROLE)
 
     loop = asyncio.get_running_loop()
     config_override = None

@@ -121,8 +121,9 @@ export function ResumeAnalysisPanel({ analysis, preferences }: ResumeAnalysisPan
         <TagListInput
           value={roles}
           onChange={setRoles}
-          placeholder="Add a role, press Enter"
+          placeholder="The title you want next, then press Enter"
           emptyText="No target roles suggested."
+          helperText="Titles you want next, not the ones you had. Breaking in? Try Data Analyst, IT Support Specialist, Sales Development Representative, Customer Success Associate."
         />
       </div>
 
