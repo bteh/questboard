@@ -1012,6 +1012,50 @@ Excel, Google Sheets, basic SQL, Tableau (beginner), Zendesk
         self.assertIn("target role", response.json()["detail"].lower())
         self.assertEqual(started, [], "search must not start on keywords alone")
 
+    def test_search_run_derives_title_from_single_line_resume_with_parenthesised_dates(self) -> None:
+        """Real case, Sep 8 2026: a PDF made from plain text extracts as ONE
+        long line, and the dates read "(2023 - present)". The title finder
+        anchors on a date token, but never tokenised a year inside
+        parentheses, so it found nothing and the search had no role."""
+        headers = self._auth_headers()
+        self.client.get("/api/v1/me", headers=headers)
+        resume_text = (
+            "Jordan Teh        San Francisco, CA  |  jordan@example.com        "
+            "SUMMARY        Data engineer with 5 years building batch and streaming pipelines.        "
+            "EXPERIENCE        Senior Data Engineer, Northwind Analytics, San Francisco, CA  (2023 - present)  "
+            "- Built a Kafka to BigQuery streaming pipeline.        "
+            "Data Engineer, Contoso Retail, Oakland, CA  (2020 - 2023)        "
+            "SKILLS        Python, SQL, dbt, Airflow, Spark"
+        )
+        with patch("job_finder.tools.resume_parser_tool.parse_resume", return_value=resume_text), patch.object(
+            self.workspace_service, "get_workspace_llm", return_value=None
+        ):
+            upload = self.client.post(
+                "/api/v1/onboarding/resume",
+                headers=headers,
+                files={"file": ("resume.pdf", b"%PDF-1.4\nmock", "application/pdf")},
+            )
+        self.assertEqual(upload.status_code, 200, upload.text)
+
+        captured: dict[str, object] = {}
+
+        def fake_start_run(**kwargs):
+            captured.update(kwargs)
+            return SimpleNamespace(run_id="run-paren-dates", status="pending", started_at=None, completed_at=None)
+
+        with patch("app.services.pipeline_service.start_run", side_effect=fake_start_run):
+            response = self.client.post(
+                "/api/v1/onboarding/search",
+                headers=headers,
+                json={
+                    "preferred_places": [{"label": "San Francisco, CA", "kind": "city", "match_scope": "metro"}],
+                    "workplace_preference": "remote_friendly",
+                    "max_days_old": 14,
+                },
+            )
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(captured["roles"], ["Senior Data Engineer"])
+
     def test_search_suggest_times_out_falls_back_to_resume_terms(self) -> None:
         headers = self._auth_headers()
         self.client.get("/api/v1/me", headers=headers)

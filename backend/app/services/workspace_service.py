@@ -1790,17 +1790,24 @@ def derive_search_terms_from_resume(
         if reconstructed:
             return reconstructed
 
-        tokens = re.findall(r"\([A-Za-z][A-Za-z0-9&/().,+-]*|&|[A-Za-z][A-Za-z0-9&/().,+-]*", text)
+        # A year is the anchor the title is read back from, and resumes often
+        # wrap it: "(2023 - present)". Tokenise years with their parentheses
+        # and compare bare, or a single-line PDF never yields a title.
+        tokens = re.findall(
+            r"\([A-Za-z][A-Za-z0-9&/().,+-]*|&|[A-Za-z][A-Za-z0-9&/().,+-]*|\(?(?:19|20)\d{2}\)?",
+            text,
+        )
         search_window = tokens[:180]
+
+        def _bare(token: str) -> str:
+            return token.lower().strip(".,()")
+
         date_idx = next(
             (
                 idx
                 for idx, token in enumerate(search_window)
-                if (
-                    token.lower().strip(".,") in _DATE_TOKENS
-                    and token.lower().strip(".,") not in _AMBIGUOUS_MONTH_WORDS
-                )
-                or re.fullmatch(r"(19|20)\d{2}", token)
+                if (_bare(token) in _DATE_TOKENS and _bare(token) not in _AMBIGUOUS_MONTH_WORDS)
+                or re.fullmatch(r"(19|20)\d{2}", _bare(token))
             ),
             None,
         )
@@ -1809,12 +1816,12 @@ def derive_search_terms_from_resume(
 
         collected: list[str] = []
         for token in reversed(search_window[max(0, date_idx - 18):date_idx]):
-            lowered = token.lower().strip(".,")
+            lowered = _bare(token)
             if lowered in _RESUME_STOP_TOKENS:
                 if collected:
                     break
                 continue
-            if token.isdigit():
+            if lowered.isdigit():
                 if collected:
                     break
                 continue
