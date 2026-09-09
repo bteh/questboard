@@ -41,6 +41,9 @@
 .qb-land-hero .qb-lsub { font-size: 16.5px; color: var(--soft); margin: 14px auto 0; max-width: 560px; }
 .qb-land-cta { margin-top: 22px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .qb-lnote { font-size: 13.5px; color: var(--mute); }
+.qb-lnote-link { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+/* The download button is an anchor so browsers treat it as a download. */
+.qb-cta-stack a.qb-btn-sage { display: inline-block; text-decoration: none; text-align: center; }
 
 /* the board window, floating over the field */
 .qb-winpersp { perspective: 1500px; max-width: 1060px; margin: 54px auto 0; position: relative; }

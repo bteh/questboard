@@ -23,7 +23,7 @@ describe('DownloadOrNotify (no env configured)', () => {
 
   it('does not render a Download button when no release URL is set', () => {
     render(<DownloadOrNotify />);
-    expect(screen.queryByRole('button', { name: /^download/i })).toBeNull();
+    expect(screen.queryByRole('link', { name: /^download/i })).toBeNull();
   });
 });
 
@@ -34,7 +34,10 @@ describe('DownloadOrNotify (release URL configured)', () => {
     vi.resetModules();
     const { DownloadOrNotify: Configured } = await import('./download-cta');
     render(<Configured big />);
-    expect(screen.getByRole('button', { name: /download for mac/i })).toBeTruthy();
+    // A real link with the file as its href, so browsers download it directly
+    // and Safari's pop-up blocker never gets involved.
+    const link = screen.getByRole('link', { name: /download for mac/i }) as HTMLAnchorElement;
+    expect(link.getAttribute('href')).toBe('https://example.test/Questboard.dmg');
     expect(screen.queryByText(/isn.t out yet/i)).toBeNull();
     // The build is signed and notarized now; a warning note would be a lie.
     expect(screen.queryByText(/privacy|warns/i)).toBeNull();

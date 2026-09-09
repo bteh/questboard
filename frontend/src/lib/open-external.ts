@@ -33,6 +33,9 @@ export async function openExternal(url: string): Promise<void> {
  */
 export function openExternalClick(url: string) {
   return (e: React.MouseEvent) => {
+    // On the web the anchor itself is the right mechanism: no pop-up
+    // blocker, no blank tab, and the browser shows the download.
+    if (!isDesktopApp()) return;
     e.preventDefault();
     openExternal(url);
   };

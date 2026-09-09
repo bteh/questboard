@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { SageButton } from '@questboard/ui';
-import { openExternal } from '@/lib/open-external';
+import { SageButton, cx } from '@questboard/ui';
+import { openExternal, openExternalClick } from '@/lib/open-external';
 
 /* The download call-to-action, in three honest states driven by build-time
  * env. It never renders a button that points at nothing:
@@ -26,11 +26,24 @@ export function DownloadOrNotify({ big = false }: { big?: boolean }) {
   if (DOWNLOAD_URL) {
     return (
       <div className="qb-cta-stack">
-        <SageButton big={big} onClick={() => void openExternal(DOWNLOAD_URL)}>
+        {/* A real link, not window.open: Safari's pop-up blocker leaves it
+            alone and the browser shows the download instead of a blank tab. */}
+        <a
+          href={DOWNLOAD_URL}
+          className={cx('qb-btn-sage', big && 'qb-lbig')}
+          onClick={openExternalClick(DOWNLOAD_URL)}
+        >
           Download for Mac
-        </SageButton>
+        </a>
         <span className="qb-lnote">Free. Apple Silicon, macOS 12 or newer. No account.</span>
         <span className="qb-lnote">Signed and notarized, so it opens like any other app.</span>
+        <span className="qb-lnote">
+          Nothing happened? Check your Downloads folder, or{' '}
+          <a href={DOWNLOAD_URL} className="qb-lnote-link" onClick={openExternalClick(DOWNLOAD_URL)}>
+            use the direct link
+          </a>
+          .
+        </span>
       </div>
     );
   }
