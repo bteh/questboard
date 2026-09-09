@@ -76,3 +76,5 @@ test-results/
 !.aidesigner/.gitkeep
 !.aidesigner/first-run-hero.html
 .claude-octopus/
+.vercel
+.env*

@@ -1,0 +1,40 @@
+# Only the pnpm workspace (frontend + packages + root manifests) is needed to
+# build the landing. Leading slashes anchor rules to the repo root, so "/src"
+# is the Python package and never frontend/src.
+/.venv
+/.venv-x86
+/.desktop-build
+/backend
+/src
+/tests
+/scripts
+/docs
+/data
+/knowledge
+/temp
+/test-results
+/integrations
+/.github
+/.claude
+/.claude-octopus
+/.planning
+/.streamlit
+/.agents
+/.aidesigner
+/.pytest_cache
+/.ruff_cache
+/.mypy_cache
+/alembic.ini
+/Makefile
+/Dockerfile
+/docker-compose.yml
+/frontend/src-tauri
+/frontend/scripts
+/frontend/dist
+__pycache__
+*.dmg
+*.pdf
+*.db
+*.log
+.env
+.env.*
