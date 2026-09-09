@@ -98,8 +98,8 @@ search_settings:
   exclude_staffing_agencies: true
   country: "USA"
   max_parallel_searches: 6  # Concurrent JobSpy workers (each hits 5 boards, so 6 = 30 requests)
-  max_unique_jobs: 500      # Per-JobSpy-board cap; one source never cancels another
-  min_queries_per_source: 15 # Cover at least this many role queries per board before its cap can stop secondary locations
+  max_unique_jobs: 500      # Per-JobSpy-board cap, kept per place; one source never cancels another
+  min_queries_per_source: 15 # Role queries a board must run in a place before that place's cap can stop the rest
   max_search_tasks: 30      # Hard cap on total JobSpy queries (term × location combos)
   ai_score_top_n: 60        # Keyword-score all jobs, then AI-score only the top N for speed (<=0 = AI-score all)
 

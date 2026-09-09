@@ -56,7 +56,11 @@ class ScraperMeta:
 
 
 _REGISTRY: dict[str, ScraperMeta] = {}
-_SCRAPER_POOL_TIMEOUT_SECONDS = 60.0
+# Shared wall-clock ceiling for one run_scrapers fan-out. The ATS scanners
+# (Greenhouse 308 boards, Lever 251, Ashby 387) take 40-50s on a slow run and
+# 60s cut them off with 0 rows on 2 of 5 runs (Sep 9 2026). The pipeline's
+# scraper_thread.join(timeout=120) is the hard ceiling; stay under it.
+_SCRAPER_POOL_TIMEOUT_SECONDS = 100.0
 
 
 def register_scraper(
@@ -169,6 +173,7 @@ def run_scrapers(
         outcome per attempted source. This lets a whole refresh publish an
         exact coverage receipt without re-reading the run log by timestamp.
     """
+    import inspect
     import queue
     import threading
     import time
@@ -276,6 +281,58 @@ def run_scrapers(
         "include_founding": _filters.get("include_founding_titles", True),
     }
 
+    # One sink per source. A source that fans out over many boards publishes
+    # each board's rows here as they land (publish_partial in _utils), so the
+    # deadline can keep what was fetched instead of discarding the whole run.
+    partial_sinks: dict[str, list[dict]] = {}
+    sinks_lock = threading.Lock()
+
+    def _source_cap(name: str) -> int:
+        return max(1, int((max_results_by_source or {}).get(name, max_results)))
+
+    def _accepts_partial_sink(fn: Callable) -> bool:
+        try:
+            params = inspect.signature(fn).parameters
+        except (TypeError, ValueError):
+            return False
+        return "partial_sink" in params or any(
+            p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()
+        )
+
+    def _settle(name: str, meta: ScraperMeta, jobs: list[dict], outcome: dict) -> list[dict]:
+        """Row contract + company discovery, shared by the normal and deadline paths."""
+        # The row contract: a row publishes only when it is actionable
+        # (job_finder.row_contract). Rejects are counted, never silent,
+        # so a validator that suddenly rejects everything is as visible
+        # in the run log as a source that broke.
+        from job_finder.row_contract import validate_rows
+
+        jobs, rejected = validate_rows(jobs or [], meta)
+        if rejected:
+            outcome["rows_invalid"] = len(rejected)
+            sample_row, sample_reason = rejected[0]
+            logger.warning(
+                "%s: %d row(s) failed the row contract (first: %s %r)",
+                name, len(rejected), sample_reason,
+                str(sample_row.get("title", ""))[:80],
+            )
+        # One common discovery boundary for every source. Portfolio boards
+        # and aggregators can now teach Questboard a company's industry,
+        # ecosystem, and official ATS URL without source-specific glue.
+        if jobs and meta.vertical == "career":
+            try:
+                from job_finder.company_taxonomy import observe_jobs
+
+                observe_jobs(jobs, source_category=meta.category)
+            except Exception as exc:
+                logger.warning(
+                    "Company discovery observation for %s failed (non-fatal): %s",
+                    name,
+                    exc,
+                )
+        outcome["rows_found"] = len(jobs)
+        return jobs
+
     def _run_one(name: str) -> tuple[str, list[dict], dict]:
         import time as _time
         from datetime import datetime as _dt, timezone as _tz
@@ -295,12 +352,12 @@ def run_scrapers(
             outcome["finish_reason"] = "exception"
             outcome["error_sample"] = "unknown or metadata-only source"
             return name, [], outcome
+        sink: list[dict] = []
+        with sinks_lock:
+            partial_sinks[name] = sink
         t0 = _time.monotonic()
         try:
-            source_max_results = max(
-                1,
-                int((max_results_by_source or {}).get(name, max_results)),
-            )
+            source_max_results = _source_cap(name)
             kwargs: dict[str, Any] = dict(role_match_kwargs)
             if name in _ats_scrapers:
                 extra = ats_watchlist.get(name, [])
@@ -308,6 +365,8 @@ def run_scrapers(
                     kwargs["watchlist_companies"] = extra
             if scraper_kwargs and name in scraper_kwargs:
                 kwargs.update(scraper_kwargs[name])
+            if _accepts_partial_sink(meta.search_fn):
+                kwargs["partial_sink"] = sink
             jobs = meta.search_fn(
                 roles=roles,
                 max_results=source_max_results,
@@ -317,36 +376,7 @@ def run_scrapers(
             )
             raw_count = len(jobs or [])
             outcome["duration_s"] = round(_time.monotonic() - t0, 2)
-            # The row contract: a row publishes only when it is actionable
-            # (job_finder.row_contract). Rejects are counted, never silent,
-            # so a validator that suddenly rejects everything is as visible
-            # in the run log as a source that broke.
-            from job_finder.row_contract import validate_rows
-
-            jobs, rejected = validate_rows(jobs or [], meta)
-            if rejected:
-                outcome["rows_invalid"] = len(rejected)
-                sample_row, sample_reason = rejected[0]
-                logger.warning(
-                    "%s: %d row(s) failed the row contract (first: %s %r)",
-                    name, len(rejected), sample_reason,
-                    str(sample_row.get("title", ""))[:80],
-                )
-            # One common discovery boundary for every source. Portfolio boards
-            # and aggregators can now teach Questboard a company's industry,
-            # ecosystem, and official ATS URL without source-specific glue.
-            if jobs and meta.vertical == "career":
-                try:
-                    from job_finder.company_taxonomy import observe_jobs
-
-                    observe_jobs(jobs, source_category=meta.category)
-                except Exception as exc:
-                    logger.warning(
-                        "Company discovery observation for %s failed (non-fatal): %s",
-                        name,
-                        exc,
-                    )
-            outcome["rows_found"] = len(jobs)
+            jobs = _settle(name, meta, jobs or [], outcome)
             if not jobs:
                 outcome["finish_reason"] = "zero_rows"
             elif (
@@ -392,15 +422,7 @@ def run_scrapers(
             daemon=True,
         ).start()
 
-    deadline = time.monotonic() + scraper_timeout
-    while len(seen_sources) < len(runnable):
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            break
-        try:
-            name, jobs, outcome = result_queue.get(timeout=remaining)
-        except queue.Empty:
-            break
+    def _absorb(name: str, jobs: list[dict], outcome: dict) -> None:
         seen_sources.add(name)
         outcomes.append(outcome)
         meta = _REGISTRY.get(name)
@@ -412,28 +434,66 @@ def run_scrapers(
         elif progress:
             progress(f"  {display}: no results")
 
+    deadline = time.monotonic() + scraper_timeout
+    while len(seen_sources) < len(runnable):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        try:
+            name, jobs, outcome = result_queue.get(timeout=remaining)
+        except queue.Empty:
+            break
+        _absorb(name, jobs, outcome)
+
+    # A source that finished in the last instant before the deadline is a
+    # complete result, not a partial one.
+    while len(seen_sources) < len(runnable):
+        try:
+            name, jobs, outcome = result_queue.get_nowait()
+        except queue.Empty:
+            break
+        _absorb(name, jobs, outcome)
+
     if len(seen_sources) < len(runnable):
-        logger.warning("Scraper pool timed out after %.1fs — using partial results", scraper_timeout)
+        logger.warning("Scraper pool timed out after %.1fs, using partial results", scraper_timeout)
         if progress:
             progress("Warning: some scrapers timed out, using partial results")
 
     # A hung source must not vanish from the record: it looks exactly like a
     # healthy quiet day otherwise. Every runnable source gets a run-log row.
+    # Rows it published into its sink before the deadline are kept: the
+    # registry is the one place that ranks, caps, and validates them.
     for name in runnable:
         if name in seen_sources:
             continue
         meta = _REGISTRY.get(name)
-        outcomes.append({
+        display = meta.display_name if meta else name
+        with sinks_lock:
+            fetched = list(partial_sinks.get(name, ()))
+        outcome = {
             "source": name,
             "vertical": meta.vertical if meta else "career",
             "duration_s": scraper_timeout,
             "finish_reason": "timeout",
             "rows_found": 0,
             "error_sample": f"no result within {scraper_timeout:g}s",
-        })
-        if progress:
-            display = meta.display_name if meta else name
+        }
+        if fetched and meta:
+            from job_finder.tools.scrapers._utils import cap_with_protected
+
+            kept = _settle(
+                name, meta, cap_with_protected(fetched, roles, _source_cap(name)), outcome,
+            )
+            all_jobs.extend(kept)
+            outcome["finish_reason"] = "partial"
+            outcome["error_sample"] = (
+                f"deadline {scraper_timeout:g}s hit; kept {len(kept)} rows fetched so far"
+            )
+            if progress:
+                progress(f"  {display}: deadline hit, kept {len(kept)} rows so far")
+        elif progress:
             progress(f"  {display}: timed out")
+        outcomes.append(outcome)
     try:
         from job_finder.models.database import record_scrape_runs
         record_scrape_runs(outcomes)

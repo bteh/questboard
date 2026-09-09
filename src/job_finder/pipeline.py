@@ -362,6 +362,61 @@ def _build_jobspy_tasks(
     ]
 
 
+def _jobspy_board_key(task_boards: list[str] | None) -> str:
+    return task_boards[0].strip().lower() if task_boards else "jobspy"
+
+
+class _BoardPlaceBudget:
+    """Volume budget for JobSpy queries, kept per (board, place).
+
+    A board that fills ``max_unique`` in one place stops only that place's
+    remaining queries; every other place still gets each role once. A place
+    may stop only after ``minimum_queries`` of its own queries ran.
+    """
+
+    def __init__(self, max_unique: int, minimum_queries: int) -> None:
+        self._max_unique = max_unique
+        self._minimum_queries = minimum_queries
+        self._lock = threading.Lock()
+        self._seen_urls: dict[tuple[str, str], set[str]] = {}
+        self._unique_counts: dict[tuple[str, str], int] = {}
+        self._done_counts: dict[tuple[str, str], int] = {}
+        self._stop_events: dict[tuple[str, str], threading.Event] = {}
+
+    @staticmethod
+    def key(board_key: str, location: str) -> tuple[str, str]:
+        return (board_key, location.strip().lower())
+
+    def stop_event(self, board_key: str, location: str) -> threading.Event:
+        with self._lock:
+            return self._stop_events.setdefault(self.key(board_key, location), threading.Event())
+
+    def record(self, board_key: str, location: str, jobs: list[dict]) -> bool:
+        """Count one finished query. True once this (board, place) hit its cap."""
+        key = self.key(board_key, location)
+        with self._lock:
+            self._done_counts[key] = self._done_counts.get(key, 0) + 1
+            seen = self._seen_urls.setdefault(key, set())
+            new_count = 0
+            for job in jobs:
+                url = job.get("url", "")
+                if url and url not in seen:
+                    seen.add(url)
+                    new_count += 1
+            self._unique_counts[key] = self._unique_counts.get(key, 0) + new_count
+            event = self._stop_events.setdefault(key, threading.Event())
+            if (
+                self._unique_counts[key] >= self._max_unique
+                and self._done_counts[key] >= self._minimum_queries
+            ):
+                event.set()
+            return event.is_set()
+
+    def capped(self) -> list[tuple[str, str]]:
+        with self._lock:
+            return [key for key, event in self._stop_events.items() if event.is_set()]
+
+
 def _scaled_results_per_board(base: int, original_terms: int, consolidated_terms: int) -> int:
     """Preserve approximate total recall after query consolidation.
 
@@ -481,6 +536,28 @@ def _strip_prefix(term: str, prefixes: list[str]) -> tuple[str, str]:
     return "", t
 
 
+def _same_word_stem(a: str, b: str) -> bool:
+    if a == b:
+        return True
+    return (a.startswith(b) or b.startswith(a)) and abs(len(a) - len(b)) <= 3
+
+
+def _adds_role_type_token(shorter: str, longer: str) -> bool:
+    """True when *longer* carries a role-type word that *shorter* lacks.
+
+    "data engineering manager" adds "manager" over "data engineering", so the
+    broader query must not absorb it: boards answer "data engineering" with IC
+    rows and never return the manager title. Inflections of a word already
+    present ("engineer" vs "engineering") do not count as new tokens.
+    """
+    have = set(re.findall(r"[a-z0-9]+", shorter.lower()))
+    extra = {
+        w for w in re.findall(r"[a-z0-9]+", longer.lower())
+        if not any(_same_word_stem(w, h) for h in have)
+    }
+    return bool(extra & _ROLE_TYPE_TOKENS)
+
+
 def _consolidate_search_terms(
     roles: list[str],
     keywords: list[str],
@@ -562,8 +639,11 @@ def _consolidate_search_terms(
             if " " not in kept:
                 continue  # single-word terms too broad to absorb others
             # Word prefix: "product manager" covers "product manager operations"
+            # but never "data engineering manager" (extra word names a role type).
             if term.startswith(kept + " ") or term.startswith(kept + "-"):
-                logger.info("'%s' covered by broader query '%s' — skipping", term, kept)
+                if _adds_role_type_token(kept, term):
+                    continue
+                logger.info("'%s' covered by broader query '%s', skipping", term, kept)
                 is_covered = True
                 break
             # Suffix variant: "product manager" ≈ "product managing" (≤3 char diff)
@@ -601,10 +681,14 @@ def _consolidate_search_terms(
                 logger.info("Keeping high-value keyword: '%s'", kw_stripped)
             continue
 
-        # Skip if this keyword is already covered by an existing role query
-        is_covered = any(base in kw_lower for base in kept_bases)
+        # A role query covers a keyword that contains it, unless the keyword
+        # adds a role-type word ("sales" covers "sales enablement", not "sales manager").
+        is_covered = any(
+            base in kw_lower and not _adds_role_type_token(base, kw_lower)
+            for base in kept_bases
+        )
         if is_covered:
-            logger.info("Keyword '%s' covered by existing role query — skipping", kw_stripped)
+            logger.info("Keyword '%s' covered by existing role query, skipping", kw_stripped)
             continue
 
         if kw_stripped not in consolidated:
@@ -1489,7 +1573,9 @@ class JobFinderPipeline:
         # Cover every role in the primary place before spending a second query
         # on the same role elsewhere. The old role-major order could use the
         # entire task budget on the first few titles (city + remote) and never
-        # ask a board about later saved roles at all.
+        # ask a board about later saved roles at all. Each place keeps its own
+        # volume budget (see _BoardPlaceBudget), so a full first place never
+        # cancels the later places' queries.
         for loc in locations:
             for term in prioritized:
                 search_tasks.append((term, loc))
@@ -1514,22 +1600,18 @@ class JobFinderPipeline:
         counter = {"done": 0}
         lock = threading.Lock()
         all_jobs: list[dict] = []
-        # Early stopping is isolated PER BOARD. A prolific Indeed query must
-        # never cancel LinkedIn (or any other board) before it has answered.
-        # Each board also gets at least one planned query per consolidated role
-        # before its own volume cap may stop secondary-location work.
+        # Early stopping is isolated per board AND per place. Filling Indeed's
+        # cap in Los Angeles cancels only Indeed's remaining Los Angeles queries;
+        # LinkedIn and every later place still run each role once.
         max_unique = max(100, settings.get("max_unique_jobs", 500))
-        minimum_queries_per_board = min(
-            total_combos,
+        minimum_queries_per_place = min(
+            len(prioritized),
             max(
                 1,
                 int(settings.get("min_queries_per_source", len(prioritized)) or len(prioritized)),
             ),
         ) if total_combos else 0
-        board_seen_urls: dict[str, set[str]] = {}
-        board_unique_counts: dict[str, int] = {}
-        board_done_counts: dict[str, int] = {}
-        board_stop_events: dict[str, threading.Event] = {}
+        budget = _BoardPlaceBudget(max_unique, minimum_queries_per_place)
         jobspy_outcomes: dict[str, list[dict[str, Any]]] = {}
         jobspy_started_at = datetime.now(timezone.utc).replace(tzinfo=None)
         jobspy_started_mono = time.monotonic()
@@ -1541,12 +1623,10 @@ class JobFinderPipeline:
 
         def _search_one(task: tuple[str, str, list[str] | None]) -> list[dict]:
             term, loc, task_boards = task
-            board_key = task_boards[0].strip().lower() if task_boards else "jobspy"
-            with lock:
-                stop_event = board_stop_events.setdefault(board_key, threading.Event())
-            # Skip only this board after it has satisfied its own coverage and
-            # volume budget; other boards continue independently.
-            if stop_event.is_set():
+            board_key = _jobspy_board_key(task_boards)
+            # A cancelled future never runs; this catches tasks a worker
+            # dequeued before the cancellation loop reached them.
+            if budget.stop_event(board_key, loc).is_set():
                 return []
             telemetry: dict[str, Any] = {
                 "term": term,
@@ -1605,23 +1685,10 @@ class JobFinderPipeline:
                 jobspy_outcomes.setdefault(board_key, []).append(telemetry)
                 counter["done"] += 1
                 n = counter["done"]
-                board_done_counts[board_key] = board_done_counts.get(board_key, 0) + 1
-                seen_urls = board_seen_urls.setdefault(board_key, set())
-                new_count = 0
-                for j in jobs:
-                    url = j.get("url", "")
-                    if url and url not in seen_urls:
-                        seen_urls.add(url)
-                        new_count += 1
-                board_unique_counts[board_key] = board_unique_counts.get(board_key, 0) + new_count
-                if (
-                    board_unique_counts[board_key] >= max_unique
-                    and board_done_counts[board_key] >= minimum_queries_per_board
-                ):
-                    stop_event.set()
+            place_capped = budget.record(board_key, loc, jobs)
             if progress:
                 sources = ", ".join(set(j.get("source", "?") for j in jobs)) if jobs else "no boards"
-                suffix = f" ({board_key} coverage complete)" if stop_event.is_set() else ""
+                suffix = f" ({board_key} coverage complete for {loc})" if place_capped else ""
                 progress(f"  [{n}/{total_tasks}] '{term}' in {loc} → {len(jobs)} results from {sources}{suffix}")
             return jobs
 
@@ -1744,29 +1811,31 @@ class JobFinderPipeline:
         if jobspy_tasks:
             with ThreadPoolExecutor(max_workers=max_jobspy_workers) as pool:
                 futures = {pool.submit(_search_one, t): t for t in jobspy_tasks}
-                cancelled_boards: set[str] = set()
+                cancelled_places: set[tuple[str, str]] = set()
                 for future in as_completed(futures):
+                    if future.cancelled():
+                        continue
                     try:
                         all_jobs.extend(future.result())
                     except Exception as e:
                         logger.warning("JobSpy search failed (non-fatal): %s", e)
-                    # Cancel queued work only for boards that independently met
-                    # their cap. Already-running calls still return their rows.
-                    for board_key, stop_event in list(board_stop_events.items()):
-                        if not stop_event.is_set() or board_key in cancelled_boards:
+                    # Cancel queued work only for the (board, place) that met
+                    # its cap. Already-running calls still return their rows.
+                    for capped_key in budget.capped():
+                        if capped_key in cancelled_places:
                             continue
-                        cancelled_boards.add(board_key)
+                        cancelled_places.add(capped_key)
                         cancelled = 0
-                        for queued, queued_task in futures.items():
-                            queued_boards = queued_task[2]
-                            queued_key = queued_boards[0].strip().lower() if queued_boards else "jobspy"
-                            if queued_key == board_key and queued.cancel():
+                        for queued, (_, queued_loc, queued_boards) in futures.items():
+                            queued_key = _BoardPlaceBudget.key(_jobspy_board_key(queued_boards), queued_loc)
+                            if queued_key == capped_key and queued.cancel():
                                 cancelled += 1
                         if cancelled:
                             logger.info(
-                                "Early stop: cancelled %d queued %s searches after minimum coverage",
+                                "Early stop: cancelled %d queued %s searches in %s after minimum coverage",
                                 cancelled,
-                                board_key,
+                                capped_key[0],
+                                capped_key[1],
                             )
 
         # JobSpy boards used to be invisible to source health because only

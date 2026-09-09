@@ -296,7 +296,8 @@ def test_prolific_board_cannot_starve_other_board_or_later_roles(monkeypatch):
 
     linkedin_calls = [call for call in calls if call[0] == "linkedin"]
     indeed_calls = [call for call in calls if call[0] == "indeed"]
-    # Indeed hits the volume cap immediately, but still covers every role once.
+    # Indeed fills its Los Angeles budget on the first query, but the budget is
+    # per (board, place): every role still runs once there and once in Remote.
     assert len(indeed_calls) >= len(roles)
     assert {term for _, term, _ in indeed_calls[:len(roles)]} == {
         "data engineer",

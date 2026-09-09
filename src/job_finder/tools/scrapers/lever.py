@@ -20,6 +20,7 @@ from job_finder.tools.scrapers._utils import (
     _strip_html,
     date_confidence_for,
     is_crypto_company,
+    publish_partial,
 )
 
 logger = logging.getLogger(__name__)
@@ -129,6 +130,7 @@ def search_lever(
     **kwargs,
 ) -> list[dict]:
     """Fetch jobs directly from Lever postings API for known companies."""
+    partial_sink = kwargs.get("partial_sink")
     company_list = list(companies or _LEVER_COMPANIES)
     watchlist = set(watchlist_companies or [])
     if watchlist_companies:
@@ -156,6 +158,7 @@ def search_lever(
             try:
                 jobs = future.result()
                 results.extend(jobs)
+                publish_partial(partial_sink, jobs)
             except Exception as e:
                 slug = futures[future]
                 logger.warning("Lever/%s failed: %s", slug, e)

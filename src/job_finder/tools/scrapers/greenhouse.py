@@ -20,6 +20,7 @@ from job_finder.tools.scrapers._utils import (
     cap_with_protected,
     date_confidence_for,
     is_crypto_company,
+    publish_partial,
 )
 
 logger = logging.getLogger(__name__)
@@ -127,6 +128,7 @@ def search_greenhouse(
     **kwargs,
 ) -> list[dict]:
     """Fetch jobs directly from Greenhouse boards API for known companies."""
+    partial_sink = kwargs.get("partial_sink")
     company_list = list(companies or _GREENHOUSE_COMPANIES)
     watchlist = set(watchlist_companies or [])
     if watchlist_companies:
@@ -154,6 +156,7 @@ def search_greenhouse(
             try:
                 jobs = future.result()
                 results.extend(jobs)
+                publish_partial(partial_sink, jobs)
             except Exception as e:
                 slug = futures[future]
                 logger.warning("Greenhouse/%s failed: %s", slug, e)

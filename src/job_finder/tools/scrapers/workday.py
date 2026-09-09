@@ -31,6 +31,7 @@ from job_finder.tools.scrapers._utils import (
     _match_roles,
     _norm_company_key,
     cap_with_protected,
+    publish_partial,
     rank_by_relevance,
 )
 
@@ -486,6 +487,7 @@ def search_workday(
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
+    partial_sink = kwargs.get("partial_sink")
     employers = _load_employers()
     watchlist_keys: set[str] = set()
     if watchlist_companies:
@@ -519,6 +521,7 @@ def search_workday(
                 jobs = future.result()
                 if jobs:
                     all_jobs.extend(jobs)
+                    publish_partial(partial_sink, jobs)
                     logger.info("Workday/%s: %d jobs", employer_key, len(jobs))
             except Exception as e:
                 logger.warning("Workday/%s failed: %s", employer_key, e)

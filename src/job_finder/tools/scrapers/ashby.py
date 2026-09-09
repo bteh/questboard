@@ -19,6 +19,7 @@ from job_finder.tools.scrapers._utils import (
     cap_with_protected,
     date_confidence_for,
     is_crypto_company,
+    publish_partial,
 )
 
 logger = logging.getLogger(__name__)
@@ -185,6 +186,7 @@ def search_ashby(
     **kwargs,
 ) -> list[dict]:
     """Fetch jobs directly from Ashby job board API for specified companies."""
+    partial_sink = kwargs.get("partial_sink")
     company_list = list(companies or _ASHBY_COMPANIES)
     watchlist = set(watchlist_companies or [])
     if watchlist_companies:
@@ -212,6 +214,7 @@ def search_ashby(
             try:
                 jobs = future.result()
                 results.extend(jobs)
+                publish_partial(partial_sink, jobs)
             except Exception as e:
                 slug = futures[future]
                 # warning, not debug, matching the other three ATS scrapers.

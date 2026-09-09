@@ -1174,6 +1174,18 @@ def cap_with_protected(
     return kept
 
 
+def publish_partial(sink: list[dict] | None, jobs: list[dict]) -> None:
+    """Hand one finished board's rows to the registry's partial sink.
+
+    A source that fans out over hundreds of boards publishes each board's
+    rows as they land, so the registry can keep them when the source is
+    still running at the pool deadline. Rows here are raw and pre-cap; the
+    registry ranks and caps whatever it harvests.
+    """
+    if sink is not None and jobs:
+        sink.extend(jobs)
+
+
 # High-precision crypto/web3 signals — matched as substrings. These rarely
 # appear in non-crypto job titles, so substring matching is safe.
 _CRYPTO_SUBSTRING_TERMS: tuple[str, ...] = (

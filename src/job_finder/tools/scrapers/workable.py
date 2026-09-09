@@ -31,6 +31,7 @@ from job_finder.tools.scrapers._utils import (
     _strip_html,
     date_confidence_for,
     is_crypto_company,
+    publish_partial,
 )
 
 logger = logging.getLogger(__name__)
@@ -150,6 +151,7 @@ def search_workable(
     **kwargs,
 ) -> list[dict]:
     """Fetch jobs directly from Workable widget API for known companies."""
+    partial_sink = kwargs.get("partial_sink")
     company_list = list(companies or _WORKABLE_COMPANIES)
     watchlist = set(watchlist_companies or [])
     if watchlist_companies:
@@ -177,6 +179,7 @@ def search_workable(
             try:
                 jobs = future.result()
                 results.extend(jobs)
+                publish_partial(partial_sink, jobs)
             except Exception as e:
                 slug = futures[future]
                 logger.warning("Workable/%s failed: %s", slug, e)
