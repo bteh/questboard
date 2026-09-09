@@ -21,7 +21,10 @@ That one command:
 4. Signs the app, sends it to Apple, waits for the verdict, staples the ticket
 5. Notarizes and staples the DMG separately (see below)
 6. Verifies the DMG the way a stranger's Mac would, and fails if Gatekeeper objects
-7. Writes `latest.json` next to the DMG
+7. Boots the shipped runtime in an empty folder, uploads a synthetic resume,
+   runs a real search from that resume alone, and fails unless the board
+   fills (`verify_desktop_bundle.py --live-search`, about 3 minutes)
+8. Writes `latest.json` next to the DMG
 
 It refuses to finish on any failure rather than shipping a half-signed build.
 

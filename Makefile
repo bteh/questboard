@@ -252,6 +252,8 @@ desktop-release: .venv ## Build, sign, and notarize the public Questboard DMG
 	xcrun notarytool submit "$$DMG" --apple-id "$$NOTARY_ID" --password "$$NOTARY_PW" --team-id "$$TEAM_ID" --wait || exit 1; \
 	xcrun stapler staple "$$DMG" || exit 1; \
 	$(PYTHON) scripts/verify_release_dmg.py "$$DMG"; \
+	echo "  Proving a stranger can upload a resume and get a full board (live search, ~3 min)"; \
+	$(PYTHON) scripts/verify_desktop_bundle.py --bundle-root "$$(dirname "$$(dirname "$$APP")")" --live-search || exit 1; \
 	VERSION=$$($(PYTHON) -c "import json;print(json.load(open('frontend/src-tauri/tauri.conf.json'))['version'])"); \
 	$(PYTHON) scripts/build_update_manifest.py \
 		--bundle-dir "$$(dirname "$$APP")" \

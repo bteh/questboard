@@ -23,6 +23,15 @@ def parse_args() -> argparse.Namespace:
         default="frontend/src-tauri/target/release/bundle",
         help="Path to the Tauri bundle output root",
     )
+    parser.add_argument(
+        "--live-search",
+        action="store_true",
+        help=(
+            "Also upload a synthetic resume and run a real search against the "
+            "shipped runtime. Needs the network; used by make desktop-release, "
+            "not by CI."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -62,7 +71,126 @@ def _json_request(
     return payload
 
 
-def smoke_packaged_runtime(sidecar: Path) -> None:
+SYNTHETIC_RESUME = """Jordan Example
+San Francisco, CA | jordan@example.com
+
+SUMMARY
+Data engineer with 5 years building batch and streaming pipelines on AWS and GCP.
+
+EXPERIENCE
+Senior Data Engineer, Northwind Analytics, San Francisco, CA (2023 - present)
+- Built a Kafka to BigQuery streaming pipeline handling 40M events per day.
+- Migrated 300 dbt models from Redshift to Snowflake.
+
+Data Engineer, Contoso Retail, Oakland, CA (2020 - 2023)
+- Designed Airflow DAGs for 120 daily jobs across Postgres, S3, and Salesforce.
+
+SKILLS
+Python, SQL, dbt, Airflow, Spark, Kafka, Snowflake, BigQuery, Terraform, AWS, GCP
+"""
+
+LIVE_SEARCH_PLACE = {
+    "label": "San Francisco, CA",
+    "kind": "city",
+    "match_scope": "metro",
+    "city": "San Francisco",
+    "region": "California",
+    "country": "United States",
+    "country_code": "US",
+}
+
+
+def synthetic_resume_pdf(target: Path) -> Path:
+    """Render the synthetic resume to a real PDF the parser can read.
+
+    macOS ships cupsfilter, which turns plain text into a text-layer PDF;
+    a hand-built PDF would not survive the parser's text extraction.
+    """
+    text_path = target.with_suffix(".txt")
+    text_path.write_text(SYNTHETIC_RESUME, encoding="utf-8")
+    with target.open("wb") as out:
+        subprocess.run(
+            ["cupsfilter", str(text_path)],
+            stdout=out,
+            stderr=subprocess.DEVNULL,
+            check=True,
+        )
+    if target.stat().st_size == 0:
+        raise RuntimeError("cupsfilter produced an empty PDF")
+    return target
+
+
+def _json_post(url: str, *, headers: dict[str, str], data: bytes, content_type: str) -> dict:
+    request = urllib.request.Request(
+        url,
+        method="POST",
+        headers={**headers, "Content-Type": content_type},
+        data=data,
+    )
+    with urllib.request.urlopen(request, timeout=30) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"Expected object response from {url}")
+    return payload
+
+
+def _multipart(field: str, filename: str, content: bytes) -> tuple[bytes, str]:
+    boundary = "questboardsmoke"
+    body = (
+        f"--{boundary}\r\n"
+        f'Content-Disposition: form-data; name="{field}"; filename="{filename}"\r\n'
+        "Content-Type: application/pdf\r\n\r\n"
+    ).encode("utf-8") + content + f"\r\n--{boundary}--\r\n".encode("utf-8")
+    return body, f"multipart/form-data; boundary={boundary}"
+
+
+def live_search_as_stranger(base: str, resume_pdf: Path) -> int:
+    """Do what a first-time user does: upload a resume, pick a place, search.
+
+    Returns the number of jobs on the board afterwards. Zero is a failure:
+    the point is that a stranger with nothing configured gets a full board.
+    """
+    origin = {"Origin": "http://127.0.0.1:5173"}
+    boot = _json_post(f"{base}/api/v1/session/bootstrap", headers=origin, data=b"", content_type="application/json")
+    headers = {
+        **origin,
+        "X-Questboard-Session": str(boot.get("session_token") or ""),
+        "X-CSRF-Token": str(boot.get("csrf_token") or ""),
+    }
+    body, content_type = _multipart("file", "resume.pdf", resume_pdf.read_bytes())
+    upload = _json_post(f"{base}/api/v1/onboarding/resume", headers=headers, data=body, content_type=content_type)
+    parse_status = (upload.get("resume") or {}).get("parse_status")
+    if parse_status != "parsed":
+        raise RuntimeError(f"Shipped runtime did not parse the resume: {upload}")
+
+    prefs = json.dumps({
+        "preferred_places": [LIVE_SEARCH_PLACE],
+        "workplace_preference": "remote_friendly",
+        "max_days_old": 14,
+    }).encode("utf-8")
+    run = _json_post(f"{base}/api/v1/onboarding/search", headers=headers, data=prefs, content_type="application/json")
+    run_id = str(run.get("run_id") or "")
+    if not run_id:
+        raise RuntimeError(f"Search did not start from a resume alone: {run}")
+
+    deadline = time.monotonic() + 600
+    status = ""
+    while time.monotonic() < deadline:
+        status = str(_json_request(f"{base}/api/v1/search/runs/{run_id}/status", headers=headers).get("status"))
+        if status in {"completed", "failed", "cancelled"}:
+            break
+        time.sleep(5)
+    if status != "completed":
+        raise RuntimeError(f"Search run ended as {status!r}")
+
+    board = _json_request(f"{base}/api/v1/applications?limit=1", headers=headers)
+    total = int(board.get("total") or 0)
+    if total == 0:
+        raise RuntimeError("Search completed but the board is empty for a fresh user")
+    return total
+
+
+def smoke_packaged_runtime(sidecar: Path, *, live_search: bool = False) -> None:
     """Boot the shipped sidecar exactly like a clean friend's machine."""
     port = _available_port()
     with tempfile.TemporaryDirectory(prefix="questboard-friend-smoke-") as temp:
@@ -175,6 +303,9 @@ def smoke_packaged_runtime(sidecar: Path) -> None:
                 raise RuntimeError("Fresh install did not open in blank onboarding state")
             if onboarding.get("ready_to_search"):
                 raise RuntimeError("Fresh install incorrectly reported itself ready to search")
+            if live_search:
+                total = live_search_as_stranger(base, synthetic_resume_pdf(root / "resume.pdf"))
+                print(f"Live search as a stranger: {total} jobs on the board")
         finally:
             if os.name != "nt":
                 try:
@@ -230,7 +361,7 @@ def resolve_bundle_root(bundle_root: Path) -> Path:
     return max(candidates, key=lambda path: path.stat().st_mtime)
 
 
-def verify_macos_bundle(bundle_root: Path) -> None:
+def verify_macos_bundle(bundle_root: Path, *, live_search: bool = False) -> None:
     app_bundle = bundle_root / "macos" / "Questboard.app"
     app_binary = app_bundle / "Contents" / "MacOS" / "questboard-desktop"
     sidecar = app_bundle / "Contents" / "Resources" / "sidecars" / "questboard-runtime"
@@ -273,7 +404,7 @@ def verify_macos_bundle(bundle_root: Path) -> None:
             + ", ".join(str(path.relative_to(app_bundle)) for path in forbidden_files)
         )
 
-    smoke_packaged_runtime(sidecar)
+    smoke_packaged_runtime(sidecar, live_search=live_search)
 
 
 def main() -> None:
@@ -282,7 +413,7 @@ def main() -> None:
     system = platform.system()
 
     if system == "Darwin":
-        verify_macos_bundle(bundle_root)
+        verify_macos_bundle(bundle_root, live_search=args.live_search)
     else:
         raise SystemExit(f"Bundle verification is not implemented for {system} yet")
 
