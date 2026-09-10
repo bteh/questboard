@@ -26,6 +26,8 @@
 }
 .qb-update-pill:hover { transform: translateY(-1px); color: var(--ink); }
 .qb-update-pill b { color: var(--ink); font-weight: 600; }
+span.qb-update-pill { cursor: default; }
+span.qb-update-pill:hover { transform: none; color: var(--soft); }
 .qb-fold, .qb-xbtn {
   width: 34px; height: 34px; flex: none;
   display: grid; place-items: center;

@@ -12,6 +12,8 @@ export type UpdateState =
   | { kind: 'up_to_date' }
   | { kind: 'downloading'; percent: number }
   | { kind: 'ready'; version: string }
+  | { kind: 'installing'; version: string }
+  | { kind: 'install_failed'; version: string }
   | { kind: 'failed' };
 
 export const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
@@ -39,6 +41,10 @@ export function checkStatusText(state: UpdateState, currentVersion: string): str
       return `Downloading the update… ${state.percent}%`;
     case 'ready':
       return `Version ${state.version} is downloaded. Restart to use it.`;
+    case 'installing':
+      return `Installing ${state.version}…`;
+    case 'install_failed':
+      return `Couldn't install ${state.version}. Try again, or download it from the website.`;
     case 'failed':
       return 'Could not reach the update server. Check your connection and try again.';
     case 'idle':
@@ -51,10 +57,31 @@ export function updateBannerText(state: UpdateState): string | null {
   switch (state.kind) {
     case 'ready':
       return `Version ${state.version} is ready.`;
+    case 'installing':
+      return `Installing ${state.version}…`;
+    case 'install_failed':
+      return `Couldn't install ${state.version}. The app still works.`;
     case 'downloading':
       // A percentage that only moves on a fast connection reads as broken,
       // so the download stays wordless until it lands.
       return null;
+    case 'checking':
+    case 'up_to_date':
+    case 'failed':
+    case 'idle':
+      return null;
+  }
+}
+
+/** The word on the pill's button. Null means nothing to click. */
+export function updateActionText(state: UpdateState): string | null {
+  switch (state.kind) {
+    case 'ready':
+      return 'Restart';
+    case 'install_failed':
+      return 'Try again';
+    case 'installing':
+    case 'downloading':
     case 'checking':
     case 'up_to_date':
     case 'failed':

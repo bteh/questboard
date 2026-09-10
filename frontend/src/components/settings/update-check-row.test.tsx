@@ -45,4 +45,19 @@ describe('UpdateCheckRow', () => {
     fireEvent.click(screen.getByRole('button', { name: /restart to update/i }));
     expect(hook.restart).toHaveBeenCalledTimes(1);
   });
+
+  it('offers a retry after an install that failed', () => {
+    hook.state = { kind: 'install_failed', version: '0.2.6' };
+    render(<UpdateCheckRow />);
+    expect(screen.getByText(/couldn't install 0\.2\.6/i)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+    expect(hook.restart).toHaveBeenCalledTimes(1);
+  });
+
+  it('has nothing to click while the install runs', () => {
+    hook.state = { kind: 'installing', version: '0.2.6' };
+    render(<UpdateCheckRow />);
+    expect(screen.getByText('Installing 0.2.6…')).toBeTruthy();
+    expect((screen.getByRole('button', { name: /check for updates/i }) as HTMLButtonElement).disabled).toBe(true);
+  });
 });

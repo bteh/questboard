@@ -1,7 +1,14 @@
+import type { Update } from '@tauri-apps/plugin-updater';
+
 import { isDesktopApp } from '@/lib/platform';
 import { downloadPercent, type UpdateState } from '@/lib/updater-logic';
 
 const LAST_CHECK_KEY = 'questboard.updater.lastCheckedAt';
+
+/* Only the Update object that ran download() may install; a fresh check()
+   hands back a new one that throws on install(). So the downloaded object
+   lives here until it is installed or a check finds nothing. */
+let staged: Update | null = null;
 
 export function readLastCheckedAt(): number | null {
   try {
@@ -39,23 +46,12 @@ export async function fetchAndStageUpdate(
     const { check } = await import('@tauri-apps/plugin-updater');
     const update = await check();
     if (!update) {
+      staged = null;
       onState({ kind: 'up_to_date' });
       return;
     }
 
-    let downloaded = 0;
-    let total: number | null = null;
-    onState({ kind: 'downloading', percent: 0 });
-
-    await update.download((event) => {
-      if (event.event === 'Started') {
-        total = event.data.contentLength ?? null;
-      } else if (event.event === 'Progress') {
-        downloaded += event.data.chunkLength;
-        onState({ kind: 'downloading', percent: downloadPercent(downloaded, total) });
-      }
-    });
-
+    await downloadAndStage(update, onState);
     onState({ kind: 'ready', version: update.version });
   } catch (err) {
     console.warn('update check failed', err);
@@ -63,23 +59,60 @@ export async function fetchAndStageUpdate(
   }
 }
 
-/**
- * Install the staged update and relaunch.
- *
- * The backend is shut down first on purpose. It owns an open SQLite file
- * and a listening port, and letting the process group die on its own
- * during a relaunch races the new instance for both.
- */
-export async function installAndRestart(): Promise<void> {
-  const { invoke } = await import('@tauri-apps/api/core');
-  const { check } = await import('@tauri-apps/plugin-updater');
-  const { relaunch } = await import('@tauri-apps/plugin-process');
+async function downloadAndStage(
+  update: Update,
+  onState: (state: UpdateState) => void,
+): Promise<void> {
+  let downloaded = 0;
+  let total: number | null = null;
+  onState({ kind: 'downloading', percent: 0 });
 
-  const update = await check();
+  await update.download((event) => {
+    if (event.event === 'Started') {
+      total = event.data.contentLength ?? null;
+    } else if (event.event === 'Progress') {
+      downloaded += event.data.chunkLength;
+      onState({ kind: 'downloading', percent: downloadPercent(downloaded, total) });
+    }
+  });
+
+  staged = update;
+}
+
+/**
+ * Install the staged update, then shut the backend down, then relaunch.
+ *
+ * Install comes first so a failed install leaves a working app: the user
+ * sees "Couldn't install" and can try again or keep working. The backend
+ * is shut down only once the new bundle is on disk. It owns the SQLite
+ * file and the port, and letting it die on its own during the relaunch
+ * races the new instance for both.
+ *
+ * With nothing staged (a fresh window, a cleared store) this downloads
+ * first. With nothing to download it says "up to date" and touches nothing.
+ * Never rejects: the hook fires this and forgets, so a thrown error would
+ * vanish and the pill would sit there saying "Restart".
+ */
+export async function installAndRestart(
+  onState: (state: UpdateState) => void,
+): Promise<void> {
+  if (!staged) await fetchAndStageUpdate(onState);
+  const update = staged;
   if (!update) return;
 
+  onState({ kind: 'installing', version: update.version });
+  try {
+    await update.install();
+  } catch (err) {
+    console.warn('update install failed', err);
+    onState({ kind: 'install_failed', version: update.version });
+    return;
+  }
+  staged = null;
+
+  const { invoke } = await import('@tauri-apps/api/core');
+  const { relaunch } = await import('@tauri-apps/plugin-process');
   await invoke('shutdown_runtime_for_update');
-  await update.install();
   await relaunch();
 }
 

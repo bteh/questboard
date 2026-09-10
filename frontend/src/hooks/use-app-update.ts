@@ -42,7 +42,7 @@ export function useAppUpdate() {
   }, []);
 
   const restart = useCallback(() => {
-    void installAndRestart();
+    void installAndRestart(setUpdateState);
   }, []);
 
   return { state, restart };
@@ -64,7 +64,7 @@ export function useUpdateCheck() {
   }, []);
 
   const restart = useCallback(() => {
-    void installAndRestart();
+    void installAndRestart(setUpdateState);
   }, []);
 
   return { state, version, checkNow, restart };
