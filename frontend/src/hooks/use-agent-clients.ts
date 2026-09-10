@@ -92,11 +92,6 @@ export function useDecideRoleProposal() {
   return useMutation({
     mutationFn: ({ id, accept }: { id: number; accept: boolean }) =>
       decideRoleProposal(id, accept),
-    onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ROLE_PROPOSALS_KEY }),
-        queryClient.invalidateQueries({ queryKey: AGENT_CLIENTS_KEY }),
-      ]);
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ROLE_PROPOSALS_KEY }),
   });
 }

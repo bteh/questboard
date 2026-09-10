@@ -677,10 +677,9 @@ def _migrate_db(engine) -> None:
             conn.execute(
                 text("ALTER TABLE applications ADD COLUMN quest_json TEXT DEFAULT ''")
             )
-        # Source-independent taxonomy backfill. This is intentionally
-        # idempotent and deterministic: rows already tagged are untouched,
-        # while historical crypto-source and known-company rows immediately
-        # join the Crypto shelf after upgrading.
+        # Taxonomy backfill. '[]' is a classified answer (nothing found);
+        # only NULL means never classified. Rule changes belong to the
+        # versioned company_taxonomy repair in maintenance.py, not here.
         from job_finder.company_taxonomy import classify_job_taxonomy, tags_json
 
         # A few very old/minimal local DBs predate even source/description.
@@ -691,19 +690,20 @@ def _migrate_db(engine) -> None:
                 return name
             return f"'' AS {name}"
 
-        taxonomy_fields = ", ".join(
-            _taxonomy_select(name)
-            for name in (
-                "id", "company", "source", "job_title", "description",
-                "industry_tags", "ecosystem_tags",
-            )
+        taxonomy_fields = ", ".join(_taxonomy_select(name) for name in (
+            "id", "company", "source", "job_title", "description",
+            "industry_tags", "ecosystem_tags",
+        ))
+        # ADD COLUMN gives legacy rows '[]' without classifying them, so the
+        # boot that adds the columns sweeps '' and '[]' once.
+        taxonomy_where = (
+            "WHERE industry_tags IS NULL OR industry_tags IN ('', '[]') "
+            "OR ecosystem_tags IS NULL OR ecosystem_tags = ''"
+            if not {"industry_tags", "ecosystem_tags"} <= existing_cols
+            else "WHERE industry_tags IS NULL OR ecosystem_tags IS NULL"
         )
         taxonomy_rows = conn.execute(
-            text(
-                f"SELECT {taxonomy_fields} FROM applications "
-                "WHERE (industry_tags IS NULL OR industry_tags = '' OR industry_tags = '[]') "
-                "OR (ecosystem_tags IS NULL OR ecosystem_tags = '')"
-            )
+            text(f"SELECT {taxonomy_fields} FROM applications {taxonomy_where}")
         ).fetchall()
         for row in taxonomy_rows:
             industries, ecosystems = classify_job_taxonomy(

@@ -10,6 +10,12 @@ app is using, so the agent reads the same local board and resume.
 GUI apps on macOS do not inherit the shell PATH, so `claude`/`codex` live in
 places `shutil.which` won't find by default. We search the common install
 dirs and run with an augmented PATH.
+
+Status is read from the client's own config file, never from the CLI:
+`claude mcp get` starts the registered server to test it, which took 15 to
+27 seconds per call and left orphaned runtime processes behind. Connected
+means the registered `questboard` command is this app's runtime, the same
+rule claude_desktop_service uses.
 """
 from __future__ import annotations
 
@@ -20,6 +26,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -146,20 +153,39 @@ def _remove_command(client: str, binary: str) -> list[str]:
     return [binary, "mcp", "remove", SERVER_NAME]
 
 
-def _is_connected(client: str, binary: str) -> bool:
+def claude_code_config_path() -> Path:
+    """User-scope config `claude mcp add --scope user` writes to."""
+    base = os.environ.get("CLAUDE_CONFIG_DIR")
+    return (Path(base).expanduser() if base else Path.home()) / ".claude.json"
+
+
+def codex_config_path() -> Path:
+    base = os.environ.get("CODEX_HOME")
+    return (Path(base).expanduser() if base else Path.home() / ".codex") / "config.toml"
+
+
+def _registered_servers(client: str) -> dict[str, Any]:
+    if client == "codex":
+        path, parse, key = codex_config_path(), tomllib.loads, "mcp_servers"
+    else:
+        path, parse, key = claude_code_config_path(), json.loads, "mcpServers"
     try:
-        result = subprocess.run(
-            [binary, "mcp", "get", SERVER_NAME],
-            capture_output=True,
-            text=True,
-            env=_augmented_env(),
-            timeout=15,
-            check=False,
-        )
-        return result.returncode == 0
-    except Exception:  # noqa: BLE001 - a broken client CLI must not crash the app
-        logger.warning("Could not read MCP status for %s", client, exc_info=True)
-        return False
+        loaded = parse(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    servers = loaded.get(key) if isinstance(loaded, dict) else None
+    return servers if isinstance(servers, dict) else {}
+
+
+def _registered_command(client: str) -> str | None:
+    """The command the client has on file for the questboard server, if any."""
+    entry = _registered_servers(client).get(SERVER_NAME)
+    command = entry.get("command") if isinstance(entry, dict) else None
+    return command if isinstance(command, str) else None
+
+
+def _is_connected(client: str) -> bool:
+    return _registered_command(client) == runtime_command()[0]
 
 
 def client_status(client: str) -> dict[str, Any]:
@@ -170,7 +196,7 @@ def client_status(client: str) -> dict[str, Any]:
         "id": client,
         "name": CLIENTS[client],
         "installed": binary is not None,
-        "connected": bool(binary and _is_connected(client, binary)),
+        "connected": binary is not None and _is_connected(client),
     }
 
 
@@ -193,7 +219,7 @@ def connect(client: str) -> dict[str, Any]:
     env = _augmented_env()
     try:
         # Replace any stale entry so a re-connect always points at the current runtime.
-        if _is_connected(client, binary):
+        if _registered_command(client) is not None:
             subprocess.run(_remove_command(client, binary), capture_output=True, text=True, env=env, timeout=30, check=False)
         result = subprocess.run(
             _add_command(client, binary, runtime),
