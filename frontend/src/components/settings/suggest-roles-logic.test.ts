@@ -34,13 +34,13 @@ describe('pickAssistant', () => {
 describe('suggestButtonLabel', () => {
   it('names the assistant and says what the click does', () => {
     expect(suggestButtonLabel({ assistantName: 'Claude Code', consentGranted: true, running: false })).toBe(
-      'Suggest roles from my resume with Claude Code',
+      'Suggest roles and keywords from my resume with Claude Code',
     );
   });
 
   it('says the click also grants resume access when it does', () => {
     expect(suggestButtonLabel({ assistantName: 'Claude Code', consentGranted: false, running: false })).toBe(
-      'Allow resume access and suggest roles',
+      'Allow resume access and suggest roles and keywords',
     );
   });
 

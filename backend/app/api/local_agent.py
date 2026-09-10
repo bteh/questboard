@@ -21,6 +21,8 @@ from app.schemas.resume import (
     AgentConnectRequest,
     AgentConsentRequest,
     AgentConsentStatus,
+    AgentIntentRequest,
+    AgentIntentResponse,
     AgentRunRequest,
     AgentRunResponse,
     RoleProposalDecisionRequest,
@@ -44,17 +46,22 @@ _AGENT_TASKS: dict[str, dict[str, object]] = {
         "needs_resume": True,
         "prompt": (
             "Use the Questboard MCP tools. First call read_resume_for_matching to read my "
-            "resume, then get_career_preferences for my saved target roles. Then call "
-            "propose_career_preferences ONCE with 6 to 10 target roles I should search: "
-            "keep the saved roles that fit my resume, add adjacent titles and variants I "
-            "might not think to search for, and drop nothing I added myself. Calibrate to "
-            "my resume's ACTUAL seniority: at most one level up from titles I have held. "
-            "If my resume shows no professional title in the field I am aiming at, I am "
-            "breaking in: propose entry-level and adjacent titles that hire people from my "
-            "background, never senior, staff, lead, or manager titles. Give a rationale of "
-            "two or three plain sentences. Proposing records a suggestion for me to accept "
-            "in the app; do NOT call set_career_preferences, refresh_work, or search_work, "
-            "and do not save anything yourself. Stop after the proposal."
+            "resume, then get_career_preferences for my saved target roles and keywords. "
+            "Then call propose_career_preferences ONCE with two lists. roles: 6 to 10 "
+            "target roles I should search: keep the saved roles that fit my resume, add "
+            "adjacent titles and variants I might not think to search for, and drop "
+            "nothing I added myself. Calibrate to my resume's ACTUAL seniority: at most "
+            "one level up from titles I have held. If my resume shows no professional "
+            "title in the field I am aiming at, I am breaking in: propose entry-level and "
+            "adjacent titles that hire people from my background, never senior, staff, "
+            "lead, or manager titles. keywords: 10 to 15 search keywords, the tools, "
+            "technologies, and domain terms from my resume that a posting for those roles "
+            "would mention: keep the saved keywords that still fit, add what is missing, "
+            "and drop nothing I added myself. Give a rationale of two or three plain "
+            "sentences. Proposing records a suggestion for me to accept in the app; do "
+            "NOT call set_career_preferences, refresh_work, or search_work, and do not "
+            "save anything yourself. If the tool's answer carries a note, repeat it in "
+            "one plain sentence. Stop after the proposal."
         ),
     },
     "find_and_rank": {
@@ -186,6 +193,7 @@ def run_agent(payload: AgentRunRequest, db: Session = Depends(get_db)) -> AgentR
     # Drop the previous run's trail so a poll during THIS run can't read the
     # last one's steps and report progress that already happened.
     agent_run_progress.clear()
+    agent_run_progress.mark_requested(payload.task)
     try:
         outcome = agent_integration_service.run_headless(payload.client, str(task["prompt"]))
     except ValueError as exc:
@@ -193,6 +201,21 @@ def run_agent(payload: AgentRunRequest, db: Session = Depends(get_db)) -> AgentR
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc))
     return AgentRunResponse(**outcome)
+
+
+@router.post("/intent", response_model=AgentIntentResponse)
+def mark_agent_intent(payload: AgentIntentRequest) -> AgentIntentResponse:
+    """Note that the person is about to run a task by hand.
+
+    A pasted prompt in Claude Desktop or Codex never passes through /run, so
+    this is how that run gets the same asked-for treatment: a proposal the
+    person asked for answers even inside the quiet week after a "Not now".
+    """
+    _require_local()
+    if payload.task not in _AGENT_TASKS:
+        raise HTTPException(status_code=400, detail=f"Unknown task: {payload.task}")
+    agent_run_progress.mark_requested(payload.task)
+    return AgentIntentResponse(task=payload.task)
 
 
 @router.get("/progress", response_model=AgentProgressResponse)

@@ -208,23 +208,30 @@ def set_career_preferences(
 @mcp.tool(annotations=WRITE, structured_output=True)
 @_step
 def propose_career_preferences(
-    roles: list[str], rationale: str = ""
+    roles: list[str], rationale: str = "", keywords: list[str] | None = None
 ) -> dict[str, Any]:
-    """Record a proposed change to target roles; never changes saved preferences.
+    """Record a proposed change to target roles and search keywords; never
+    changes saved preferences.
 
     Use this instead of set_career_preferences when a run's judged roles
-    differ from the saved ones. It writes a pending proposal the person can
+    differ from the saved ones. ``keywords`` are the tools, technologies, and
+    domain terms a posting for those roles would mention; accepting merges
+    them into the saved keywords. It writes a pending proposal the person can
     accept or reject later; the saved search stays exactly what they set
     until they act on it. Supersedes any prior pending proposal for this
     workspace.
     """
-
+    # Only a propose_roles run the person started skips the quiet week; a
+    # find_and_rank run's side proposals keep it.
+    requested_by_user = agent_run_progress.requested_task() == "propose_roles"
     with _database_session() as db:
         return _tool_error(
             local_agent_service.propose_career_preferences,
             db,
             roles=roles,
             rationale=rationale,
+            keywords=keywords,
+            requested_by_user=requested_by_user,
         )
 
 

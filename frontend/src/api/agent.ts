@@ -40,6 +40,7 @@ export interface RoleProposal {
   workspace_id: string | null;
   base_roles: string[];
   proposed_roles: string[];
+  proposed_keywords: string[];
   rationale: string;
   status: string;
   created_at: string | null;
@@ -50,6 +51,11 @@ export interface RoleProposalDecision {
   id: number;
   status: string;
   proposed_roles: string[];
+  proposed_keywords: string[];
+  /** The saved lists after the decision. The server owns the keyword merge
+   *  rule, so the form applies these as-is rather than merging itself. */
+  roles: string[];
+  keywords: string[];
   decided_at: string | null;
 }
 
@@ -62,4 +68,11 @@ export function decideRoleProposal(
   accept: boolean,
 ): Promise<RoleProposalDecision> {
   return apiPost<RoleProposalDecision>(`/agent/role-proposals/${id}/decide`, { accept });
+}
+
+/** Record that the person asked for a task themselves. A prompt pasted into
+ *  Claude Desktop or Codex arrives at the MCP server with no click behind it;
+ *  this is how the backend knows to keep the proposal that run produces. */
+export function markAgentIntent(task: string): Promise<{ task: string; marked: boolean }> {
+  return apiPost<{ task: string; marked: boolean }>('/agent/intent', { task });
 }

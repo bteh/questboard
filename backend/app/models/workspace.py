@@ -152,6 +152,7 @@ class AgentRoleProposal(Base):
     workspace_id = Column(String(64), ForeignKey("workspaces.id"), nullable=True, index=True)
     base_roles_json = Column(Text, default="[]")
     proposed_roles_json = Column(Text, default="[]")
+    proposed_keywords_json = Column(Text, default="[]")
     rationale = Column(String(500), default="")
     status = Column(String(16), default="pending")
     created_at = Column(DateTime, default=_utcnow)

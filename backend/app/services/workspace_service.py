@@ -82,6 +82,7 @@ _DEFAULT_JOBSPY_BOARDS: list[str] = ["indeed"]
 # advertises it on the MCP surface; the save below must trim to the same
 # number or a within-cap save silently loses its tail.
 ROLES_CAP = 18
+KEYWORDS_CAP = 20
 _LINKEDIN_JOBSPY_BOARD = "linkedin"
 _DESKTOP_SESSION_HEADER = "X-Questboard-Session"
 
@@ -518,7 +519,7 @@ def _seed_preferences_from_default() -> WorkspacePreferencesSchema:
     job_boards = [str(board).strip().lower() for board in cfg.get("job_boards", []) if str(board).strip()]
     return WorkspacePreferencesSchema(
         roles=_clean_string_list(cfg.get("target_roles"), ROLES_CAP),
-        keywords=_clean_string_list(cfg.get("keyword_searches"), 20),
+        keywords=_clean_string_list(cfg.get("keyword_searches"), KEYWORDS_CAP),
         companies=_clean_string_list(
             [entry.get("name", "") for entry in watchlist if isinstance(entry, dict)],
             60,
@@ -576,7 +577,7 @@ def _prefs_to_schema(prefs: WorkspacePreferences | None) -> WorkspacePreferences
 
     return WorkspacePreferencesSchema(
         roles=_clean_string_list(roles, ROLES_CAP),
-        keywords=_clean_string_list(keywords, 20),
+        keywords=_clean_string_list(keywords, KEYWORDS_CAP),
         companies=cleaned_companies,
         company_targets=company_targets,
         preferred_places=_deserialize_places(prefs.preferred_places_json),
@@ -1125,7 +1126,7 @@ def save_workspace_preferences(
         db.add(record)
 
     record.roles_json = json.dumps(_clean_string_list(preferences.roles, ROLES_CAP))
-    record.keywords_json = json.dumps(_clean_string_list(preferences.keywords, 20))
+    record.keywords_json = json.dumps(_clean_string_list(preferences.keywords, KEYWORDS_CAP))
     cleaned_companies = _clean_string_list(preferences.companies, 60)
     # The resolved-board cache is owned by the Companies endpoints, not this
     # general save. Reconcile it against the incoming names (drop removed
@@ -1878,7 +1879,7 @@ def derive_search_terms_from_resume(
     if not keywords and record and record.extracted_text:
         keywords.extend(_extract_keywords_from_text(record.extracted_text))
 
-    return roles[:ROLES_CAP], keywords[:20]
+    return roles[:ROLES_CAP], keywords[:KEYWORDS_CAP]
 
 
 def _extract_keywords_from_text(text: str) -> list[str]:

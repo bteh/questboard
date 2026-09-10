@@ -126,6 +126,10 @@ def _migrate_db(engine) -> None:
                 "SET updated_at = COALESCE(updated_at, completed_at, started_at, CURRENT_TIMESTAMP)"
             ))
 
+    _add_missing_columns(engine, "agent_role_proposals", [
+        ("proposed_keywords_json", "ALTER TABLE agent_role_proposals ADD COLUMN proposed_keywords_json TEXT DEFAULT '[]'"),
+    ])
+
 
 def init_db(db_path: str | None = None) -> None:
     global _engine, _SessionLocal

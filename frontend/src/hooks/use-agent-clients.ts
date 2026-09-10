@@ -7,6 +7,7 @@ import {
   getAgentClients,
   getAgentProgress,
   getRoleProposals,
+  markAgentIntent,
   runAgent,
 } from '@/api/agent';
 
@@ -47,9 +48,8 @@ export function useRunAgent() {
   return useMutation({
     mutationKey: AGENT_RUN_KEY,
     mutationFn: ({ task, client }: { task?: string; client?: string } = {}) => runAgent(task, client),
-    onSettled: () => {
-      void queryClient.refetchQueries({ queryKey: ROLE_PROPOSALS_KEY, type: 'active' });
-    },
+    // Returned so the caller's onSuccess sees fresh proposals, not a stale list.
+    onSettled: () => queryClient.refetchQueries({ queryKey: ROLE_PROPOSALS_KEY, type: 'active' }),
   });
 }
 
@@ -76,6 +76,14 @@ export function useRoleProposals(enabled = true) {
     queryKey: ROLE_PROPOSALS_KEY,
     queryFn: getRoleProposals,
     enabled,
+  });
+}
+
+/** Mark a task as asked for by the person before they paste a prompt into an
+ *  assistant the app cannot drive itself. */
+export function useMarkAgentIntent() {
+  return useMutation({
+    mutationFn: (task: string) => markAgentIntent(task),
   });
 }
 

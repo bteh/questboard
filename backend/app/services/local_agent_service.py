@@ -40,6 +40,8 @@ _WORK_KIND = "work"
 # the pull. 15 blocked all additions once the saved list filled; 18 leaves
 # room to propose while keeping the pull fan-out bounded.
 ROLES_CAP = workspace_service.ROLES_CAP
+KEYWORDS_CAP = workspace_service.KEYWORDS_CAP
+_QUIET_DAYS = 7
 _EXCERPT_CHARS = 1200
 # A list row carries only enough body text to decide whether a posting is worth
 # opening; `get_opportunity` serves the long excerpt for finalists. A full page
@@ -279,7 +281,7 @@ def set_career_preferences(
 
     current = workspace_service.get_workspace_preferences(db, workspace.id)
     new_roles = clean_terms(roles, limit=ROLES_CAP) if roles is not None else current.roles
-    new_keywords = clean_terms(keywords, limit=20) if keywords is not None else current.keywords
+    new_keywords = clean_terms(keywords, limit=KEYWORDS_CAP) if keywords is not None else current.keywords
     # Never let this tool blank out all retrieval intent. Empty or
     # whitespace-only lists clean to [], and saving both would starve Find
     # Work, the exact state this tool exists to prevent. A caller that means
@@ -332,6 +334,7 @@ def _proposal_payload(proposal: AgentRoleProposal) -> dict[str, Any]:
         "workspace_id": proposal.workspace_id,
         "base_roles": _json_list(proposal.base_roles_json, limit=ROLES_CAP),
         "proposed_roles": _json_list(proposal.proposed_roles_json, limit=ROLES_CAP),
+        "proposed_keywords": _json_list(proposal.proposed_keywords_json, limit=KEYWORDS_CAP),
         "rationale": proposal.rationale or "",
         "status": proposal.status,
         "created_at": _iso(proposal.created_at),
@@ -339,18 +342,118 @@ def _proposal_payload(proposal: AgentRoleProposal) -> dict[str, Any]:
     }
 
 
+def _noted(proposal: AgentRoleProposal, note: str) -> dict[str, Any]:
+    payload = _proposal_payload(proposal)
+    payload["note"] = note
+    return payload
+
+
+def _lowered(values: list[str]) -> frozenset[str]:
+    return frozenset(str(v).lower() for v in values)
+
+
+def _proposed_sets(proposal: AgentRoleProposal) -> tuple[frozenset[str], frozenset[str]]:
+    return (
+        _lowered(_json_list(proposal.proposed_roles_json, limit=ROLES_CAP)),
+        _lowered(_json_list(proposal.proposed_keywords_json, limit=KEYWORDS_CAP)),
+    )
+
+
+def _rejected_this_week(proposal: AgentRoleProposal, now: datetime) -> bool:
+    return bool(
+        proposal.status == "rejected"
+        and proposal.decided_at
+        and (now - _as_utc(proposal.decided_at)).days < _QUIET_DAYS
+    )
+
+
+def merge_keywords(saved: list[str], proposed: list[str]) -> list[str]:
+    """Saved keywords first in their order, then proposed ones not already
+    there (case-insensitive, the saved spelling wins), capped."""
+    merged = list(saved)
+    seen = {k.lower() for k in merged}
+    for keyword in proposed:
+        lowered = keyword.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        merged.append(keyword)
+    return merged[:KEYWORDS_CAP]
+
+
+def _standing_answer(
+    recent: list[AgentRoleProposal],
+    *,
+    proposed_roles: list[str],
+    proposed_keywords: list[str],
+    saved_roles: list[str],
+    now: datetime,
+    requested_by_user: bool,
+) -> dict[str, Any] | None:
+    """A prior proposal that already answers this one, or None to record it.
+
+    The same lists again are an answer the user already has: an identical
+    pending proposal comes back untouched rather than superseded, so the
+    card does not nag on every pull.
+
+    The quiet week is for unprompted suggestions during a refresh. "Keep
+    mine" answers "should my roles change?", not one specific list, so after
+    a rejection every unprompted proposal waits a week unless the saved
+    roles changed (the base no longer matching the saved list means the
+    user gave the assistant something new to react to). A run the person
+    started always answers: the maintainer clicked Suggest four hours after a "Not
+    now" and got nothing (Sep 2026), so requested runs skip the week.
+    """
+    proposed = (_lowered(proposed_roles), _lowered(proposed_keywords))
+    for previous in recent:
+        if _proposed_sets(previous) != proposed:
+            continue
+        if previous.status == "pending":
+            return _noted(
+                previous,
+                "An identical proposal is already pending; returning it "
+                "instead of creating a duplicate.",
+            )
+        if not requested_by_user and _rejected_this_week(previous, now):
+            return _noted(
+                previous,
+                "The user rejected this same list recently; that answer "
+                "stands, so no new proposal was recorded.",
+            )
+    if requested_by_user:
+        return None
+    last_rejection = next((p for p in recent if p.status == "rejected"), None)
+    if (
+        last_rejection is not None
+        and _rejected_this_week(last_rejection, now)
+        and _lowered(_json_list(last_rejection.base_roles_json, limit=ROLES_CAP))
+        == _lowered(saved_roles)
+    ):
+        return _noted(
+            last_rejection,
+            "The user chose to keep their roles within the last week and has "
+            "not changed them since, so no new proposal was recorded. Mention "
+            "this in at most one sentence and move on.",
+        )
+    return None
+
+
 def propose_career_preferences(
     db: Session,
     roles: list[str],
     rationale: str = "",
+    keywords: list[str] | None = None,
     *,
     workspace_id: str | None = None,
+    requested_by_user: bool = False,
 ) -> dict[str, Any]:
-    """Record a pending role proposal; never writes workspace_preferences.
+    """Record a pending proposal; never writes workspace_preferences.
 
     Captures the currently saved roles as the proposal's base, so a later
     accept can detect drift. Any prior pending proposal for this workspace is
     marked superseded, since only the latest suggestion should be actionable.
+    ``requested_by_user`` means the person started this run, so it always
+    gets an answer instead of waiting out the quiet week after a rejection.
     """
     workspace = resolve_local_workspace(db, workspace_id)
     if workspace is None:
@@ -367,18 +470,10 @@ def propose_career_preferences(
             f"You proposed {submitted} titles but the list caps at {ROLES_CAP}. "
             f"Resubmit at most {ROLES_CAP}, dropping something to make room."
         )
+    cleaned_keywords = clean_terms(keywords, limit=KEYWORDS_CAP)
 
     current = workspace_service.get_workspace_preferences(db, workspace.id)
-
     now = datetime.now(timezone.utc)
-
-    # The same list again is an answer the user already has, not a new
-    # proposal. Every run used to supersede and recreate an identical row, so
-    # the card nagged on every pull; and a list the user rejected in the last
-    # week coming straight back turns "Keep mine" into a question that never
-    # stays answered. Order matters: check pending first, so an identical
-    # pending proposal is returned untouched rather than superseded.
-    proposed_set = {r.lower() for r in cleaned_roles}
     recent = (
         db.query(AgentRoleProposal)
         .filter(
@@ -389,45 +484,16 @@ def propose_career_preferences(
         .limit(20)
         .all()
     )
-    for previous in recent:
-        if {r.lower() for r in _json_list(previous.proposed_roles_json, limit=ROLES_CAP)} != proposed_set:
-            continue
-        if previous.status == "pending":
-            payload = _proposal_payload(previous)
-            payload["note"] = (
-                "An identical proposal is already pending; returning it "
-                "instead of creating a duplicate."
-            )
-            return payload
-        if previous.decided_at and (now - _as_utc(previous.decided_at)).days < 7:
-            payload = _proposal_payload(previous)
-            payload["note"] = (
-                "The user rejected this same list recently; that answer "
-                "stands, so no new proposal was recorded."
-            )
-            return payload
-
-    # "Keep mine" answers "should my roles change?", not one specific list.
-    # The run after a rejection proposed a slightly different trio and the
-    # card came straight back (Aug 2026), so a rejection quiets every
-    # proposal for a week. Editing the saved roles reopens the door early:
-    # the base captured at proposal time no longer matching the saved list
-    # is the signal the user gave the assistant something new to react to.
-    last_rejection = next((p for p in recent if p.status == "rejected"), None)
-    if (
-        last_rejection is not None
-        and last_rejection.decided_at
-        and (now - _as_utc(last_rejection.decided_at)).days < 7
-        and {r.lower() for r in _json_list(last_rejection.base_roles_json, limit=ROLES_CAP)}
-        == {r.lower() for r in current.roles}
-    ):
-        payload = _proposal_payload(last_rejection)
-        payload["note"] = (
-            "The user chose to keep their roles within the last week and has "
-            "not changed them since, so no new proposal was recorded. Mention "
-            "this in at most one sentence and move on."
-        )
-        return payload
+    standing = _standing_answer(
+        recent,
+        proposed_roles=cleaned_roles,
+        proposed_keywords=cleaned_keywords,
+        saved_roles=current.roles,
+        now=now,
+        requested_by_user=requested_by_user,
+    )
+    if standing is not None:
+        return standing
 
     # A guarded UPDATE, not loaded objects: a row this session read as pending
     # may have been accepted by the user mid-run, and writing "superseded"
@@ -444,6 +510,7 @@ def propose_career_preferences(
         workspace_id=workspace.id,
         base_roles_json=json.dumps(current.roles),
         proposed_roles_json=json.dumps(cleaned_roles),
+        proposed_keywords_json=json.dumps(cleaned_keywords),
         rationale=_clean_rationale(rationale),
         status="pending",
         created_at=now,
@@ -471,46 +538,24 @@ def list_role_proposals(
     return {"proposals": [_proposal_payload(p) for p in proposals]}
 
 
-def decide_role_proposal(
-    db: Session, proposal_id: int, accept: bool
-) -> dict[str, Any]:
-    """Accept or reject a pending role proposal.
+def _decision_payload(db: Session, proposal: AgentRoleProposal) -> dict[str, Any]:
+    """The proposal plus the saved lists as they stand after the decision."""
+    saved = workspace_service.get_workspace_preferences(db, proposal.workspace_id)
+    payload = _proposal_payload(proposal)
+    payload["roles"] = list(saved.roles)
+    payload["keywords"] = list(saved.keywords)
+    return payload
 
-    Rejecting only marks the row rejected. Accepting re-reads the currently
-    saved preferences and patches ONLY roles through save_workspace_preferences
-    (a read-modify-write, same as set_career_preferences), but first checks
-    that the current roles still match the proposal's base_roles_json; a
-    mismatch means the base went stale and raises RoleProposalConflict
-    instead of writing anything.
+
+def _claim_pending(db: Session, proposal: AgentRoleProposal, now: datetime) -> None:
+    """Mark the row accepted with a guarded UPDATE, or raise if it moved.
+
+    The status the caller read came from the identity map and can be stale:
+    a run may have superseded this proposal since, and an unguarded accept
+    would write "accepted" over the newer run's verdict, then save roles a
+    fresher proposal already replaced. Zero rows claimed means someone else
+    decided first; their decision wins.
     """
-    proposal = db.get(AgentRoleProposal, proposal_id)
-    if proposal is None:
-        raise ValueError(f"No role proposal found with id {proposal_id}.")
-    if proposal.status != "pending":
-        raise ValueError(f"Proposal {proposal_id} is already {proposal.status}.")
-
-    now = datetime.now(timezone.utc)
-    if not accept:
-        proposal.status = "rejected"
-        proposal.decided_at = now
-        db.commit()
-        return _proposal_payload(proposal)
-
-    current = workspace_service.get_workspace_preferences(db, proposal.workspace_id)
-    base_roles = _json_list(proposal.base_roles_json, limit=ROLES_CAP)
-    if current.roles != base_roles:
-        raise RoleProposalConflict(
-            "Your saved roles changed since this proposal was made; accepting it "
-            "now would overwrite that change. Reject it and ask for a fresh "
-            "proposal instead."
-        )
-
-    # Claim the row first with a guarded UPDATE. The status read above came
-    # from the identity map and can be stale: a run may have superseded this
-    # proposal between that read and now, and an unguarded accept would write
-    # "accepted" over the newer run's verdict, then save roles a fresher
-    # proposal already replaced. Zero rows claimed means someone else decided
-    # first; their decision wins.
     claimed = (
         db.query(AgentRoleProposal)
         .filter(
@@ -529,9 +574,53 @@ def decide_role_proposal(
             "exists. Review the latest one instead."
         )
 
+
+def decide_role_proposal(
+    db: Session, proposal_id: int, accept: bool
+) -> dict[str, Any]:
+    """Accept or reject a pending proposal.
+
+    Rejecting only marks the row rejected. Accepting re-reads the currently
+    saved preferences and patches roles and keywords through
+    save_workspace_preferences (a read-modify-write, same as
+    set_career_preferences): roles are replaced, proposed keywords merge into
+    the saved ones. It first checks that the current roles still match the
+    proposal's base_roles_json; a mismatch means the base went stale and
+    raises RoleProposalConflict instead of writing anything. Either way the
+    payload carries the saved lists as they stand afterwards.
+    """
+    proposal = db.get(AgentRoleProposal, proposal_id)
+    if proposal is None:
+        raise ValueError(f"No role proposal found with id {proposal_id}.")
+    if proposal.status != "pending":
+        raise ValueError(f"Proposal {proposal_id} is already {proposal.status}.")
+
+    now = datetime.now(timezone.utc)
+    if not accept:
+        proposal.status = "rejected"
+        proposal.decided_at = now
+        db.commit()
+        return _decision_payload(db, proposal)
+
+    current = workspace_service.get_workspace_preferences(db, proposal.workspace_id)
+    base_roles = _json_list(proposal.base_roles_json, limit=ROLES_CAP)
+    if current.roles != base_roles:
+        raise RoleProposalConflict(
+            "Your saved roles changed since this proposal was made; accepting it "
+            "now would overwrite that change. Reject it and ask for a fresh "
+            "proposal instead."
+        )
+
+    _claim_pending(db, proposal, now)
     try:
         proposed_roles = _json_list(proposal.proposed_roles_json, limit=ROLES_CAP)
-        updated = current.model_copy(update={"roles": proposed_roles})
+        proposed_keywords = _json_list(proposal.proposed_keywords_json, limit=KEYWORDS_CAP)
+        updated = current.model_copy(
+            update={
+                "roles": proposed_roles,
+                "keywords": merge_keywords(current.keywords, proposed_keywords),
+            }
+        )
         workspace_service.save_workspace_preferences(
             db, proposal.workspace_id, updated, commit=False
         )
@@ -542,7 +631,7 @@ def decide_role_proposal(
 
     db.refresh(proposal)
 
-    result = _proposal_payload(proposal)
+    result = _decision_payload(db, proposal)
     result["external_action_performed"] = False
     return result
 

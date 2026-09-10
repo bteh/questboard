@@ -10,21 +10,31 @@ import {
   useAgentProgress,
   useAgentRunActive,
   useDecideRoleProposal,
+  useMarkAgentIntent,
   useRoleProposals,
   useRunAgent,
 } from '@/hooks/use-agent-clients';
 import { isDesktopApp } from '@/lib/platform';
-import { PROPOSE_ROLES_PROMPT, canRunHeadless, panelState, pickAssistant, suggestButtonLabel } from './suggest-roles-logic';
+import type { AgentRunResult } from '@/types/resume';
+import {
+  PROPOSE_ROLES_PROMPT,
+  canRunHeadless,
+  panelState,
+  pickAssistant,
+  runOutcomeNote,
+  suggestButtonLabel,
+} from './suggest-roles-logic';
+import { SuggestRolesProposalCard } from './suggest-roles-proposal-card';
 
 interface SuggestRolesPanelProps {
   resumeExists: boolean;
-  onAccepted: (roles: string[]) => void;
+  onAccepted: (applied: { roles: string[]; keywords: string[] }) => void;
 }
 
 /**
  * Under "Target roles": the connected assistant reads the resume and proposes
- * titles, right here, with one click. The assistant can only propose; the
- * person accepts, and the saved roles change only then.
+ * titles and keywords, right here, with one click. The assistant can only
+ * propose; the person accepts, and the saved lists change only then.
  */
 export function SuggestRolesPanel({ resumeExists, onAccepted }: SuggestRolesPanelProps) {
   const clientsQuery = useAgentClients();
@@ -35,7 +45,9 @@ export function SuggestRolesPanel({ resumeExists, onAccepted }: SuggestRolesPane
   const progress = useAgentProgress(running);
   const proposals = useRoleProposals();
   const decide = useDecideRoleProposal();
+  const markIntent = useMarkAgentIntent();
   const [copied, setCopied] = useState(false);
+  const [lastRun, setLastRun] = useState<AgentRunResult | null>(null);
 
   const clients = clientsQuery.data?.clients ?? [];
   const state = panelState({ desktop: isDesktopApp(), clients, resumeExists });
@@ -48,7 +60,7 @@ export function SuggestRolesPanel({ resumeExists, onAccepted }: SuggestRolesPane
         <Link to="/settings" search={{ tab: 'assistant' }} className="underline underline-offset-2">
           Assistant tab
         </Link>{' '}
-        and it can suggest roles from your resume.
+        and it can suggest roles and keywords from your resume.
       </p>
     );
   }
@@ -59,7 +71,7 @@ export function SuggestRolesPanel({ resumeExists, onAccepted }: SuggestRolesPane
         <Link to="/settings" search={{ tab: 'resume' }} className="underline underline-offset-2">
           Resume tab
         </Link>{' '}
-        and your assistant can suggest roles from it.
+        and your assistant can suggest roles and keywords from it.
       </p>
     );
   }
@@ -69,18 +81,23 @@ export function SuggestRolesPanel({ resumeExists, onAccepted }: SuggestRolesPane
   const granted = Boolean(consent.data?.granted);
   const pending = (proposals.data?.proposals ?? []).filter((proposal) => proposal.status === 'pending');
   const headless = assistant ? canRunHeadless(assistant) : false;
+  const phase = progress.data?.phase;
+  const outcome = lastRun ? runOutcomeNote(lastRun, pending.length) : null;
 
   const start = () => {
-    const launch = () =>
+    const launch = () => {
+      setLastRun(null);
       run.mutate(
         { task: 'propose_roles', client: assistant?.id ?? 'claude' },
         {
           onSuccess: (result) => {
             if (!result.ok) toast.error(result.error || `${assistantName} did not finish.`);
+            setLastRun(result);
           },
           onError: (error) => toast.error(error instanceof Error ? error.message : 'The run failed'),
         },
       );
+    };
     if (granted) {
       launch();
       return;
@@ -95,6 +112,7 @@ export function SuggestRolesPanel({ resumeExists, onAccepted }: SuggestRolesPane
 
   const copyPrompt = async () => {
     const write = async () => {
+      markIntent.mutate('propose_roles');
       try {
         await navigator.clipboard.writeText(PROPOSE_ROLES_PROMPT);
         setCopied(true);
@@ -113,13 +131,13 @@ export function SuggestRolesPanel({ resumeExists, onAccepted }: SuggestRolesPane
     });
   };
 
-  const accept = (id: number, roles: string[]) =>
+  const accept = (id: number) =>
     decide.mutate(
       { id, accept: true },
       {
-        onSuccess: () => {
-          onAccepted(roles);
-          toast.success('Roles updated from the suggestion');
+        onSuccess: (decision) => {
+          onAccepted({ roles: decision.roles, keywords: decision.keywords });
+          toast.success('Roles and keywords updated from the suggestion');
         },
         onError: (error) => toast.error(error instanceof Error ? error.message : 'Could not apply'),
       },
@@ -129,8 +147,8 @@ export function SuggestRolesPanel({ resumeExists, onAccepted }: SuggestRolesPane
     <div className="space-y-2 rounded-xl border border-border-default bg-bg-subtle/40 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-text-muted">
-          Not sure what to type? {assistantName} can read your resume and suggest titles. Nothing is saved
-          until you accept.
+          Not sure what to type? {assistantName} can read your resume and fill in titles and keywords.
+          Nothing is saved until you accept.
         </p>
         {headless ? (
           <Button
@@ -161,35 +179,21 @@ export function SuggestRolesPanel({ resumeExists, onAccepted }: SuggestRolesPane
           Paste it into {assistantName} and send. When it answers, the suggestion appears here.
         </p>
       ) : null}
-      {running && progress.data?.phase ? (
-        <p className="text-xs text-text-muted">{progress.data.phase}</p>
+      {running ? (
+        <p className="text-xs text-text-muted">
+          {phase ? `Usually about a minute. ${phase}` : 'Usually about a minute.'}
+        </p>
       ) : null}
+      {outcome ? <p className="text-xs text-text-muted">{outcome}</p> : null}
       {pending.map((proposal) => (
-        <div key={proposal.id} className="space-y-2 rounded-lg border border-border-default bg-bg-card p-3">
-          <p className="text-xs font-medium text-text-primary">Suggested by {assistantName}</p>
-          <div className="flex flex-wrap gap-1.5">
-            {proposal.proposed_roles.map((role) => (
-              <span key={role} className="rounded-full border border-border-default px-2 py-0.5 text-xs">
-                {role}
-              </span>
-            ))}
-          </div>
-          {proposal.rationale ? <p className="text-xs text-text-muted">{proposal.rationale}</p> : null}
-          <div className="flex gap-2">
-            <Button type="button" size="sm" disabled={decide.isPending} onClick={() => accept(proposal.id, proposal.proposed_roles)}>
-              Use these roles
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={decide.isPending}
-              onClick={() => decide.mutate({ id: proposal.id, accept: false })}
-            >
-              Not now
-            </Button>
-          </div>
-        </div>
+        <SuggestRolesProposalCard
+          key={proposal.id}
+          proposal={proposal}
+          assistantName={assistantName}
+          busy={decide.isPending}
+          onAccept={() => accept(proposal.id)}
+          onDismiss={() => decide.mutate({ id: proposal.id, accept: false })}
+        />
       ))}
     </div>
   );

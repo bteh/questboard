@@ -60,6 +60,19 @@ class AgentRunResponse(BaseModel):
     num_turns: int | None = None
 
 
+class AgentIntentRequest(BaseModel):
+    """The person is about to run a task by hand (a pasted prompt in Claude
+    Desktop or Codex), so the tools treat it as asked-for, same as the in-app
+    run."""
+
+    task: str
+
+
+class AgentIntentResponse(BaseModel):
+    task: str
+    marked: bool = True
+
+
 class ResumeAnalysisSummary(BaseModel):
     """Summary of what resume analysis extracted, echoed in the upload response."""
 
@@ -105,6 +118,7 @@ class RoleProposal(BaseModel):
     workspace_id: str | None = None
     base_roles: list[str] = Field(default_factory=list)
     proposed_roles: list[str] = Field(default_factory=list)
+    proposed_keywords: list[str] = Field(default_factory=list)
     rationale: str = ""
     status: str = "pending"
     created_at: str | None = None
@@ -120,7 +134,13 @@ class RoleProposalDecisionRequest(BaseModel):
 
 
 class RoleProposalDecisionResponse(BaseModel):
+    """The decision plus the saved lists as they stand after it: patched on
+    accept, unchanged on reject."""
+
     id: int
     status: str
     proposed_roles: list[str] = Field(default_factory=list)
+    proposed_keywords: list[str] = Field(default_factory=list)
+    roles: list[str] = Field(default_factory=list)
+    keywords: list[str] = Field(default_factory=list)
     decided_at: str | None = None

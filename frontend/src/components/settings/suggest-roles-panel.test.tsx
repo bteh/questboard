@@ -7,10 +7,12 @@ import type { ReactNode } from 'react';
 
 const clientsQuery = { data: { clients: [{ id: 'claude', name: 'Claude Code', installed: true, connected: true, restart_required: false }] } };
 const claudeCode = clientsQuery.data.clients[0];
-const proposalsQuery = { data: { proposals: [] as { id: number; status: string; proposed_roles: string[]; rationale: string }[] } };
+type Proposal = { id: number; status: string; proposed_roles: string[]; proposed_keywords: string[]; rationale: string };
+const proposalsQuery = { data: { proposals: [] as Proposal[] } };
 const runMutate = vi.fn();
 const decideMutate = vi.fn();
 const consentMutate = vi.fn();
+const intentMutate = vi.fn();
 
 vi.mock('@/hooks/use-agent-clients', () => ({
   useAgentClients: () => clientsQuery,
@@ -19,6 +21,7 @@ vi.mock('@/hooks/use-agent-clients', () => ({
   useAgentProgress: () => ({ data: undefined }),
   useRoleProposals: () => proposalsQuery,
   useDecideRoleProposal: () => ({ mutate: decideMutate, isPending: false }),
+  useMarkAgentIntent: () => ({ mutate: intentMutate, isPending: false }),
 }));
 vi.mock('@/hooks/use-agent-consent', () => ({
   useAgentConsent: () => ({ data: { granted: true }, isLoading: false }),
@@ -51,23 +54,36 @@ describe('SuggestRolesPanel', () => {
 
   it('runs the propose_roles task with the connected assistant', () => {
     render(<SuggestRolesPanel resumeExists onAccepted={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: /suggest roles from my resume with claude code/i }));
+    fireEvent.click(screen.getByRole('button', { name: /suggest roles and keywords from my resume with claude code/i }));
     expect(runMutate).toHaveBeenCalledTimes(1);
     expect(runMutate.mock.calls[0][0]).toEqual({ task: 'propose_roles', client: 'claude' });
   });
 
   it('shows a pending proposal and applies it only when the person accepts', () => {
     proposalsQuery.data = {
-      proposals: [{ id: 7, status: 'pending', proposed_roles: ['Data Analyst', 'IT Support Specialist'], rationale: 'Entry-level fits.' }],
+      proposals: [
+        { id: 7, status: 'pending', proposed_roles: ['Data Analyst', 'IT Support Specialist'], proposed_keywords: [], rationale: 'Entry-level fits.' },
+      ],
     };
-    decideMutate.mockImplementation((_vars: unknown, opts: { onSuccess?: () => void }) => opts.onSuccess?.());
+    decideMutate.mockImplementation((_vars: unknown, opts: { onSuccess?: (decision: unknown) => void }) =>
+      opts.onSuccess?.({
+        id: 7,
+        status: 'accepted',
+        proposed_roles: ['Data Analyst', 'IT Support Specialist'],
+        proposed_keywords: [],
+        roles: ['Data Analyst', 'IT Support Specialist'],
+        keywords: ['SQL'],
+        decided_at: null,
+      }),
+    );
     const onAccepted = vi.fn();
     render(<SuggestRolesPanel resumeExists onAccepted={onAccepted} />);
     expect(screen.getByText('Data Analyst')).toBeTruthy();
+    expect(screen.queryByText('Keywords')).toBeNull();
     expect(onAccepted).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: /use these roles/i }));
+    fireEvent.click(screen.getByRole('button', { name: /use these/i }));
     expect(decideMutate.mock.calls[0][0]).toEqual({ id: 7, accept: true });
-    expect(onAccepted).toHaveBeenCalledWith(['Data Analyst', 'IT Support Specialist']);
+    expect(onAccepted).toHaveBeenCalledWith({ roles: ['Data Analyst', 'IT Support Specialist'], keywords: ['SQL'] });
   });
 
   it('points at the Resume tab when no resume is uploaded yet', () => {

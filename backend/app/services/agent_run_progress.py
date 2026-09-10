@@ -92,6 +92,41 @@ def set_work_fit_run_id(run_id: str) -> None:
         logger.debug("could not stamp work fit run id", exc_info=True)
 
 
+def mark_requested(task: str) -> None:
+    """Note that the person asked for ``task`` themselves.
+
+    A proposal the person asked for must always get an answer; the quiet
+    week after a "Not now" is for unprompted suggestions during a refresh.
+    The MCP server is a separate process, so the mark rides in this file
+    alongside the steps. Never raises.
+    """
+    try:
+        payload = _load()
+        payload["requested_task"] = str(task)
+        payload["requested_at"] = datetime.now(timezone.utc).isoformat()
+        payload.setdefault("steps", [])
+        _write(payload)
+    except Exception:  # noqa: BLE001 - a lost mark must not fail the run
+        logger.debug("could not mark requested task %s", task, exc_info=True)
+
+
+def requested_task(max_age_seconds: int = 1800) -> str:
+    """The task the person asked for, or "" when none or the mark is stale."""
+    payload = _load()
+    task = payload.get("requested_task")
+    stamped = payload.get("requested_at")
+    if not isinstance(task, str) or not isinstance(stamped, str):
+        return ""
+    try:
+        marked_at = datetime.fromisoformat(stamped)
+    except ValueError:
+        return ""
+    if marked_at.tzinfo is None:
+        marked_at = marked_at.replace(tzinfo=timezone.utc)
+    age = (datetime.now(timezone.utc) - marked_at).total_seconds()
+    return task if age < max_age_seconds else ""
+
+
 def clear() -> None:
     """Start a fresh run. Called when the app launches the assistant."""
     try:

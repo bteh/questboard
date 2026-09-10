@@ -84,7 +84,7 @@ export function SearchPrefsTab({ onboarding, navigate }: SearchPrefsTabProps) {
           />
           <SuggestRolesPanel
             resumeExists={onboarding?.needs_resume === false}
-            onAccepted={(roles) => setPrefsForm((prev) => ({ ...prev, roles }))}
+            onAccepted={({ roles, keywords }) => setPrefsForm((prev) => ({ ...prev, roles, keywords }))}
           />
         </div>
 
