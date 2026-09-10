@@ -72,6 +72,28 @@ The certificate comes from Xcode > Settings > Accounts > Manage Certificates >
 The first notarization of a new Apple team takes up to an hour or so because
 Apple runs a one-time review. Every later one takes about two minutes.
 
+**The DMG step can die on Finder.** Tauri builds the DMG with create-dmg, whose
+icon-layout AppleScript needs Finder to answer within a minute. Under a full
+build Finder sometimes does not (`AppleEvent timed out (-1712)`, visible only
+with `tauri bundle --verbose`), the build fails after the app is already
+notarized, and the updater archive is never produced. Recovery, from the repo
+root, with the same environment the release target exports:
+
+1. `.venv/bin/python scripts/clean_dmg_artifacts.py` (a failed run leaves the
+   working image mounted).
+2. `pnpm -C frontend exec tauri bundle --verbose --target aarch64-apple-darwin --bundles app`
+   re-signs and re-notarizes the app and writes a fresh `Questboard.app.tar.gz`
+   plus `.sig`. Check their mtimes; an older pair is a previous release.
+3. From `bundle/macos`, build the DMG by hand:
+   `bash ../dmg/bundle_dmg.sh --volname Questboard --icon Questboard.app 180 170 --app-drop-link 480 170 --window-size 660 400 --hide-extension Questboard.app --volicon ../dmg/icon.icns ../dmg/Questboard_<version>_aarch64.dmg Questboard.app`
+   (`--skip-jenkins` drops the icon layout if Finder still will not answer).
+4. A hand-built DMG is unsigned. `codesign --force --sign "$IDENTITY" --timestamp` it
+   BEFORE `notarytool submit` and `stapler staple`, or `verify_release_dmg.py`
+   reports `no usable signature`.
+5. Run the rest of the release target's lines by hand: `verify_release_dmg.py`,
+   `verify_desktop_bundle.py --live-search`, `build_update_manifest.py`, the
+   `Questboard_aarch64.dmg` copy, `gh release create`.
+
 ## Publishing so the updater can see it
 
 The app polls
@@ -117,8 +139,11 @@ silently stays on its current version.
 
 `useAppUpdate` checks four seconds after the board paints, then every six hours.
 It downloads in the background and shows a small pill in the topbar only once a
-new version is on disk. Clicking it shuts the backend down cleanly (it holds an
-open SQLite file and a port), installs, and relaunches.
+new version is on disk. Clicking it installs the update that was downloaded
+(only the object that downloaded may install; a fresh check cannot), then shuts
+the backend down cleanly (it holds an open SQLite file and a port), then
+relaunches. Install comes first so a failed install leaves a working app: the
+pill says "Couldn't install X. The app still works." and offers Try again.
 
 A failed check is silent on purpose: no endpoint, no network, or a
 half-published release are all things the user did not ask about and cannot act
