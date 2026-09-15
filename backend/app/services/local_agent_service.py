@@ -914,6 +914,37 @@ _LEVEL_TOKENS = frozenset({
     "senior", "staff", "principal", "junior", "associate", "entry",
     "i", "ii", "iii", "iv", "v",
 })
+# Role-type words that mark a leadership seat. _role_tokens already folds
+# "mgr" into "manager". The SQL layer expands the pseudo-token "leadership"
+# to the same family (see application_service.get_applications).
+_LEADERSHIP_TOKENS = frozenset({"manager", "director", "head", "lead", "vp", "chief"})
+
+
+def _retrieval_token_groups(terms: list[str]) -> list[list[str]]:
+    """Turn saved roles into the SQL title-token groups the board retrieves on.
+
+    A role with a leadership word means the person wants the whole family at
+    that level, and titles for the same job vary too much for an exact token
+    set: "Head of Data", "Director, Data Platform" and "VP, Data Engineering"
+    are all answers to "Data Engineering Manager". So each of that role's
+    domain words becomes its own group paired with the "leadership"
+    pseudo-token, and the Python gates after retrieval decide the rest. A role
+    without a leadership word keeps its own words as one group, minus pure
+    level words, exactly as before.
+    """
+    groups: list[list[str]] = []
+    for term in terms:
+        tokens = _role_tokens(term)
+        own = [tok for tok in sorted(tokens) if tok not in _LEVEL_TOKENS]
+        domain = sorted(tokens - _LEVEL_TOKENS - _LEADERSHIP_TOKENS - _ROLE_GENERIC_TOKENS)
+        if tokens & _LEADERSHIP_TOKENS and domain:
+            candidates = [[tok, "leadership"] for tok in domain]
+        else:
+            candidates = [own] if own else []
+        for group in candidates:
+            if group not in groups:
+                groups.append(group)
+    return groups
 
 
 def _title_is_in_lane(title: str | None, queries: list[str]) -> bool:
@@ -1380,17 +1411,10 @@ def _search_work_uncached(
     page_size = max(1, min(int(page_size), effective_cap))
     candidate_page_size = 1000 if browse_all else min(1000, max(page_size * 10, 200))
 
-    # Saved role families are token groups, not exact phrases. This retrieves
-    # "Manager, Data Engineering" for "Data Engineering Manager" while the
-    # Python check below prevents description-only and substring false hits.
-    # Retrieval is recall-first: match a role on its DOMAIN words and drop the
-    # pure seniority level, so "Staff Data Engineer" also surfaces "Senior Data
-    # Engineer" and plain "Data Engineer" (the agent ranks; we don't pre-drop).
-    role_groups = [
-        [tok for tok in sorted(_role_tokens(term)) if tok not in _LEVEL_TOKENS]
-        for term in terms
-    ]
-    role_groups = [group for group in role_groups if group]
+    # Saved roles retrieve as token groups, not exact phrases; a leadership
+    # role widens to its whole family (see _retrieval_token_groups). The
+    # Python gates below do the precise title, lane and level work.
+    role_groups = _retrieval_token_groups(terms)
     candidate_query = dict(
         title_token_groups=role_groups or None,
         is_remote=True if effective_workplace == "remote_only" else None,

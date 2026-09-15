@@ -828,6 +828,10 @@ def get_applications(
         variants = {
             "architect": ("architect", "architecture"),
             "engineer": ("engineer", "engineering"),
+            # pseudo-token: any leadership word at all. The board sends it for
+            # a leadership seeker so "Head of Data" and "Director, Data
+            # Platform" answer the same saved role family.
+            "leadership": ("manager", "mgr", "director", "head", "lead", "vp", "chief"),
             "manager": ("manager", "mgr"),
             "ops": ("ops", "operations"),
             # the role-token alias maps scientist/scientists -> "science", which
