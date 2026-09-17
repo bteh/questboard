@@ -1,6 +1,6 @@
 /* The board's filter state, serialized two ways and pinned by
    board-state.test.ts:
-   - URL search params (?v, ?q, ?place, ?from, ?to, ?p, ?days, ?src) so a
+   - URL search params (?v, ?q, ?place, ?from, ?to, ?p, ?days, ?src, ?lvl) so a
      filtered board is a shareable address and back/forward walks filter
      changes;
    - localStorage at questboard:board.v1 so Tuesday's board is already set
@@ -38,6 +38,8 @@ export interface BoardParams {
   /** Work-lane source-category chip ('startup', 'crypto', ...); absent =
       "My roles". Persisted like every other filter so reload keeps it. */
   src?: string;
+  /** Work-lane level chip ('lead', 'manager', ...); absent = every level. */
+  lvl?: string;
   /** Open job detail sheet (?job=123). Never persisted: a share or refresh
       reopens it from the URL alone. */
   job?: number;
@@ -88,6 +90,7 @@ export function validateBoardSearch(search: Record<string, unknown>): BoardParam
     p,
     days,
     src: cleanString(search.src),
+    lvl: cleanString(search.lvl),
     job: cleanId(search.job),
   };
 }
@@ -98,7 +101,7 @@ export function validateBoardSearch(search: Record<string, unknown>): BoardParam
 export function hasBoardParams(params: BoardParams): boolean {
   return Boolean(
     params.v || params.f || params.q || params.place || params.near ||
-      params.from || params.to || params.p || params.days || params.src,
+      params.from || params.to || params.p || params.days || params.src || params.lvl,
   );
 }
 
@@ -130,7 +133,7 @@ export function readSavedBoardState(): SavedBoardState | null {
 export function saveBoardState(state: SavedBoardState): void {
   try {
     const compact: Record<string, string> = {};
-    for (const key of ['v', 'f', 'q', 'place', 'near', 'from', 'to', 'p', 'days', 'src', 'sort'] as const) {
+    for (const key of ['v', 'f', 'q', 'place', 'near', 'from', 'to', 'p', 'days', 'src', 'lvl', 'sort'] as const) {
       const value = state[key];
       if (value) compact[key] = value;
     }

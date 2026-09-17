@@ -593,11 +593,7 @@ def _consolidate_search_terms(
         if not t:
             continue
 
-        pfx, base = _strip_prefix(t, _SENIORITY_PREFIXES)
-        if not pfx:
-            pfx, base = _strip_prefix(t, _MANAGEMENT_PREFIXES)
-
-        base_key = re.sub(r"\s+", " ", base.lower().strip())
+        base_key = _consolidation_base(t)
         base_groups.setdefault(base_key, []).append(t)
 
     # For each group: keep the base role as the search query.
@@ -700,6 +696,69 @@ def _consolidate_search_terms(
         len(roles), len(keywords), len(consolidated),
     )
     return consolidated
+
+
+def _normalise_search_term(term: str) -> str:
+    return re.sub(r"\s+", " ", str(term).lower().strip())
+
+
+def _consolidation_base(term: str) -> str:
+    """Base role the consolidator groups *term* under (Phase 1)."""
+    pfx, base = _strip_prefix(term.strip(), _SENIORITY_PREFIXES)
+    if not pfx:
+        pfx, base = _strip_prefix(term.strip(), _MANAGEMENT_PREFIXES)
+    return _normalise_search_term(base)
+
+
+def _role_derived_terms(
+    consolidated: list[str],
+    target_roles: list[str] | None,
+) -> set[str]:
+    """Consolidated terms that stand in for a saved role.
+
+    A term is role-derived when it equals one of the saved ``target_roles``
+    or is the base the consolidator groups that role under (same prefix
+    strip and case/whitespace normalisation as ``_consolidate_search_terms``
+    Phase 1). Everything else in *consolidated* came from a keyword phrase or
+    a resume skill. The API path merges title-shaped keywords into ``roles``
+    before search, so ``roles_raw`` cannot tell the two apart; the saved
+    roles can. Returned terms are normalised.
+    """
+    saved: set[str] = set()
+    for role in target_roles or []:
+        r = str(role).strip()
+        if not r:
+            continue
+        saved.add(_normalise_search_term(r))
+        saved.add(_consolidation_base(r))
+    return {
+        _normalise_search_term(t)
+        for t in consolidated
+        if _normalise_search_term(t) in saved
+    }
+
+
+def _cap_search_tasks(
+    tasks: list[tuple[str, str]],
+    cap: int,
+    role_terms: set[str],
+) -> list[tuple[str, str]]:
+    """Trim place-major (term, place) tasks to *cap* without losing a role query.
+
+    Tasks whose term is in *role_terms* (normalised) are never dropped.
+    Keyword tasks are dropped from the back, so a keyword loses its later
+    places first and keeps its first-place query as long as possible. The
+    result keeps ``max(cap, role task count)`` entries in the original order.
+    """
+    if len(tasks) <= cap:
+        return list(tasks)
+    keyword_idx = [
+        i for i, (term, _loc) in enumerate(tasks)
+        if _normalise_search_term(term) not in role_terms
+    ]
+    to_drop = min(len(keyword_idx), len(tasks) - cap)
+    dropped = set(keyword_idx[len(keyword_idx) - to_drop:]) if to_drop else set()
+    return [task for i, task in enumerate(tasks) if i not in dropped]
 
 
 def _pick_best_job(group: list[dict]) -> dict:
@@ -1580,19 +1639,25 @@ class JobFinderPipeline:
             for term in prioritized:
                 search_tasks.append((term, loc))
 
-        # Hard cap on total search tasks to avoid 8+ minute searches.
-        # High-priority (niche) queries are at the front, so trimming
-        # from the back drops only broad/duplicate-heavy queries.
+        # Hard cap on total search tasks to avoid 8+ minute searches. The cap
+        # bounds keyword queries only: a saved role runs in every chosen place
+        # whatever the cap, so a remote-friendly search always asks for each
+        # role remotely (Sep 15 2026: ten Remote role queries were dropped).
         max_tasks = max(12, settings.get("max_search_tasks", 30))
-        if len(search_tasks) > max_tasks:
-            trimmed = len(search_tasks) - max_tasks
-            search_tasks = search_tasks[:max_tasks]
+        role_terms = _role_derived_terms(consolidated, self.config.get("target_roles"))
+        capped_tasks = _cap_search_tasks(search_tasks, max_tasks, role_terms)
+        trimmed = len(search_tasks) - len(capped_tasks)
+        if trimmed:
             logger.info(
-                "Capped search tasks from %d to %d (dropped %d low-priority queries)",
-                max_tasks + trimmed, max_tasks, trimmed,
+                "Capped search tasks from %d to %d (dropped %d keyword queries; every saved role kept in every place)",
+                len(search_tasks), len(capped_tasks), trimmed,
             )
             if progress:
-                progress(f"Capped to {max_tasks} search queries (dropped {trimmed} low-priority duplicates)")
+                progress(
+                    f"Capped to {len(capped_tasks)} search queries "
+                    f"(dropped {trimmed} keyword queries; every saved role still runs in every place)"
+                )
+        search_tasks = capped_tasks
 
         total_combos = len(search_tasks)
         jobspy_tasks = _build_jobspy_tasks(search_tasks, jobspy_boards)

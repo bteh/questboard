@@ -156,6 +156,8 @@ class ProfileWorkListResponse(ApplicationListResponse):
     unreviewed_count: int = 0
     # source kind -> count across the full in-lane set, for the browse chips.
     source_categories: dict[str, int] = Field(default_factory=dict)
+    # leadership level -> count across the full in-lane set, for the level chips.
+    levels: dict[str, int] = Field(default_factory=dict)
     retrieval_note: str = ""
 
 

@@ -31,6 +31,7 @@ export function getProfileWork(filters: ApplicationFilters = {}): Promise<Profil
     timezone_name:
       filters.timezone_name ?? (filters.found_within_days ? localTimeZone() : undefined),
     source_category: filters.source_category,
+    level: filters.level,
     sort_by: filters.sort_by,
     page: filters.page,
     page_size: filters.page_size,

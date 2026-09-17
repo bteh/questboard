@@ -624,9 +624,9 @@ def test_profile_work_api_returns_application_cards_for_the_active_profile(
     assert response.profile_configured is True
     assert response.resume_available is True
     assert response.jurisdiction_configured is True
-    # "Director of Data Engineering" is in the leadership family of the saved
-    # "Data Engineering Manager", so its card shows too (Sep 2026).
-    assert {item.company for item in response.items} == {"Profile Match Co", "Local Co"}
+    # "Director of Data Engineering" (Local Co) sits one level above the saved
+    # "Data Engineering Manager", so its card stays out (Sep 17 2026).
+    assert {item.company for item in response.items} == {"Profile Match Co"}
     assert response.ranking_owner == "connected_agent"
 
 

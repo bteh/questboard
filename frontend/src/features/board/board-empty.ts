@@ -18,6 +18,8 @@ export interface BoardFilterSignals {
   facet?: string;
   presetCount?: number;
   sourceCategory?: string | null;
+  /** the work lane's level chip (?lvl) */
+  level?: string | null;
   /** the posted-within window (?days); set means the reader narrowed by date */
   postedDays?: string;
 }
@@ -35,6 +37,7 @@ export function boardFiltersActive(signals: BoardFilterSignals): boolean {
     Boolean(signals.facet) ||
     (signals.presetCount ?? 0) > 0 ||
     Boolean(signals.sourceCategory) ||
+    Boolean(signals.level) ||
     Boolean(signals.postedDays)
   );
 }

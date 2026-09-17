@@ -20,7 +20,7 @@ describe('kindSearchForLane', () => {
 
   it('clears hidden career filters when entering Side quests', () => {
     expect(kindSearchForLane(
-      { v: 'work', p: 'founding', src: 'crypto', from: '150k' },
+      { v: 'work', p: 'founding', src: 'crypto', lvl: 'lead', from: '150k' },
       'all',
       presets,
       keys,
@@ -28,6 +28,7 @@ describe('kindSearchForLane', () => {
       v: undefined,
       p: undefined,
       src: undefined,
+      lvl: undefined,
       from: undefined,
     }));
   });

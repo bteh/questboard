@@ -914,31 +914,79 @@ _LEVEL_TOKENS = frozenset({
     "senior", "staff", "principal", "junior", "associate", "entry",
     "i", "ii", "iii", "iv", "v",
 })
-# Role-type words that mark a leadership seat. _role_tokens already folds
-# "mgr" into "manager". The SQL layer expands the pseudo-token "leadership"
-# to the same family (see application_service.get_applications).
-_LEADERSHIP_TOKENS = frozenset({"manager", "director", "head", "lead", "vp", "chief"})
+# Leadership levels, lowest first. A title's level is the highest one it
+# names ("Senior Vice President, Data" is vp). "officer" only counts behind
+# "chief", which is in the bucket already, so "Data Protection Officer" stays
+# an individual contributor. _role_tokens already folds "mgr" into "manager";
+# "vice president" is two words, so title_level matches it as a phrase.
+_LEVEL_VOCABULARY: tuple[tuple[str, frozenset[str]], ...] = (
+    ("lead", frozenset({"lead"})),
+    ("manager", frozenset({"manager"})),
+    ("director", frozenset({"director", "head"})),
+    ("vp", frozenset({"vp", "svp", "evp"})),
+    ("chief", frozenset({"chief", "cto", "cdo", "cio"})),
+)
+TITLE_LEVELS: tuple[str, ...] = tuple(name for name, _ in _LEVEL_VOCABULARY)
+_VICE_PRESIDENT_RE = re.compile(r"\bvice[\s-]+president\b")
+# The SQL word(s) that retrieve each level. application_service expands
+# "manager" to manager|mgr and "vp" to vp|vice president.
+_LEVEL_SQL_WORDS: dict[str, tuple[str, ...]] = {
+    "lead": ("lead",),
+    "manager": ("manager",),
+    "director": ("director", "head"),
+    "vp": ("vp",),
+    "chief": ("chief",),
+}
+_LEADERSHIP_TOKENS = frozenset().union(*(words for _, words in _LEVEL_VOCABULARY)) | {
+    "vice",
+    "president",
+}
+
+
+def title_level(title: str | None) -> str | None:
+    """The leadership level a title names (lead, manager, director, vp or
+    chief), or None for an individual-contributor title."""
+    tokens = _role_tokens(title)
+    if _VICE_PRESIDENT_RE.search(str(title or "").lower()):
+        tokens = tokens | {"vp"}
+    for level, words in reversed(_LEVEL_VOCABULARY):
+        if tokens & words:
+            return level
+    return None
+
+
+def _wanted_levels(terms: list[str]) -> set[str | None]:
+    return {title_level(term) for term in terms}
 
 
 def _retrieval_token_groups(terms: list[str]) -> list[list[str]]:
     """Turn saved roles into the SQL title-token groups the board retrieves on.
 
-    A role with a leadership word means the person wants the whole family at
-    that level, and titles for the same job vary too much for an exact token
-    set: "Head of Data", "Director, Data Platform" and "VP, Data Engineering"
-    are all answers to "Data Engineering Manager". So each of that role's
-    domain words becomes its own group paired with the "leadership"
-    pseudo-token, and the Python gates after retrieval decide the rest. A role
-    without a leadership word keeps its own words as one group, minus pure
-    level words, exactly as before.
+    Titles for the same leadership job vary too much for an exact token set
+    ("Manager, Data Platform" answers "Data Engineering Manager"), so a role
+    that names a level pairs each of its domain words with each level word
+    the saved roles name, one group per (domain word, level word). The levels
+    are exactly the ones saved, no higher and no lower: manager and lead roles
+    retrieve manager and lead titles; a director role also admits head-of
+    titles (one family); vp and chief titles are retrieved only when a saved
+    role names them. A role without a level keeps its own words as one group,
+    minus pure seniority words. The Python gates after retrieval decide the
+    rest.
     """
+    wanted = _wanted_levels(terms)
+    level_words = [
+        word
+        for level in TITLE_LEVELS
+        if level in wanted
+        for word in _LEVEL_SQL_WORDS[level]
+    ]
     groups: list[list[str]] = []
     for term in terms:
         tokens = _role_tokens(term)
         own = [tok for tok in sorted(tokens) if tok not in _LEVEL_TOKENS]
         domain = sorted(tokens - _LEVEL_TOKENS - _LEADERSHIP_TOKENS - _ROLE_GENERIC_TOKENS)
-        if tokens & _LEADERSHIP_TOKENS and domain:
-            candidates = [[tok, "leadership"] for tok in domain]
+        if title_level(term) and domain:
+            candidates = [[tok, word] for tok in domain for word in level_words]
         else:
             candidates = [own] if own else []
         for group in candidates:
@@ -1382,8 +1430,17 @@ def _search_work_uncached(
     })
     profile_hash = fit_profile_hash(db, workspace_id)
     terms = clean_terms(queries, limit=ROLES_CAP)
+    terms_are_saved_roles = False
     if not terms and use_saved_preferences:
         terms = clean_terms(saved_terms, limit=ROLES_CAP)
+        terms_are_saved_roles = True
+    # Saved roles are titles, so an individual-contributor role bounds the
+    # board to individual-contributor titles. An ad-hoc query ("Data
+    # Engineering") names a field, not a title, so a query set bounds levels
+    # only when one of its terms names a level.
+    wanted_levels = _wanted_levels(terms)
+    if wanted_levels == {None} and not terms_are_saved_roles:
+        wanted_levels = set()
     effective_location = " ".join(location.split())[:120] or (
         saved_location if use_saved_preferences else ""
     )
@@ -1450,6 +1507,7 @@ def _search_work_uncached(
     stale_excluded = 0
     unknown_freshness_excluded = 0
     title_mismatch_excluded = 0
+    level_bound_excluded = 0
     level_mismatch_excluded = 0
     duplicate_records_excluded = 0
 
@@ -1517,6 +1575,9 @@ def _search_work_uncached(
             or not (primary_role_match or crypto_role_match)
         ):
             title_mismatch_excluded += 1
+            continue
+        if wanted_levels and title_level(row.job_title) not in wanted_levels:
+            level_bound_excluded += 1
             continue
         if not _filter_jobs_by_level(
             [filter_job],
@@ -1678,6 +1739,7 @@ def _search_work_uncached(
             "known_stale_excluded": stale_excluded,
             "unknown_date_excluded": unknown_freshness_excluded,
             "title_mismatch_excluded": title_mismatch_excluded,
+            "level_bound_excluded": level_bound_excluded,
             "level_mismatch_excluded": level_mismatch_excluded,
             "duplicate_records_excluded": duplicate_records_excluded,
         },

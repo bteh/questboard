@@ -4,6 +4,8 @@
    composable filter, so it can narrow My roles or any source category. Counts
    are the full inventory, showing the real breadth even when few roles match. */
 
+import { chipActiveClass, chipClass, chipCountClass, chipInactiveClass } from './chip-classes';
+
 const CATEGORY_LABELS: Record<string, string> = {
   startup: 'Startups & founding',
   vc: 'VC portfolios',
@@ -28,11 +30,6 @@ interface SourceCategoryChipsProps {
   onFoundingToggle: () => void;
 }
 
-const inactiveClass = 'border-border-default text-text-secondary hover:text-text-primary';
-const activeClass = 'border-brand bg-brand/10 font-medium text-brand';
-const chipClass =
-  'focus-ring min-h-11 rounded-full border px-3 py-1 text-xs transition-colors md:min-h-0';
-
 export function SourceCategoryChips({
   counts,
   selected,
@@ -52,7 +49,7 @@ export function SourceCategoryChips({
         type="button"
         aria-pressed={selected === null}
         onClick={() => onSelect(null)}
-        className={`${chipClass} ${selected === null ? activeClass : inactiveClass}`}
+        className={`${chipClass} ${selected === null ? chipActiveClass : chipInactiveClass}`}
       >
         My roles
       </button>
@@ -60,7 +57,7 @@ export function SourceCategoryChips({
         type="button"
         aria-pressed={foundingOnly}
         onClick={onFoundingToggle}
-        className={`${chipClass} ${foundingOnly ? activeClass : inactiveClass}`}
+        className={`${chipClass} ${foundingOnly ? chipActiveClass : chipInactiveClass}`}
       >
         Founding
       </button>
@@ -70,10 +67,10 @@ export function SourceCategoryChips({
           type="button"
           aria-pressed={selected === c}
           onClick={() => onSelect(selected === c ? null : c)}
-          className={`${chipClass} ${selected === c ? activeClass : inactiveClass}`}
+          className={`${chipClass} ${selected === c ? chipActiveClass : chipInactiveClass}`}
         >
           {CATEGORY_LABELS[c] ?? c}{' '}
-          <span className="font-mono text-text-secondary tabular-nums">{counts?.[c]}</span>
+          <span className={chipCountClass}>{counts?.[c]}</span>
         </button>
       ))}
     </div>

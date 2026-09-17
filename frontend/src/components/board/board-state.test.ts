@@ -97,6 +97,12 @@ describe('validateBoardSearch', () => {
     expect(validateBoardSearch({}).src).toBeUndefined();
   });
 
+  it('carries the work-lane level chip (?lvl) like any other param', () => {
+    expect(validateBoardSearch({ lvl: 'lead' }).lvl).toBe('lead');
+    expect(validateBoardSearch({ lvl: '' }).lvl).toBeUndefined();
+    expect(validateBoardSearch({}).lvl).toBeUndefined();
+  });
+
   it('carries the posted window (?days) and drops junk', () => {
     expect(validateBoardSearch({ days: '7' }).days).toBe('7');
     expect(validateBoardSearch({ days: 30 }).days).toBe('30');
@@ -148,6 +154,7 @@ describe('hasBoardParams', () => {
     expect(hasBoardParams({ v: 'lookafter', f: 'pets' })).toBe(true);
     expect(hasBoardParams({ p: 'noexp' })).toBe(true);
     expect(hasBoardParams({ src: 'crypto' })).toBe(true);
+    expect(hasBoardParams({ lvl: 'lead' })).toBe(true);
     expect(hasBoardParams({ days: '7' })).toBe(true);
   });
 });
@@ -213,6 +220,13 @@ describe('board state persistence', () => {
     saveBoardState({ v: 'work', src: 'startup' });
     expect(readSavedBoardState()?.src).toBe('startup');
     expect(JSON.parse(store.get(BOARD_STATE_KEY)!)).toEqual({ v: 'work', src: 'startup' });
+  });
+
+  it('persists the work-lane level chip so reload keeps it', () => {
+    const store = stubStorage();
+    saveBoardState({ v: 'work', lvl: 'lead' });
+    expect(readSavedBoardState()?.lvl).toBe('lead');
+    expect(JSON.parse(store.get(BOARD_STATE_KEY)!)).toEqual({ v: 'work', lvl: 'lead' });
   });
 
   it('persists a facet with its kind and validates it on read', () => {

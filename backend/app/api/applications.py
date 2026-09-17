@@ -49,6 +49,15 @@ def _parse_verticals(vertical: str | None) -> list[str] | None:
     return [v.strip() for v in vertical.split(",") if v.strip()]
 
 
+def _level_counts(records: list) -> dict[str, int]:
+    found = [local_agent_service.title_level(record.job_title) for record in records]
+    return {
+        name: count
+        for name in local_agent_service.TITLE_LEVELS
+        if (count := found.count(name))
+    }
+
+
 def _source_category_map() -> dict[str, str]:
     """Lowercased source name -> its provenance category."""
     from job_finder.tools.scrapers import get_registry
@@ -420,6 +429,10 @@ def list_profile_work(
         None,
         description="Browse by source kind: remote | ats | startup | vc | crypto | community | jobspy | general",
     ),
+    level: str | None = Query(
+        None,
+        description="Narrow to one leadership level: lead | manager | director | vp | chief",
+    ),
     sort_by: str = "date_found",
     page: int = Query(1, ge=1),
     page_size: int = Query(24, ge=1, le=50),
@@ -436,12 +449,19 @@ def list_profile_work(
     # Query default is not resolved into None. Keep the service boundary typed.
     if not isinstance(salary_currency, str):
         salary_currency = None
+    if not isinstance(level, str):
+        level = None
 
     reject_legacy_route_in_hosted_mode(
         "Profile Work retrieval is available through the local Questboard app"
     )
     if sort_by not in {"date_found", "rank"}:
         raise HTTPException(status_code=400, detail="sort_by must be date_found or rank")
+    if level is not None and level not in local_agent_service.TITLE_LEVELS:
+        raise HTTPException(
+            status_code=400,
+            detail="level must be one of " + ", ".join(local_agent_service.TITLE_LEVELS),
+        )
     workspace_id = workspace.workspace.id if workspace is not None else None
     profile = local_agent_service.career_preferences(db, workspace_id)
     profile_hash = local_agent_service.fit_profile_hash(db, workspace_id)
@@ -536,6 +556,7 @@ def list_profile_work(
             )
             if count:
                 category_counts[category] = count
+    level_counts = _level_counts(ordered)
 
     if source_category and ordered:
         shelf_ids = {
@@ -551,6 +572,12 @@ def list_profile_work(
             .all()
         }
         ordered = [record for record in ordered if record.id in shelf_ids]
+    if level:
+        ordered = [
+            record
+            for record in ordered
+            if local_agent_service.title_level(record.job_title) == level
+        ]
 
     # Coherent global order BEFORE pagination: current ranked picks, reviewed
     # non-skips without an integer rank, unreviewed/stale rows, then skips.
@@ -635,6 +662,7 @@ def list_profile_work(
         skipped_count=skipped_count,
         unreviewed_count=len(unreviewed),
         source_categories=category_counts,
+        levels=level_counts,
         retrieval_note=(
             "Target-role candidates only. Use your connected agent for "
             "requirement-by-requirement resume fit."

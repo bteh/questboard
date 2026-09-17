@@ -62,6 +62,7 @@ import { JobsSetupStrip } from '@/features/board/jobs-callout';
 import { showBankBonusBridge } from '@/features/board/bridge-line';
 import { WorkToolbar } from '@/features/board/work-toolbar';
 import { useSearchContext } from '@/contexts/search-context';
+import { LevelChips } from '@/features/board/level-chips';
 import { SourceCategoryChips } from '@/features/board/source-category-chips';
 import {
   advanceWorkCutoff,
@@ -117,6 +118,7 @@ export const Route = createRoute({
         search: {
           v: saved.v, f: saved.f, q: saved.q, place: saved.place, near: saved.near,
           from: saved.from, to: saved.to, p: saved.p, days: saved.days, src: saved.src,
+          lvl: saved.lvl,
         },
         replace: true,
       });
@@ -339,7 +341,7 @@ function BoardPage() {
   const { data: onboarding } = useOnboardingState();
 
   /* the URL is the one truth for the kind tag, presets, and the work
-     lane's source-category chip */
+     lane's source-category and level chips */
   const kindKey: KindKey = params.v ?? 'all';
   const careerLane = isCareerKind(kindKey);
   const urlActiveKeys = useMemo(() => presetKeysFrom(params.p, PRESET_KEYS), [params.p]);
@@ -350,6 +352,8 @@ function BoardPage() {
   const pushedFoundingRef = useRef(urlActiveKeys.has('founding'));
   const [sourceCategoryView, setSourceCategoryView] = useState<string | null>(params.src ?? null);
   const pushedSourceCategoryRef = useRef<string | null>(params.src ?? null);
+  const [levelView, setLevelView] = useState<string | null>(params.lvl ?? null);
+  const pushedLevelRef = useRef<string | null>(params.lvl ?? null);
   const activeKeys = useMemo(() => {
     const next = new Set(urlActiveKeys);
     if (careerLane && foundingOnly) next.add('founding');
@@ -357,6 +361,7 @@ function BoardPage() {
     return next;
   }, [urlActiveKeys, careerLane, foundingOnly]);
   const sourceCategory = careerLane ? sourceCategoryView : null;
+  const level = careerLane ? levelView : null;
   /* text inputs buffer locally, debounce into the URL with replace so
      typing never spams history */
   const [searchRaw, setSearchRaw] = useState(params.q ?? '');
@@ -474,6 +479,13 @@ function BoardPage() {
     setSourceCategoryView(fromUrl);
   }, [params.src]);
 
+  useEffect(() => {
+    const fromUrl = params.lvl ?? null;
+    if (fromUrl === pushedLevelRef.current) return;
+    pushedLevelRef.current = fromUrl;
+    setLevelView(fromUrl);
+  }, [params.lvl]);
+
   /* the whole state persists locally so the next bare /board reopens it */
   useEffect(() => {
     saveBoardState({
@@ -487,9 +499,10 @@ function BoardPage() {
       p: params.p,
       days: params.days,
       src: params.src,
+      lvl: params.lvl,
       sort: sortNewest ? undefined : 'score',
     });
-  }, [params.v, params.f, params.q, params.place, params.near, params.from, params.to, params.p, params.days, params.src, sortNewest]);
+  }, [params.v, params.f, params.q, params.place, params.near, params.from, params.to, params.p, params.days, params.src, params.lvl, sortNewest]);
 
   const baseFilters = useMemo<ApplicationFilters>(
     () => ({
@@ -509,6 +522,7 @@ function BoardPage() {
       posted_within_days: postedWithin,
       found_within_days: foundWithin,
       source_category: sourceCategory ?? undefined,
+      level: level ?? undefined,
       /* quest rows have no rank_score, so only the work lane offers the
          best-score sort; quest lanes stay on the honest date sort */
       sort_by: sortByFor(kindKey, sortNewest),
@@ -516,7 +530,7 @@ function BoardPage() {
       page_size: PAGE_SIZE,
       scope: 'board',
     }),
-    [kindKey, careerLane, activeKeys, params.f, search, place, nearParam, payFloor, payCeiling, payCurrency, postedWithin, foundWithin, sortNewest, sourceCategory],
+    [kindKey, careerLane, activeKeys, params.f, search, place, nearParam, payFloor, payCeiling, payCurrency, postedWithin, foundWithin, sortNewest, sourceCategory, level],
   );
 
   /* the rail's counts must describe THIS board: the same user filters ride
@@ -599,11 +613,12 @@ function BoardPage() {
       ...kindParams(kindKey),
       facet: params.f,
       source_category: sourceCategory ?? undefined,
+      level: level ?? undefined,
       page: 1,
       page_size: 1,
       scope: 'board',
     }),
-    [kindKey, params.f, sourceCategory],
+    [kindKey, params.f, sourceCategory, level],
   );
   const workLaneTotalQuery = useQuery({
     queryKey: ['profile-work', workLaneBase],
@@ -691,6 +706,7 @@ function BoardPage() {
     facet: params.f,
     presetCount: activeKeys.size,
     sourceCategory,
+    level,
     postedDays,
   });
   const laneCheckedAt = careerLane ? summary?.career_checked_at : summary?.side_quest_checked_at;
@@ -761,6 +777,16 @@ function BoardPage() {
     void navigate({
       to: '/board',
       search: (prev: BoardParams) => ({ ...prev, src: category ?? undefined }),
+    });
+  }
+
+  /* the level chip rides the URL (?lvl=) the same way */
+  function selectLevel(next: string | null) {
+    setLevelView(next);
+    pushedLevelRef.current = next;
+    void navigate({
+      to: '/board',
+      search: (prev: BoardParams) => ({ ...prev, lvl: next ?? undefined }),
     });
   }
 
@@ -960,6 +986,7 @@ function BoardPage() {
               foundingOnly={activeKeys.has('founding')}
               onFoundingToggle={() => toggle('founding')}
             />
+            <LevelChips counts={workMeta?.levels} selected={level} onSelect={selectLevel} />
           </>
         ) : (
           <>

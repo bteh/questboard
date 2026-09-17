@@ -81,6 +81,7 @@ describe('what counts as an active filter', () => {
     expect(boardFiltersActive({ facet: 'pets' })).toBe(true);
     expect(boardFiltersActive({ presetCount: 1 })).toBe(true);
     expect(boardFiltersActive({ sourceCategory: 'gov' })).toBe(true);
+    expect(boardFiltersActive({ level: 'lead' })).toBe(true);
     expect(boardFiltersActive({ postedDays: '7' })).toBe(true);
   });
 

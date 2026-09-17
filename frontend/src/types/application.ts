@@ -205,6 +205,9 @@ export interface ProfileWorkListResponse extends ApplicationListResponse {
   unreviewed_count: number;
   /** source kind -> count across the full career inventory, for browse chips */
   source_categories?: Record<string, number>;
+  /** level (lead | manager | director | vp | chief) -> count over the visible
+      lane before any level narrowing; zero counts are omitted */
+  levels?: Record<string, number>;
   retrieval_note: string;
 }
 
@@ -272,6 +275,8 @@ export interface ApplicationFilters {
   source?: string;
   /** Browse by source kind: remote | ats | startup | vc | crypto | community | jobspy */
   source_category?: string;
+  /** Narrow the work lane to one seniority: lead | manager | director | vp | chief */
+  level?: string;
   search?: string;
   sort_by?: string;
   sort_order?: 'asc' | 'desc';

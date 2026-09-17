@@ -141,9 +141,11 @@ def test_leadership_seeker_sees_the_whole_data_leadership_family(leadership_db) 
         "Data Engineering Manager",
         "Head of Data",
         "Director, Data Platform",
-        "VP, Data Engineering",
         "Data Analytics Manager",
     } <= visible
+    # Sep 17 2026: the family is bounded by the saved levels (manager and
+    # head-of here), so VP stays out unless a saved role names it.
+    assert "VP, Data Engineering" not in visible
 
 
 def test_leadership_seeker_does_not_see_individual_contributor_titles(leadership_db) -> None:
