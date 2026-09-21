@@ -14,6 +14,9 @@ export type UpdateState =
   | { kind: 'ready'; version: string }
   | { kind: 'installing'; version: string }
   | { kind: 'install_failed'; version: string }
+  /* the new bundle is on disk but the relaunch did not happen; only a
+     manual quit and reopen finishes it */
+  | { kind: 'installed'; version: string }
   | { kind: 'failed' };
 
 export const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
@@ -27,6 +30,10 @@ export const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 export function shouldCheck(lastCheckedAt: number | null, now: number): boolean {
   if (lastCheckedAt === null) return true;
   return now - lastCheckedAt >= CHECK_INTERVAL_MS;
+}
+
+function installedText(version: string): string {
+  return `Installed ${version}. Quit and reopen Questboard to finish.`;
 }
 
 /** Text for the explicit "Check for updates" row in Settings. Unlike the
@@ -45,6 +52,8 @@ export function checkStatusText(state: UpdateState, currentVersion: string): str
       return `Installing ${state.version}…`;
     case 'install_failed':
       return `Couldn't install ${state.version}. Try again, or download it from the website.`;
+    case 'installed':
+      return installedText(state.version);
     case 'failed':
       return 'Could not reach the update server. Check your connection and try again.';
     case 'idle':
@@ -61,6 +70,8 @@ export function updateBannerText(state: UpdateState): string | null {
       return `Installing ${state.version}…`;
     case 'install_failed':
       return `Couldn't install ${state.version}. The app still works.`;
+    case 'installed':
+      return installedText(state.version);
     case 'downloading':
       // A percentage that only moves on a fast connection reads as broken,
       // so the download stays wordless until it lands.
@@ -80,6 +91,7 @@ export function updateActionText(state: UpdateState): string | null {
       return 'Restart';
     case 'install_failed':
       return 'Try again';
+    case 'installed':
     case 'installing':
     case 'downloading':
     case 'checking':

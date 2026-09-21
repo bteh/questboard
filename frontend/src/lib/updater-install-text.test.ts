@@ -1,5 +1,6 @@
-/* The words for the two states the restart flow now has: installing, and an
-   install that failed while the app kept working. */
+/* The words for the states the restart flow has: installing, an install
+   that failed while the app kept working, and (Sep 21 2026 review) an
+   install that landed but whose relaunch did not. */
 import { describe, expect, it } from 'vitest';
 
 import { checkStatusText, updateActionText, updateBannerText } from './updater-logic';
@@ -33,5 +34,19 @@ describe('install states in the Settings row', () => {
 
   it('reports installing', () => {
     expect(checkStatusText({ kind: 'installing', version: '0.2.6' }, '0.2.5')).toBe('Installing 0.2.6…');
+  });
+});
+
+describe('an install that landed without a relaunch', () => {
+  const installed = { kind: 'installed', version: '0.2.6' } as const;
+  const words = 'Installed 0.2.6. Quit and reopen Questboard to finish.';
+
+  it('tells the person to quit and reopen, with nothing to click', () => {
+    expect(updateBannerText(installed)).toBe(words);
+    expect(updateActionText(installed)).toBeNull();
+  });
+
+  it('says the same in the Settings row', () => {
+    expect(checkStatusText(installed, '0.2.5')).toBe(words);
   });
 });

@@ -222,8 +222,9 @@ def propose_career_preferences(
     workspace.
     """
     # Only a propose_roles run the person started skips the quiet week; a
-    # find_and_rank run's side proposals keep it.
-    requested_by_user = agent_run_progress.requested_task() == "propose_roles"
+    # find_and_rank run's side proposals keep it. The mark is consumed so
+    # just the first proposal after the click counts as asked-for.
+    requested_by_user = agent_run_progress.consume_requested("propose_roles")
     with _database_session() as db:
         return _tool_error(
             local_agent_service.propose_career_preferences,
@@ -508,6 +509,16 @@ def set_work_fit(rankings: list[dict[str, Any]]) -> dict[str, Any]:
       - rank (int, optional): 1 = best fit; omit for skips
       - why (str): one or two sentences on why it fits (or, for a skip, why not)
       - caveat (str, optional): a real risk to check (level, comp floor, remote)
+
+    The tiers:
+      strong: every stated must-have maps to resume evidence, and there is
+        no level or domain gap.
+      good: one gap in the must-haves, no level or domain stretch; otherwise
+        a fit.
+      reach: a level or domain stretch, or more than one gap.
+      skip: not this person's work (wrong role, staffing agency, junk).
+    A run where one tier covers nearly everything is a failed ranking; the
+    tiers only help when they separate the shortlist.
 
     Current verdicts for unchanged jobs are preserved. Requested ranks are
     global positions: inserting a new #2 shifts the old #2 down without making

@@ -279,13 +279,24 @@ def _build_search_terms(
     config: dict | None,
     roles: list[str] | None = None,
 ) -> tuple[list[str], list[str], list[str]]:
+    """``_build_search_terms_with_provenance`` without the provenance map."""
+    consolidated, roles_raw, keywords_raw, _ = _build_search_terms_with_provenance(config, roles)
+    return consolidated, roles_raw, keywords_raw
+
+
+def _build_search_terms_with_provenance(
+    config: dict | None,
+    roles: list[str] | None = None,
+) -> tuple[list[str], list[str], list[str], dict[str, str]]:
     """Assemble the consolidated board-query list for a profile.
 
-    Returns ``(consolidated_terms, roles_raw, keywords_raw)``. When *roles*
-    is passed explicitly (the API path — keywords already merged into it),
-    ``keyword_searches`` is NOT re-read (double-count), but title-shaped
-    resume skills from ``keywords.technical`` still merge in: they were
-    previously used only for scoring and never reached search queries.
+    Returns ``(consolidated_terms, roles_raw, keywords_raw, provenance)``;
+    *provenance* maps each normalised input term to the consolidated query
+    that stands for it. When *roles* is passed explicitly (the API path,
+    keywords already merged into it), ``keyword_searches`` is NOT re-read
+    (double-count), but title-shaped resume skills from ``keywords.technical``
+    still merge in: they were previously used only for scoring and never
+    reached search queries.
     """
     config = config or {}
     profile_tokens = _profile_title_tokens(config)
@@ -313,8 +324,8 @@ def _build_search_terms(
             keywords_raw.append(s)
             seen.add(s.lower())
 
-    consolidated = _consolidate_search_terms(roles_raw, keywords_raw, config=config)
-    return consolidated, roles_raw, keywords_raw
+    consolidated, provenance = _consolidate_with_provenance(roles_raw, keywords_raw, config=config)
+    return consolidated, roles_raw, keywords_raw, provenance
 
 
 def _search_query_priority(term: str, specialty_kw: set[str]) -> int:
@@ -441,6 +452,8 @@ def _source_coverage_entry(
     """Collapse one source's attempts into the refresh receipt.
 
     A source that returned useful rows but lost one query is ``partial``, not
+    ``failed``; so is one the scraper deadline cut short with rows in hand
+    (``finish_reason == "partial"``), and that same cut with no rows is
     ``failed``. A clean zero is a completed check and remains distinct from a
     source that never answered. The UI uses these states to avoid turning an
     incomplete refresh into a false "nothing new" claim.
@@ -449,7 +462,7 @@ def _source_coverage_entry(
     failed_attempts = sum(
         1
         for item in outcomes
-        if str(item.get("finish_reason") or "zero_rows") in {"timeout", "exception"}
+        if str(item.get("finish_reason") or "zero_rows") in {"timeout", "exception", "partial"}
     )
     attempted = len(outcomes)
     errors = [
@@ -571,7 +584,7 @@ def _consolidate_search_terms(
     collapses them into fewer, broader queries to avoid wasting time on
     duplicate searches.
 
-    Works for any profession — engineering, marketing, design, finance, etc.
+    Works for any profession: engineering, marketing, design, finance, etc.
 
     Strategy:
     1. Strip seniority/management prefixes ("senior", "director of", etc.)
@@ -581,120 +594,176 @@ def _consolidate_search_terms(
     4. Always keep short technology/specialty keywords ("SQL", "Figma", etc.).
     5. Keep high-value niche terms ("founding engineer", "first hire", etc.).
 
-    Returns the consolidated list and logs what was merged.
+    Returns the consolidated list and logs what was merged. See
+    ``_consolidate_with_provenance`` for the term-by-term mapping.
     """
-    # --- Phase 1: group roles by base role ---
-    # "senior product manager" and "VP product" both have base "product"
-    # "senior software engineer" and "staff software engineer" → "software engineer"
-    base_groups: dict[str, list[str]] = {}
+    return _consolidate_with_provenance(roles, keywords, config=config)[0]
 
+
+def _consolidate_with_provenance(
+    roles: list[str],
+    keywords: list[str],
+    config: dict | None = None,
+) -> tuple[list[str], dict[str, str]]:
+    """Consolidate and record which query each input term ended up under.
+
+    Returns ``(consolidated, provenance)``: *provenance* maps each normalised
+    input term to the normalised consolidated term that stands for it. A
+    role kept under another spelling ("Director of Marketing" surviving as
+    "vp marketing") or absorbed by a broader query ("Product Manager
+    Operations" into "product manager") stays traceable from the saved role,
+    so the search-task cap protects the query that actually runs.
+    """
+    provenance: dict[str, str] = {}
+    queries, survivor_of_base = _group_roles_by_base(roles, provenance)
+    queries = _merge_overlapping_bases(queries, survivor_of_base, provenance)
+    consolidated = _add_keyword_queries(
+        queries, keywords, survivor_of_base, provenance, config,
+    )
+    logger.info(
+        "Search term consolidation: %d roles + %d keywords → %d queries",
+        len(roles), len(keywords), len(consolidated),
+    )
+    return consolidated, provenance
+
+
+def _group_roles_by_base(
+    roles: list[str], provenance: dict[str, str],
+) -> tuple[list[str], dict[str, str]]:
+    """Phase 1: one query per base role; each role's query lands in *provenance*.
+
+    Returns ``(queries, survivor_of_base)``; the second maps every base key
+    to the normalised query that stands for its group.
+    """
+    base_groups: dict[str, list[str]] = {}
     for term in roles:
         t = term.strip()
-        if not t:
-            continue
+        if t:
+            base_groups.setdefault(_consolidation_base(t), []).append(t)
 
-        base_key = _consolidation_base(t)
-        base_groups.setdefault(base_key, []).append(t)
-
-    # For each group: keep the base role as the search query.
-    # When the base is a single generic word (e.g. "marketing" from
-    # "VP marketing" + "director of marketing"), use the shortest
-    # original term instead — single words return too much noise.
-    consolidated: list[str] = []
-    kept_bases: set[str] = set()
-
+    queries: list[str] = []
+    survivor_of_base: dict[str, str] = {}
     for base_key, group in base_groups.items():
         if " " not in base_key and len(group) > 1:
-            # Single-word base is too broad — pick shortest original term.
-            # e.g. "head of sales" + "VP sales" → search "vp sales" not "sales"
-            best = min(group, key=len)
-            consolidated.append(best.lower())
-            kept_bases.add(base_key)
+            # A single-word base ("marketing") returns too much noise, so the
+            # shortest original spelling ("vp marketing") stands for the group.
+            query = min(group, key=len).lower()
             logger.info(
                 "Consolidated %d terms into '%s' (base '%s' too broad): %s",
-                len(group), best, base_key, group,
+                len(group), query, base_key, group,
             )
         else:
-            consolidated.append(base_key)
-            kept_bases.add(base_key)
+            query = base_key
             if len(group) > 1:
                 logger.info(
                     "Consolidated %d terms into '%s': %s",
                     len(group), base_key, group,
                 )
+        queries.append(query)
+        survivor_of_base[base_key] = _normalise_search_term(query)
+        for t in group:
+            provenance[_normalise_search_term(t)] = survivor_of_base[base_key]
+    return queries, survivor_of_base
 
-    # --- Phase 1b: merge overlapping multi-word bases ---
-    # "product manager" and "product management" return the same job board
-    # results.  Merge when one is a word-boundary prefix or suffix variant
-    # of another (e.g. -ing, -er, -ment differ by ≤3 chars).
+
+def _merge_overlapping_bases(
+    queries: list[str],
+    survivor_of_base: dict[str, str],
+    provenance: dict[str, str],
+) -> list[str]:
+    """Phase 1b: drop a query that a broader multi-word query already covers.
+
+    "product manager" covers "product manager operations" (word prefix) and
+    "product managing" (suffix variant within three chars) but never "data
+    engineering manager": the extra word names a role type. Terms that
+    pointed at the dropped query are re-pointed at the one that covers it.
+    """
     merged: list[str] = []
-    sorted_bases = sorted(consolidated, key=len)
-    for term in sorted_bases:
-        is_covered = False
-        for kept in merged:
-            if " " not in kept:
-                continue  # single-word terms too broad to absorb others
-            # Word prefix: "product manager" covers "product manager operations"
-            # but never "data engineering manager" (extra word names a role type).
-            if term.startswith(kept + " ") or term.startswith(kept + "-"):
-                if _adds_role_type_token(kept, term):
-                    continue
-                logger.info("'%s' covered by broader query '%s', skipping", term, kept)
-                is_covered = True
-                break
-            # Suffix variant: "product manager" ≈ "product managing" (≤3 char diff)
-            if term.startswith(kept) and len(term) - len(kept) <= 3:
-                logger.info("'%s' merged with '%s' (suffix variant) — skipping", term, kept)
-                is_covered = True
-                break
-        if not is_covered:
+    for term in sorted(queries, key=len):
+        covering = _covering_query(term, merged)
+        if covering is None:
             merged.append(term)
+            continue
+        old, new = _normalise_search_term(term), _normalise_search_term(covering)
+        for mapping in (provenance, survivor_of_base):
+            for key, value in mapping.items():
+                if value == old:
+                    mapping[key] = new
+    return merged
 
-    consolidated = merged
-    # Include original base keys so keyword overlap detection catches
-    # terms containing single-word bases (e.g. "sales" in "sales enablement")
-    kept_bases = set(merged) | set(base_groups.keys())
 
-    # --- Phase 2: process keyword searches ---
+def _covering_query(term: str, kept: list[str]) -> str | None:
+    for query in kept:
+        if " " not in query:
+            continue  # single-word queries are too broad to absorb others
+        if term.startswith(query + " ") or term.startswith(query + "-"):
+            if _adds_role_type_token(query, term):
+                continue
+            logger.info("'%s' covered by broader query '%s', skipping", term, query)
+            return query
+        if term.startswith(query) and len(term) - len(query) <= 3:
+            logger.info("'%s' merged with '%s' (suffix variant), skipping", term, query)
+            return query
+    return None
+
+
+def _add_keyword_queries(
+    queries: list[str],
+    keywords: list[str],
+    survivor_of_base: dict[str, str],
+    provenance: dict[str, str],
+    config: dict | None,
+) -> list[str]:
+    """Phase 2: add keyword queries no role query already covers.
+
+    Short specialty keywords ("SQL", "Figma") and high-value niche terms
+    ("founding engineer") always run. Original base keys count as covering
+    queries so "sales" still absorbs "sales enablement" after its group
+    survived as "vp sales"; a keyword it covers maps to that survivor.
+    """
+    consolidated = list(queries)
+    covering_bases = list(dict.fromkeys(queries + list(survivor_of_base)))
     specialty_kw = _get_specialty_keywords(config)
     for kw in keywords:
         kw_stripped = kw.strip()
         if not kw_stripped:
             continue
-
         kw_lower = kw_stripped.lower()
+        kw_norm = _normalise_search_term(kw_stripped)
 
-        # Always keep short specialty keywords (tools, technologies, etc.)
         if kw_lower in specialty_kw or len(kw_lower) <= 4:
             if kw_stripped not in consolidated:
                 consolidated.append(kw_stripped)
+            provenance[kw_norm] = kw_norm
             continue
 
-        # Keep high-value niche terms regardless of overlap
         if _HIGH_VALUE_PATTERNS.search(kw_stripped):
             if kw_stripped not in consolidated:
                 consolidated.append(kw_stripped)
                 logger.info("Keeping high-value keyword: '%s'", kw_stripped)
+            provenance[kw_norm] = kw_norm
             continue
 
         # A role query covers a keyword that contains it, unless the keyword
         # adds a role-type word ("sales" covers "sales enablement", not "sales manager").
-        is_covered = any(
-            base in kw_lower and not _adds_role_type_token(base, kw_lower)
-            for base in kept_bases
+        covering = next(
+            (
+                base for base in covering_bases
+                if base in kw_lower and not _adds_role_type_token(base, kw_lower)
+            ),
+            None,
         )
-        if is_covered:
+        if covering is not None:
             logger.info("Keyword '%s' covered by existing role query, skipping", kw_stripped)
+            provenance[kw_norm] = survivor_of_base.get(
+                covering, _normalise_search_term(covering),
+            )
             continue
 
         if kw_stripped not in consolidated:
             consolidated.append(kw_stripped)
-            kept_bases.add(kw_lower)
-
-    logger.info(
-        "Search term consolidation: %d roles + %d keywords → %d queries",
-        len(roles), len(keywords), len(consolidated),
-    )
+            covering_bases.append(kw_lower)
+        provenance[kw_norm] = kw_norm
     return consolidated
 
 
@@ -713,28 +782,32 @@ def _consolidation_base(term: str) -> str:
 def _role_derived_terms(
     consolidated: list[str],
     target_roles: list[str] | None,
+    provenance: dict[str, str] | None = None,
 ) -> set[str]:
     """Consolidated terms that stand in for a saved role.
 
-    A term is role-derived when it equals one of the saved ``target_roles``
-    or is the base the consolidator groups that role under (same prefix
-    strip and case/whitespace normalisation as ``_consolidate_search_terms``
-    Phase 1). Everything else in *consolidated* came from a keyword phrase or
-    a resume skill. The API path merges title-shaped keywords into ``roles``
-    before search, so ``roles_raw`` cannot tell the two apart; the saved
-    roles can. Returned terms are normalised.
+    With *provenance* (from ``_consolidate_with_provenance``) a term is
+    role-derived when any saved ``target_roles`` entry maps to it, whatever
+    spelling or broader query consolidation kept. Without it, fall back to
+    the consolidator's own grouping: a term equal to a saved role, to its
+    Phase 1 base, or sharing that base. Everything else in *consolidated*
+    came from a keyword phrase or a resume skill. The API path merges
+    title-shaped keywords into ``roles`` before search, so ``roles_raw``
+    cannot tell the two apart; the saved roles can. Returned terms are
+    normalised.
     """
-    saved: set[str] = set()
-    for role in target_roles or []:
-        r = str(role).strip()
-        if not r:
-            continue
-        saved.add(_normalise_search_term(r))
-        saved.add(_consolidation_base(r))
+    roles = {
+        _normalise_search_term(str(role))
+        for role in target_roles or []
+        if str(role).strip()
+    }
+    present = {_normalise_search_term(t) for t in consolidated}
+    if provenance is not None:
+        return {provenance[r] for r in roles if r in provenance} & present
+    bases = {_consolidation_base(r) for r in roles}
     return {
-        _normalise_search_term(t)
-        for t in consolidated
-        if _normalise_search_term(t) in saved
+        t for t in present
+        if t in roles or t in bases or _consolidation_base(t) in bases
     }
 
 
@@ -1597,7 +1670,7 @@ class JobFinderPipeline:
         # When roles are passed explicitly (e.g. from the API, which already
         # merges keywords into the roles list), keyword_searches is not
         # re-read — that would double-count it.
-        consolidated, roles_raw, keywords_raw = _build_search_terms(self.config, roles)
+        consolidated, roles_raw, keywords_raw, provenance = _build_search_terms_with_provenance(self.config, roles)
 
         # Broader queries → more results per query to compensate
         original_count = len(roles_raw) + len(keywords_raw)
@@ -1644,7 +1717,7 @@ class JobFinderPipeline:
         # whatever the cap, so a remote-friendly search always asks for each
         # role remotely (Sep 15 2026: ten Remote role queries were dropped).
         max_tasks = max(12, settings.get("max_search_tasks", 30))
-        role_terms = _role_derived_terms(consolidated, self.config.get("target_roles"))
+        role_terms = _role_derived_terms(consolidated, self.config.get("target_roles"), provenance)
         capped_tasks = _cap_search_tasks(search_tasks, max_tasks, role_terms)
         trimmed = len(search_tasks) - len(capped_tasks)
         if trimmed:

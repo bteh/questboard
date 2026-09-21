@@ -54,6 +54,14 @@ describe('UpdateCheckRow', () => {
     expect(hook.restart).toHaveBeenCalledTimes(1);
   });
 
+  it('offers no restart and no re-check once the install landed without a relaunch', () => {
+    hook.state = { kind: 'installed', version: '0.2.6' };
+    render(<UpdateCheckRow />);
+    expect(screen.getByText('Installed 0.2.6. Quit and reopen Questboard to finish.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /restart|try again/i })).toBeNull();
+    expect((screen.getByRole('button', { name: /check for updates/i }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it('has nothing to click while the install runs', () => {
     hook.state = { kind: 'installing', version: '0.2.6' };
     render(<UpdateCheckRow />);

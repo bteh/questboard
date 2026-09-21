@@ -652,6 +652,18 @@ def publishable_source_condition(model):
     return ~func.lower(func.coalesce(model.source, "")).in_(research_only)
 
 
+# LIKE has no word boundary and "cto" sits inside "director", so the chief
+# acronyms only match at the start of the title or after a separator.
+_ANCHORED_ACRONYMS = frozenset({"cto", "cdo", "cio"})
+_ACRONYM_SEPARATORS = (" ", ",", "/", "(", "-", "|", ":")
+
+
+def _title_like_patterns(variant: str) -> tuple[str, ...]:
+    if variant not in _ANCHORED_ACRONYMS:
+        return (f"%{variant}%",)
+    return (f"{variant}%",) + tuple(f"%{sep}{variant}%" for sep in _ACRONYM_SEPARATORS)
+
+
 def get_applications(
     db: Session,
     *,
@@ -827,13 +839,10 @@ def get_applications(
         # filters (location, freshness, status) ahead of that check.
         variants = {
             "architect": ("architect", "architecture"),
+            "chief": ("chief", "cto", "cdo", "cio"),
             "engineer": ("engineer", "engineering"),
-            # pseudo-token: any leadership word at all. The board sends the
-            # saved levels' own words instead; this stays for callers that
-            # ask for the whole family.
-            "leadership": ("manager", "mgr", "director", "head", "lead", "vp", "chief"),
             "manager": ("manager", "mgr"),
-            "vp": ("vp", "vice president"),
+            "vp": ("vp", "vice president", "vice-president"),
             "ops": ("ops", "operations"),
             # the role-token alias maps scientist/scientists -> "science", which
             # is NOT a substring of the words in real titles, so expand it back
@@ -844,7 +853,9 @@ def get_applications(
         }
         lowered_title = func.lower(ApplicationRecord.job_title)
         role_groups = []
-        for raw_group in title_token_groups[:20]:
+        # Six mixed leadership roles alone produce ~25 groups; a ceiling of
+        # 20 silently dropped the tail (a saved "Database Administrator").
+        for raw_group in title_token_groups[:80]:
             tokens = [
                 token.lower()
                 for token in raw_group[:12]
@@ -857,8 +868,9 @@ def get_applications(
                     *(
                         or_(
                             *(
-                                lowered_title.like(f"%{variant}%")
+                                lowered_title.like(pattern)
                                 for variant in variants.get(token, (token,))
+                                for pattern in _title_like_patterns(variant)
                             )
                         )
                         for token in tokens

@@ -2,18 +2,21 @@
    24 a page. A reader paged a few times and concluded there were no lead
    roles. Counts per level make the split visible; a chip narrows to it.
    Counts come from the API over the visible lane before any level
-   narrowing, so they stay put while one chip is selected. */
+   narrowing, so they stay put while one chip is selected.
+   Sep 21 2026: 249 individual-contributor rows had no chip, so the counts
+   never reached the lane total; the ic chip leads the ladder now. */
 
-import { chipActiveClass, chipClass, chipCountClass, chipInactiveClass } from './chip-classes';
+import { chipActiveClass, chipClass, chipCountClass, chipInactiveClass, chipRowLabelClass } from './chip-classes';
 
 const LEVEL_LABELS: Record<string, string> = {
+  ic: 'Individual contributor',
   lead: 'Lead',
   manager: 'Manager',
   director: 'Director',
   vp: 'VP',
   chief: 'Chief',
 };
-const LEVEL_ORDER = ['lead', 'manager', 'director', 'vp', 'chief'];
+const LEVEL_ORDER = ['ic', 'lead', 'manager', 'director', 'vp', 'chief'];
 
 interface LevelChipsProps {
   counts: Record<string, number> | undefined;
@@ -27,6 +30,7 @@ export function LevelChips({ counts, selected, onSelect }: LevelChipsProps) {
 
   return (
     <div className="mt-2 flex flex-wrap items-center gap-1.5" role="group" aria-label="Filter by level">
+      <span className={chipRowLabelClass}>Level</span>
       {present.map((level) => (
         <button
           key={level}

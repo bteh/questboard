@@ -10,7 +10,7 @@ import {
   newestFirst,
   rotationFor,
   scannableDesc,
-  toPoster,
+  posterModelFor,
 } from './poster-model';
 import { kindParams, normalizeKindKey } from './kind-params';
 import type { ApplicationResponse } from '@/types/application';
@@ -41,48 +41,48 @@ function app(overrides: Partial<ApplicationResponse>): ApplicationResponse {
 
 describe('the poster model', () => {
   it('maps stored verticals onto kinds', () => {
-    expect(toPoster(app({ vertical: 'study' }), 'Fieldwork').kind).toBe('think');
-    expect(toPoster(app({ vertical: 'camera' }), 'x').kind).toBe('perform');
+    expect(posterModelFor(app({ vertical: 'study' }), 'Fieldwork').kind).toBe('think');
+    expect(posterModelFor(app({ vertical: 'camera' }), 'x').kind).toBe('perform');
     // career is its own Jobs lane now; lens (freelance/gigs) stays skill
-    expect(toPoster(app({ vertical: 'career' }), 'x').kind).toBe('work');
-    expect(toPoster(app({ vertical: 'lens' }), 'x').kind).toBe('skill');
+    expect(posterModelFor(app({ vertical: 'career' }), 'x').kind).toBe('work');
+    expect(posterModelFor(app({ vertical: 'lens' }), 'x').kind).toBe('skill');
   });
 
   it('adds honest effort and criteria to Side Quests, never career jobs', () => {
-    const quest = toPoster(app({ vertical: 'scholarship' }), 'Scholarship America');
+    const quest = posterModelFor(app({ vertical: 'scholarship' }), 'Scholarship America');
     expect(quest.requirements?.effort).toMatchObject({
       level: 'involved',
       basis: 'typical',
     });
     expect(quest.requirements?.criteria.items[0]).toContain('eligibility proof');
-    expect(toPoster(app({ vertical: 'career' }), 'BuiltIn').requirements).toBeUndefined();
+    expect(posterModelFor(app({ vertical: 'career' }), 'BuiltIn').requirements).toBeUndefined();
   });
 
   it('career rows carry no flavor tags, and remote never doubles', () => {
     // remote/location reads on the meta line; it must not also be a tag
-    expect(toPoster(app({ vertical: 'career', is_remote: true, work_type: 'remote' }), 'BuiltIn').tags)
+    expect(posterModelFor(app({ vertical: 'career', is_remote: true, work_type: 'remote' }), 'BuiltIn').tags)
       .toEqual([]);
   });
 
   it('labels only the widened role bucket as adjacent', () => {
-    expect(toPoster(app({ vertical: 'career', match_bucket: 'primary' }), 'BuiltIn').tags).toEqual([]);
-    expect(toPoster(app({ vertical: 'career', match_bucket: 'adjacent' }), 'BuiltIn').tags)
+    expect(posterModelFor(app({ vertical: 'career', match_bucket: 'primary' }), 'BuiltIn').tags).toEqual([]);
+    expect(posterModelFor(app({ vertical: 'career', match_bucket: 'adjacent' }), 'BuiltIn').tags)
       .toEqual(['adjacent match']);
   });
 
   it('a quest keeps a work type only when it adds something the meta lacks', () => {
-    expect(toPoster(app({ vertical: 'camera', is_remote: true, work_type: 'remote' }), 'x').tags).toEqual([]);
-    expect(toPoster(app({ vertical: 'lens', work_type: 'hybrid' }), 'x').tags).toEqual(['hybrid']);
+    expect(posterModelFor(app({ vertical: 'camera', is_remote: true, work_type: 'remote' }), 'x').tags).toEqual([]);
+    expect(posterModelFor(app({ vertical: 'lens', work_type: 'hybrid' }), 'x').tags).toEqual(['hybrid']);
   });
 
   it('never asks a focus group for a resume', () => {
-    const poster = toPoster(app({ vertical: 'study' }), 'Fieldwork');
+    const poster = posterModelFor(app({ vertical: 'study' }), 'Fieldwork');
     expect(poster.copy.bring).toContain('no resume');
     expect(poster.hasFit).toBe(false);
   });
 
   it("a row's stated bring and catch beat the kind template", () => {
-    const stated = toPoster(
+    const stated = posterModelFor(
       app({
         vertical: 'flip',
         first_quest_ok: true,
@@ -97,9 +97,9 @@ describe('the poster model', () => {
   });
 
   it('gives the beginner treatment only on the stated signal', () => {
-    const plain = toPoster(app({ vertical: 'camera' }), 'x');
+    const plain = posterModelFor(app({ vertical: 'camera' }), 'x');
     expect(plain.copy.bringFree).toBeUndefined();
-    const stated = toPoster(app({ vertical: 'camera', first_quest_ok: true }), 'x');
+    const stated = posterModelFor(app({ vertical: 'camera', first_quest_ok: true }), 'x');
     expect(stated.copy.bringFree).toBe(true);
     expect(stated.copy.bring).toContain('nothing');
   });
@@ -129,17 +129,17 @@ describe('the poster model', () => {
   });
 
   it('gives career posters the logo well, quests the small giver logo', () => {
-    const career = toPoster(app({ vertical: 'career', company: 'Stripe' }), 'BuiltIn');
+    const career = posterModelFor(app({ vertical: 'career', company: 'Stripe' }), 'BuiltIn');
     expect(career.logoWell).toBeDefined();
     expect(career.logoWell!.initial).toBe('S');
     expect(career.logoWell!.color).toMatch(/^#/);
     expect(career.logoUrl).toBeUndefined();
 
-    const quest = toPoster(app({ vertical: 'study' }), 'Fieldwork');
+    const quest = posterModelFor(app({ vertical: 'study' }), 'Fieldwork');
     expect(quest.logoWell).toBeUndefined();
 
     /* placeholder company tokens never earn a monogram */
-    const blank = toPoster(app({ vertical: 'career', company: 'null' }), 'BuiltIn');
+    const blank = posterModelFor(app({ vertical: 'career', company: 'null' }), 'BuiltIn');
     expect(blank.logoWell).toBeUndefined();
   });
 

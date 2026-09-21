@@ -10,7 +10,7 @@
 import { PlainButton, Sheet, TextLink } from '@questboard/ui';
 import { DetailArtifacts } from '@/features/board/detail-artifacts';
 import { effortMarks, type QuestRequirements } from '@/features/board/quest-requirements';
-import { toPoster } from '@/features/board/poster-model';
+import { posterModelFor } from '@/features/board/poster-model';
 import { useApplication } from '@/hooks/use-applications';
 import { resolveSourceLabel } from '@/hooks/use-scrapers';
 import { cleanDescription } from '@/utils/format';
@@ -136,7 +136,7 @@ export function JobDetailSheet({
 }) {
   const { data: app, isError } = useApplication(jobId ?? 0);
   const open = jobId !== null;
-  const poster = open && app ? toPoster(app, resolveSourceLabel(app.source, labels)) : null;
+  const poster = open && app ? posterModelFor(app, resolveSourceLabel(app.source, labels)) : null;
   const card = poster?.card ?? null;
   /* rows scraped before the pipeline cleaned text can carry markup junk;
      cleanDescription keeps the newlines, so pre-wrap still shows paragraphs */

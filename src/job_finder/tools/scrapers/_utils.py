@@ -1180,10 +1180,12 @@ def publish_partial(sink: list[dict] | None, jobs: list[dict]) -> None:
     A source that fans out over hundreds of boards publishes each board's
     rows as they land, so the registry can keep them when the source is
     still running at the pool deadline. Rows here are raw and pre-cap; the
-    registry ranks and caps whatever it harvests.
+    registry ranks and caps whatever it harvests. The sink holds copies:
+    the scraper's own cap_with_protected strips PROTECTED_ROW_KEY from the
+    originals, and a deadline harvest must still see it.
     """
     if sink is not None and jobs:
-        sink.extend(jobs)
+        sink.extend(dict(job) for job in jobs)
 
 
 # High-precision crypto/web3 signals — matched as substrings. These rarely

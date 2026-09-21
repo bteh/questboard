@@ -3,7 +3,7 @@ import { Chip, KindStamp, Poster } from '@questboard/ui';
 import { KINDS } from '@questboard/kinds';
 import { resolveSourceLabel } from '@/hooks/use-scrapers';
 import { shortDate } from '@/utils/board-card';
-import { toPoster } from '@/features/board/poster-model';
+import { posterModelFor } from '@/features/board/poster-model';
 import { World } from './world';
 import { plainWords } from './landing-logic';
 import { DownloadOrNotify } from './download-cta';
@@ -60,7 +60,7 @@ function SnapshotPoster({
   labels: Record<string, string>;
   onClip?: () => void;
 }) {
-  const poster = toPoster(app, resolveSourceLabel(app.source, labels));
+  const poster = posterModelFor(app, resolveSourceLabel(app.source, labels));
   const { card } = poster;
   return (
     <Poster

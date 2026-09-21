@@ -127,6 +127,23 @@ def requested_task(max_age_seconds: int = 1800) -> str:
     return task if age < max_age_seconds else ""
 
 
+def consume_requested(task: str, max_age_seconds: int = 1800) -> bool:
+    """True, and the mark is cleared, when the person asked for ``task``
+    recently; False otherwise. Only the first use after a click counts as
+    asked-for. Never raises."""
+    if requested_task(max_age_seconds) != task:
+        return False
+    try:
+        payload = _load()
+        payload.pop("requested_task", None)
+        payload.pop("requested_at", None)
+        payload.setdefault("steps", [])
+        _write(payload)
+    except Exception:  # noqa: BLE001 - a stuck mark must not fail the run
+        logger.debug("could not consume requested task %s", task, exc_info=True)
+    return True
+
+
 def clear() -> None:
     """Start a fresh run. Called when the app launches the assistant."""
     try:

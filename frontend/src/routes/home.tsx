@@ -8,7 +8,7 @@ import { CLIP_STATUS } from '@/utils/board-card';
 import { ALL_VERTICALS, verticalParams } from '@/utils/board-verticals';
 import { backendDownLine } from '@/features/board/backend-down';
 import { checkedAgoLabel } from '@/features/board/freshness';
-import { toPoster } from '@/features/board/poster-model';
+import { posterModelFor } from '@/features/board/poster-model';
 import { logStripTiles, pickBounty } from '@/components/home/home-logic';
 import type { ApplicationResponse } from '@/types/application';
 import '@/components/home/home.css';
@@ -90,7 +90,7 @@ function HomeHorizon() {
    renders as plain text here. */
 function BountyPoster({ app, labels }: { app: ApplicationResponse; labels: Record<string, string> }) {
   const updateStatus = useUpdateStatus();
-  const poster = toPoster(app, resolveSourceLabel(app.source, labels));
+  const poster = posterModelFor(app, resolveSourceLabel(app.source, labels));
   const { card } = poster;
   const bring = poster.hasFit
     ? `a resume. this one covers ${card.fit!.strong} of the ${card.fit!.total} things they ask for`

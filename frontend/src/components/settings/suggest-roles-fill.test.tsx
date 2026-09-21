@@ -22,6 +22,7 @@ const runMutate = vi.fn();
 const decideMutate = vi.fn();
 const consentMutate = vi.fn();
 const intentMutate = vi.fn();
+const intentMutateAsync = vi.fn(async () => undefined);
 let running = false;
 
 vi.mock('@/hooks/use-agent-clients', () => ({
@@ -31,7 +32,7 @@ vi.mock('@/hooks/use-agent-clients', () => ({
   useAgentProgress: () => ({ data: running ? { steps: [], phase: 'Reading your resume' } : undefined }),
   useRoleProposals: () => proposalsQuery,
   useDecideRoleProposal: () => ({ mutate: decideMutate, isPending: false }),
-  useMarkAgentIntent: () => ({ mutate: intentMutate, isPending: false }),
+  useMarkAgentIntent: () => ({ mutate: intentMutate, mutateAsync: intentMutateAsync, isPending: false }),
 }));
 vi.mock('@/hooks/use-agent-consent', () => ({
   useAgentConsent: () => ({ data: { granted: true }, isLoading: false }),
@@ -53,6 +54,7 @@ afterEach(() => {
   runMutate.mockReset();
   decideMutate.mockReset();
   intentMutate.mockReset();
+  intentMutateAsync.mockReset();
   Object.defineProperty(navigator, 'clipboard', { value: { writeText: vi.fn().mockResolvedValue(undefined) }, configurable: true });
 });
 
@@ -120,7 +122,7 @@ describe('SuggestRolesPanel fills roles and keywords', () => {
     render(<SuggestRolesPanel resumeExists onAccepted={vi.fn()} />);
     fireEvent.click(screen.getByRole('button', { name: /copy prompt for claude desktop/i }));
     await Promise.resolve();
-    expect(intentMutate).toHaveBeenCalledTimes(1);
-    expect(intentMutate.mock.calls[0][0]).toEqual('propose_roles');
+    expect(intentMutateAsync).toHaveBeenCalledTimes(1);
+    expect(intentMutateAsync.mock.calls[0][0]).toEqual('propose_roles');
   });
 });

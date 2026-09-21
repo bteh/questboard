@@ -4,7 +4,7 @@
    composable filter, so it can narrow My roles or any source category. Counts
    are the full inventory, showing the real breadth even when few roles match. */
 
-import { chipActiveClass, chipClass, chipCountClass, chipInactiveClass } from './chip-classes';
+import { chipActiveClass, chipClass, chipCountClass, chipInactiveClass, chipRowLabelClass } from './chip-classes';
 
 const CATEGORY_LABELS: Record<string, string> = {
   startup: 'Startups & founding',
@@ -45,6 +45,7 @@ export function SourceCategoryChips({
       role="group"
       aria-label="Browse and filter work"
     >
+      <span className={chipRowLabelClass}>Source</span>
       <button
         type="button"
         aria-pressed={selected === null}

@@ -852,10 +852,17 @@ _ROLE_TOKEN_ALIASES = {
     "scientists": "science",
     "stewardship": "steward",
     "sr": "senior",
+    "jr": "junior",
 }
 _ROLE_FILLER_TOKENS = frozenset({"a", "an", "and", "of", "the"})
+# revenue/gtm: "Revenue Operations Lead", "Manager, GTM Analytics" are sales
+# operations, not data work. protection/insider: "Data Protection and Insider
+# Risk" is a security function that happens to contain the word "data".
 _OCCUPATION_CONFLICT_TOKENS = frozenset(
-    {"center", "centre", "clinical", "product", "program", "project", "science"}
+    {
+        "center", "centre", "clinical", "product", "program", "project", "science",
+        "revenue", "gtm", "protection", "insider",
+    }
 )
 # "Data Center/Centre" poisons the word "data" itself (facilities work), so
 # these conflict anywhere in the title. The other occupation words only
@@ -904,7 +911,8 @@ def _role_tokens(value: str | None) -> set[str]:
 # title that only shares one of these with a target role is not "in lane".
 _ROLE_GENERIC_TOKENS = frozenset({
     "senior", "staff", "principal", "lead", "manager", "director", "head",
-    "vp", "chief", "officer", "junior", "associate", "i", "ii", "iii", "iv",
+    "vp", "vice", "president", "chief", "officer", "junior", "associate",
+    "i", "ii", "iii", "iv",
 })
 # Pure seniority-LEVEL words (not role-type). Dropped from a role's retrieval
 # tokens so the DOMAIN drives the match: "Staff Data Engineer" also finds
@@ -929,7 +937,8 @@ _LEVEL_VOCABULARY: tuple[tuple[str, frozenset[str]], ...] = (
 TITLE_LEVELS: tuple[str, ...] = tuple(name for name, _ in _LEVEL_VOCABULARY)
 _VICE_PRESIDENT_RE = re.compile(r"\bvice[\s-]+president\b")
 # The SQL word(s) that retrieve each level. application_service expands
-# "manager" to manager|mgr and "vp" to vp|vice president.
+# "manager" to manager|mgr, "vp" to vp|vice president|vice-president and
+# "chief" to chief|cto|cdo|cio.
 _LEVEL_SQL_WORDS: dict[str, tuple[str, ...]] = {
     "lead": ("lead",),
     "manager": ("manager",),
@@ -957,6 +966,60 @@ def title_level(title: str | None) -> str | None:
 
 def _wanted_levels(terms: list[str]) -> set[str | None]:
     return {title_level(term) for term in terms}
+
+
+# Individual-contributor seniorities, lowest first. "plain" is an IC title
+# with none of these words. _role_tokens folds "sr" into "senior" and "jr"
+# into "junior"; the digits catch "Data Engineer 2".
+_IC_SENIORITY_VOCABULARY: tuple[tuple[str, frozenset[str]], ...] = (
+    ("junior", frozenset({"junior", "entry", "intern", "associate", "i", "ii", "1", "2"})),
+    ("plain", frozenset()),
+    ("senior", frozenset({"senior"})),
+    ("staff", frozenset({"staff", "principal", "distinguished"})),
+)
+IC_SENIORITIES: tuple[str, ...] = tuple(name for name, _ in _IC_SENIORITY_VOCABULARY)
+# The level chips the board offers: one bucket for individual-contributor
+# rows plus every leadership level.
+LEVEL_FACETS: tuple[str, ...] = ("ic",) + TITLE_LEVELS
+
+
+def ic_seniority(title: str | None) -> str | None:
+    """The seniority an individual-contributor title names (junior, plain,
+    senior or staff), or None for a leadership title."""
+    if title_level(title) is not None:
+        return None
+    tokens = _role_tokens(title)
+    for seniority, words in reversed(_IC_SENIORITY_VOCABULARY):
+        if tokens & words:
+            return seniority
+    return "plain"
+
+
+def _wanted_ic_seniorities(terms: list[str]) -> set[str]:
+    """The IC seniorities the saved roles admit. A role with a seniority word
+    admits that seniority and above ("Staff Data Engineer" admits staff and
+    principal, not the 100 plain "Data Engineer" rows a manager once got);
+    a plain role admits every one."""
+    admitted: set[str] = set()
+    for term in terms:
+        seniority = ic_seniority(term)
+        if seniority is None:
+            continue
+        floor = 0 if seniority == "plain" else IC_SENIORITIES.index(seniority)
+        admitted.update(IC_SENIORITIES[floor:])
+    return admitted
+
+
+def _title_bound_exclusion(
+    title: str | None, wanted_levels: set[str | None], wanted_seniorities: set[str]
+) -> str | None:
+    """Which saved-role bound excludes ``title``: "level", "seniority" or None."""
+    level = title_level(title)
+    if wanted_levels and level not in wanted_levels:
+        return "level"
+    if level is None and wanted_seniorities and ic_seniority(title) not in wanted_seniorities:
+        return "seniority"
+    return None
 
 
 def _retrieval_token_groups(terms: list[str]) -> list[list[str]]:
@@ -1441,6 +1504,7 @@ def _search_work_uncached(
     wanted_levels = _wanted_levels(terms)
     if wanted_levels == {None} and not terms_are_saved_roles:
         wanted_levels = set()
+    wanted_seniorities = _wanted_ic_seniorities(terms) if terms_are_saved_roles else set()
     effective_location = " ".join(location.split())[:120] or (
         saved_location if use_saved_preferences else ""
     )
@@ -1508,6 +1572,7 @@ def _search_work_uncached(
     unknown_freshness_excluded = 0
     title_mismatch_excluded = 0
     level_bound_excluded = 0
+    seniority_bound_excluded = 0
     level_mismatch_excluded = 0
     duplicate_records_excluded = 0
 
@@ -1576,8 +1641,12 @@ def _search_work_uncached(
         ):
             title_mismatch_excluded += 1
             continue
-        if wanted_levels and title_level(row.job_title) not in wanted_levels:
+        bound = _title_bound_exclusion(row.job_title, wanted_levels, wanted_seniorities)
+        if bound == "level":
             level_bound_excluded += 1
+            continue
+        if bound == "seniority":
+            seniority_bound_excluded += 1
             continue
         if not _filter_jobs_by_level(
             [filter_job],
@@ -1740,6 +1809,7 @@ def _search_work_uncached(
             "unknown_date_excluded": unknown_freshness_excluded,
             "title_mismatch_excluded": title_mismatch_excluded,
             "level_bound_excluded": level_bound_excluded,
+            "seniority_bound_excluded": seniority_bound_excluded,
             "level_mismatch_excluded": level_mismatch_excluded,
             "duplicate_records_excluded": duplicate_records_excluded,
         },

@@ -112,7 +112,13 @@ export function SuggestRolesPanel({ resumeExists, onAccepted }: SuggestRolesPane
 
   const copyPrompt = async () => {
     const write = async () => {
-      markIntent.mutate('propose_roles');
+      /* the mark is what lets the backend act on the pasted answer inside
+         the quiet week; the copy itself must not wait on it */
+      try {
+        await markIntent.mutateAsync('propose_roles');
+      } catch {
+        toast.error("Couldn't tell the app you asked; the suggestion may wait out the quiet week.");
+      }
       try {
         await navigator.clipboard.writeText(PROPOSE_ROLES_PROMPT);
         setCopied(true);
@@ -131,11 +137,15 @@ export function SuggestRolesPanel({ resumeExists, onAccepted }: SuggestRolesPane
     });
   };
 
-  const accept = (id: number) =>
+  /* a decision ends the run it came from: its outcome note must not
+     resurface once the proposal is gone */
+  const decideProposal = (id: number, accept: boolean) =>
     decide.mutate(
-      { id, accept: true },
+      { id, accept },
       {
         onSuccess: (decision) => {
+          setLastRun(null);
+          if (!accept) return;
           onAccepted({ roles: decision.roles, keywords: decision.keywords });
           toast.success('Roles and keywords updated from the suggestion');
         },
@@ -191,8 +201,8 @@ export function SuggestRolesPanel({ resumeExists, onAccepted }: SuggestRolesPane
           proposal={proposal}
           assistantName={assistantName}
           busy={decide.isPending}
-          onAccept={() => accept(proposal.id)}
-          onDismiss={() => decide.mutate({ id: proposal.id, accept: false })}
+          onAccept={() => decideProposal(proposal.id, true)}
+          onDismiss={() => decideProposal(proposal.id, false)}
         />
       ))}
     </div>

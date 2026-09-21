@@ -91,7 +91,9 @@ async function downloadAndStage(
  * With nothing staged (a fresh window, a cleared store) this downloads
  * first. With nothing to download it says "up to date" and touches nothing.
  * Never rejects: the hook fires this and forgets, so a thrown error would
- * vanish and the pill would sit there saying "Restart".
+ * vanish and the pill would sit there saying "Restart". That covers the
+ * shutdown and relaunch too: once the bundle is on disk, a relaunch that
+ * fails leaves only a manual quit and reopen, so the state says so.
  */
 export async function installAndRestart(
   onState: (state: UpdateState) => void,
@@ -110,10 +112,15 @@ export async function installAndRestart(
   }
   staged = null;
 
-  const { invoke } = await import('@tauri-apps/api/core');
-  const { relaunch } = await import('@tauri-apps/plugin-process');
-  await invoke('shutdown_runtime_for_update');
-  await relaunch();
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    const { relaunch } = await import('@tauri-apps/plugin-process');
+    await invoke('shutdown_runtime_for_update');
+    await relaunch();
+  } catch (err) {
+    console.warn('relaunch after install failed', err);
+    onState({ kind: 'installed', version: update.version });
+  }
 }
 
 /** The version this build carries, for the Settings row. */

@@ -16,8 +16,9 @@ Rules under test:
    hidden for a leadership seeker.
 2. A seeker with individual-contributor roles keeps today's behaviour: the
    role's own words must all be in the title.
-3. The SQL layer understands a "leadership" pseudo-token that expands to
-   manager, director, head, lead, vp, chief (and mgr).
+3. The SQL layer expands the level words it is sent: manager also matches
+   mgr, vp matches vice president and vice-president, chief matches CTO,
+   CDO and CIO.
 """
 
 from __future__ import annotations
@@ -163,29 +164,29 @@ def test_individual_contributor_seeker_keeps_todays_matching(ic_db) -> None:
     assert "Data Analyst" not in visible
 
 
-def test_sql_leadership_pseudo_token_expands_to_every_leadership_word(tmp_path, monkeypatch) -> None:
+def test_sql_chief_token_expands_to_its_acronyms(tmp_path, monkeypatch) -> None:
+    """A chief seeker's [data, chief] group answers "CDO, Data" and "CTO, Data
+    Platform" as well as "Chief Data Officer", and not the directors whose
+    word happens to contain "cto"."""
     from app.services import application_service
 
-    db, generator = _make_db(tmp_path, monkeypatch, ["Data Engineering Manager"])
+    db, generator = _make_db(tmp_path, monkeypatch, ["Chief Data Officer"])
     try:
         _seed(
             db,
             [
-                ("Head of Data", False),
-                ("Data Mgr", False),
-                ("Director of Data", False),
-                ("Data Team Lead", False),
-                ("VP Data", False),
                 ("Chief Data Officer", False),
+                ("CDO, Data", False),
+                ("CTO, Data Platform", False),
+                ("Director of Data", False),
                 ("Senior Data Engineer", False),
             ],
         )
         rows, total = application_service.get_applications(
-            db, title_token_groups=[["data", "leadership"]], page_size=50
+            db, title_token_groups=[["data", "chief"]], page_size=50
         )
         titles = {row.job_title for row in rows}
-        assert total == 6
-        assert "Senior Data Engineer" not in titles
-        assert {"Head of Data", "Data Mgr", "Director of Data", "Data Team Lead", "VP Data", "Chief Data Officer"} <= titles
+        assert total == 3
+        assert titles == {"Chief Data Officer", "CDO, Data", "CTO, Data Platform"}
     finally:
         generator.close()

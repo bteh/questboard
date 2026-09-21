@@ -49,13 +49,68 @@ def _parse_verticals(vertical: str | None) -> list[str] | None:
     return [v.strip() for v in vertical.split(",") if v.strip()]
 
 
+def _level_facet(title: str | None) -> str:
+    return local_agent_service.title_level(title) or "ic"
+
+
 def _level_counts(records: list) -> dict[str, int]:
-    found = [local_agent_service.title_level(record.job_title) for record in records]
+    found = [_level_facet(record.job_title) for record in records]
     return {
         name: count
-        for name in local_agent_service.TITLE_LEVELS
+        for name in local_agent_service.LEVEL_FACETS
         if (count := found.count(name))
     }
+
+
+def _narrow_by_level(records: list, level: str | None) -> list:
+    if not level:
+        return records
+    return [record for record in records if _level_facet(record.job_title) == level]
+
+
+def _narrow_by_source_category(db: Session, records: list, source_category: str | None) -> list:
+    if not source_category or not records:
+        return records
+    shelf_ids = {
+        item_id
+        for (item_id,) in db.query(ApplicationRecord.id)
+        .filter(ApplicationRecord.id.in_([record.id for record in records]))
+        .filter(application_service.source_category_condition(ApplicationRecord, source_category))
+        .all()
+    }
+    return [record for record in records if record.id in shelf_ids]
+
+
+def _source_category_counts(db: Session, records: list) -> dict[str, int]:
+    """Chip counts with the exact predicate clicking the chip will use
+    (identity shelves like Startup and Crypto qualify rows from many source
+    categories)."""
+    if not records:
+        return {}
+    lane_ids = [record.id for record in records]
+    counts: dict[str, int] = {}
+    for category in sorted({value for value in _source_category_map().values() if value}):
+        count = (
+            db.query(ApplicationRecord.id)
+            .filter(ApplicationRecord.id.in_(lane_ids))
+            .filter(application_service.source_category_condition(ApplicationRecord, category))
+            .count()
+        )
+        if count:
+            counts[category] = count
+    return counts
+
+
+def _facet_counts(
+    db: Session, records: list, *, source_category: str | None, level: str | None
+) -> tuple[dict[str, int], dict[str, int]]:
+    """Each chip row is counted with the other row's selection applied and
+    only its own selection left open, so a chip never promises rows that
+    clicking it hides."""
+    return (
+        _source_category_counts(db, _narrow_by_level(records, level)),
+        _level_counts(_narrow_by_source_category(db, records, source_category)),
+    )
 
 
 def _source_category_map() -> dict[str, str]:
@@ -431,7 +486,7 @@ def list_profile_work(
     ),
     level: str | None = Query(
         None,
-        description="Narrow to one leadership level: lead | manager | director | vp | chief",
+        description="Narrow to one level: ic | lead | manager | director | vp | chief",
     ),
     sort_by: str = "date_found",
     page: int = Query(1, ge=1),
@@ -457,10 +512,10 @@ def list_profile_work(
     )
     if sort_by not in {"date_found", "rank"}:
         raise HTTPException(status_code=400, detail="sort_by must be date_found or rank")
-    if level is not None and level not in local_agent_service.TITLE_LEVELS:
+    if level is not None and level not in local_agent_service.LEVEL_FACETS:
         raise HTTPException(
             status_code=400,
-            detail="level must be one of " + ", ".join(local_agent_service.TITLE_LEVELS),
+            detail="level must be one of " + ", ".join(local_agent_service.LEVEL_FACETS),
         )
     workspace_id = workspace.workspace.id if workspace is not None else None
     profile = local_agent_service.career_preferences(db, workspace_id)
@@ -534,50 +589,14 @@ def list_profile_work(
         visible_ids = {item_id for (item_id,) in view_query.all()}
         ordered = [record for record in ordered if record.id in visible_ids]
 
-    # Chip counts over the same narrowed lane the rows come from, with the
-    # exact predicate clicking the chip will use (identity shelves like
-    # Startup and Crypto qualify rows from many source categories), so a chip
-    # never promises rows the view below hides.
-    cat_map = _source_category_map()
-    category_counts: dict[str, int] = {}
-    if ordered:
-        visible_lane_ids = [record.id for record in ordered]
-        for category in sorted({value for value in cat_map.values() if value}):
-            count = (
-                db.query(ApplicationRecord.id)
-                .filter(ApplicationRecord.id.in_(visible_lane_ids))
-                .filter(
-                    application_service.source_category_condition(
-                        ApplicationRecord,
-                        category,
-                    )
-                )
-                .count()
-            )
-            if count:
-                category_counts[category] = count
-    level_counts = _level_counts(ordered)
-
-    if source_category and ordered:
-        shelf_ids = {
-            item_id
-            for (item_id,) in db.query(ApplicationRecord.id)
-            .filter(ApplicationRecord.id.in_([record.id for record in ordered]))
-            .filter(
-                application_service.source_category_condition(
-                    ApplicationRecord,
-                    source_category,
-                )
-            )
-            .all()
-        }
-        ordered = [record for record in ordered if record.id in shelf_ids]
-    if level:
-        ordered = [
-            record
-            for record in ordered
-            if local_agent_service.title_level(record.job_title) == level
-        ]
+    # Chip counts over the same narrowed lane the rows come from; the
+    # cross-facet rule lives in _facet_counts.
+    category_counts, level_counts = _facet_counts(
+        db, ordered, source_category=source_category, level=level
+    )
+    ordered = _narrow_by_level(
+        _narrow_by_source_category(db, ordered, source_category), level
+    )
 
     # Coherent global order BEFORE pagination: current ranked picks, reviewed
     # non-skips without an integer rank, unreviewed/stale rows, then skips.

@@ -26,7 +26,8 @@ export interface PosterLogoWell {
 export interface PosterModel {
   kind: string;
   card: BoardCardModel;
-  /** the scannable one-liner, cut from the posting's own text */
+  /** the assistant's own reason once it has judged the row, else the
+      scannable one-liner cut from the posting's own text */
   desc?: string;
   copy: KindCopy;
   /** true when the career fit line replaces the kind template */
@@ -130,11 +131,15 @@ export function fitGroups<T extends FitRow>(items: T[]): FitWall<T> {
 
 /** "Your assistant ranked 12 jobs: 6 strong, 4 good, 2 reach." Zero groups
     stay out; null when nothing but skips carries a verdict (the fold's own
-    count tells that story). */
+    count tells that story). When one tier holds every ranked row the count
+    breakdown says nothing, so the line names the flat result and the fix. */
 export function fitDigest<T>(wall: FitWall<T>): string | null {
   const parts = wall.groups.map((g) => `${g.items.length} ${g.verdict}`);
   const n = wall.groups.reduce((sum, g) => sum + g.items.length, 0);
   if (n === 0) return null;
+  if (n > 1 && wall.groups.length === 1) {
+    return `All ${n} came back ${wall.groups[0].verdict}. Ask your assistant to re-rank strictly.`;
+  }
   return `Your assistant ranked ${n} job${n === 1 ? '' : 's'}: ${parts.join(', ')}.`;
 }
 
@@ -179,6 +184,13 @@ export function scannableDesc(description: string | null | undefined): string | 
   return (lastSpace > 60 ? slice.slice(0, lastSpace) : slice).replace(/[,;:.]$/, '');
 }
 
+/** The assistant's own reason for its verdict, or undefined when it has
+    not judged the row (or said nothing). */
+function fitWhy(app: ApplicationResponse): string | undefined {
+  const why = app.agent_fit?.why?.trim();
+  return why || undefined;
+}
+
 function statedStr(quest: ApplicationResponse['quest'], key: string): string {
   const v = quest?.[key];
   return typeof v === 'string' ? v.trim() : '';
@@ -190,7 +202,7 @@ export function rotationFor(id: number): number {
   return steps[Math.abs(id) % steps.length];
 }
 
-export function toPoster(app: ApplicationResponse, sourceLabel: string): PosterModel {
+export function posterModelFor(app: ApplicationResponse, sourceLabel = ''): PosterModel {
   const kind = kindForVertical(app.vertical || 'career')?.id ?? 'skill';
   const card = toBoardCard(app, sourceLabel);
   const hasFit = Boolean(card.fit && card.fit.total > 0);
@@ -234,7 +246,7 @@ export function toPoster(app: ApplicationResponse, sourceLabel: string): PosterM
   return {
     kind,
     card,
-    desc: scannableDesc(app.description),
+    desc: fitWhy(app) ?? scannableDesc(app.description),
     copy,
     hasFit,
     tags: tags.slice(0, 2),

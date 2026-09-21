@@ -8,7 +8,7 @@ import { Poster } from '@questboard/ui';
 import { resolveSourceLabel } from '@/hooks/use-scrapers';
 import { useUpdateStatus } from '@/hooks/use-applications';
 import { CLIP_STATUS } from '@/utils/board-card';
-import { fitDigest, fitGroups, toPoster } from '@/features/board/poster-model';
+import { fitDigest, fitGroups, posterModelFor } from '@/features/board/poster-model';
 import { isNewSince, splitBySince } from '@/features/board/new-since';
 import { decoratePosterLink } from '@/monetization/affiliate';
 import type { ApplicationResponse } from '@/types/application';
@@ -62,7 +62,7 @@ export function PosterWall({
   const navigate = useNavigate();
 
   function renderPoster(app: ApplicationResponse) {
-    const poster = toPoster(app, resolveSourceLabel(app.source, labels));
+    const poster = posterModelFor(app, resolveSourceLabel(app.source, labels));
     const { card } = poster;
     /* render edge only: decoration runs after ordering, so the bounty
        can never touch what shows or the order */

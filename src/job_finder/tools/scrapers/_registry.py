@@ -5,6 +5,7 @@ Zero imports from sibling scraper modules to avoid circular deps.
 
 from __future__ import annotations
 
+import inspect
 import logging
 from dataclasses import dataclass
 from typing import Any, Callable
@@ -140,6 +141,27 @@ def get_all_metadata() -> list[ScraperMeta]:
     return list(_REGISTRY.values())
 
 
+def _accepts_partial_sink(fn: Callable) -> bool:
+    try:
+        params = inspect.signature(fn).parameters
+    except (TypeError, ValueError):
+        return False
+    return "partial_sink" in params or any(
+        p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()
+    )
+
+
+def _timeout_outcome(name: str, meta: ScraperMeta | None, timeout: float) -> dict[str, Any]:
+    return {
+        "source": name,
+        "vertical": meta.vertical if meta else "career",
+        "duration_s": timeout,
+        "finish_reason": "timeout",
+        "rows_found": 0,
+        "error_sample": f"no result within {timeout:g}s",
+    }
+
+
 def run_scrapers(
     names: list[str] | None = None,
     roles: list[str] | None = None,
@@ -173,7 +195,6 @@ def run_scrapers(
         outcome per attempted source. This lets a whole refresh publish an
         exact coverage receipt without re-reading the run log by timestamp.
     """
-    import inspect
     import queue
     import threading
     import time
@@ -285,19 +306,21 @@ def run_scrapers(
     # each board's rows here as they land (publish_partial in _utils), so the
     # deadline can keep what was fetched instead of discarding the whole run.
     partial_sinks: dict[str, list[dict]] = {}
+    harvested: set[str] = set()
     sinks_lock = threading.Lock()
 
     def _source_cap(name: str) -> int:
         return max(1, int((max_results_by_source or {}).get(name, max_results)))
 
-    def _accepts_partial_sink(fn: Callable) -> bool:
-        try:
-            params = inspect.signature(fn).parameters
-        except (TypeError, ValueError):
-            return False
-        return "partial_sink" in params or any(
-            p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()
-        )
+    def _claim_harvest(name: str) -> list[dict]:
+        """Take a hung source's sink rows; its own thread must not settle later."""
+        with sinks_lock:
+            harvested.add(name)
+            return list(partial_sinks.get(name, ()))
+
+    def _was_harvested(name: str) -> bool:
+        with sinks_lock:
+            return name in harvested
 
     def _settle(name: str, meta: ScraperMeta, jobs: list[dict], outcome: dict) -> list[dict]:
         """Row contract + company discovery, shared by the normal and deadline paths."""
@@ -333,7 +356,7 @@ def run_scrapers(
         outcome["rows_found"] = len(jobs)
         return jobs
 
-    def _run_one(name: str) -> tuple[str, list[dict], dict]:
+    def _run_one(name: str) -> tuple[str, list[dict], dict] | None:
         import time as _time
         from datetime import datetime as _dt, timezone as _tz
 
@@ -376,6 +399,8 @@ def run_scrapers(
             )
             raw_count = len(jobs or [])
             outcome["duration_s"] = round(_time.monotonic() - t0, 2)
+            if _was_harvested(name):
+                return None
             jobs = _settle(name, meta, jobs or [], outcome)
             if not jobs:
                 outcome["finish_reason"] = "zero_rows"
@@ -412,7 +437,9 @@ def run_scrapers(
     result_queue: queue.Queue[tuple[str, list[dict], dict]] = queue.Queue()
 
     def _run_and_publish(name: str) -> None:
-        result_queue.put(_run_one(name))
+        result = _run_one(name)
+        if result is not None:
+            result_queue.put(result)
 
     for name in runnable:
         threading.Thread(
@@ -468,16 +495,8 @@ def run_scrapers(
             continue
         meta = _REGISTRY.get(name)
         display = meta.display_name if meta else name
-        with sinks_lock:
-            fetched = list(partial_sinks.get(name, ()))
-        outcome = {
-            "source": name,
-            "vertical": meta.vertical if meta else "career",
-            "duration_s": scraper_timeout,
-            "finish_reason": "timeout",
-            "rows_found": 0,
-            "error_sample": f"no result within {scraper_timeout:g}s",
-        }
+        fetched = _claim_harvest(name)
+        outcome = _timeout_outcome(name, meta, scraper_timeout)
         if fetched and meta:
             from job_finder.tools.scrapers._utils import cap_with_protected
 

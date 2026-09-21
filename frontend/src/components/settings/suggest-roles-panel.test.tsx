@@ -13,6 +13,7 @@ const runMutate = vi.fn();
 const decideMutate = vi.fn();
 const consentMutate = vi.fn();
 const intentMutate = vi.fn();
+const intentMutateAsync = vi.fn(async () => undefined);
 
 vi.mock('@/hooks/use-agent-clients', () => ({
   useAgentClients: () => clientsQuery,
@@ -21,7 +22,7 @@ vi.mock('@/hooks/use-agent-clients', () => ({
   useAgentProgress: () => ({ data: undefined }),
   useRoleProposals: () => proposalsQuery,
   useDecideRoleProposal: () => ({ mutate: decideMutate, isPending: false }),
-  useMarkAgentIntent: () => ({ mutate: intentMutate, isPending: false }),
+  useMarkAgentIntent: () => ({ mutate: intentMutate, mutateAsync: intentMutateAsync, isPending: false }),
 }));
 vi.mock('@/hooks/use-agent-consent', () => ({
   useAgentConsent: () => ({ data: { granted: true }, isLoading: false }),
