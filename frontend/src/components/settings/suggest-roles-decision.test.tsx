@@ -19,7 +19,7 @@ const proposalsQuery = { data: { proposals: [] as Proposal[] } };
 const runMutate = vi.fn();
 const decideMutate = vi.fn();
 const consentMutate = vi.fn();
-const intentMutateAsync = vi.fn(async () => undefined);
+const intentMutateAsync = vi.fn(async (_task: string) => undefined);
 
 vi.mock('@/hooks/use-agent-clients', () => ({
   useAgentClients: () => clientsQuery,

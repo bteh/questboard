@@ -22,7 +22,7 @@ const runMutate = vi.fn();
 const decideMutate = vi.fn();
 const consentMutate = vi.fn();
 const intentMutate = vi.fn();
-const intentMutateAsync = vi.fn(async () => undefined);
+const intentMutateAsync = vi.fn(async (_task: string) => undefined);
 let running = false;
 
 vi.mock('@/hooks/use-agent-clients', () => ({
