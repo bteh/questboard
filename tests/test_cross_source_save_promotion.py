@@ -64,7 +64,9 @@ class CrossSourceSavePromotionTest(unittest.TestCase):
         )
         self.assertEqual(refreshed.url_status, "unknown")
         self.assertEqual(refreshed.salary_max, 215000)
-        self.assertEqual(refreshed.date_posted, "2026-07-22T23:59:42-04:00")
+        # The employer's newer date wins, stored in the board's calendar shape
+        # (UTC, no offset) so the "posted last N days" text compare finds it.
+        self.assertEqual(refreshed.date_posted, "2026-07-23T03:59:42")
         self.assertEqual(refreshed.search_run_id, "new-run")
         self.assertEqual(refreshed.first_seen_run_id, "old-run")
 

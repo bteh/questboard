@@ -964,6 +964,22 @@ def run_startup_repairs(engine) -> None:
             "date repair failed; will retry next launch", exc_info=True
         )
     try:
+        from job_finder.models.posted_date_repair import (
+            POSTED_DATE_REPAIR_VERSION,
+            repair_posted_dates,
+        )
+
+        reshaped = repair_posted_dates(engine)
+        if reshaped:
+            logger.info(
+                "posted date repair v%d: reshaped %d date_posted row(s)",
+                POSTED_DATE_REPAIR_VERSION, reshaped,
+            )
+    except Exception:
+        logger.warning(
+            "posted date repair failed; will retry next launch", exc_info=True
+        )
+    try:
         filled = repair_salaries(engine)
         if filled:
             logger.info(

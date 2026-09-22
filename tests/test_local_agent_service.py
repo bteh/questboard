@@ -327,7 +327,11 @@ def test_title_filter_keeps_adjacent_roles_for_the_agent_to_judge() -> None:
     from app.services.local_agent_service import _title_is_in_lane
 
     q = ["Data Engineering Manager"]
-    assert _title_is_in_lane("Analytics Engineering Manager", q)  # shares "engineer"
+    # Sep 22 2026: shares only the context word "engineering", the same word
+    # that let "Engineering Manager, 3D Platform" in; a seeker who wants
+    # analytics engineering saves it as its own role.
+    assert not _title_is_in_lane("Analytics Engineering Manager", q)
+    assert _title_is_in_lane("Manager, Data & Analytics", q)  # shares "data"
     assert _title_is_in_lane("Head of Data Platform", q)  # shares "data"
     assert _title_is_in_lane("Staff Data Engineer", q)  # shares "data"/"engineer"
     assert not _title_is_in_lane("Office Manager", q)  # only shares the seniority word

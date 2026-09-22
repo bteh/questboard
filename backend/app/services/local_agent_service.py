@@ -914,6 +914,21 @@ _ROLE_GENERIC_TOKENS = frozenset({
     "vp", "vice", "president", "chief", "officer", "junior", "associate",
     "i", "ii", "iii", "iv",
 })
+# Words that describe context, not a profession. Sharing one of these with a
+# saved role never puts a title in lane on its own: "operations" from "Data
+# Operations Manager" once admitted "Procurement Operations Manager", and
+# "ai" from "AI Platform Manager" admitted "Engagement Manager, AI
+# Implementations" (Sep 22 2026). Spelled the human way; folded through the
+# alias table so they match what _role_tokens produces (ops, engineer).
+_LANE_CONTEXT_TOKENS = frozenset(
+    _ROLE_TOKEN_ALIASES.get(word, word)
+    for word in (
+        "operations", "ops", "business", "engineering", "platform", "ai",
+        "technology", "technical", "product", "program", "project", "strategy",
+        "solutions", "systems", "services", "digital", "enterprise", "global",
+        "growth",
+    )
+)
 # Pure seniority-LEVEL words (not role-type). Dropped from a role's retrieval
 # tokens so the DOMAIN drives the match: "Staff Data Engineer" also finds
 # "Senior Data Engineer" and "Data Engineer". Role-type words (manager,
@@ -1058,6 +1073,15 @@ def _retrieval_token_groups(terms: list[str]) -> list[list[str]]:
     return groups
 
 
+def _shares_lane_anchor(query_tokens: set[str], title_tokens: set[str]) -> bool:
+    """Adjacent match: the title shares a domain word that names a
+    profession ("data", "analytics", "marketing"), or shares at least two
+    domain words. One context word alone ("operations", "business", "ai") is
+    not enough."""
+    shared = (query_tokens - _ROLE_GENERIC_TOKENS) & title_tokens
+    return bool(shared - _LANE_CONTEXT_TOKENS) or len(shared) >= 2
+
+
 def _title_is_in_lane(title: str | None, queries: list[str]) -> bool:
     """Keep a candidate title that is a full role match (primary) OR shares a
     real domain word with a target role (adjacent).
@@ -1066,7 +1090,9 @@ def _title_is_in_lane(title: str | None, queries: list[str]) -> bool:
     hand it in-lane roles it can rank or skip rather than dropping them here.
     We still exclude titles with an occupation conflict the query doesn't share
     (a nurse/clinical/product role for an engineer), and titles that overlap
-    only on a bare seniority word ("Manager" alone is not a data match).
+    only on a bare seniority word ("Manager" alone is not a data match) or on
+    a single context word ("Procurement Operations Manager" is not a match for
+    "Data Operations Manager"; see _LANE_CONTEXT_TOKENS).
     """
 
     title_tokens = _role_tokens(title)
@@ -1085,9 +1111,7 @@ def _title_is_in_lane(title: str | None, queries: list[str]) -> bool:
         # primary: the whole role family is present
         if query_tokens.issubset(title_tokens):
             return True
-        # adjacent: shares a domain (non-seniority) word with the target role
-        domain = query_tokens - _ROLE_GENERIC_TOKENS
-        if domain & title_tokens:
+        if _shares_lane_anchor(query_tokens, title_tokens):
             return True
     return False
 

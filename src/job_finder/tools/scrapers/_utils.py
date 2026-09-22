@@ -9,6 +9,7 @@ import threading
 import time
 from collections.abc import Callable
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from html import unescape
 from pathlib import Path
 from typing import NamedTuple
@@ -248,39 +249,54 @@ def _parse_salary(text: str | None) -> tuple[float | None, float | None]:
     return None, None
 
 
-def _parse_posted_date(raw: object) -> datetime | None:
-    """Parse a job's posting date into a tz-aware UTC datetime, or None.
+STORED_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S"
+_EPOCH_DIGITS_RE = re.compile(r"\d{9,13}")
+_DATE_ONLY_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
 
-    Handles ISO8601 (with/without 'Z'), 'YYYY-MM-DD', and unix epoch
-    seconds/milliseconds (RemoteOK/HN use epochs). Returns None on anything
-    unparseable so callers can keep unknown-date jobs rather than drop them.
+
+def _epoch_to_datetime(raw: object) -> datetime | None:
+    try:
+        val = float(raw)  # type: ignore[arg-type]
+        if val > 1e11:  # milliseconds
+            val /= 1000.0
+        return datetime.fromtimestamp(val, tz=timezone.utc)
+    except (TypeError, ValueError, OverflowError, OSError):
+        return None
+
+
+def _parse_stated_datetime(s: str) -> datetime | None:
+    """ISO 8601 or RFC 2822 as an aware datetime (naive input is UTC)."""
+    try:
+        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except ValueError:
+        try:
+            dt = parsedate_to_datetime(s)
+        except (TypeError, ValueError, IndexError):
+            return None
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+def _parse_posted_date(raw: object) -> datetime | None:
+    """Parse a job's posting date into a tz-aware datetime, or None.
+
+    Handles ISO8601 (with/without 'Z' or an offset), RFC 2822 (We Work
+    Remotely's RSS pubDate), 'YYYY-MM-DD', and unix epoch seconds or
+    milliseconds (RemoteOK/HN/Himalayas/Lever use epochs). Returns None on
+    anything unparseable so callers can keep unknown-date jobs rather than
+    drop them.
     """
     if raw is None:
         return None
     if isinstance(raw, (int, float)):
-        try:
-            val = float(raw)
-            if val > 1e11:  # milliseconds
-                val /= 1000.0
-            return datetime.fromtimestamp(val, tz=timezone.utc)
-        except (ValueError, OverflowError, OSError):
-            return None
+        return _epoch_to_datetime(raw)
     s = str(raw).strip()
     if not s:
         return None
-    if re.fullmatch(r"\d{9,13}", s):  # all-digit epoch
-        try:
-            val = float(s)
-            if val > 1e11:
-                val /= 1000.0
-            return datetime.fromtimestamp(val, tz=timezone.utc)
-        except (ValueError, OverflowError, OSError):
-            return None
-    try:
-        dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
-        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
-    except ValueError:
-        pass
+    if _EPOCH_DIGITS_RE.fullmatch(s):
+        return _epoch_to_datetime(s)
+    parsed = _parse_stated_datetime(s)
+    if parsed is not None:
+        return parsed
     m = re.match(r"(\d{4})-(\d{1,2})-(\d{1,2})", s)
     if m:
         try:
@@ -288,6 +304,34 @@ def _parse_posted_date(raw: object) -> datetime | None:
         except ValueError:
             return None
     return None
+
+
+def normalize_posted_date(raw: object) -> str:
+    """The one stored shape for date_posted: naive-UTC ISO at second precision.
+
+    Epoch seconds or milliseconds (int or digit string), RFC 2822, and ISO
+    8601 with any offset, "Z" or fraction all come back as
+    ``STORED_DATE_FORMAT`` in UTC, the shape board_filter_conditions compares
+    as text. A date-only value stays date-only: a bare date cannot prove a
+    24-hour window and the readers treat it that way on purpose. Free text
+    ("Reposted 9 Days Ago") and the empty string come back unchanged.
+    """
+    if raw is None:
+        return ""
+    if isinstance(raw, (int, float)) and not isinstance(raw, bool):
+        parsed = _epoch_to_datetime(raw)
+        return parsed.strftime(STORED_DATE_FORMAT) if parsed else str(raw)
+    text = str(raw)
+    stripped = text.strip()
+    if _DATE_ONLY_RE.fullmatch(stripped):
+        return stripped
+    if _EPOCH_DIGITS_RE.fullmatch(stripped):
+        parsed = _epoch_to_datetime(stripped)
+    else:
+        parsed = _parse_stated_datetime(stripped)
+    if parsed is None:
+        return text
+    return parsed.astimezone(timezone.utc).strftime(STORED_DATE_FORMAT)
 
 
 def date_confidence_for(raw: object, *, fuzzy: bool = False) -> str:

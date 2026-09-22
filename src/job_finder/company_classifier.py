@@ -19,6 +19,7 @@ BIG_TECH = {
     "salesforce", "adobe", "uber", "lyft", "doordash", "instacart",
     "coinbase", "robinhood", "block", "square", "paypal",
     "shopify", "spotify", "snap", "pinterest", "reddit",
+    "airbnb", "figma",
     "palantir", "datadog", "cloudflare", "crowdstrike", "mongodb",
     "twilio", "okta", "zscaler", "servicenow", "workday", "splunk",
     "atlassian", "vmware", "broadcom", "dell", "ibm", "cisco",
@@ -39,14 +40,11 @@ ELITE_STARTUPS = {
     "gusto", "carta", "anduril", "flexport",
     # Dev tools / Data
     "vercel", "supabase", "neon", "planetscale", "retool",
-    "linear", "figma", "notion", "canva", "livekit",
+    "linear", "notion", "canva", "livekit",
     "dbt labs", "fivetran", "starburst", "clickhouse", "motherduck",
     "tabular", "dagster", "prefect", "airbyte", "meltano",
     # Consumer / Other unicorns
-    "discord", "airbnb", "faire", "vanta", "loom",
-    # Quant / HFT
-    "citadel", "jane street", "hudson river trading", "two sigma",
-    "de shaw", "jump trading", "tower research", "virtu financial",
+    "discord", "faire", "vanta", "loom",
 }
 
 # YC top companies for tagging
@@ -62,6 +60,8 @@ ENTERPRISE_COMPANIES = {
     "jpmorgan", "jp morgan", "goldman sachs", "bank of america",
     "wells fargo", "citigroup", "citi", "morgan stanley", "barclays",
     "capital one", "american express", "visa", "mastercard",
+    "citadel", "jane street", "hudson river trading", "two sigma",
+    "de shaw", "jump trading", "tower research", "virtu financial",
     # Consulting
     "deloitte", "mckinsey", "bcg", "bain", "accenture", "kpmg", "ey",
     "pwc", "pricewaterhousecoopers",

@@ -11,6 +11,15 @@ reclassified with its source's CURRENT category, so a tier only survives if a
 signal that still exists supports it. Rows from boards that are genuinely
 startup-typed keep theirs.
 
+Second pass, 2026-09-22: ELITE_STARTUPS hardcoded Airbnb (public since Dec
+2020), Figma (public since July 2025) and eight decades-old quant firms, and
+the known-list check outranks every other signal, so 21 Airbnb rows sat on the
+"Startups & founding" shelf as Elite Startup. The list fix stops new stamps;
+this pass re-stamps stored rows for exactly those ten companies. It carries
+its own marker so the first pass is never re-run: that one re-judges Early
+Startup rows without their funding signals, which is lossy for rows saved
+since it ran.
+
 Own module by the same rule as remote_flag_repair: maintenance.py already
 holds four repairs and is past its size budget.
 """
@@ -27,7 +36,21 @@ logger = logging.getLogger(__name__)
 COMPANY_TIER_REPAIR_NAME = "source_category_tier"
 COMPANY_TIER_REPAIR_VERSION = 1
 
-_REQUIRED_COLS = ("id", "company", "source", "company_type")
+PUBLIC_COMPANY_TIER_REPAIR_NAME = "public_company_tier"
+PUBLIC_COMPANY_TIER_REPAIR_VERSION = 1
+
+# Normalized names that left ELITE_STARTUPS on 2026-09-22. Only these rows are
+# re-stamped; every other Elite Startup row keeps whatever signal tiered it.
+FORMER_ELITE_STARTUPS: frozenset[str] = frozenset({
+    "airbnb", "figma",
+    "citadel", "jane street", "hudson river trading", "two sigma",
+    "de shaw", "jump trading", "tower research", "virtu financial",
+})
+
+_REQUIRED_COLS = frozenset({"id", "company", "source", "company_type"})
+_PUBLIC_REQUIRED_COLS = frozenset({
+    "id", "company", "company_type", "funding_stage", "total_funding",
+})
 
 
 def _applied_version(conn, name: str) -> int:
@@ -94,25 +117,63 @@ def _scan(conn) -> int:
     return changed
 
 
-def repair_company_tiers(engine, *, force: bool = False) -> int:
-    """Re-judge Early Startup tiers; returns the number corrected.
+def _rejudge_former_elite_startups(conn) -> int:
+    from job_finder.company_classifier import _normalize_company_name, classify_company
 
-    Version-marked like the other repairs; scan, updates and marker share one
-    transaction so a crash leaves the DB unrepaired but consistent.
-    """
+    rows = conn.execute(text(
+        "SELECT id, company, company_type, funding_stage, total_funding "
+        "FROM applications"
+    )).fetchall()
+
+    changed = 0
+    for row_id, company, current, funding_stage, total_funding in rows:
+        if _normalize_company_name(company or "") not in FORMER_ELITE_STARTUPS:
+            continue
+        verdict = classify_company(
+            company or "", funding_stage=funding_stage, total_funding=total_funding
+        )
+        if verdict == current:
+            continue
+        conn.execute(
+            text("UPDATE applications SET company_type = :t WHERE id = :i"),
+            {"t": verdict, "i": row_id},
+        )
+        changed += 1
+    return changed
+
+
+def _run_pass(conn, name: str, version: int, scan, *, ready: bool, force: bool) -> int:
+    if _applied_version(conn, name) >= version and not force:
+        return 0
+    changed = scan(conn) if ready else 0
+    _record_version(conn, name, version)
+    return changed
+
+
+def _application_columns(engine) -> frozenset[str]:
     inspector = inspect(engine)
-    names = inspector.get_table_names()
-    ready = "applications" in names and set(_REQUIRED_COLS).issubset(
-        {c["name"] for c in inspector.get_columns("applications")}
-    ) if "applications" in names else False
+    if "applications" not in inspector.get_table_names():
+        return frozenset()
+    return frozenset(c["name"] for c in inspector.get_columns("applications"))
+
+
+def repair_company_tiers(engine, *, force: bool = False) -> int:
+    """Run both tier repairs; returns the number of rows corrected.
+
+    Each pass is version-marked on its own so a pass already applied is never
+    re-run. Scan, updates and markers share one transaction so a crash leaves
+    the DB unrepaired but consistent.
+    """
+    cols = _application_columns(engine)
 
     with engine.begin() as conn:
-        if (
-            _applied_version(conn, COMPANY_TIER_REPAIR_NAME)
-            >= COMPANY_TIER_REPAIR_VERSION
-            and not force
-        ):
-            return 0
-        changed = _scan(conn) if ready else 0
-        _record_version(conn, COMPANY_TIER_REPAIR_NAME, COMPANY_TIER_REPAIR_VERSION)
+        changed = _run_pass(
+            conn, COMPANY_TIER_REPAIR_NAME, COMPANY_TIER_REPAIR_VERSION, _scan,
+            ready=_REQUIRED_COLS <= cols, force=force,
+        )
+        changed += _run_pass(
+            conn, PUBLIC_COMPANY_TIER_REPAIR_NAME, PUBLIC_COMPANY_TIER_REPAIR_VERSION,
+            _rejudge_former_elite_startups,
+            ready=_PUBLIC_REQUIRED_COLS <= cols, force=force,
+        )
         return changed

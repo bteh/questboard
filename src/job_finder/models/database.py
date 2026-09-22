@@ -890,6 +890,12 @@ def save_application(
     if not job_url:
         job_url = None
 
+    # One stored shape, whatever the source gave: the board's "posted in the
+    # last N days" filter compares this column as text.
+    from job_finder.tools.scrapers._utils import normalize_posted_date
+
+    date_posted = normalize_posted_date(date_posted)
+
     if isinstance(score_evidence, dict):
         score_evidence_json = json.dumps(score_evidence)
     elif isinstance(score_evidence, str):
