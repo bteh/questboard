@@ -2561,7 +2561,7 @@ dependencies = [
 
 [[package]]
 name = "questboard-desktop"
-version = "0.2.13"
+version = "0.2.14"
 dependencies = [
  "libc",
  "serde_json",
