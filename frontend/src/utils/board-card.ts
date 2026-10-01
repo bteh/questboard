@@ -158,7 +158,12 @@ export function shortDate(iso: string | null | undefined): string | null {
 
 /** "{source}, posted 3 days ago, remote". Skips whatever the record can't back. */
 export function boardMeta(app: ApplicationResponse, sourceLabel?: string): string {
-  const posted = postedAgoLabel(app.date_posted, app.date_confidence);
+  const posted = postedAgoLabel(
+    app.date_posted,
+    app.date_confidence,
+    app.freshness_basis,
+    app.date_updated,
+  );
   const place = app.is_remote ? 'remote' : app.location || '';
   return [sourceLabel || app.source, posted ? posted.toLowerCase() : '', place]
     .filter(Boolean)
@@ -221,7 +226,12 @@ export const EVENT_WORDS: Partial<Record<BoardVertical, string>> = {
 
 /** "{source}, posted 2 days ago, taping Jul 14, Atlanta" or "rolling sign-up". */
 export function questMeta(app: ApplicationResponse, sourceLabel?: string): string {
-  const posted = postedAgoLabel(app.date_posted, app.date_confidence);
+  const posted = postedAgoLabel(
+    app.date_posted,
+    app.date_confidence,
+    app.freshness_basis,
+    app.date_updated,
+  );
   let timing = '';
   if (app.is_rolling) {
     timing = 'rolling sign-up';
@@ -319,7 +329,12 @@ export function remotePlaceLabel(location: string | null | undefined): string {
 export function careerMeta(app: ApplicationResponse, sourceLabel?: string): string {
   const company = cleanCompany(app.company);
   const source = sourceLabel || app.source || '';
-  const posted = postedAgoLabel(app.date_posted, app.date_confidence);
+  const posted = postedAgoLabel(
+    app.date_posted,
+    app.date_confidence,
+    app.freshness_basis,
+    app.date_updated,
+  );
   const place = app.is_remote ? remotePlaceLabel(app.location) : app.location || '';
   const namesSource = company && normalizeName(company) === normalizeName(source);
   const lead = company && !namesSource ? [company, source ? `via ${source}` : ''] : [source];

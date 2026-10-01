@@ -20,6 +20,7 @@ from job_finder.tools.scrapers._utils import (
     cap_with_protected,
     date_confidence_for,
     is_crypto_company,
+    normalize_posted_date,
     publish_partial,
 )
 
@@ -100,6 +101,7 @@ def _fetch_company_jobs(
             "date_confidence": date_confidence_for(
                 date_posted, fuzzy=not first_published,
             ),
+            "date_updated": normalize_posted_date(job.get("updated_at", "")),
             "is_remote": "remote" in location.lower(),
             "company_size": "",
             "crypto": crypto,

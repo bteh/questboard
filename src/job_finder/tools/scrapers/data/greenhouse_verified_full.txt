@@ -1427,6 +1427,7 @@ stockx
 stokespacetechnologies
 storyblok
 striiminc
+stripe
 strivehealth
 studycontractors
 submittable

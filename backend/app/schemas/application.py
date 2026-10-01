@@ -36,6 +36,8 @@ class ApplicationBase(BaseModel):
     # direct_from_company is True when the source links straight to the
     # employer's own ATS/board (Greenhouse, Lever, Ashby, Workable, ...).
     date_posted: str | None = None
+    # When the source last said it edited the posting (Greenhouse updated_at).
+    date_updated: str | None = None
     direct_from_company: bool = False
 
 
@@ -120,6 +122,9 @@ class ApplicationResponse(ApplicationBase):
     referral_source: str = ""
     url_status: str = "unknown"
     last_checked_at: datetime | None = None
+    # Why the board kept this row: posted | updated | listed | verified_open.
+    # Anything but "posted" means older, still open. None on an unknown date.
+    freshness_basis: str | None = None
     user_feedback: str = ""
     feedback_notes: str = ""
     # Tags the run that last surfaced this job (overwritten on each rediscovery).

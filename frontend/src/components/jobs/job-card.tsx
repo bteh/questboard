@@ -185,9 +185,14 @@ export function JobCard({ app, sourceLabels, latestRunId }: JobCardProps) {
 
   // Trust & freshness: the TRUE original post date (not when we found it) so a
   // months-old repost can't look fresh. Falls back to date_found recency.
-  const postedAgo = postedAgoLabel(app.date_posted, app.date_confidence);
-  const freshness = classifyFreshness(app.date_posted, app.date_confidence);
-  const staleNote = staleWarning(app.date_posted, app.date_confidence);
+  const postedAgo = postedAgoLabel(
+    app.date_posted,
+    app.date_confidence,
+    app.freshness_basis,
+    app.date_updated,
+  );
+  const freshness = classifyFreshness(app.date_posted, app.date_confidence, app.freshness_basis);
+  const staleNote = staleWarning(app.date_posted, app.date_confidence, app.freshness_basis);
   const isDirect = !!app.direct_from_company;
 
   // Honest fit: "you cover N of M requirements" from the full evaluation, when

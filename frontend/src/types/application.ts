@@ -113,8 +113,14 @@ export interface ApplicationBase {
   // original post date (raw source string); direct_from_company is true when
   // the listing links straight to the employer's own ATS/board.
   date_posted?: string | null;
+  // The source's own "updated" date (Greenhouse only for now).
+  date_updated?: string | null;
+  // Why the board kept the row past the saved window; absent means unknown.
+  freshness_basis?: FreshnessBasis | null;
   direct_from_company?: boolean;
 }
+
+export type FreshnessBasis = 'posted' | 'updated' | 'listed' | 'verified_open';
 
 export interface ApplicationResponse extends ApplicationBase {
   id: number;

@@ -11,9 +11,18 @@ companies list and we match it to the right scraper automatically.
 
 To add a company: add an entry with name, ats (greenhouse/lever/ashby/
 workday), and slug (the identifier in their career page URL).
+
+Names the catalog does not know fall back to an exact normalized match
+against the shipped verified board lists (``tools/scrapers/data/
+<host>_verified_full.txt``), so "Airbnb" resolves to Greenhouse ``airbnb``
+without a catalog entry.
 """
 
 from __future__ import annotations
+
+import re
+from functools import lru_cache
+from pathlib import Path
 
 COMPANY_CATALOG: list[dict[str, str]] = [
     # ── AI Labs & LLM Providers ──────────────────────────────────────
@@ -128,39 +137,87 @@ def _build_index() -> None:
         _CATALOG_BY_NAME[key] = entry
 
 
-def lookup_company(name: str) -> dict[str, str] | None:
+def lookup_company(name: str, *, partial: bool = True) -> dict[str, str] | None:
     """Look up a company by name and return its ATS config.
 
     Returns {"name": ..., "ats": ..., "slug": ...} or None.
     Fuzzy-matches on normalized name (case-insensitive, no spaces/dashes).
+    ``partial=False`` stops at the exact match.
     """
     _build_index()
     key = _normalize(name)
     if key in _CATALOG_BY_NAME:
         return _CATALOG_BY_NAME[key]
-    # Partial match — "Anthropic" matches "Anthropic AI"
+    if not partial or not key:
+        return None
+    # Partial match: "Anthropic" matches "Anthropic AI"
     for catalog_key, entry in _CATALOG_BY_NAME.items():
         if key in catalog_key or catalog_key in key:
             return entry
     return None
 
 
-def resolve_watchlist(company_names: list[str]) -> list[dict[str, str]]:
+_VERIFIED_DATA_DIR = Path(__file__).resolve().parents[1] / "tools" / "scrapers" / "data"
+# First host wins when one name has a board on several (23 of ~5,700 do).
+_VERIFIED_HOSTS = ("greenhouse", "lever", "ashby", "workable")
+
+
+def _verified_key(name: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", (name or "").casefold())
+
+
+def _read_verified_slugs(path: Path) -> list[str]:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    return [ln.strip().lower() for ln in lines if ln.strip() and not ln.lstrip().startswith("#")]
+
+
+@lru_cache(maxsize=8)
+def _verified_index(data_dir: str) -> dict[str, dict[str, str]]:
+    index: dict[str, dict[str, str]] = {}
+    for host in _VERIFIED_HOSTS:
+        for slug in _read_verified_slugs(Path(data_dir) / f"{host}_verified_full.txt"):
+            index.setdefault(_verified_key(slug), {"ats": host, "slug": slug})
+    return index
+
+
+def lookup_verified_board(name: str, *, data_dir: Path | None = None) -> dict[str, str] | None:
+    """Exact normalized match of ``name`` against the shipped verified board lists."""
+    key = _verified_key(name)
+    if not key:
+        return None
+    hit = _verified_index(str(data_dir or _VERIFIED_DATA_DIR)).get(key)
+    if not hit:
+        return None
+    return {"name": name, "ats": hit["ats"], "slug": hit["slug"]}
+
+
+def resolve_watchlist(
+    company_names: list[str], *, data_dir: Path | None = None,
+) -> list[dict[str, str]]:
     """Convert a list of company names into watchlist entries with ATS info.
 
-    Companies found in the catalog get their ATS + slug resolved automatically.
-    Unknown companies are returned with ats="unknown" so they're still tracked
-    but won't be scraped (they'll show up in aggregator results instead).
+    Resolution order: exact catalog match, exact match in a verified board
+    list, then the catalog's substring match (an exact board beats a guess
+    such as "Scale" landing on PlanetScale). Unknown companies are returned
+    with ats="unknown" so they're still tracked but won't be scraped (they'll
+    show up in aggregator results instead). Blank names are dropped.
     """
     _build_index()
     entries = []
     seen: set[str] = set()
     for name in company_names:
         key = _normalize(name)
-        if key in seen:
+        if not key or key in seen:
             continue
         seen.add(key)
-        match = lookup_company(name)
+        match = (
+            lookup_company(name, partial=False)
+            or lookup_verified_board(name, data_dir=data_dir)
+            or lookup_company(name)
+        )
         if match:
             entries.append({
                 "name": match["name"],

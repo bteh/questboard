@@ -30,6 +30,7 @@ from app.services import (
     lane_cache,
     workspace_service,
 )
+from app.services.freshness import _source_age_days, freshness_basis
 from job_finder.job_trust import is_direct_source
 from job_finder.kinds import get_kinds, kind_for_vertical, vertical_values_for
 from job_finder.models.database import ScrapeRunRecord
@@ -1318,94 +1319,6 @@ def _dedupe_work_priority(record: ApplicationRecord) -> tuple[Any, ...]:
     )
 
 
-def _anchor_age_days(anchor: datetime | str | None) -> float | None:
-    """Age of an anchor timestamp in days, or None when it can't be read.
-
-    Accepts the ORM's datetime (naive means UTC, how SQLite hands
-    ``date_found`` back) or a stored ISO string.
-    """
-    if isinstance(anchor, str):
-        try:
-            anchor = datetime.fromisoformat(anchor.replace("Z", "+00:00"))
-        except ValueError:
-            return None
-    if not isinstance(anchor, datetime):
-        return None
-    if anchor.tzinfo is None:
-        anchor = anchor.replace(tzinfo=timezone.utc)
-    elapsed = datetime.now(timezone.utc) - anchor.astimezone(timezone.utc)
-    return max(0.0, elapsed.total_seconds() / 86_400)
-
-
-def _source_age_days(
-    value: str | None, anchor: datetime | str | None = None
-) -> float | None:
-    """Normalize exact and human-readable source dates into an age in days.
-
-    Relative prose ("Reposted 3 Days Ago", "Yesterday") only means something
-    relative to the moment the source said it, which is when WE scraped the
-    row. ``anchor`` is that moment (the record's date_found): with it, age =
-    age(anchor) + the stated offset, so a row scraped six days ago saying
-    "3 Days Ago" reads ~9 days old instead of eternally 3. Without an anchor
-    the prose is unknowable and returns None. Absolute values (ISO, epoch)
-    carry their own instant and ignore the anchor.
-    """
-
-    normalized = " ".join(str(value or "").strip().split())
-    if not normalized:
-        return None
-    lowered = normalized.lower()
-    offset_days: float | None = None
-    if re.fullmatch(r"(?:re)?posted\s+today|today", lowered):
-        offset_days = 0.0
-    elif re.fullmatch(r"(?:re)?posted\s+yesterday|yesterday", lowered):
-        offset_days = 1.0
-    else:
-        relative = re.fullmatch(
-            r"(?:(?:re)?posted\s+)?(\d+)\s+"
-            r"(minute|minutes|hour|hours|day|days)\s+ago",
-            lowered,
-        )
-        if relative:
-            amount = int(relative.group(1))
-            unit = relative.group(2)
-            if unit.startswith("minute"):
-                offset_days = amount / (24 * 60)
-            elif unit.startswith("hour"):
-                offset_days = amount / 24
-            else:
-                offset_days = float(amount)
-    if offset_days is not None:
-        anchor_age = _anchor_age_days(anchor)
-        if anchor_age is None:
-            return None
-        return anchor_age + offset_days
-
-    # Only the two real epoch widths: 10 digits is seconds, 13 is
-    # milliseconds. An 11 or 12 digit value is malformed; guessing its unit
-    # lands it far in the future and clamps to age 0 (reads as posted today),
-    # so leave it unknown instead.
-    if re.fullmatch(r"\d{10}|\d{13}", normalized):
-        timestamp = int(normalized)
-        if len(normalized) == 13:
-            timestamp /= 1000
-        try:
-            posted = datetime.fromtimestamp(timestamp, tz=timezone.utc)
-        except (OverflowError, OSError, ValueError):
-            return None
-        elapsed = datetime.now(timezone.utc) - posted
-        return max(0.0, elapsed.total_seconds() / 86_400)
-
-    try:
-        posted = datetime.fromisoformat(normalized.replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    if posted.tzinfo is None:
-        posted = posted.replace(tzinfo=timezone.utc)
-    elapsed = datetime.now(timezone.utc) - posted.astimezone(timezone.utc)
-    return max(0.0, elapsed.total_seconds() / 86_400)
-
-
 def search_work(
     db: Session,
     *,
@@ -1594,6 +1507,7 @@ def _search_work_uncached(
 
     stale_excluded = 0
     unknown_freshness_excluded = 0
+    freshness_bases: dict[int, str] = {}
     title_mismatch_excluded = 0
     level_bound_excluded = 0
     seniority_bound_excluded = 0
@@ -1612,6 +1526,7 @@ def _search_work_uncached(
             timezone_name,
             now=found_now,
         )
+    gate_now = found_now or datetime.now(timezone.utc)
 
     survivors: list[ApplicationRecord] = []
     intent_text = " ".join(terms + skill_terms).casefold()
@@ -1709,16 +1624,23 @@ def _search_work_uncached(
             )
             if not (arrived and not provably_stale):
                 continue
-        age_days = _source_age_days(row.date_posted, row.date_found)
-        if effective_freshness_window is not None and age_days is not None:
-            if age_days > effective_freshness_window:
+        basis = (
+            freshness_basis(row, effective_freshness_window, now=gate_now)
+            if effective_freshness_window is not None
+            else None
+        )
+        if basis is not None:
+            freshness_bases[row.id] = basis
+        else:
+            age_days = _source_age_days(row.date_posted, row.date_found, now=gate_now)
+            if effective_freshness_window is not None and age_days is not None:
                 stale_excluded += 1
                 continue
-        elif posted_within_days is not None or filter_settings.get("drop_missing_dates", False):
-            # An explicit freshness request is a hard constraint. Saved
-            # defaults stay recall-friendly and let the agent demote unknowns.
-            unknown_freshness_excluded += 1
-            continue
+            if posted_within_days is not None or filter_settings.get("drop_missing_dates", False):
+                # An explicit freshness request is a hard constraint. Saved
+                # defaults stay recall-friendly and let the agent demote unknowns.
+                unknown_freshness_excluded += 1
+                continue
         survivors.append(row)
 
     unique: dict[tuple[str, tuple[str, ...]], ApplicationRecord] = {}
@@ -1792,6 +1714,10 @@ def _search_work_uncached(
         # The route only needs ids to reconstruct ORM rows. Avoid building a
         # multi-hundred-row MCP-shaped payload for ordinary board pagination.
         item = {"opportunity_id": row.id} if browse_all else _candidate_payload(row)
+        if browse_all:
+            item["freshness_basis"] = freshness_bases.get(row.id)
+        else:
+            item["freshness"]["basis"] = freshness_bases.get(row.id)
         item["assistant_review"] = {
             "state": "current" if review["current"] else "needs_review",
             "reason": review["reason"],

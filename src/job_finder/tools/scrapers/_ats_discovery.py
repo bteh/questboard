@@ -20,6 +20,10 @@ Discovery is best-effort: a DDG failure (rate limit, network, parser drift)
 logs a warning and returns whatever's currently cached. ATS scrapers still
 run on their seed list even when discovery breaks.
 
+The full verified catalogs (``data/<host>_verified_full.txt``) are scanned
+one slice per pull through ``verified_rotation_slugs``; the cursor sits at
+``data/cache/ats_rotation_<host>.json`` (see ``_ats_rotation``).
+
 Disable via ``QUESTBOARD_DISABLE_ATS_DISCOVERY=1`` if you ever need to.
 """
 
@@ -266,12 +270,19 @@ def verified_rotation_slugs(
     batch_size: int = VERIFIED_ROTATION_BATCH_SIZE,
     at: datetime | None = None,
 ) -> set[str]:
-    """Return today's deterministic slice of an ATS's full verified catalog.
+    """Return this pull's slice of an ATS's full verified catalog.
 
     This is the cold lane in the hot/warm/cold coverage model.  The slice is
     intentionally not unioned into the grow-only discovery cache: doing so
     would eventually make every refresh contact every board and regress pull
-    speed.  Across successive UTC dates, every verified board is revisited.
+    speed.
+
+    The slice used to be keyed to the UTC calendar day, which only walks the
+    whole catalog for someone who pulls every day.  A twice-a-week user saw
+    the same handful of slices forever and the rest of the catalog was never
+    scanned (49% of Greenhouse after 11 pull days).  The cursor now advances
+    once per pull and is persisted by ``_ats_rotation``, so N pulls on any
+    dates cover N slices.  ``at`` is the clock, kept for tests.
     """
     if host not in ATS_HOSTS or batch_size <= 0:
         return set()
@@ -291,14 +302,15 @@ def verified_rotation_slugs(
     slugs = list(dict.fromkeys(slugs))
     if not slugs:
         return set()
-    size = min(int(batch_size), len(slugs))
-    now = at or datetime.now(timezone.utc)
-    day_index = now.date().toordinal()
-    start = (day_index * size) % len(slugs)
-    end = start + size
-    if end <= len(slugs):
-        return set(slugs[start:end])
-    return set(slugs[start:] + slugs[: end - len(slugs)])
+    from job_finder.tools.scrapers._ats_rotation import next_slice
+
+    return next_slice(
+        host,
+        slugs,
+        batch_size=batch_size,
+        now=at or datetime.now(timezone.utc),
+        cache_dir=_CACHE_DIR,
+    )
 
 
 def drop_slugs(host: str, dead: set[str]) -> int:

@@ -1058,14 +1058,54 @@ def _resolve_location_filter_preferences(
     )
 
 
+def _posting_still_open(job: dict, cutoff: datetime, known_urls: set[str] | None) -> bool:
+    """An old post date is not the last word (Natera, Airbnb, Stripe, Oct 1 2026).
+
+    A source edit inside the window keeps the posting, and so does a URL the
+    board already stores: save_application confirms that row (last_seen_at)
+    instead of inserting, so "still listed" stays provable at read time.
+    """
+    from job_finder.tools.scrapers._utils import _parse_posted_date
+
+    updated = _parse_posted_date(job.get("date_updated"))
+    if updated is not None:
+        if updated.tzinfo is None:
+            updated = updated.replace(tzinfo=timezone.utc)
+        if updated >= cutoff:
+            return True
+    return bool(known_urls) and (job.get("url") or "") in known_urls
+
+
+def _known_urls_for(
+    jobs: list[dict], *, profile: str, workspace_id: str | None
+) -> set[str]:
+    """URLs the board already stores, for _filter_jobs_by_freshness.
+
+    Non-fatal: a pull that cannot reach the database only loses the
+    still-listed evidence for this run.
+    """
+    try:
+        from job_finder.models.database import known_job_urls
+
+        return known_job_urls(
+            (job.get("url") or "" for job in jobs),
+            profile=profile,
+            workspace_id=workspace_id,
+        )
+    except Exception as exc:
+        logger.debug("known-URL lookup failed (non-fatal): %s", exc)
+        return set()
+
+
 def _filter_jobs_by_freshness(
     jobs: list[dict],
     max_days_old: int,
     *,
     now: datetime | None = None,
     drop_missing_dates: bool = False,
+    known_urls: set[str] | None = None,
 ) -> list[dict]:
-    """Drop postings older than ``max_days_old`` by their real post date.
+    """Drop postings older than ``max_days_old`` unless they are provably open.
 
     max_days_old is otherwise only an upstream hint most boards ignore, so a
     months-old reposting can slip through. By default, jobs whose date is
@@ -1074,6 +1114,10 @@ def _filter_jobs_by_freshness(
     ``date_confidence`` is 'missing' — no verifiable date means the posting
     can't be proven fresh. A 1-day skew buffer absorbs timezone/repost
     differences. ``max_days_old <= 0`` disables it.
+
+    An older post date survives when the source edited the posting inside the
+    window (``date_updated``) or the board already stores its URL
+    (``known_urls``), see _posting_still_open.
     """
     if not max_days_old or max_days_old <= 0:
         return jobs
@@ -1093,7 +1137,7 @@ def _filter_jobs_by_freshness(
             continue
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
-        if dt >= cutoff:
+        if dt >= cutoff or _posting_still_open(job, cutoff, known_urls):
             kept.append(job)
     return kept
 
@@ -1877,8 +1921,12 @@ class JobFinderPipeline:
             # Entries that carry a confirmed ats/slug (discovery or a pasted
             # careers link stored them) are trusted as-is; only bare names
             # and unknowns go through the catalog.
+            from job_finder.board_companies import watchlist_with_board_companies
             from job_finder.config.company_catalog import resolve_watchlist
-            raw_watchlist = self.config.get("watchlist", [])
+            raw_watchlist = watchlist_with_board_companies(
+                self.config.get("watchlist", []),
+                workspace_id=(self.config.get("workspace") or {}).get("workspace_id"),
+            )
             watchlist_by_ats = watchlist_tokens_by_ats(raw_watchlist, resolve=resolve_watchlist)
             # Enable ATS scrapers that have watchlist companies (career only)
             for ats_name in watchlist_by_ats:
@@ -2254,6 +2302,11 @@ class JobFinderPipeline:
                 deduped,
                 max_days_old,
                 drop_missing_dates=bool(filter_settings.get("drop_missing_dates", False)),
+                known_urls=_known_urls_for(
+                    deduped,
+                    profile=self.profile_name,
+                    workspace_id=(self.config.get("workspace") or {}).get("workspace_id"),
+                ),
             )
             dropped = pre_fresh - len(deduped)
             self._record_funnel_stage("freshness", "Freshness filter", pre_fresh, len(deduped))
@@ -3325,6 +3378,7 @@ class JobFinderPipeline:
                 salary_source=job.get("salary_source"),
                 date_posted=job.get("date_posted"),
                 date_confidence=job.get("date_confidence"),
+                date_updated=job.get("date_updated"),
                 overall_score=job.get("overall_score"),
                 technical_score=job.get("technical_score"),
                 leadership_score=job.get("leadership_score"),

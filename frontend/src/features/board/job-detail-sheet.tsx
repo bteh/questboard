@@ -58,7 +58,12 @@ function Facts({ app, sourceLabel }: { app: ApplicationResponse; sourceLabel: st
       (app.salary_source === 'reported' ? ', as the posting states it' : '')
     : 'not stated';
   const place = app.is_remote ? 'remote' : app.location || '';
-  const posted = postedAgoLabel(app.date_posted, app.date_confidence);
+  const posted = postedAgoLabel(
+    app.date_posted,
+    app.date_confidence,
+    app.freshness_basis,
+    app.date_updated,
+  );
   const source = sourceLabel + (app.direct_from_company ? ', direct from the company' : '');
   const checked = checkedDate(app.last_checked_at);
   const applyBy = questString(app, 'apply_by');

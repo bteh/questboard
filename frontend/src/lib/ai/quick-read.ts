@@ -58,8 +58,13 @@ function timingLine(app: ApplicationResponse): string | null {
 
 function sourceLine(app: ApplicationResponse, sourceLabel?: string): string {
   const source = sourceLabel || app.source;
-  const posted = postedAgoLabel(app.date_posted, app.date_confidence);
-  return posted ? `From ${source}. ${posted}.` : `From ${source}.`;
+  const posted = postedAgoLabel(
+    app.date_posted,
+    app.date_confidence,
+    app.freshness_basis,
+    app.date_updated,
+  );
+  return posted ? `From ${source}. ${capitalize(posted)}.` : `From ${source}.`;
 }
 
 /** The lines, in reading order. The source line is always present. */

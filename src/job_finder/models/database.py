@@ -6,7 +6,7 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Callable, Optional
+from typing import Callable, Iterable, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -195,6 +195,9 @@ class ApplicationRecord(Base):
     # source string (ISO or YYYY-MM-DD); the frontend parses it at display time.
     date_posted = Column(String(40), default="")
     date_confidence = Column(String(20), default="")  # exact | fuzzy | missing
+    # When the source last said it edited the posting (Greenhouse updated_at),
+    # same stored shape as date_posted; the board's freshness gate reads it.
+    date_updated = Column(String(40), default="")
 
     # Timestamps
     created_at = Column(DateTime, default=_utcnow)
@@ -564,6 +567,10 @@ def _migrate_db(engine) -> None:
             conn.execute(
                 text("ALTER TABLE applications ADD COLUMN date_confidence VARCHAR(20) DEFAULT ''")
             )
+        if "date_updated" not in existing_cols:
+            conn.execute(
+                text("ALTER TABLE applications ADD COLUMN date_updated VARCHAR(40) DEFAULT ''")
+            )
         if "search_run_id" not in existing_cols:
             conn.execute(
                 text("ALTER TABLE applications ADD COLUMN search_run_id VARCHAR(12)")
@@ -823,6 +830,54 @@ def _remote_scope_field(location: str | None) -> str:
     return classify_remote_scope(location)
 
 
+def _newer_source_update(incoming: str | None, stored: str | None) -> bool:
+    """True when the incoming source edit date is later than the stored one."""
+    if not incoming:
+        return False
+    from job_finder.tools.scrapers._utils import _parse_posted_date
+
+    new = _parse_posted_date(incoming)
+    if new is None:
+        return False
+    old = _parse_posted_date(stored or "")
+    return old is None or new > old
+
+
+def known_job_urls(
+    urls: Iterable[str],
+    *,
+    profile: str = "default",
+    workspace_id: str | None = None,
+) -> set[str]:
+    """The subset of ``urls`` this pool already stores.
+
+    Same scope as save_application's URL match, so a hit here means the save
+    path will confirm that row (last_seen_at) instead of inserting.
+    """
+    wanted = sorted({url for url in urls if url})
+    if not wanted:
+        return set()
+    session = get_session()
+    try:
+        query = session.query(ApplicationRecord.job_url)
+        if workspace_id:
+            query = query.filter(ApplicationRecord.workspace_id == workspace_id)
+        else:
+            query = query.filter(
+                ApplicationRecord.workspace_id.is_(None),
+                ApplicationRecord.profile == profile,
+            )
+        found: set[str] = set()
+        for start in range(0, len(wanted), 500):
+            chunk = wanted[start:start + 500]
+            found.update(
+                url for (url,) in query.filter(ApplicationRecord.job_url.in_(chunk)).all()
+            )
+        return found
+    finally:
+        _close_session()
+
+
 def save_application(
     job_title: str,
     company: str,
@@ -875,6 +930,7 @@ def save_application(
     ecosystem_tags: list[str] | str | None = None,
     date_posted: str | None = None,
     date_confidence: str | None = None,
+    date_updated: str | None = None,
     vertical: str = "career",
     event_start: datetime | None = None,
     event_end: datetime | None = None,
@@ -895,6 +951,7 @@ def save_application(
     from job_finder.tools.scrapers._utils import normalize_posted_date
 
     date_posted = normalize_posted_date(date_posted)
+    date_updated = normalize_posted_date(date_updated)
 
     if isinstance(score_evidence, dict):
         score_evidence_json = json.dumps(score_evidence)
@@ -974,6 +1031,10 @@ def save_application(
                     existing.date_posted = date_posted
                     existing.date_confidence = date_confidence or ""
                     changed = True
+                # Source maintenance, like quest_json below: adopt the newest
+                # edit date without reshuffling the log.
+                if _newer_source_update(date_updated, getattr(existing, "date_updated", "")):
+                    existing.date_updated = date_updated
                 # A re-scrape can move a listing (or backfill a location the
                 # first pass lacked); keep the parsed state codes in step.
                 if location and location != (existing.location or ""):
@@ -1156,6 +1217,9 @@ def save_application(
                                 cand.date_posted = date_posted
                                 cand.date_confidence = date_confidence or ""
                                 updated = True
+                        if _newer_source_update(date_updated, getattr(cand, "date_updated", "")):
+                            cand.date_updated = date_updated
+                            updated = True
                         if industry_tags_json != (getattr(cand, "industry_tags", "") or "[]"):
                             cand.industry_tags = industry_tags_json
                             updated = True
@@ -1241,6 +1305,7 @@ def save_application(
             salary_source=salary_source,
             date_posted=date_posted or "",
             date_confidence=date_confidence or "",
+            date_updated=date_updated or "",
             overall_score=overall_score,
             technical_score=technical_score,
             leadership_score=leadership_score,

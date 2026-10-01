@@ -244,6 +244,7 @@ def _to_response(record) -> ApplicationResponse:
         date_confidence=getattr(record, "date_confidence", None) or None,
         work_type_confidence=getattr(record, "work_type_confidence", None),
         date_posted=getattr(record, "date_posted", None) or None,
+        date_updated=getattr(record, "date_updated", None) or None,
         direct_from_company=is_direct_source(getattr(record, "source", "")),
         overall_score=record.overall_score,
         technical_score=record.technical_score,
@@ -553,6 +554,9 @@ def list_profile_work(
         workspace_id=workspace_id,
     )
     candidate_ids = [row["opportunity_id"] for row in payload["results"]]
+    freshness_bases = {
+        row["opportunity_id"]: row.get("freshness_basis") for row in payload["results"]
+    }
     records_by_id = {
         record.id: record
         for record in db.query(ApplicationRecord)
@@ -657,6 +661,7 @@ def list_profile_work(
     page_items: list[ApplicationResponse] = []
     for record in page_records:
         resp = _to_response(record)
+        resp.freshness_basis = freshness_bases.get(record.id)
         if not fit_states[record.id]["current"]:
             # A resume, preference, or posting change invalidates the old
             # judgment immediately; the next incremental run will replace it.

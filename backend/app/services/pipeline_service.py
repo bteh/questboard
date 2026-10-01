@@ -1044,6 +1044,7 @@ def _save_search_results(
             workspace_id=workspace_id,
             date_posted=job.get("date_posted"),
             date_confidence=job.get("date_confidence"),
+            date_updated=job.get("date_updated"),
         )
     new_jobs = max(0, get_session().query(ApplicationRecord).count() - before_count)
     progress_cb(f"Saved {len(jobs)} jobs to database ({new_jobs} new)")
