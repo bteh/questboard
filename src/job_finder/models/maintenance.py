@@ -1034,6 +1034,22 @@ def run_startup_repairs(engine) -> None:
             "company tier repair failed; will retry next launch", exc_info=True
         )
     try:
+        from job_finder.models.company_signal_repair import (
+            COMPANY_SIGNAL_REPAIR_VERSION,
+            repair_company_signals,
+        )
+
+        signaled = repair_company_signals(engine)
+        if signaled:
+            logger.info(
+                "company signal repair v%d: filled %d row(s) from posting text",
+                COMPANY_SIGNAL_REPAIR_VERSION, signaled,
+            )
+    except Exception:
+        logger.warning(
+            "company signal repair failed; will retry next launch", exc_info=True
+        )
+    try:
         tombstoned = repair_research_only_rows(engine)
         if tombstoned:
             logger.info(

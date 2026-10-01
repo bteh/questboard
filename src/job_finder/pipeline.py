@@ -47,6 +47,7 @@ from job_finder.company_classifier import (
     classify_work_type,  # noqa: F401 — re-export for existing consumers
     location_matches_preferences,
 )
+from job_finder.company_signals import fill_funding_from_text
 from job_finder.scoring import score_job_basic, get_company_baselines, normalize_company_key
 from job_finder.scoring.dimensions import (
     _extract_level,
@@ -2637,6 +2638,7 @@ class JobFinderPipeline:
         # Pass 0: Classify companies so tier baselines inform scoring
         for job in jobs:
             if "company_type" not in job:
+                fill_funding_from_text(job)
                 job["company_type"] = classify_company(
                     job.get("company", ""),
                     job.get("funding_stage"),
@@ -3326,8 +3328,8 @@ class JobFinderPipeline:
                     job["cover_letter"] = cl.get("cover_letter_text", "")
                 if intel:
                     job["company_intel_json"] = json.dumps(intel)
-                    job["funding_stage"] = intel.get("funding_stage", "")
-                    job["total_funding"] = intel.get("total_funding", "")
+                    job["funding_stage"] = intel.get("funding_stage") or job.get("funding_stage", "")
+                    job["total_funding"] = intel.get("total_funding") or job.get("total_funding", "")
                     job["employee_count"] = intel.get("employee_count", "")
                 if report:
                     job["evaluation_report_json"] = json.dumps(report)
@@ -3353,6 +3355,7 @@ class JobFinderPipeline:
         saved = 0
         for job in jobs:
             # Company type already classified in scoring phase (Pass 0)
+            fill_funding_from_text(job)
             ct = job.get("company_type") or classify_company(
                 job.get("company", ""),
                 job.get("funding_stage"),

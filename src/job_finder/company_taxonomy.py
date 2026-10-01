@@ -56,6 +56,7 @@ CRYPTO_SOURCES: frozenset[str] = frozenset({
 _CRYPTO_COMPANY_KEYS: frozenset[str] = frozenset({
     "0x",
     "alchemy",
+    "alpaca",
     "anchorage",
     "anchoragedigital",
     "aptoslabs",
@@ -94,6 +95,7 @@ _CRYPTO_COMPANY_KEYS: frozenset[str] = frozenset({
     "ripple",
     "solanafoundation",
     "solflare",
+    "trmlabs",
     "uniswaplabs",
     "wormhole",
 })

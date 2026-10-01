@@ -55,6 +55,23 @@ def test_funding_metadata_wins_over_source():
     )
 
 
+def test_venture_backed_text_stage_is_growth_stage():
+    # Shield AI: "a venture-backed defense-tech company"; Abacus: "VC-backed".
+    assert classify_company(UNKNOWN_CO, funding_stage="venture-backed") == "Growth Stage"
+    assert classify_company(UNKNOWN_CO, funding_stage="vc-backed") == "Growth Stage"
+
+
+def test_unicorn_text_stage_is_elite_startup():
+    # Vannevar Labs: "reached unicorn status".
+    assert classify_company(UNKNOWN_CO, funding_stage="unicorn") == "Elite Startup"
+
+
+def test_a_series_letter_still_wins_over_the_text_stages():
+    assert classify_company(UNKNOWN_CO, funding_stage="series b") == "Growth Stage"
+    assert classify_company(UNKNOWN_CO, funding_stage="series e") == "Elite Startup"
+    assert classify_company(UNKNOWN_CO, funding_stage="seed") == "Early Startup"
+
+
 def test_registry_categories_match_mapped_sources():
     """The source strings jobs carry must resolve to the categories we map."""
     import job_finder.tools.scrapers  # noqa: F401 — triggers plugin registration

@@ -178,6 +178,64 @@ _SOURCE_CATEGORY_TIER: dict[str, str] = {
 }
 
 
+def known_list_tier(company_name: str) -> str | None:
+    """Tier from the curated lists alone, or None for an unlisted company."""
+    normalized = _normalize_company_name(company_name)
+    if normalized in FAANG_PLUS:
+        return "FAANG+"
+    if normalized in BIG_TECH:
+        return "Big Tech"
+    if normalized in ELITE_STARTUPS:
+        return "Elite Startup"
+    if normalized in ENTERPRISE_COMPANIES:
+        return "Enterprise"
+    return None
+
+
+def _tier_from_funding_stage(
+    funding_stage: str,
+    total_funding: str | None,
+    employee_count: str | None,
+) -> str | None:
+    stage = funding_stage.lower().replace("-", " ").strip()
+
+    if stage in ("ipo", "public"):
+        emp = _parse_employee_count(employee_count)
+        if emp and emp >= 1000:
+            return "Big Tech"
+        return "Midsize"
+
+    if any(s in stage for s in ("series d", "series e", "series f", "series g")):
+        return "Elite Startup"
+
+    funding_amt = _parse_funding_amount(total_funding)
+    if funding_amt and funding_amt >= 500_000_000:
+        return "Elite Startup"
+
+    if any(s in stage for s in ("series b", "series c")):
+        if funding_amt and funding_amt >= 100_000_000:
+            return "Elite Startup"
+        return "Growth Stage"
+
+    if "series a" in stage:
+        emp = _parse_employee_count(employee_count)
+        if emp and emp > 100:
+            return "Growth Stage"
+        return "Early Startup"
+
+    # Text-derived stages (company_signals): a Series letter above still wins.
+    if "unicorn" in stage:
+        return "Elite Startup"
+
+    if "venture" in stage or "vc backed" in stage:
+        return "Growth Stage"
+
+    if any(s in stage for s in ("seed", "pre-seed", "pre seed", "angel", "bootstrap")):
+        return "Early Startup"
+
+    return None
+
+
 def classify_company(
     company_name: str,
     funding_stage: str | None = None,
@@ -192,51 +250,16 @@ def classify_company(
     board the job came from (see :data:`_SOURCE_CATEGORY_TIER`); it only
     influences the result when no stronger signal identified the company.
     """
-    normalized = _normalize_company_name(company_name)
-
     # 1. Known-list matching
-    if normalized in FAANG_PLUS:
-        return "FAANG+"
-
-    if normalized in BIG_TECH:
-        return "Big Tech"
-
-    if normalized in ELITE_STARTUPS:
-        return "Elite Startup"
-
-    if normalized in ENTERPRISE_COMPANIES:
-        return "Enterprise"
+    known = known_list_tier(company_name)
+    if known:
+        return known
 
     # 2. Funding stage heuristics
     if funding_stage:
-        stage = funding_stage.lower().replace("-", " ").strip()
-
-        if stage in ("ipo", "public"):
-            emp = _parse_employee_count(employee_count)
-            if emp and emp >= 1000:
-                return "Big Tech"
-            return "Midsize"
-
-        if any(s in stage for s in ("series d", "series e", "series f", "series g")):
-            return "Elite Startup"
-
-        funding_amt = _parse_funding_amount(total_funding)
-        if funding_amt and funding_amt >= 500_000_000:
-            return "Elite Startup"
-
-        if any(s in stage for s in ("series b", "series c")):
-            if funding_amt and funding_amt >= 100_000_000:
-                return "Elite Startup"
-            return "Growth Stage"
-
-        if "series a" in stage:
-            emp = _parse_employee_count(employee_count)
-            if emp and emp > 100:
-                return "Growth Stage"
-            return "Early Startup"
-
-        if any(s in stage for s in ("seed", "pre-seed", "pre seed", "angel", "bootstrap")):
-            return "Early Startup"
+        tier = _tier_from_funding_stage(funding_stage, total_funding, employee_count)
+        if tier:
+            return tier
 
     # 3. Employee count fallback
     emp = _parse_employee_count(employee_count)

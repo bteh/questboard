@@ -967,14 +967,15 @@ def save_application(
     else:
         match_reasons_json = ""
 
-    from job_finder.company_taxonomy import classify_job_taxonomy, tags_json
+    from job_finder.company_signals import industry_signals
+    from job_finder.company_taxonomy import classify_job_taxonomy, parse_tags, tags_json
 
     resolved_industries, resolved_ecosystems = classify_job_taxonomy(
         company=company,
         source=source,
         title=job_title,
         description=description,
-        industry_tags=industry_tags,
+        industry_tags=[*parse_tags(industry_tags), *industry_signals(company, description)],
         ecosystem_tags=ecosystem_tags,
     )
     industry_tags_json = tags_json(resolved_industries)
@@ -1018,6 +1019,12 @@ def save_application(
                 if industry_tags_json != (getattr(existing, "industry_tags", "") or "[]"):
                     existing.industry_tags = industry_tags_json
                     changed = True
+                # Funding read from a fuller description fills an empty field
+                # without reshuffling the log; a stored value is never replaced.
+                if funding_stage and not existing.funding_stage:
+                    existing.funding_stage = funding_stage
+                if total_funding and not existing.total_funding:
+                    existing.total_funding = total_funding
                 if ecosystem_tags_json != (getattr(existing, "ecosystem_tags", "") or "[]"):
                     existing.ecosystem_tags = ecosystem_tags_json
                     changed = True
