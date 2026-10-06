@@ -1080,39 +1080,15 @@ def check_urls(
     records = query.limit(limit).all()
 
     # Classify ONE url. Only high-confidence evidence means the posting is
-    # gone: 404/410, a source-specific dead redirect, or explicit closed-page
-    # prose. Bot blocks and transport errors remain unknown.
-    # 403/405/429/5xx are usually bot-blocks or HEAD-not-supported, and
-    # timeouts/connection errors are transient, none of those should mark a
-    # live job dead (that would hide good postings). Those map to "unknown".
-    soft_dead_phrases = (
-        "job is no longer available",
-        "job posting is no longer available",
-        "position is no longer available",
-        "job you are looking for is no longer open",
-        "job posting has expired",
-        "this job has expired",
-        "position has been filled",
-        "opportunity is no longer available",
-        "no longer accepting applications",
-        "this job is closed",
-        "this position has been closed",
-        "this vacancy is no longer available",
-        "the job is no longer open",
-        "the job you requested was not found",
-    )
-    content_check_hosts = (
-        "ashbyhq.com",
-        "greenhouse.io",
-        "lever.co",
-        "myworkdayjobs.com",
-        "smartrecruiters.com",
-        # Web3.career deliberately keeps closed listing pages at HTTP 200 and
-        # renders an explicit "This job is closed" banner. A HEAD-only check
-        # therefore mistakes expired crypto roles for live opportunities.
-        "web3.career",
-        "workable.com",
-    )
+    # gone: 404/410, a source-specific dead redirect, or a closed-page
+    # template (job_finder.closed_pages). Bot blocks and transport errors
+    # remain unknown. 403/405/429/5xx are usually bot-blocks or
+    # HEAD-not-supported, and timeouts/connection errors are transient, none
+    # of those should mark a live job dead (that would hide good postings).
+    from job_finder.closed_pages import closed_page, needs_body
+    from job_finder.host_pacing import HostPacer
+
+    pacer = HostPacer()
     request_headers = {
         "User-Agent": (
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -1151,17 +1127,17 @@ def check_urls(
             return True
         return False
 
-    def _get_page_status(url: str) -> str:
+    def _get_page_status(url: str, inspect_content: bool) -> str:
         """Read only the beginning of a page, enough for closed-job banners."""
         try:
             headers = {**request_headers, "Range": "bytes=0-262143"}
-            with req.get(
+            with pacer.run(url, lambda: req.get(
                 url,
                 headers=headers,
                 timeout=8,
                 allow_redirects=True,
                 stream=True,
-            ) as response:
+            )) as response:
                 if response.status_code in (404, 410):
                     return "dead"
                 if response.status_code >= 400:
@@ -1177,8 +1153,11 @@ def check_urls(
                     size += len(chunk)
                     if size >= 262_144:
                         break
-                page = b"".join(chunks).decode("utf-8", "ignore").casefold()
-                if any(phrase in page for phrase in soft_dead_phrases):
+                page = b"".join(chunks).decode("utf-8", "ignore")
+                final_url = str(getattr(response, "url", "") or url)
+                if closed_page(
+                    url, final_url, response.status_code, page, inspect=inspect_content
+                ):
                     return "dead"
                 return "alive"
         except Exception:
@@ -1186,20 +1165,15 @@ def check_urls(
 
     def _classify_url(url: str, *, inspect_content: bool = False) -> str:
         try:
-            r = req.head(
-                url,
-                timeout=8,
-                allow_redirects=True,
-            )
+            r = pacer.run(url, lambda: req.head(url, timeout=8, allow_redirects=True))
             code = r.status_code
             if code in (404, 410):
                 return "dead"
             if code < 400 and _dead_redirect(url, r):
                 return "dead"
             if code < 400:
-                host = (urlparse(url).hostname or "").casefold()
-                if inspect_content or _host_matches(host, content_check_hosts):
-                    body_status = _get_page_status(url)
+                if inspect_content or needs_body(url):
+                    body_status = _get_page_status(url, inspect_content)
                     # A blocked GET does not refute a successful HEAD.
                     return "alive" if body_status == "unknown" else body_status
                 return "alive"
@@ -1223,12 +1197,15 @@ def check_urls(
             if cached is not None:
                 return cached
             try:
-                response = req.get(
+                api_url = (
                     "https://api.ashbyhq.com/posting-api/job-board/"
-                    f"{quote(slug, safe='')}?includeCompensation=false",
+                    f"{quote(slug, safe='')}?includeCompensation=false"
+                )
+                response = pacer.run(api_url, lambda: req.get(
+                    api_url,
                     headers={**request_headers, "Accept": "application/json"},
                     timeout=8,
-                )
+                ))
                 if response.status_code in (404, 410):
                     result = ("dead", frozenset())
                 elif response.status_code >= 400:
@@ -1279,12 +1256,15 @@ def check_urls(
             if cached is not None:
                 return cached
             try:
-                response = req.get(
+                api_url = (
                     "https://boards-api.greenhouse.io/v1/boards/"
-                    f"{quote(slug, safe='')}/jobs",
+                    f"{quote(slug, safe='')}/jobs"
+                )
+                response = pacer.run(api_url, lambda: req.get(
+                    api_url,
                     headers={**request_headers, "Accept": "application/json"},
                     timeout=8,
-                )
+                ))
                 if response.status_code in (404, 410):
                     result = ("dead", frozenset())
                 elif response.status_code >= 400:
@@ -1355,9 +1335,8 @@ def check_urls(
             try:
                 from job_finder.tools.scrapers.builtin import fetch_builtin_detail
 
-                direct_url = str(
-                    fetch_builtin_detail(url).get("direct_application_url") or ""
-                ).strip()
+                detail = pacer.run(url, lambda: fetch_builtin_detail(url))
+                direct_url = str(detail.get("direct_application_url") or "").strip()
             except Exception:
                 direct_url = ""
             if direct_url and direct_url != url:

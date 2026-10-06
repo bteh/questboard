@@ -25,11 +25,16 @@ class Settings(BaseSettings):
     scheduler_enabled: bool = True
     scheduler_tick_seconds: int = 900
     scheduler_initial_delay_seconds: int = 90
-    # Rolling dead-link re-verification: each tick HEAD-checks this many
-    # of the oldest-checked live rows (0 disables). Only definitive
-    # 404/410 marks a row dead; at 40 per 15-minute tick a ~2,000-row
-    # board re-proves every link roughly daily.
-    scheduler_reverify_batch: int = 40
+    # Rolling dead-link re-verification: each tick checks this many of the
+    # oldest-checked live rows (0 disables), never-checked rows first. Only a
+    # definitive 404/410 or a closed-page template marks a row dead. At 200
+    # per 15-minute tick the ~1,500 rows the soft_closed_links repair sends
+    # back are re-proved in under two hours (9.5 hours at the old 40), and a
+    # ~14,000-row board cycles in about 17 hours instead of 3.6 days. Requests
+    # to one host are paced a second apart (job_finder.host_pacing), so a
+    # 200-row tick of template hosts takes about 11 minutes; bursts drew 429s
+    # from LinkedIn on 79 of 87 rows.
+    scheduler_reverify_batch: int = 200
     # Hosted ops access: comma-separated emails allowed to read the
     # scraper health/runs/schedule endpoints. Local mode is always open
     # (it is your machine).

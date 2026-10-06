@@ -1061,6 +1061,22 @@ def run_startup_repairs(engine) -> None:
         logger.warning(
             "research-only repair failed; will retry next launch", exc_info=True
         )
+    try:
+        from job_finder.models.link_status_repair import (
+            LINK_STATUS_REPAIR_VERSION,
+            repair_link_status,
+        )
+
+        reset = repair_link_status(engine)
+        if reset:
+            logger.info(
+                "link status repair v%d: sent %d alive row(s) back for re-check",
+                LINK_STATUS_REPAIR_VERSION, reset,
+            )
+    except Exception:
+        logger.warning(
+            "link status repair failed; will retry next launch", exc_info=True
+        )
 
 
 def main(argv: list[str] | None = None) -> int:

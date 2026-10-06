@@ -17,6 +17,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+import importlib
 import os
 
 import pytest
@@ -35,6 +36,21 @@ def _isolated_data_dir(tmp_path, monkeypatch):
     monkeypatch.setenv("JOB_FINDER_DATA_DIR", str(tmp_path))
     yield
     # tmp_path is auto-cleaned by pytest; nothing further to do.
+
+
+@pytest.fixture(autouse=True)
+def _no_host_pacing_waits(monkeypatch):
+    """Per-host request spacing is wall-clock time; the suite never waits it out.
+
+    Pacing tests build their own HostPacer with an explicit spacing.
+    """
+    try:
+        pacing = importlib.import_module("job_finder.host_pacing")
+    except ModuleNotFoundError:
+        yield
+        return
+    monkeypatch.setattr(pacing, "HOST_SPACING_SECONDS", 0.0)
+    yield
 
 
 @pytest.fixture(autouse=True)

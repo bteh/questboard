@@ -31,12 +31,23 @@ most on a datacenter IP (hosting), where blocks come faster.
 ## Built now (PR: link re-verification)
 
 **0b. Dead links tombstone between expiry windows.** Each scheduler tick
-HEAD-checks a rolling batch of the oldest-checked live rows
-(`scheduler_reverify_batch`, default 40; 0 disables). Only a definitive
-404/410 marks a row dead: bot walls, 403/405/429, 5xx, and timeouts map
-to "unknown" so a live posting is never hidden by a hiccup. At 40 per
-15-minute tick a ~2,000-row board re-proves every link roughly daily.
-Expiry contracts catch delisting; this catches the posting that died
+checks a rolling batch of the oldest-checked live rows, never-checked rows
+first (`scheduler_reverify_batch`, default 200; 0 disables). A definitive
+404/410 marks a row dead, and so does a closed-job page that still answers
+200: the per-host templates in `src/job_finder/closed_pages.py` (BuiltIn
+"Sorry, this job was removed", LinkedIn's `expired_jd_redirect` hop or "No
+longer accepting applications" banner, Workable's `/oops` and
+`?not_found=true` redirects, Greenhouse, Lever, Getro boards). A template
+only counts on its own host. Bot walls, 403/405/429/999, 5xx, and timeouts
+map to "unknown" so a live posting is never hidden by a hiccup. Requests to
+one host go one at a time, a second apart (`src/job_finder/host_pacing.py`);
+the 16-wide pool stays parallel across hosts. Without that, a 200-row batch
+drew 429s from LinkedIn on 79 of 87 rows and each became "unknown"; paced,
+the same batch came back 0 unknown. At 200 per 15-minute tick a ~14,000-row
+board re-proves every link in about 17 hours.
+The `soft_closed_links` startup repair sends alive rows on template hosts
+back for re-check (Oct 6 2026: 6 of 8 BuiltIn rows stamped alive were
+dead). Expiry contracts catch delisting; this catches the posting that died
 mid-window.
 
 ## Built now (PR: the scheduler)

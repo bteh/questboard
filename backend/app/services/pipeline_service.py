@@ -742,8 +742,11 @@ def _execute_pipeline(
             try:
                 _send_event(run, "progress", "Checking which job postings are still active...")
                 from app.services.application_service import check_urls as _check_urls
-                # Cover this run's jobs (capped); parallelized inside check_urls.
-                _limit = min(max(len(jobs), 50), 200)
+                # A small slice only: rows just scraped are live on their own
+                # board, and check_urls now paces one request per host per
+                # second, so 200 rows could hold the run for minutes. The
+                # scheduler re-verifies the rest within hours.
+                _limit = min(max(len(jobs), 20), 60)
                 _with_db(lambda db: _check_urls(
                     db,
                     limit=_limit,
