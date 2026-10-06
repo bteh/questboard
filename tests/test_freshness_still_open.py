@@ -485,3 +485,38 @@ def test_mcp_search_work_payload_carries_the_basis_without_changing_shape(
         assert item["freshness"]["source_posted_at"]
     finally:
         generator.close()
+
+
+def test_an_explicit_posted_window_means_the_posted_date(tmp_path, monkeypatch) -> None:
+    """Oct 6 2026: the assistant's search_work(posted_within_days=7) came back
+    with 274 rows while the board's toolbar showed 26, because the still-open
+    evidence (listed, verified open) was satisfying an explicit posted window.
+    An explicit window is about the posted date; the saved window keeps the
+    still-open rule."""
+    from app.services import local_agent_service as las
+
+    db, generator = _make_db(tmp_path, monkeypatch)
+    try:
+        now = datetime.now(timezone.utc)
+        old_listed = _add_row(
+            db, title=NATERA_TITLE, company="Natera", url=NATERA_URL,
+            posted_days_ago=120, last_seen_at=now - timedelta(days=1),
+            url_status="alive", last_checked_at=now - timedelta(days=1),
+        )
+        fresh = _add_row(
+            db, title="Lead Data Engineer", company="Fresh Co",
+            url="https://fresh.example/1", posted_days_ago=3,
+        )
+
+        explicit = las._search_work_uncached(
+            db, browse_all=True, page_size=50, workspace_id="local", posted_within_days=7,
+        )
+        assert {row["opportunity_id"] for row in explicit["results"]} == {fresh.id}
+        assert explicit["freshness_filter_summary"]["known_stale_excluded"] == 1
+
+        saved = las._search_work_uncached(db, browse_all=True, page_size=50, workspace_id="local")
+        by_id = {row["opportunity_id"]: row for row in saved["results"]}
+        assert set(by_id) == {old_listed.id, fresh.id}
+        assert by_id[old_listed.id]["freshness_basis"] == "listed"
+    finally:
+        generator.close()

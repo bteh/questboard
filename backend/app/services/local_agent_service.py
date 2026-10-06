@@ -1629,6 +1629,10 @@ def _search_work_uncached(
             if effective_freshness_window is not None
             else None
         )
+        if posted_within_days is not None and basis not in (None, "posted"):
+            # An explicit posted window asks about the posted date; the
+            # still-open evidence only widens the saved default.
+            basis = None
         if basis is not None:
             freshness_bases[row.id] = basis
         else:
