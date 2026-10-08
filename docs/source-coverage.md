@@ -71,6 +71,7 @@ false actionability. Debate record:
 | perform | AuditionsFree, Casting Networks, Project Casting, Standing Room Only, r/castingcalls (2026-10-08 carve-out), Central Casting LA link card | stated when posted |
 | audience | 1iota, On Camera Audiences | never; seats are free tickets, not paid gigs |
 | odd | r/LAjobs (2026-10-08 carve-out), Qwick LA link card | stated when posted |
+| parttime | **Indeed part-time** (JobSpy, 2026-10-08) | hourly, only when Indeed states an amount |
 | flip | none, paused by curation verdict (was r/PKMNTCGDeals) | n/a |
 | deliver | none, by verdict (see below) | n/a |
 | lookafter | **Sittercity** (429 postmortem fixed), **Care.com**, **UrbanSitter** | poster-set hourly ranges only |
@@ -113,6 +114,42 @@ r/slavelabour, and r/PKMNTCGDeals stay in the tree as research tooling
 - **Flip cards mostly carry no pay on purpose.** Deal sources state a
   price (what you pay), never a profit. Rendering "not stated" on a
   drop lead is the truth of flipping, not a data gap.
+
+## Part-time shifts near home (2026-10-08)
+
+Owner ask: barista, boba, restaurant, retail, and event shifts near his
+place (Koreatown LA). The `parttime` kind gets its own tile beside
+Small jobs. Supply is `indeed-parttime`: the career path's JobSpy
+wrapper, Indeed only, `job_type=parttime`, 10 miles around the saved
+place, eight fixed terms (barista, cafe, boba, server, host, retail
+associate, cashier, event staff). Indeed drops the part-time filter
+whenever `hours_old` is sent, so the source sends none and keeps the
+last 14 days by `date_posted` itself. It drops full-time-only rows,
+titles that say full-time or name a salaried role (manager, supervisor,
+sous chef), and yearly pay. No saved place means no fetch.
+
+Live probe from a residential IP, "barista" near "Koreatown, Los
+Angeles, CA": 50 of 50 rows part-time (33 part-time, 17 part or full),
+32 with stated hourly pay. The whole eight-term sweep took 6s and kept
+100 rows (the per-source cap).
+
+Declined in the same pass, each fetched live 2026-10-08:
+
+- **Culinary Agents**: listings are in plain HTML and robots.txt allows
+  `/search/jobs`, but the agreement
+  (https://culinaryagents.com/agreement) says "You will not use any
+  robot, spider, scraper, or other automated means to access the
+  Platform for any purpose without our express written permission."
+- **Poached**: listings render by JS, `/api/v1/jobs` is 401, robots.txt
+  disallows ClaudeBot and GPTBot site-wide, and the terms
+  (https://poachedjobs.com/terms-of-use) ban "any robot or spider, to
+  gather, catalog, or in any way duplicate" the service. Its open
+  `/api/v1/feeds/indeed` XML is an employer feed built for Indeed, not a
+  licence to us.
+- **Snagajob**: Cloudflare 403 to plain clients, robots.txt disallows
+  `/api/` and `/job-search/`, and the terms
+  (https://legal.snagajob.com/#terms-of-use) ban spiders, robots,
+  scrapers, and crawlers, exempting only public search engines.
 
 ## Declined, with reasons (do not re-add without new facts)
 

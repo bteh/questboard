@@ -352,7 +352,7 @@ def test_refresh_endpoint_runs_and_returns_summary(api_client, monkeypatch):
     calls: dict = {}
 
     def fake_run(
-        verticals, *, query=None, lat=None, lon=None, radius_miles=None,
+        verticals, *, query=None, lat=None, lon=None, radius_miles=None, place=None,
         workspace_id=None, progress=None,
     ):
         calls["args"] = (list(verticals), query, lat, lon, radius_miles)
@@ -378,6 +378,28 @@ def test_refresh_endpoint_runs_and_returns_summary(api_client, monkeypatch):
     assert payload["deduped"] == 1
     assert payload["sources"]["1iota"]["found"] == 2
     assert calls["args"] == (["camera", "study"], "tv taping", 40.7, -74.0, 30)
+
+
+def test_refresh_endpoint_hands_the_place_to_near_home_sources(api_client, monkeypatch):
+    client, _jf_db = api_client
+    import job_finder.quests as quests
+
+    seen: list = []
+
+    def fake_run(verticals, *, place=None, **_kwargs):
+        seen.append(place)
+        return {"verticals": sorted(set(verticals)), "sources": {}}
+
+    monkeypatch.setattr(quests, "run_quest_search", fake_run)
+    resp = client.post(
+        "/api/v1/quests/refresh",
+        json={"verticals": ["parttime"], "place": "Koreatown, Los Angeles, CA"},
+    )
+    assert resp.status_code == 200, resp.text
+    # no saved place in a fresh workspace: nothing is invented
+    resp = client.post("/api/v1/quests/refresh", json={"verticals": ["parttime"]})
+    assert resp.status_code == 200, resp.text
+    assert seen == ["Koreatown, Los Angeles, CA", None]
 
 
 def test_local_refresh_writes_into_the_shared_pool(api_client, monkeypatch):

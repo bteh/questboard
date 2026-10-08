@@ -806,3 +806,17 @@ def test_invariant_9b_team_name_suffix_does_not_poison_the_lane():
         assert not _title_is_in_lane(still_conflicting, q), (
             f"{still_conflicting!r} is not a data-engineering role"
         )
+
+
+def test_koreatown_means_the_la_metro_near_only():
+    """Owner, Oct 2026: a seeker in Koreatown wants LA shifts, and Indeed
+    files a Koreatown cafe under "Los Angeles, CA". The neighborhood names
+    the metro; strict mode still drops remote and other metros."""
+    s = _fresh_session()
+    _add(s, job_title="ktown-cafe", location="Los Angeles, CA, US")
+    _add(s, job_title="pasadena", location="Pasadena, CA, US")
+    _add(s, job_title="sf", location="San Francisco, CA, US")
+    _add(s, job_title="remote", location="Remote", is_remote=True)
+    for typed in ("Koreatown", "Koreatown, Los Angeles, CA", "ktown", "K-Town LA"):
+        assert _place_matches(s, typed, strict=True) == {"ktown-cafe", "pasadena"}, typed
+    assert _place_matches(s, "Ktownsend", strict=True) == set()

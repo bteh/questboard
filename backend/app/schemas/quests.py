@@ -12,6 +12,7 @@ class QuestRefreshRequest(BaseModel):
     lat: float | None = Field(None, ge=-90, le=90)
     lon: float | None = Field(None, ge=-180, le=180)
     radius_miles: int | None = Field(None, ge=1, le=500)
+    place: str | None = Field(None, max_length=200)
 
 
 class QuestSourceCounts(BaseModel):

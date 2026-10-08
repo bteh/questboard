@@ -338,11 +338,66 @@
       ]
     },
     {
+      "id": "parttime",
+      "label": "Part-time",
+      "sub": "cafes, restaurants, retail, shifts",
+      "hue": "#8C5A2B",
+      "order": 15,
+      "legacy_verticals": [],
+      "facets": [
+        {
+          "id": "cafe",
+          "label": "cafe",
+          "terms": [
+            "barista",
+            "coffee",
+            "cafe",
+            "boba",
+            "milk tea",
+            "tea shop",
+            "tea house"
+          ]
+        },
+        {
+          "id": "restaurant",
+          "label": "restaurant",
+          "terms": [
+            "server",
+            "host",
+            "busser",
+            "line cook",
+            "dishwasher",
+            "restaurant",
+            "kitchen"
+          ]
+        },
+        {
+          "id": "retail",
+          "label": "retail",
+          "terms": [
+            "retail",
+            "cashier",
+            "sales associate",
+            "stock"
+          ]
+        },
+        {
+          "id": "events",
+          "label": "events",
+          "terms": [
+            "event staff",
+            "catering",
+            "banquet"
+          ]
+        }
+      ]
+    },
+    {
       "id": "work",
       "label": "Find work",
       "sub": "jobs, full-time, contract",
       "hue": "#3D4756",
-      "order": 15,
+      "order": 16,
       "legacy_verticals": [
         "career"
       ]

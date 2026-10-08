@@ -189,7 +189,7 @@ one still leaves results.
 sources (Remotive, Himalayas, We Work Remotely, HN Who's Hiring, RemoteOK, CryptoJobsList,
 Getro, Consider, Arbeitnow, The Muse, YC Work at a Startup, plus ATS scrapers for Greenhouse,
 Lever, Ashby, and Workday driven by user watchlist) and quest-kind sources (focus groups,
-casting, paid research, bank bonuses, sitting). **Reddit is research-only, with one
+casting, paid research, bank bonuses, sitting, part-time shifts via JobSpy Indeed near the saved place). **Reddit is research-only, with one
 carve-out** (curation verdict 2026-07-10; carve-out approved by the owner 2026-10-08):
 r/LAjobs and r/castingcalls publish to the board as "Reddit" cards. That allowlist is
 `BOARD_SUBREDDITS` in `_reddit.py`, every subreddit scraper takes `research_only` from it,

@@ -30,6 +30,10 @@ const COPY: Record<string, KindCopy> = {
     catchLine: 'tickets can be overbooked; arriving late can mean no seat even with a reservation',
   },
   odd: { bring: 'nothing, just show up', bringFree: true },
+  parttime: {
+    bring: 'your weekly availability; food jobs in CA want a food handler card within 30 days',
+    catchLine: 'hours can swing week to week, so ask how many shifts are typical before you take it',
+  },
   deliver: {
     bring: 'a 4-door car, license, insurance, 21+, a background check',
     catchLine: 'personal auto policies often exclude delivery, so check yours first',

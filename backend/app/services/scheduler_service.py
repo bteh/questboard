@@ -121,6 +121,26 @@ class BoardScheduler:
             except StopIteration:
                 pass
 
+    def _saved_place(self) -> str:
+        """The local user's saved place for near-home sources. The hosted
+        pool is shared, so no one visitor's place may steer it."""
+        if get_settings().hosted_mode:
+            return ""
+        from app.models.database import get_db
+        from app.services.local_agent_service import saved_place
+
+        db_gen = get_db()
+        try:
+            return saved_place(next(db_gen))
+        except Exception:
+            logger.exception("board scheduler: saved place lookup failed")
+            return ""
+        finally:
+            try:
+                next(db_gen)
+            except StopIteration:
+                pass
+
     async def tick(self) -> int:
         """Sweep every due source. Returns how many sources were swept."""
         if self._sweeping.locked():
@@ -148,10 +168,12 @@ class BoardScheduler:
 
             from job_finder.quests import run_quest_search
 
+            place = await asyncio.to_thread(self._saved_place)
             summary = await asyncio.to_thread(
                 lambda: run_quest_search(
                     verticals=verticals,
                     only_sources=names,
+                    place=place or None,
                     workspace_id=None,
                 )
             )

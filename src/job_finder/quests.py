@@ -100,6 +100,7 @@ def run_quest_search(
     lat: float | None = None,
     lon: float | None = None,
     radius_miles: int | None = None,
+    place: str | None = None,
     workspace_id: str | None = None,
     progress: Callable[[str], None] | None = None,
     only_sources: list[str] | None = None,
@@ -111,6 +112,9 @@ def run_quest_search(
     run_scrapers, then saves each emitted row with the quest kwargs. Rows
     whose event_start is already in the past are skipped as stale. Returns a
     summary with totals and per-source counts.
+
+    ``place`` is the user's saved place label; only sources that declare a
+    ``place`` parameter (local shift work) receive it.
 
     ``only_sources`` narrows the selection further (the scheduler sweeps
     exactly the sources that are due, not a vertical's whole roster); it
@@ -145,7 +149,13 @@ def run_quest_search(
 
     snapshot_database()
 
-    geo = {"query": query, "lat": lat, "lon": lon, "radius_miles": radius_miles}
+    geo = {
+        "query": query,
+        "lat": lat,
+        "lon": lon,
+        "radius_miles": radius_miles,
+        "place": (place or "").strip() or None,
+    }
     scraper_kwargs: dict[str, dict[str, Any]] = {}
     for name in names:
         extra = _accepted_geo_kwargs(registry[name].search_fn, geo)

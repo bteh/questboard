@@ -70,6 +70,10 @@ const TYPICAL_EFFORT: Record<string, TypicalEffort> = {
     note: 'Complete an eligibility screen before any consent or appointment steps.',
   },
   odd: { level: 'quick', note: 'Send a short response and confirm the task, place, and timing.' },
+  parttime: {
+    level: 'quick',
+    note: 'Apply on the posting with your availability; expect a short interview or a trial shift.',
+  },
   deliver: {
     level: 'involved',
     note: 'Expect identity, license, insurance, vehicle, and background-check setup.',

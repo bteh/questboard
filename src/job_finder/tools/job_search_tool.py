@@ -234,7 +234,7 @@ def search_jobs(
     search_term: str,
     location: str = "United States",
     results_wanted: int = 25,
-    hours_old: int = 336,
+    hours_old: int | None = 336,
     is_remote: bool | None = None,
     country: str = "USA",
     linkedin_fetch_description: bool = True,
@@ -242,6 +242,7 @@ def search_jobs(
     distance: int | None = None,
     scrape_timeout: float | None = None,
     telemetry: dict[str, Any] | None = None,
+    job_type: str | None = None,
 ) -> list[dict]:
     """Search multiple job boards via JobSpy and return normalised dicts.
 
@@ -258,6 +259,12 @@ def search_jobs(
     boards : list[str] or None
         JobSpy site names to scrape.  Defaults to Indeed, Glassdoor,
         ZipRecruiter, and Google. LinkedIn is opt-in via ``job_boards``.
+    job_type : str or None
+        JobSpy's employment filter (fulltime, parttime, internship,
+        contract). Each row carries the board's own ``job_type`` back.
+        Indeed drops job_type whenever hours_old is set, so a caller that
+        needs the type filter passes ``hours_old=None`` and windows by
+        ``date_posted`` itself.
     """
     started = time.monotonic()
 
@@ -318,7 +325,6 @@ def search_jobs(
             google_search_term=google_search_term,
             location=location,
             results_wanted=results_wanted,
-            hours_old=hours_old,
             country_indeed=country,
             linkedin_fetch_description=linkedin_fetch_description,
         )
@@ -328,6 +334,10 @@ def search_jobs(
             scrape_kwargs["is_remote"] = bool(is_remote)
         if distance is not None:
             scrape_kwargs["distance"] = distance
+        if hours_old is not None:
+            scrape_kwargs["hours_old"] = hours_old
+        if job_type:
+            scrape_kwargs["job_type"] = job_type
 
         # Bound the scrape with a wall-clock deadline when requested. JobSpy
         # has no fail-fast knob, so a slow/hung board (google CAPTCHA, Indeed
@@ -413,6 +423,7 @@ def search_jobs(
                 "company_size": _safe_str(
                     row.get("company_num_employees", "")
                 ),
+                "job_type": _safe_str(row.get("job_type", "")),
             }
             # Capture JobSpy's pay interval (yearly/monthly/weekly/daily/hourly)
             # so salary scoring + the salary floor filter can annualize instead

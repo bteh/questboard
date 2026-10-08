@@ -44,12 +44,24 @@ _METRO_CITIES: dict[str, tuple[str, ...]] = {
 }
 
 
+# Neighborhoods a seeker types that job boards file under the metro's core
+# city: Indeed lists a Koreatown cafe as "Los Angeles, CA" (owner, Oct 2026).
+_METRO_NEIGHBORHOODS: dict[str, str] = {
+    "koreatown": "los angeles",
+    "ktown": "los angeles",
+    "k-town": "los angeles",
+}
+
+
 def _metro_cities_for(location: str) -> tuple[str, ...] | None:
     """The metro's city list if `location` names a known metro, else None."""
     low = " ".join((location or "").lower().split())
     for metro, cities in _METRO_CITIES.items():
         if metro in low:
             return cities
+    for hood, metro in _METRO_NEIGHBORHOODS.items():
+        if re.search(rf"\b{re.escape(hood)}\b", low):
+            return _METRO_CITIES[metro]
     return None
 
 _ALLOWED_SORT_BY = frozenset({

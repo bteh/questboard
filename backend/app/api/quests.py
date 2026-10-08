@@ -57,6 +57,11 @@ def refresh_quests(
         db=db if workspace else None,
     )
 
+    from app.services.local_agent_service import saved_place
+
+    place = (req.place or "").strip() or saved_place(
+        db, workspace.workspace.id if workspace else None
+    )
     logger.info("Quest refresh: verticals=%s query=%r", req.verticals, req.query)
     summary = run_quest_search(
         req.verticals,
@@ -64,6 +69,7 @@ def refresh_quests(
         lat=req.lat,
         lon=req.lon,
         radius_miles=req.radius_miles,
+        place=place or None,
         # local rows join the one pool
         workspace_id=workspace_scope_id(workspace),
     )

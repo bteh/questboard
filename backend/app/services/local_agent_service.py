@@ -748,6 +748,12 @@ def _saved_search_defaults(
     )
 
 
+def saved_place(db: Session, workspace_id: str | None = None) -> str:
+    """The local user's saved place label ('' when none), for sources that
+    search near home."""
+    return _saved_search_defaults(db, workspace_id)[1]
+
+
 def _clean_excerpt(text: str | None, limit: int = _EXCERPT_CHARS) -> str:
     """Serve a clean excerpt: strip residual HTML/entities (some stored
     descriptions predate the scraper-side fix) and truncate on a word
