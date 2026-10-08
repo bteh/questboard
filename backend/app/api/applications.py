@@ -10,6 +10,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from job_finder.entry_level import is_entry_level
 from job_finder.job_trust import is_direct_source
 from job_finder.company_taxonomy import parse_tags
 from app.models.database import get_db
@@ -49,22 +50,38 @@ def _parse_verticals(vertical: str | None) -> list[str] | None:
     return [v.strip() for v in vertical.split(",") if v.strip()]
 
 
+# "entry" overlaps the ic bucket: an entry row is also an ic row, so its
+# count is extra and the level counts no longer have to sum to the lane.
+ENTRY_FACET = "entry"
+LEVEL_FILTERS: tuple[str, ...] = local_agent_service.LEVEL_FACETS + (ENTRY_FACET,)
+
+
 def _level_facet(title: str | None) -> str:
     return local_agent_service.title_level(title) or "ic"
 
 
+def _is_entry(record) -> bool:
+    return is_entry_level(record.job_title, getattr(record, "description", None))
+
+
 def _level_counts(records: list) -> dict[str, int]:
     found = [_level_facet(record.job_title) for record in records]
-    return {
+    counts = {
         name: count
         for name in local_agent_service.LEVEL_FACETS
         if (count := found.count(name))
     }
+    entry = sum(1 for record in records if _is_entry(record))
+    if entry:
+        counts[ENTRY_FACET] = entry
+    return counts
 
 
 def _narrow_by_level(records: list, level: str | None) -> list:
     if not level:
         return records
+    if level == ENTRY_FACET:
+        return [record for record in records if _is_entry(record)]
     return [record for record in records if _level_facet(record.job_title) == level]
 
 
@@ -492,7 +509,7 @@ def list_profile_work(
     ),
     level: str | None = Query(
         None,
-        description="Narrow to one level: ic | lead | manager | director | vp | chief",
+        description="Narrow to one level: ic | lead | manager | director | vp | chief | entry",
     ),
     sort_by: str = "date_found",
     page: int = Query(1, ge=1),
@@ -518,10 +535,10 @@ def list_profile_work(
     )
     if sort_by not in {"date_found", "rank"}:
         raise HTTPException(status_code=400, detail="sort_by must be date_found or rank")
-    if level is not None and level not in local_agent_service.LEVEL_FACETS:
+    if level is not None and level not in LEVEL_FILTERS:
         raise HTTPException(
             status_code=400,
-            detail="level must be one of " + ", ".join(local_agent_service.LEVEL_FACETS),
+            detail="level must be one of " + ", ".join(LEVEL_FILTERS),
         )
     workspace_id = workspace.workspace.id if workspace is not None else None
     profile = local_agent_service.career_preferences(db, workspace_id)

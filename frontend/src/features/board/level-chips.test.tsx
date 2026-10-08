@@ -33,6 +33,15 @@ describe('LevelChips', () => {
     expect(onSelect).toHaveBeenCalledWith('manager');
   });
 
+  it('shows Entry level right after individual contributor and selects it', () => {
+    const onSelect = vi.fn();
+    render(<LevelChips counts={{ manager: 3, entry: 12, ic: 40 }} selected={null} onSelect={onSelect} />);
+    const labels = screen.getAllByRole('button').map((b) => b.textContent?.replace(/\s+/g, ' ').trim());
+    expect(labels).toEqual(['Individual contributor 40', 'Entry level 12', 'Manager 3']);
+    fireEvent.click(screen.getByRole('button', { name: /entry level 12/i }));
+    expect(onSelect).toHaveBeenCalledWith('entry');
+  });
+
   it('labels director-level, VP and chief plainly', () => {
     render(<LevelChips counts={{ director: 9, vp: 2, chief: 1 }} selected={null} onSelect={() => {}} />);
     expect(screen.getByRole('button', { name: /director 9/i })).toBeTruthy();

@@ -24,6 +24,7 @@ export interface LocationSuggestion {
 }
 
 export const LEVEL_OPTIONS = [
+  { value: 'entry', label: 'Entry level' },
   { value: 'intern', label: 'Intern' },
   { value: 'junior', label: 'Junior' },
   { value: 'associate', label: 'Associate' },

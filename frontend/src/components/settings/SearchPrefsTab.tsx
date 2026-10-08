@@ -14,6 +14,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSaveWorkspacePreferences } from '@/hooks/use-workspace';
 import { SuggestRolesPanel } from './suggest-roles-panel';
+import { StaffingToggle } from '@/features/settings/staffing-toggle';
+import { StarterRoleButtons } from '@/features/settings/starter-role-buttons';
 import { buildDefaultWorkspacePreferences, LEVEL_OPTIONS } from '@/lib/profile-preferences';
 import { cn } from '@/lib/utils';
 import type { OnboardingState, WorkspacePreferences } from '@/types/workspace';
@@ -81,6 +83,10 @@ export function SearchPrefsTab({ onboarding, navigate }: SearchPrefsTabProps) {
             value={prefsForm.roles}
             onChange={(roles) => setPrefsForm((prev) => ({ ...prev, roles }))}
             placeholder="The title you want next, then press Enter"
+          />
+          <StarterRoleButtons
+            roles={prefsForm.roles}
+            onChange={(roles) => setPrefsForm((prev) => ({ ...prev, roles }))}
           />
           <SuggestRolesPanel
             resumeExists={onboarding?.needs_resume === false}
@@ -381,20 +387,10 @@ export function SearchPrefsTab({ onboarding, navigate }: SearchPrefsTabProps) {
                     <p className="mt-0.5 text-xs text-text-muted">Useful for startup roles with stock options.</p>
                   </div>
                 </div>
-                <div className="flex items-start gap-3">
-                  <Checkbox
-                    id="exclude-staffing"
-                    checked={prefsForm.exclude_staffing_agencies}
-                    onCheckedChange={(checked) => setPrefsForm((prev) => ({
-                      ...prev,
-                      exclude_staffing_agencies: !!checked,
-                    }))}
-                  />
-                  <div>
-                    <Label htmlFor="exclude-staffing">Exclude staffing agencies</Label>
-                    <p className="mt-0.5 text-xs text-text-muted">Filter out listings from known recruitment firms.</p>
-                  </div>
-                </div>
+                <StaffingToggle
+                  excludeStaffingAgencies={prefsForm.exclude_staffing_agencies}
+                  onChange={(exclude_staffing_agencies) => setPrefsForm((prev) => ({ ...prev, exclude_staffing_agencies }))}
+                />
               </div>
             </div>
           )}

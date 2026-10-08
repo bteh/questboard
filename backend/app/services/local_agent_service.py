@@ -1594,7 +1594,7 @@ def _search_work_uncached(
             seniority_bound_excluded += 1
             continue
         if not _filter_jobs_by_level(
-            [filter_job],
+            [{**filter_job, "description": row.description or ""}],
             career_baseline,
             filters=filter_settings,
             target_roles=terms,
