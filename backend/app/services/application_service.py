@@ -10,87 +10,29 @@ from sqlalchemy.orm import Session
 # The mandatory vertical scope. Every list-level read of applications goes
 # through it so quest rows never leak into career surfaces by omission.
 from job_finder.models.database import APPLICATION_VERTICALS, scoped_applications
+from job_finder.place_areas import WORD_EXCLUDES, Area, area_for
 from job_finder.staffing import STAFFING_AGENCY_NAMES
 from app.models.application import ApplicationRecord
 
-# A place filter keyed to a city name alone drops every metro-sibling city:
-# "Los Angeles" would hide Beverly Hills, Santa Monica, Culver City, etc.,
-# which is not what a job seeker means by their city. Expand a known metro to
-# its cities so on-site work anywhere in the metro still surfaces.
-_METRO_CITIES: dict[str, tuple[str, ...]] = {
-    "los angeles": (
-        "los angeles", "beverly hills", "santa monica", "culver city", "pasadena",
-        "burbank", "glendale", "long beach", "torrance", "el segundo", "marina del rey",
-        "west hollywood", "hollywood", "inglewood", "hawthorne", "manhattan beach",
-        "playa vista", "venice", "westwood", "century city", "sherman oaks",
-        "studio city", "north hollywood", "van nuys", "woodland hills", "el monte",
-        "alhambra", "monterey park", "redondo beach", "santa clarita", "universal city",
-        "south gate", "san gabriel", "pico rivera", "huntington park", "east los angeles",
-        "echo park", "los feliz", "mid-wilshire", "mid wilshire", "boyle heights",
-    ),
-    "san francisco": (
-        "san francisco", "oakland", "berkeley", "san mateo", "palo alto", "mountain view",
-        "menlo park", "redwood city", "sunnyvale", "santa clara", "san jose", "cupertino",
-        "emeryville", "south san francisco", "foster city", "burlingame",
-    ),
-    "new york": (
-        "new york", "brooklyn", "manhattan", "queens", "jersey city", "hoboken",
-        "long island city", "newark",
-    ),
-    "seattle": ("seattle", "bellevue", "redmond", "kirkland", "tacoma"),
-    "boston": ("boston", "cambridge", "somerville", "waltham", "burlington"),
-    "austin": ("austin", "round rock"),
-    "chicago": ("chicago", "evanston"),
-    "denver": ("denver", "boulder"),
-    "san diego": ("san diego", "la jolla", "carlsbad"),
-}
 
-
-# Neighborhoods a seeker types that job boards file under the metro's core
-# city: Indeed lists a Koreatown cafe as "Los Angeles, CA" (owner, Oct 2026).
-_METRO_NEIGHBORHOODS: dict[str, str] = {
-    "koreatown": "los angeles",
-    "ktown": "los angeles",
-    "k-town": "los angeles",
-}
-
-
-# Metro places whose bare name is also part of another place or word: Bell
-# sits inside Bellflower, Bellevue, and Campbell; Commerce, Vernon, Maywood,
-# Downey, Montebello, Highland Park, Eagle Rock, Silver Lake, and Koreatown
-# all exist in other states. These match only as a whole word on a row that
-# also says California.
-_METRO_WORD_CITIES: dict[str, tuple[str, ...]] = {
-    "los angeles": (
-        "bell", "vernon", "commerce", "maywood", "downey", "montebello",
-        "highland park", "eagle rock", "silver lake", "koreatown",
-    ),
-}
-_METRO_WORD_REGION: dict[str, tuple[str, ...]] = {
-    "los angeles": ("ca", "california"),
-}
-
-
-def _metro_for(location: str) -> str | None:
-    low = " ".join((location or "").lower().split())
-    for metro in _METRO_CITIES:
-        if metro in low:
-            return metro
-    for hood, metro in _METRO_NEIGHBORHOODS.items():
-        if re.search(rf"\b{re.escape(hood)}\b", low):
-            return metro
-    return None
-
-
-def _metro_place_match(model, metro: str):
-    """SQL clause: the row's location names one of the metro's places."""
-    clauses = [model.location.ilike(f"%{c}%") for c in _METRO_CITIES[metro]]
-    words = _METRO_WORD_CITIES.get(metro, ())
-    if words:
+def _area_place_match(model, area: Area):
+    """SQL twin of job_finder.place_areas.location_in_area."""
+    clauses = [model.location.ilike(f"%{c}%") for c in area.cities]
+    if area.word_cities:
         padded = _word_padded_location(model)
-        in_region = or_(*[padded.ilike(f"% {r} %") for r in _METRO_WORD_REGION[metro]])
-        clauses.append(and_(or_(*[padded.ilike(f"% {w} %") for w in words]), in_region))
+        words = []
+        for word in area.word_cities:
+            hit = padded.ilike(f"% {word} %")
+            excludes = WORD_EXCLUDES.get(word, ())
+            if excludes:
+                hit = and_(hit, *(~padded.ilike(f"% {ex} %") for ex in excludes))
+            words.append(hit)
+        word_match = or_(*words)
+        if area.region:
+            word_match = and_(word_match, or_(*[padded.ilike(f"% {r} %") for r in area.region]))
+        clauses.append(word_match)
     return or_(*clauses)
+
 
 _ALLOWED_SORT_BY = frozenset({
     "overall_score", "date_found", "company", "job_title", "salary_min", "salary_max",
@@ -418,15 +360,16 @@ def place_filter(model, location: str | None, location_strict: bool = False):
         return None
     from job_finder.us_states import STATE_TO_ABBR, state_aliases
 
-    metro = _metro_for(location)
+    area = area_for(location)
     aliases = state_aliases(location)
     # A US city or state means US-nationwide postings ("United States" with no
     # city) are reachable for this seeker.
-    seeker_is_us = bool(metro or aliases) or _looks_like_us_place(location)
-    if metro:
-        # "Los Angeles" also finds Beverly Hills / Santa Monica / etc. — the
-        # seeker means the metro, not only rows that name the core city.
-        place_match = _metro_place_match(model, metro)
+    seeker_is_us = bool(area or aliases) or _looks_like_us_place(location)
+    if area:
+        # "Los Angeles" also finds Beverly Hills / Santa Monica, and
+        # "San Gabriel Valley (626)" finds Arcadia / El Monte: the seeker
+        # means the area, not only rows that name it (job_finder.place_areas).
+        place_match = _area_place_match(model, area)
     elif aliases:
         full_name, abbr = aliases
         token_match = model.state_codes.like(f"%,{abbr},%")

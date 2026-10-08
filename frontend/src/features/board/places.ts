@@ -69,7 +69,36 @@ const CITIES: PlaceOption[] = [
   aliases: aliases as string[] | undefined,
 }));
 
-export const PLACE_OPTIONS: PlaceOption[] = [...CITIES, ...STATES];
+/* Areas expand to their cities on the backend (job_finder.place_areas is
+   the source of truth; tests/test_place_areas.py pins this list to it).
+   Their cities pass "City, CA" so the backend's whole-word + CA guard
+   keeps Orange, NJ and Walnut Creek out. */
+const AREAS: PlaceOption[] = [
+  {
+    label: 'San Gabriel Valley (626)',
+    value: 'San Gabriel Valley (626)',
+    sub: 'area',
+    aliases: ['626', 'SGV', 'San Gabriel Valley'],
+  },
+  {
+    label: 'North Orange County',
+    value: 'North Orange County',
+    sub: 'area',
+    aliases: ['North OC', 'Fullerton area'],
+  },
+];
+
+const AREA_CITIES: PlaceOption[] = [
+  'Arcadia', 'Alhambra', 'Monterey Park', 'El Monte', 'South El Monte', 'San Gabriel',
+  'Rosemead', 'Temple City', 'San Marino', 'South Pasadena', 'Pasadena', 'Monrovia',
+  'Duarte', 'Azusa', 'Covina', 'West Covina', 'Baldwin Park', 'Irwindale',
+  'City of Industry', 'Rowland Heights', 'Hacienda Heights', 'Walnut', 'Diamond Bar',
+  'La Puente', 'Glendora', 'Sierra Madre', 'Altadena',
+  'Fullerton', 'Anaheim', 'Brea', 'Buena Park', 'La Habra', 'Placentia', 'Yorba Linda',
+  'Orange', 'Cypress', 'La Palma', 'Garden Grove', 'Stanton',
+].map((city) => ({ label: `${city}, CA`, value: `${city}, CA` }));
+
+export const PLACE_OPTIONS: PlaceOption[] = [...AREAS, ...CITIES, ...AREA_CITIES, ...STATES];
 
 /** Best matches for a query: prefix hits first, then contained, capped. */
 export function filterPlaces(query: string, limit = 6): PlaceOption[] {

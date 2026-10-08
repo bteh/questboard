@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from job_finder.place_areas import COMMUTE_METROS, location_in_area, named_area_for
+
 # =========================================================================
 # Known-company lists (lowercase, normalized)
 # =========================================================================
@@ -295,29 +297,7 @@ def classify_company(
 # Metro area mapping (cities that belong to the same metro / commute zone)
 # =========================================================================
 
-METRO_AREAS: dict[str, set[str]] = {
-    "Los Angeles": {"los angeles", "santa monica", "culver city", "burbank", "pasadena", "glendale", "long beach", "torrance", "el segundo", "playa vista", "marina del rey", "venice", "west hollywood", "beverly hills", "inglewood", "hawthorne", "manhattan beach", "hermosa beach", "redondo beach", "woodland hills", "encino", "sherman oaks"},
-    "Orange County": {"irvine", "costa mesa", "anaheim", "santa ana", "huntington beach", "newport beach"},
-    "San Francisco": {"san francisco", "san jose", "oakland", "palo alto", "mountain view", "sunnyvale", "santa clara", "cupertino", "menlo park", "redwood city", "san mateo", "fremont", "berkeley", "emeryville", "south san francisco", "foster city", "milpitas", "campbell", "los gatos", "saratoga"},
-    "New York": {"new york", "brooklyn", "manhattan", "queens", "bronx", "staten island", "jersey city", "hoboken", "newark", "white plains", "stamford", "yonkers"},
-    "Seattle": {"seattle", "bellevue", "redmond", "kirkland", "tacoma", "bothell", "renton", "kent", "everett"},
-    "Boston": {"boston", "cambridge", "somerville", "quincy", "brookline", "waltham", "newton", "lexington", "burlington"},
-    "Austin": {"austin", "round rock", "cedar park", "pflugerville", "georgetown", "san marcos", "kyle"},
-    "Chicago": {"chicago", "evanston", "schaumburg", "naperville", "arlington heights", "skokie", "oak brook"},
-    "Denver": {"denver", "boulder", "aurora", "lakewood", "littleton", "broomfield", "westminster", "englewood"},
-    "San Diego": {"san diego", "la jolla", "chula vista", "carlsbad", "encinitas", "oceanside"},
-    "Washington": {"washington", "arlington", "alexandria", "bethesda", "silver spring", "tysons", "reston", "mclean", "fairfax"},
-    "Miami": {"miami", "fort lauderdale", "hollywood", "coral gables", "boca raton", "doral", "aventura"},
-    "Atlanta": {"atlanta", "decatur", "marietta", "alpharetta", "sandy springs", "roswell", "dunwoody"},
-    "Dallas": {"dallas", "fort worth", "plano", "frisco", "irving", "arlington", "richardson", "addison"},
-    "Portland": {"portland", "beaverton", "hillsboro", "lake oswego", "tigard"},
-    "Minneapolis": {"minneapolis", "st paul", "saint paul", "bloomington", "eden prairie", "plymouth"},
-    "Pittsburgh": {"pittsburgh", "carnegie mellon", "oakland"},
-    "Detroit": {"detroit", "ann arbor", "dearborn", "troy", "southfield"},
-    "Philadelphia": {"philadelphia", "king of prussia", "conshohocken", "cherry hill", "camden"},
-    "Raleigh": {"raleigh", "durham", "chapel hill", "cary", "morrisville", "research triangle"},
-    "Salt Lake City": {"salt lake city", "provo", "sandy", "draper", "lehi", "orem"},
-}
+METRO_AREAS: dict[str, set[str]] = COMMUTE_METROS
 
 
 def _find_metro(city: str) -> str | None:
@@ -998,6 +978,25 @@ def _seeker_is_us(
     return False
 
 
+def _matches_named_area(
+    job_location: str,
+    preferred_locations: list[str] | None,
+    preferred_places: list[dict[str, Any]] | None,
+) -> bool:
+    """A saved area ("San Gabriel Valley (626)") accepts any of its cities.
+    Its label parses as no city or state, so the rules below can't see it."""
+    labels = list(preferred_locations or [])
+    labels += [
+        str(place.get("label", "") if isinstance(place, dict) else place or "")
+        for place in (preferred_places or [])
+    ]
+    for label in labels:
+        area = named_area_for(label)
+        if area and location_in_area(job_location, area):
+            return True
+    return False
+
+
 def location_matches_preferences(
     job_location: str,
     is_remote: bool,
@@ -1062,6 +1061,9 @@ def location_matches_preferences(
     if nationwide_ok and _is_nationwide_us(job_location) and _seeker_is_us(
         preferred_countries, preferred_states, preferred_cities, preferred_places
     ):
+        return True
+
+    if _matches_named_area(job_location, preferred_locations, preferred_places):
         return True
 
     if preferred_places:

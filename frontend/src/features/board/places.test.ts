@@ -27,6 +27,24 @@ describe('the board place suggestions', () => {
     expect(labels).toContain('New York, NY');
   });
 
+  it('offers the San Gabriel Valley as an area by its 626 and SGV aliases', () => {
+    for (const q of ['626', 'sgv', 'san gabriel valley']) {
+      const hit = filterPlaces(q).find((o) => o.value === 'San Gabriel Valley (626)');
+      expect(hit?.sub).toBe('area');
+    }
+  });
+
+  it('offers North Orange County from "north oc" and "fullerton"', () => {
+    expect(filterPlaces('north oc').map((o) => o.value)).toContain('North Orange County');
+    expect(filterPlaces('fullerton').map((o) => o.value)).toContain('North Orange County');
+  });
+
+  it('suggests a single area city with CA so the backend guard applies', () => {
+    expect(filterPlaces('arcad').map((o) => o.value)).toContain('Arcadia, CA');
+    expect(filterPlaces('fullerton').map((o) => o.value)).toContain('Fullerton, CA');
+    expect(filterPlaces('orange').map((o) => o.value)).toContain('Orange, CA');
+  });
+
   it('caps the list', () => {
     expect(filterPlaces('a', 4).length).toBeLessThanOrEqual(4);
   });

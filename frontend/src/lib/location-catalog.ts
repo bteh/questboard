@@ -71,6 +71,10 @@ const REGIONS: LocationOption[] = [
   { label: 'California, United States', kind: 'region', country: 'United States', aliases: ['California', 'CA'] },
   { label: 'New York, United States', kind: 'region', country: 'United States', aliases: ['New York State', 'NY'] },
   { label: 'Texas, United States', kind: 'region', country: 'United States', aliases: ['Texas', 'TX'] },
+  // Areas from job_finder.place_areas. No region field: it would widen the
+  // saved place to all of California in the search's location gate.
+  { label: 'San Gabriel Valley (626)', kind: 'region', country: 'United States', country_code: 'US', aliases: ['626', 'SGV', 'San Gabriel Valley'] },
+  { label: 'North Orange County', kind: 'region', country: 'United States', country_code: 'US', aliases: ['North OC', 'Fullerton area'] },
   { label: 'Ontario, Canada', kind: 'region', country: 'Canada', aliases: ['Ontario'] },
   { label: 'British Columbia, Canada', kind: 'region', country: 'Canada', aliases: ['British Columbia', 'BC'] },
   { label: 'Quebec, Canada', kind: 'region', country: 'Canada', aliases: ['Quebec'] },
