@@ -38,7 +38,8 @@ class ScraperMeta:
     # visible in the registry (so /scrapers/sources and internal tools can
     # use it) but no selection path may run it in a sweep or refresh:
     # reddit tells us WHERE to crawl, it is never itself the content
-    # (curation verdict, docs/source-coverage.md).
+    # (curation verdict, docs/source-coverage.md), except the subs in
+    # _reddit.BOARD_SUBREDDITS (owner carve-out 2026-10-08).
     research_only: bool = False
     # Refresh cadence, declared by each source about ITSELF (like the
     # expiry contract): how many hours between automatic sweeps. The

@@ -22,6 +22,9 @@ Live-verified API quirks (see reddit_forhire.py for the originals):
 from __future__ import annotations
 
 import re
+from datetime import datetime, timedelta, timezone
+
+from job_finder.tools.scrapers._utils import _parse_posted_date
 
 ARCTIC_API_URL = "https://arctic-shift.photon-reddit.com/api/posts/search"
 ARCTIC_FIELDS = "author,created_utc,link_flair_text,selftext,title,url"
@@ -29,11 +32,94 @@ THREAD_PREFIX = "https://www.reddit.com/r/"
 
 REMOVED_BODIES = frozenset({"[removed]", "[deleted]"})
 
+# The one Reddit carve-out. The 2026-07-10 curation verdict made every
+# subreddit research-only; on 2026-10-08 the owner (in Los Angeles)
+# approved exactly these two as board content. Every subreddit scraper
+# derives research_only from this set, so a sub not listed here can never
+# publish. Lowercase names.
+BOARD_SUBREDDITS = frozenset({"lajobs", "castingcalls"})
+
+
+def research_only_for(subreddit: str) -> bool:
+    return subreddit.lower() not in BOARD_SUBREDDITS
+
+
+# Board subs have no mod flairs to gate on, so these are the house rules
+# that apply to their rows: adult work, known scam shapes (car decals,
+# account rentals), and pay-in-kind.
+HOUSE_RULES_RE = re.compile(
+    r"fetish|onlyfans|fansly|\bnsfw\b|\bnudes?\b|\bnudity\b|boudoir|lingerie"
+    r"|sugar ?(?:daddy|baby)|content pics|big boob|large breast|no clothes"
+    r"|foot (?:model|pic|jewelry)|feet pic|\bescort|\bdecal\b|car wrap|vehicle wrap"
+    r"|account (?:task|rental)|linkedin account|gift ?cards?",
+    re.IGNORECASE,
+)
+
+UNPAID_RE = re.compile(
+    r"\bunpaid\b|\bnon[- ]?paid\b|\bno pay\b|\bnot paid\b|\bvolunteer|\bfree gig\b"
+    r"|\btfp\b|no[- ]budget|\bfor credit\b|\bpassion project\b|\bfandub\b",
+    re.IGNORECASE,
+)
+
+LA_LABEL = "Los Angeles, CA"
+
+# Order matters only on a tie at the same text position: LA names win.
+_PLACES: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(
+        r"\blos angeles\b|\bdtla\b|\bhollywood\b|\bburbank\b|\bsanta monica\b"
+        r"|\blong beach\b|\bpasadena\b|\bglendale\b|\bsouth bay\b|\bwestside\b"
+        r"|\bsylmar\b|\bparamount\b|\bcarson\b|\bculver city\b|\binglewood\b"
+        r"|\btorrance\b|\bmanhattan beach\b|\bkoreatown\b|\bvan nuys\b"
+        r"|\bsan fernando valley\b|\bmid[- ]wilshire\b|\bsilver lake\b|\becho park\b",
+        re.IGNORECASE,
+    ), LA_LABEL),
+    (re.compile(r"\bLA\b|\bL\.A\."), LA_LABEL),
+    (re.compile(r"\borange county\b|\birvine\b|\banaheim\b|\bbrea\b", re.IGNORECASE),
+     "Orange County, CA"),
+    (re.compile(r"\bcorona\b|\briverside\b|\binland empire\b", re.IGNORECASE),
+     "Inland Empire, CA"),
+    (re.compile(r"\bsan diego\b", re.IGNORECASE), "San Diego, CA"),
+    (re.compile(r"\bfremont\b|\bbay area\b|\bsan francisco\b|\bsan jose\b", re.IGNORECASE),
+     "Bay Area, CA"),
+    (re.compile(r"\b(?:las )?vegas\b", re.IGNORECASE), "Las Vegas, NV"),
+    (re.compile(r"\bnew york\b|\bnyc\b", re.IGNORECASE), "New York, NY"),
+    (re.compile(r"\bhouston\b", re.IGNORECASE), "Houston, TX"),
+    (re.compile(r"\bseattle\b", re.IGNORECASE), "Seattle, WA"),
+    (re.compile(r"\bdenver\b", re.IGNORECASE), "Denver, CO"),
+    (re.compile(r"\bchicago\b", re.IGNORECASE), "Chicago, IL"),
+    (re.compile(r"\batlanta\b", re.IGNORECASE), "Atlanta, GA"),
+    (re.compile(r"\bmiami\b", re.IGNORECASE), "Miami, FL"),
+    (re.compile(r"\bcincinnati\b", re.IGNORECASE), "Cincinnati, OH"),
+    (re.compile(r"\bistanbul\b", re.IGNORECASE), "Istanbul, Turkey"),
+    (re.compile(r"\bremote\b", re.IGNORECASE), "Remote"),
+)
+
+
+def stated_place(*texts: str) -> str | None:
+    """The first place a post names, checking ``texts`` in order (title
+    before body), earliest mention within a text. None when none is named."""
+    for text in texts:
+        if not text:
+            continue
+        best: tuple[int, int, str] | None = None
+        for rank, (pattern, label) in enumerate(_PLACES):
+            m = pattern.search(text)
+            if m and (best is None or (m.start(), rank) < best[:2]):
+                best = (m.start(), rank, label)
+        if best is not None:
+            return best[2]
+    return None
+
+
+def is_removed(post: dict) -> bool:
+    """Body snapshotted as removed or deleted: a mod or the author pulled it."""
+    return (post.get("selftext") or "").strip() in REMOVED_BODIES
+
 # One money mention: optional ~, $, amount (optional k), optional range tail,
 # optional +, optional per-unit word ("/hr", "per video", "a video").
 _PAY_RE = re.compile(
-    r"~?\$\s*(\d[\d,]*(?:\.\d+)?)(?:\s*([kK])\b)?"
-    r"(?:\s*(?:-|to)\s*\$?\s*(\d[\d,]*(?:\.\d+)?)(?:\s*([kK])\b)?)?"
+    r"~?\$\s*(\d(?:[\d,]*\d)?(?:\.\d+)?)(?:\s*([kK])\b)?"
+    r"(?:\s*(?:-|\u2013|to)\s*\$?\s*(\d(?:[\d,]*\d)?(?:\.\d+)?)(?:\s*([kK])\b)?)?"
     r"(?:\s*\+)?"
     r"(?:\s*(?:/|\bper\s+|\ban?\s+)\s*([A-Za-z]+))?"
 )
@@ -116,3 +202,11 @@ def arctic_params(subreddit: str, limit: int = 100) -> dict[str, str]:
         "sort": "desc",
         "fields": ARCTIC_FIELDS,
     }
+
+
+def older_than(post: dict, days: int) -> bool:
+    """Posted more than ``days`` ago. Unknown dates are kept."""
+    posted = _parse_posted_date(post.get("created_utc"))
+    if posted is None:
+        return False
+    return posted < datetime.now(timezone.utc) - timedelta(days=days)

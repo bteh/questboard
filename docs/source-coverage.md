@@ -47,6 +47,17 @@ Fable; blinded round) settled it:
   real date) is the next trust build; rejects will land in the run log
   as rows_invalid.
 
+**Carve-out (2026-10-08).** The owner, based in Los Angeles, approved two
+subreddits as board content: r/LAjobs (odd, casting posts route to
+perform) and r/castingcalls (perform). Cards show "Reddit" as the source.
+The allowlist is `BOARD_SUBREDDITS` in `_reddit.py`; every subreddit
+scraper derives `research_only` from it, and a test pins the set to these
+two. Because the mirror can't see live mod state, both scrapers drop
+posts whose body snapshotted as [removed] or [deleted], and both gate on
+the post's own words (hiring statement or casting ask), house rules
+(adult work, decal and account-rental scams), and explicit unpaid
+wording. Every other sub stays research-only.
+
 Principle, from the debate synthesis: scarcity is less damaging than
 false actionability. Debate record:
 `~/.claude-octopus/debates/.../001-board-curation/synthesis.md`.
@@ -57,9 +68,9 @@ false actionability. Debate record:
 |---|---|---|
 | skill | 18 career scrapers + JobSpy boards | stated ranges |
 | think | FocusGroups.org, **User Interviews** | per-session, stated |
-| perform | AuditionsFree, Casting Networks, Project Casting, Standing Room Only | stated when posted |
+| perform | AuditionsFree, Casting Networks, Project Casting, Standing Room Only, r/castingcalls (2026-10-08 carve-out), Central Casting LA link card | stated when posted |
 | audience | 1iota, On Camera Audiences | never; seats are free tickets, not paid gigs |
-| odd | none (honest state; see the 2026-07-11 verdicts) | n/a |
+| odd | r/LAjobs (2026-10-08 carve-out), Qwick LA link card | stated when posted |
 | flip | none, paused by curation verdict (was r/PKMNTCGDeals) | n/a |
 | deliver | none, by verdict (see below) | n/a |
 | lookafter | **Sittercity** (429 postmortem fixed), **Care.com**, **UrbanSitter** | poster-set hourly ranges only |
@@ -71,8 +82,9 @@ false actionability. Debate record:
 
 Bold = added in the kind-sources push. Every source is one decorated
 file under `src/job_finder/tools/scrapers/`, lane-validated at import,
-and judged per run by `GET /api/v1/scrapers/health`. The three reddit
-scrapers stay in the tree as research tooling (`research_only=True`).
+and judged per run by `GET /api/v1/scrapers/health`. r/forhire,
+r/slavelabour, and r/PKMNTCGDeals stay in the tree as research tooling
+(`research_only=True`); r/LAjobs and r/castingcalls are the carve-out.
 
 ## Verdicts that shaped the lineup
 
