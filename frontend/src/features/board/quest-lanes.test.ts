@@ -66,3 +66,14 @@ describe('the Part-time lane', () => {
     expect(normalizeFacetKey('parttime', 'pets')).toBeUndefined();
   });
 });
+
+describe('the Part-time lane', () => {
+  /* Owner, Oct 8 2026, on 0.2.17: "can you add a part time filter in side
+     quest". The lane shipped but its tile hid at 0 until the first refresh,
+     so a fresh install never showed it. Part-time is searched near your
+     place, so it stays on the rail at 0 and a refresh fills it. */
+  it('keeps the Part-time tile on the rail before its first refresh', () => {
+    const lanes = railLanes([kind('think', 12, 1), kind('parttime', 0, 15), kind('flip', 0, 11)]);
+    expect(lanes.map((l) => l.id)).toEqual(['think', 'parttime']);
+  });
+});

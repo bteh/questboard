@@ -89,3 +89,31 @@ describe('what counts as an active filter', () => {
     expect(boardFiltersActive({ search: '   ', place: ' ', payFrom: ' ', payTo: ' ' })).toBe(false);
   });
 });
+
+describe('the empty Part-time lane', () => {
+  /* Owner, Oct 8 2026, on 0.2.17: the Part-time lane had 0 rows because its
+     source had never run, and the board told them nothing useful. */
+  it('names the place and the check that pulls shifts', () => {
+    expect(trulyEmptyLines(false, { kind: 'parttime', place: 'Los Angeles' })).toEqual({
+      lead: 'No shifts yet near Los Angeles.',
+      body: 'Check for new to pull cafe, restaurant, and retail shifts.',
+    });
+  });
+
+  it('asks for a place when none is set', () => {
+    expect(trulyEmptyLines(true, { kind: 'parttime', place: ' ' })).toEqual({
+      lead: 'No shifts yet. Set your place first.',
+      body: 'Then Check for new to pull cafe, restaurant, and retail shifts.',
+    });
+  });
+
+  it('never calls the place a chip to clear on Part-time', () => {
+    expect(boardFiltersActive({ kind: 'parttime', place: 'Los Angeles' })).toBe(false);
+    expect(boardFiltersActive({ kind: 'parttime', place: 'Los Angeles', search: 'boba' })).toBe(true);
+    expect(boardFiltersActive({ kind: 'think', place: 'Los Angeles' })).toBe(true);
+  });
+
+  it('keeps the general copy on other lanes', () => {
+    expect(trulyEmptyLines(false, { kind: 'think', place: 'Los Angeles' })).toEqual(trulyEmptyLines(false));
+  });
+});

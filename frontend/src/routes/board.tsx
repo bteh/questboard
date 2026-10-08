@@ -578,11 +578,9 @@ function BoardPage() {
     if (searchState === 'failed') pullStartedAt.current = null;
   }, [searchState, careerLane]);
 
-  /* which empty board is this: the filters cut everything, or nothing has
-     been fetched yet? The message must match the cause. Before this lane's
-     first-ever source run there was nothing to filter, so the place a new
-     user answered at /start never counts as a chip to clear. */
+  /* which empty board is this; the rules live in board-empty.ts */
   const visibleFiltersActive = boardFiltersActive({
+    kind: kindKey,
     search,
     place,
     payFrom,
@@ -596,6 +594,7 @@ function BoardPage() {
   const laneCheckedAt = careerLane ? summary?.career_checked_at : summary?.side_quest_checked_at;
   const neverChecked = summary !== undefined && laneCheckedAt === null;
   const emptyState = boardEmptyState(total, visibleFiltersActive, neverChecked);
+  const emptyLines = trulyEmptyLines(neverChecked, { kind: kindKey, place });
 
   const newSince = careerLane
     ? countNewSince(visibleItems, workCutoff, {
@@ -945,8 +944,8 @@ function BoardPage() {
             The career lane keeps its own empty state below. */}
         {emptyState === 'truly-empty' && !careerLane && (
           <div className="qb-board-empty" role="status">
-            <p className="qb-board-empty-lead">{trulyEmptyLines(neverChecked).lead}</p>
-            <p>{trulyEmptyLines(neverChecked).body}</p>
+            <p className="qb-board-empty-lead">{emptyLines.lead}</p>
+            <p>{emptyLines.body}</p>
             <div style={{ marginTop: 14 }}>
               <QuestRestockButton big />
             </div>

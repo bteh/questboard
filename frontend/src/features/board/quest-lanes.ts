@@ -1,7 +1,8 @@
 /* The rail's tiles. Most lanes are one registry kind; Small jobs folds odd,
    skill, and deliver into one tile where the first of them sits in registry
    order. Career rows never make a tile, and a lane with nothing live stays
-   off the rail. */
+   off the rail, except ALWAYS_SHOWN_LANES: Part-time is searched near your
+   place, so it shows at 0 and a refresh fills it. */
 
 import type { KindSummary } from '@/api/board';
 import {
@@ -22,6 +23,7 @@ export interface RailLane {
 
 export const SMALL_JOBS_LABEL = 'Small jobs';
 const SMALL_JOBS_SUB = 'odd jobs, gigs, delivery';
+export const ALWAYS_SHOWN_LANES: ReadonlySet<string> = new Set(['parttime']);
 
 export function railLanes(kinds: readonly KindSummary[]): RailLane[] {
   const lanes: RailLane[] = [];
@@ -53,5 +55,5 @@ export function railLanes(kinds: readonly KindSummary[]): RailLane[] {
       new_today: kind.new_today,
     });
   }
-  return lanes.filter((lane) => lane.count > 0);
+  return lanes.filter((lane) => lane.count > 0 || ALWAYS_SHOWN_LANES.has(lane.id));
 }
