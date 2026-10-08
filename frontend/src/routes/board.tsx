@@ -1,19 +1,10 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoute, Link, redirect, useNavigate } from '@tanstack/react-router';
 import { useQueries, useQuery } from '@tanstack/react-query';
-import { HugeiconsIcon } from '@hugeicons/react';
-import { Search01Icon } from '@hugeicons/core-free-icons';
 import { Route as appRoute } from './app';
-import {
-  Chip,
-  LedgerRow,
-  PlainButton,
-  Sheet,
-  StampDefs,
-  TextLink,
-} from '@questboard/ui';
+import { Chip, StampDefs } from '@questboard/ui';
 import { getApplications, getProfileWork } from '@/api/applications';
-import { useApplications, useUpdateStatus } from '@/hooks/use-applications';
+import { useApplications } from '@/hooks/use-applications';
 import { useSourceLabels, resolveSourceLabel } from '@/hooks/use-scrapers';
 import { ExplainSheet } from '@/components/board/explain-sheet';
 import { RestockLine } from '@/components/board/restock-line';
@@ -21,9 +12,7 @@ import { QuestRestockButton } from '@/components/board/quest-restock';
 import { boardEmptyState, boardFiltersActive, trulyEmptyLines } from '@/features/board/board-empty';
 import { backendDownLine } from '@/features/board/backend-down';
 import {
-  dismissNotice,
   hasBoardParams,
-  noticeDismissed,
   presetKeysFrom,
   presetKeysTo,
   readSavedBoardState,
@@ -31,16 +20,10 @@ import {
   validateBoardSearch,
   type BoardParams,
 } from '@/components/board/board-state';
-import {
-  CLIP_STATUS,
-  parseAmount,
-  toBoardCard,
-} from '@/utils/board-card';
+import { parseAmount } from '@/utils/board-card';
 import { checkedAgoLabel } from '@/features/board/freshness';
 import {
-  POSTED_OPTIONS,
   hiddenDatesClause,
-  normalizePostedDays,
   foundWithinDays,
   postedWithinDays,
   type PostedDaysKey,
@@ -57,7 +40,6 @@ import {
 import type { BoardSummaryFilters, CareerRefreshReceipt } from '@/api/board';
 import { KindRail } from '@/features/board/kind-rail';
 import { LaneTabs } from '@/features/board/lane-tabs';
-import { PlacePicker } from '@/features/board/place-picker';
 import { JobsSetupStrip } from '@/features/board/jobs-callout';
 import { showBankBonusBridge } from '@/features/board/bridge-line';
 import { WorkToolbar } from '@/features/board/work-toolbar';
@@ -74,6 +56,12 @@ import {
 import { JobDetailSheet } from '@/features/board/job-detail-sheet';
 import { newestFirst } from '@/features/board/poster-model';
 import { PosterWall } from '@/features/board/poster-wall';
+import { FirstRunNotice, HouseRules, RequirementSheet } from '@/features/board/board-asides';
+import { QuestFilterBar } from '@/features/board/quest-filter-bar';
+import { questFilterParams } from '@/features/board/quest-filter-logic';
+import { QuestList } from '@/features/board/quest-list';
+import { QuestViewBar } from '@/features/board/quest-view-toggle';
+import { resolveQuestView, saveQuestView, type QuestView } from '@/features/board/quest-view';
 import { useBoardSummary } from '@/hooks/use-board-summary';
 import { useAgentRunActive } from '@/hooks/use-agent-clients';
 import { useOnboardingState } from '@/hooks/use-workspace';
@@ -87,7 +75,6 @@ import type {
   ApplicationFilters,
   ApplicationResponse,
   ProfileWorkListResponse,
-  RequirementMatch,
 } from '@/types/application';
 import '@/components/board/board.css';
 import '@/features/board/board-felt.css';
@@ -117,6 +104,7 @@ export const Route = createRoute({
         to: '/board',
         search: {
           v: saved.v, f: saved.f, q: saved.q, place: saved.place, near: saved.near,
+          rem: saved.rem, paid: saved.paid,
           from: saved.from, to: saved.to, p: saved.p, days: saved.days, src: saved.src,
           lvl: saved.lvl,
         },
@@ -204,12 +192,6 @@ function useDebounced(value: string, ms = 300): string {
   return debounced;
 }
 
-function verdict(strength: RequirementMatch['strength']): ReactNode {
-  if (strength === 'strong') return <span style={{ color: 'var(--sage)' }}>in your resume</span>;
-  if (strength === 'partial') return <span style={{ color: 'var(--mute)' }}>partial</span>;
-  return <span style={{ color: 'var(--mute)' }}>not in your resume yet</span>;
-}
-
 function PresetChip({
   preset,
   active,
@@ -224,114 +206,6 @@ function PresetChip({
   /* page_size 1 keeps the payload tiny; the count is the query's true total */
   const { data } = useApplications(countFilters);
   return <Chip label={preset.label} count={data?.total} active={active} onClick={onToggle} />;
-}
-
-function HouseRules() {
-  return (
-    <aside className="qb-house">
-      <h4>House rules</h4>
-      <p>Every quest links to its source. Pay is only what the poster states, never a guess.</p>
-      <p>No MLMs, no pay-to-start, nothing adult. The risky ones carry their catch in plain words.</p>
-      <p className="qb-house-sig">If it's pinned here, it's real.</p>
-    </aside>
-  );
-}
-
-function RequirementSheet({
-  app,
-  labels,
-  onClose,
-}: {
-  app: ApplicationResponse | null;
-  labels: Record<string, string>;
-  onClose: () => void;
-}) {
-  const updateStatus = useUpdateStatus();
-  /* the mutation's response is the server's own updated row, so a clip made
-     inside the sheet flips the footer without waiting for a refetch */
-  const effective =
-    app && updateStatus.data && updateStatus.data.id === app.id ? updateStatus.data : app;
-  const card = effective ? toBoardCard(effective, resolveSourceLabel(effective.source, labels)) : null;
-  return (
-    <Sheet
-      open={app !== null}
-      onClose={onClose}
-      label="Requirements against your resume"
-      title={card?.title}
-      meta={card ? `${card.meta ? `${card.meta}, ` : ''}covers ${card.fit?.strong ?? 0} of ${card.fit?.total ?? 0} requirements` : undefined}
-    >
-      {effective && card?.report && (
-        <>
-          <div
-            style={{
-              border: '1px solid var(--hair)',
-              borderBottomColor: 'var(--edge)',
-              borderRadius: 10,
-              background: 'var(--paper)',
-              padding: '14px 18px',
-              marginTop: 14,
-              maxHeight: '46vh',
-              overflowY: 'auto',
-            }}
-          >
-            <div className="qb-fb-label">From the posting, read against your resume</div>
-            {card.report.requirements.map((req, i) => (
-              <LedgerRow key={i} title={req.requirement} pay={verdict(req.strength)} />
-            ))}
-          </div>
-          <div className="qb-srow">
-            {effective.job_url && <TextLink href={effective.job_url}>Apply at source</TextLink>}
-            {card.applied ? (
-              <span className="qb-applied-stamp">{card.applied}</span>
-            ) : card.clippedDate ? (
-              <span className="qb-applied-stamp" style={{ color: 'var(--sage)' }}>
-                Clipped, {card.clippedDate}
-              </span>
-            ) : (
-              <PlainButton
-                onClick={() =>
-                  updateStatus.mutate({ id: effective.id, data: { status: CLIP_STATUS } })
-                }
-              >
-                Clip
-              </PlainButton>
-            )}
-            <PlainButton className="qb-closebtn" onClick={onClose}>
-              Done for now
-            </PlainButton>
-          </div>
-        </>
-      )}
-    </Sheet>
-  );
-}
-
-/* "Never done any of this?" One honest door: the no-experience preset,
-   backed by the source-stated first_quest_ok flag. Dismissal is stored
-   locally and never asked about again. */
-function FirstRunNotice({ onStartHere }: { onStartHere: () => void }) {
-  const [gone, setGone] = useState(() => noticeDismissed());
-  if (gone) return null;
-  return (
-    <div className="qb-board-notice">
-      <span>
-        Never done any of this? Most quests here need nothing you don't already have.{' '}
-        <button type="button" className="qb-textlink" style={{ fontSize: 14 }} onClick={onStartHere}>
-          Start here
-        </button>
-      </span>
-      <button
-        type="button"
-        className="qb-dismiss"
-        onClick={() => {
-          dismissNotice();
-          setGone(true);
-        }}
-      >
-        Dismiss
-      </button>
-    </div>
-  );
 }
 
 function BoardPage() {
@@ -400,6 +274,16 @@ function BoardPage() {
 
   /* near me only is meaningless without a place, so it rides the place text */
   const nearParam = nearOnly && place ? '1' : undefined;
+  const withRemote = params.rem === '1';
+  const paidOnly = params.paid === '1';
+  const questView: QuestView = resolveQuestView(params.view);
+  const placeParams = useMemo(
+    () =>
+      careerLane
+        ? { location: place || undefined, location_strict: nearParam ? true : undefined }
+        : questFilterParams({ place, withRemote, paidOnly }),
+    [careerLane, place, nearParam, withRemote, paidOnly],
+  );
 
   /* what this page last wrote into the URL; anything else is history nav */
   const pushedRef = useRef<{ q?: string; place?: string; near?: string; from?: string; to?: string }>({
@@ -494,6 +378,8 @@ function BoardPage() {
       q: params.q,
       place: params.place,
       near: params.near,
+      rem: params.rem,
+      paid: params.paid,
       from: params.from,
       to: params.to,
       p: params.p,
@@ -502,7 +388,7 @@ function BoardPage() {
       lvl: params.lvl,
       sort: sortNewest ? undefined : 'score',
     });
-  }, [params.v, params.f, params.q, params.place, params.near, params.from, params.to, params.p, params.days, params.src, params.lvl, sortNewest]);
+  }, [params.v, params.f, params.q, params.place, params.near, params.rem, params.paid, params.from, params.to, params.p, params.days, params.src, params.lvl, sortNewest]);
 
   const baseFilters = useMemo<ApplicationFilters>(
     () => ({
@@ -510,8 +396,7 @@ function BoardPage() {
       ...presetParams(activeKeys),
       facet: params.f,
       search: search || undefined,
-      location: place || undefined,
-      location_strict: nearParam ? true : undefined,
+      ...placeParams,
       ...(careerLane
         ? {
             salary_min: payFloor ?? undefined,
@@ -530,7 +415,7 @@ function BoardPage() {
       page_size: PAGE_SIZE,
       scope: 'board',
     }),
-    [kindKey, careerLane, activeKeys, params.f, search, place, nearParam, payFloor, payCeiling, payCurrency, postedWithin, foundWithin, sortNewest, sourceCategory, level],
+    [kindKey, careerLane, activeKeys, params.f, search, placeParams, payFloor, payCeiling, payCurrency, postedWithin, foundWithin, sortNewest, sourceCategory, level],
   );
 
   /* the rail's counts must describe THIS board: the same user filters ride
@@ -541,8 +426,7 @@ function BoardPage() {
       // quests and its endpoint intentionally has no founding vocabulary.
       ...(isCareerKind(kindKey) ? {} : presetParams(activeKeys)),
       search: search || undefined,
-      location: place || undefined,
-      location_strict: nearParam ? true : undefined,
+      ...placeParams,
       ...(careerLane
         ? {
             salary_min: payFloor ?? undefined,
@@ -553,7 +437,7 @@ function BoardPage() {
       posted_within_days: postedWithin,
       found_within_days: foundWithin,
     }),
-    [kindKey, careerLane, activeKeys, search, place, nearParam, payFloor, payCeiling, payCurrency, postedWithin, foundWithin],
+    [kindKey, careerLane, activeKeys, search, placeParams, payFloor, payCeiling, payCurrency, postedWithin, foundWithin],
   );
   const summary = useBoardSummary(summaryFilters).data;
   const checkedAgo = checkedAgoLabel(
@@ -704,7 +588,7 @@ function BoardPage() {
     payFrom,
     payTo,
     facet: params.f,
-    presetCount: activeKeys.size,
+    presetCount: activeKeys.size + (paidOnly && !careerLane ? 1 : 0),
     sourceCategory,
     level,
     postedDays,
@@ -790,6 +674,23 @@ function BoardPage() {
     });
   }
 
+  function setQuestFlag(key: 'rem' | 'paid', on: boolean) {
+    void navigate({
+      to: '/board',
+      search: (prev: BoardParams) => ({ ...prev, [key]: on ? '1' : undefined }),
+      replace: true,
+    });
+  }
+
+  function setQuestView(view: QuestView) {
+    saveQuestView(view);
+    void navigate({
+      to: '/board',
+      search: (prev: BoardParams) => ({ ...prev, view }),
+      replace: true,
+    });
+  }
+
   /* the posted window rides the URL (?days=) like every other filter */
   function setPostedDays(value: PostedDaysKey | undefined) {
     setPostedDaysView(value);
@@ -861,8 +762,7 @@ function BoardPage() {
       ...presetParams(probe),
       facet: params.f,
       search: search || undefined,
-      location: place || undefined,
-      location_strict: nearParam ? true : undefined,
+      ...placeParams,
       ...(careerLane
         ? {
             salary_min: payFloor ?? undefined,
@@ -916,6 +816,22 @@ function BoardPage() {
 
         {/* the Jobs lane's toolbar owns its own run door and status line */}
         {!careerLane && <RestockLine />}
+
+        {!careerLane && (
+          <QuestFilterBar
+            search={searchRaw}
+            onSearch={setSearchRaw}
+            place={placeRaw}
+            onPlace={setPlaceRaw}
+            withRemote={withRemote}
+            onWithRemote={(on) => setQuestFlag('rem', on)}
+            paidOnly={paidOnly}
+            onPaidOnly={(on) => setQuestFlag('paid', on)}
+            postedDays={postedDays}
+            onPostedDays={setPostedDays}
+            hiddenNote={questHiddenNote}
+          />
+        )}
 
         {!careerLane && (
           <KindRail selected={kindKey} onSelect={selectKind} filters={summaryFilters} />
@@ -989,63 +905,7 @@ function BoardPage() {
             <LevelChips counts={workMeta?.levels} selected={level} onSelect={selectLevel} />
           </>
         ) : (
-          <>
-            <div className="qb-tray" role="search">
-              <label className="qb-tray-field qb-tray-grow">
-                <HugeiconsIcon icon={Search01Icon} size={16} strokeWidth={1.7} />
-                <input
-                  placeholder="Search the board"
-                  aria-label="Search the board"
-                  value={searchRaw}
-                  onChange={(e) => setSearchRaw(e.target.value)}
-                />
-              </label>
-              <PlacePicker
-                value={placeRaw}
-                onChange={setPlaceRaw}
-                ariaLabel="Filter by place; remote quests pass unless near me only is on"
-                className="qb-tray-field qb-tray-place"
-              />
-              <label className="qb-tray-field qb-tray-posted">
-                <span className="qb-tray-label">date</span>
-                <select
-                  aria-label="Filter by date"
-                  value={postedDays ?? ''}
-                  onChange={(e) => setPostedDays(normalizePostedDays(e.target.value))}
-                >
-                  {POSTED_OPTIONS.map((opt) => (
-                    <option key={opt.value || 'any'} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <p className="qb-tray-note">
-              {placeRaw.trim() ? (
-                <>
-                  <label className="qb-nearme">
-                    <input
-                      type="checkbox"
-                      checked={nearOnly}
-                      onChange={(e) => setNearOnly(e.target.checked)}
-                    />
-                    near me only
-                  </label>
-                  {nearOnly
-                    ? ' Showing only quests in that place. Remote and no-place quests are hidden.'
-                    : ' A place keeps remote and no-place quests too. Tick near me only to hide them.'}
-                </>
-              ) : (
-                'Pay counts only what the posting states. Quests with no stated pay stay on the board. A place keeps remote and no-place quests too.'
-              )}
-              {/* the posted window's confession, one quiet sentence, only
-                  while the window is on and actually hid rows */}
-              {questHiddenNote &&
-                ` ${questHiddenNote.charAt(0).toUpperCase()}${questHiddenNote.slice(1)}.`}
-            </p>
-            <FirstRunNotice onStartHere={startHere} />
-          </>
+          <FirstRunNotice onStartHere={startHere} />
         )}
 
         {/* the bridge only where it belongs: the work lane (a new paycheck)
@@ -1127,7 +987,15 @@ function BoardPage() {
           </p>
         )}
 
-        {total !== undefined && total > 0 && (
+        {!careerLane && total !== undefined && total > 0 && (
+          <QuestViewBar view={questView} onView={setQuestView} shown={wallItems.length} total={total} />
+        )}
+
+        {total !== undefined && total > 0 && !careerLane && questView === 'list' && (
+          <QuestList items={wallItems} labels={labels} onOpenDetail={openDetail} />
+        )}
+
+        {total !== undefined && total > 0 && (careerLane || questView === 'wall') && (
           <div className="qb-felt">
             <PosterWall
               items={wallItems}
@@ -1140,17 +1008,18 @@ function BoardPage() {
               onOpenDetail={openDetail}
             />
             <HouseRules />
-            {pages * PAGE_SIZE < total && (
-              <div style={{ display: 'flex', justifyContent: 'center', marginTop: 6 }}>
-                <button
-                  type="button"
-                  className="qb-textlink"
-                  onClick={() => setPageState({ key: filtersKey, pages: pages + 1 })}
-                >
-                  more
-                </button>
-              </div>
-            )}
+          </div>
+        )}
+
+        {total !== undefined && pages * PAGE_SIZE < total && (
+          <div className="qb-qmore">
+            <button
+              type="button"
+              className="qb-textlink"
+              onClick={() => setPageState({ key: filtersKey, pages: pages + 1 })}
+            >
+              more
+            </button>
           </div>
         )}
 

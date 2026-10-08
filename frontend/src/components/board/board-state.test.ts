@@ -67,9 +67,24 @@ describe('validateBoardSearch', () => {
     /* legacy vertical values from old URLs and saved state keep working */
     expect(validateBoardSearch({ v: 'camera' }).v).toBe('perform');
     expect(validateBoardSearch({ v: 'career' }).v).toBe('work');
-    expect(validateBoardSearch({ v: 'lens' }).v).toBe('skill');
+    /* skill, odd, and deliver share the Small jobs lane */
+    expect(validateBoardSearch({ v: 'lens' }).v).toBe('small');
+    expect(validateBoardSearch({ v: 'skill' }).v).toBe('small');
+    expect(validateBoardSearch({ v: 'odd' }).v).toBe('small');
+    expect(validateBoardSearch({ v: 'small' }).v).toBe('small');
     expect(validateBoardSearch({ v: 'party-bus' }).v).toBeUndefined();
     expect(validateBoardSearch({ v: 42 }).v).toBeUndefined();
+  });
+
+  it('reads the Side Quests remote, pay, and view params', () => {
+    const parsed = validateBoardSearch({ rem: 1, paid: '1', view: 'wall' });
+    expect(parsed).toMatchObject({ rem: '1', paid: '1', view: 'wall' });
+    expect(validateBoardSearch({ rem: '0', paid: 'yes', view: 'grid' })).toMatchObject({
+      rem: undefined,
+      paid: undefined,
+      view: undefined,
+    });
+    expect(hasBoardParams({ view: 'list' })).toBe(true);
   });
 
   it('treats all as the default, not a param', () => {

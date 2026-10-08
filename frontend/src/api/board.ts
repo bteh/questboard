@@ -14,6 +14,7 @@ export type BoardSummaryFilters = Pick<
   | 'salary_currency'
   | 'is_remote'
   | 'first_quest_ok'
+  | 'pay_stated'
   | 'posted_within_days'
   | 'found_within_days'
   | 'timezone_name'

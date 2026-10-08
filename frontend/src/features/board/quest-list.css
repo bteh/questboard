@@ -1,0 +1,64 @@
+/* Side Quests list view, the filter bar's second line, and the list | wall
+   switch. Paper, hairlines, an edge-colored bottom border; no shadows. */
+
+.qb-questbar-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 8px; }
+.qb-questbar-line .qb-tray-note { margin: 0; }
+
+.qb-viewbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 18px 0 8px; }
+.qb-viewbar-count { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 12.5px; color: var(--mute); }
+.qb-viewtoggle { display: inline-flex; border: 1px solid var(--hair); border-radius: 4px; overflow: hidden; background: var(--paper); }
+.qb-viewtoggle button {
+  border: 0; background: transparent; padding: 5px 12px; cursor: pointer;
+  font-family: inherit; font-size: 13px; color: var(--soft);
+}
+.qb-viewtoggle button + button { border-left: 1px solid var(--hair); }
+.qb-viewtoggle button[aria-pressed='true'] { background: var(--step2); color: var(--ink); font-weight: 500; }
+.qb-viewtoggle button:hover { color: var(--ink); }
+
+.qb-qlist {
+  background: var(--paper);
+  border: 1px solid var(--hair); border-bottom: 2px solid var(--edge);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.qb-qlist ul { list-style: none; margin: 0; padding: 0; }
+.qb-qlist li + li { border-top: 1px solid var(--hair); }
+
+.qb-qrow {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr) 170px 150px 96px;
+  align-items: center; gap: 14px;
+  width: 100%; padding: 9px 16px;
+  border: 0; background: transparent; text-align: left; cursor: pointer;
+  font-family: inherit; font-size: 14px; color: var(--soft);
+}
+.qb-qlist li .qb-qrow:hover { background: var(--ground); }
+.qb-qlist li .qb-qrow:focus-visible { outline: 2px solid var(--sage); outline-offset: -2px; }
+
+.qb-qhead { cursor: default; padding-top: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--hair); font-family: var(--mono); font-size: 11.5px; color: var(--mute); }
+
+.qb-qkind { display: flex; align-items: center; gap: 7px; min-width: 0; font-size: 12.5px; color: var(--mute); }
+.qb-qkind svg { flex: none; }
+.qb-qkind span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qb-qtitle { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+.qb-qtitle b { font-weight: 600; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qb-qsource { font-size: 12px; color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qb-qplace { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qb-qpay { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 13.5px; color: var(--ink); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qb-qpay .qb-u { font-size: 11.5px; color: var(--mute); }
+.qb-qnone { font-family: var(--sans); font-size: 12px; color: var(--mute); }
+.qb-qposted { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 12px; color: var(--mute); text-align: right; white-space: nowrap; }
+.qb-qhead .qb-qpay, .qb-qhead .qb-qposted { font-size: 11.5px; color: var(--mute); }
+
+.qb-qmore { display: flex; justify-content: center; padding: 10px 0 4px; }
+
+@media (max-width: 860px) {
+  .qb-qrow { grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 10px 14px; min-height: 44px; }
+  .qb-qhead { display: none; }
+  .qb-qkind { grid-column: 1 / -1; }
+  .qb-qtitle { grid-column: 1; }
+  .qb-qpay { grid-column: 2; grid-row: 2; }
+  .qb-qplace { grid-column: 1; }
+  .qb-qposted { grid-column: 2; }
+  .qb-viewtoggle button { min-height: 44px; }
+}

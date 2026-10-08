@@ -493,6 +493,7 @@ def board_filter_conditions(
     founding_only: bool = False,
     exclude_staffing_agencies: bool = False,
     first_quest_ok: bool | None = None,
+    pay_stated: bool = False,
     posted_within_days: int | None = None,
     found_within_days: int | None = None,
     timezone_name: str = "UTC",
@@ -521,6 +522,12 @@ def board_filter_conditions(
     pay = stated_pay_filter(model, salary_min, salary_max, salary_currency)
     if pay is not None:
         conditions.append(pay)
+    if pay_stated:
+        # Quest pay comes per session, hour, or gig, so an annual floor cannot
+        # compare it. "Pay stated" keeps rows whose poster named any amount.
+        conditions.append(
+            or_(model.salary_min.isnot(None), model.salary_max.isnot(None))
+        )
     if first_quest_ok is not None:
         # "No experience needed", provably. Only rows whose source stated a
         # beginner-friendly signal carry the flag; career rows and unmarked
@@ -694,6 +701,7 @@ def get_applications(
     exclude_dead: bool = False,
     upcoming_only: bool = False,
     first_quest_ok: bool | None = None,
+    pay_stated: bool = False,
     posted_within_days: int | None = None,
     found_within_days: int | None = None,
     timezone_name: str = "UTC",
@@ -752,6 +760,7 @@ def get_applications(
         founding_only=founding_only,
         exclude_staffing_agencies=exclude_staffing_agencies,
         first_quest_ok=first_quest_ok,
+        pay_stated=pay_stated,
         posted_within_days=posted_within_days,
         found_within_days=found_within_days,
         timezone_name=timezone_name,
