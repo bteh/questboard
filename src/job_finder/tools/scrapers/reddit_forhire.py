@@ -36,6 +36,7 @@ from job_finder.tools.scrapers._reddit import (
     author_handle,
     clean_body,
     extract_pay,
+    research_only_for,
 )
 from job_finder.tools.scrapers._registry import register_scraper
 from job_finder.tools.scrapers._utils import _get_json, _parse_posted_date, _strip_html
@@ -109,7 +110,7 @@ def _normalize_post(post: dict) -> dict | None:
     stale_after_days=21,
     # curation verdict 2026-07-10: reddit is research, never board content
     # (mirror can't see mod removals; see docs/source-coverage.md)
-    research_only=True,
+    research_only=research_only_for("forhire"),
 )
 def search_reddit_forhire(
     roles: list[str] | None = None,

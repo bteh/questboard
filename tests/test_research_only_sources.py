@@ -93,3 +93,28 @@ def test_versioned_repair_tombstones_legacy_research_rows(tmp_path) -> None:
     assert statuses["doctorofcredit"] == "expired"
     assert statuses["scholarshipamerica"] == "unknown"
     assert repair_research_only_rows(engine) == 0
+
+
+def test_owner_la_carve_out_2026_10_08_is_the_only_reddit_on_the_board(registry) -> None:
+    """Owner in LA approved r/LAjobs + r/castingcalls on 2026-10-08; all
+    other subs stay research-only. Any registered source pointing at a
+    subreddit must take research_only from the one allowlist."""
+    from urllib.parse import urlparse
+
+    from job_finder.tools.scrapers._reddit import BOARD_SUBREDDITS, research_only_for
+
+    assert BOARD_SUBREDDITS == frozenset({"lajobs", "castingcalls"})
+    assert research_only_for("LAjobs") is False
+    assert research_only_for("castingcalls") is False
+    assert research_only_for("slavelabour") is True
+
+    on_board = set()
+    for name, meta in registry.items():
+        parsed = urlparse(meta.url)
+        if not parsed.netloc.endswith("reddit.com"):
+            continue
+        sub = parsed.path.strip("/").split("/")[1]
+        assert meta.research_only is research_only_for(sub), name
+        if not meta.research_only:
+            on_board.add(sub.lower())
+    assert on_board == {"lajobs", "castingcalls"}

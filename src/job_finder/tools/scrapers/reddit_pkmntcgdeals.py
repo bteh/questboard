@@ -23,6 +23,7 @@ from job_finder.tools.scrapers._reddit import (
     arctic_params,
     author_handle,
     clean_body,
+    research_only_for,
 )
 from job_finder.tools.scrapers._registry import register_scraper
 from job_finder.tools.scrapers._utils import _get_json, _parse_posted_date, _strip_html
@@ -70,7 +71,7 @@ def _normalize_post(post: dict) -> dict | None:
     # curation verdict 2026-07-10: a reddit thread about a drop is not a
     # place to act; the flip lane is paused until sanctioned retailer
     # sources + the scheduler exist (see docs/source-coverage.md)
-    research_only=True,
+    research_only=research_only_for("PKMNTCGDeals"),
 )
 def search_reddit_pkmntcgdeals(
     roles: list[str] | None = None,

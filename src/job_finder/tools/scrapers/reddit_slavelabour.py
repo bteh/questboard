@@ -27,6 +27,7 @@ from job_finder.tools.scrapers._reddit import (
     author_handle,
     clean_body,
     extract_pay,
+    research_only_for,
 )
 from job_finder.tools.scrapers._registry import register_scraper
 from job_finder.tools.scrapers._utils import _get_json, _parse_posted_date, _strip_html
@@ -108,7 +109,7 @@ def _normalize_post(post: dict) -> dict | None:
     # The sub's scam filter is mod removal, which the arctic-shift mirror
     # cannot see, so a removed scam would stay pinned for days
     # (see docs/source-coverage.md)
-    research_only=True,
+    research_only=research_only_for("slavelabour"),
 )
 def search_reddit_slavelabour(
     roles: list[str] | None = None,
