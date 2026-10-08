@@ -1,6 +1,6 @@
 [package]
 name = "questboard-desktop"
-version = "0.2.17"
+version = "0.2.18"
 description = "Questboard desktop shell"
 edition = "2021"
 
