@@ -30,6 +30,34 @@ logger = logging.getLogger(__name__)
 _LEVER_COMPANIES: list[str] = _load_seed_slugs("lever_seed.txt")
 
 
+# Lever salaryRange intervals -> the shared salary_period vocabulary
+_INTERVAL_PERIODS = {
+    "per-hour-wage": "hourly",
+    "per-day-wage": "daily",
+    "per-week-salary": "weekly",
+    "per-month-salary": "monthly",
+    "per-year-salary": "yearly",
+}
+
+
+def _salary_range(salary: object) -> dict:
+    """Lever's stated salaryRange as salary fields (Blue Bottle Barista,
+    $20 per-hour-wage, Oct 8 2026). Unstated pay stays None."""
+    empty = {"salary_min": None, "salary_max": None}
+    if not isinstance(salary, dict):
+        return empty
+    lo, hi = salary.get("min"), salary.get("max")
+    if lo is None and hi is None:
+        return empty
+    return {
+        "salary_min": lo,
+        "salary_max": hi if hi is not None else lo,
+        "salary_currency": str(salary.get("currency") or ""),
+        "salary_period": _INTERVAL_PERIODS.get(str(salary.get("interval") or ""), ""),
+        "salary_source": "reported",
+    }
+
+
 def _fetch_company_postings(
     slug: str,
     roles: list[str] | None,
@@ -87,6 +115,7 @@ def _fetch_company_postings(
         # _parse_posted_date handles it, so stale jobs no longer bypass the
         # freshness filter via a hardcoded empty date.
         created_at = posting.get("createdAt", "")
+        pay = _salary_range(posting.get("salaryRange"))
 
         results.append({
             "title": title,
@@ -95,8 +124,8 @@ def _fetch_company_postings(
             "url": posting.get("hostedUrl", ""),
             "source": "lever",
             "description": desc_plain,
-            "salary_min": None,
-            "salary_max": None,
+            **pay,
+            "employment": str(categories.get("commitment") or ""),
             "date_posted": created_at,
             "date_confidence": date_confidence_for(created_at),
             "is_remote": workplace == "remote" or "remote" in location.lower(),
