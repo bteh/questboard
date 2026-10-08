@@ -34,6 +34,8 @@ DIRECT_SOURCES: frozenset[str] = frozenset({
     "consider",          # a16z / VC talent-network boards (server-rendered)
     "getro",             # VC portfolio job networks
     "yc_workatastartup", # Y Combinator's Work at a Startup
+    "csu_careers",       # CSU's own PageUp board; applications go to the campus
+    "edjoin",            # California districts take applications on EdJoin itself
 })
 
 # Age thresholds in days, by the posting's *true* post date.

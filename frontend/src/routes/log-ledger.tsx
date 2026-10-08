@@ -92,6 +92,8 @@ const SOURCE_LABEL_MAP: Record<string, string> = {
   arbeitnow: 'Arbeitnow',
   themuse: 'The Muse',
   workday: 'Workday',
+  edjoin: 'EdJoin',
+  csu_careers: 'CSU Careers',
 };
 
 function LedgerPage() {

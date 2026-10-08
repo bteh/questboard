@@ -172,8 +172,10 @@ def build_sidecar(*, target_arch: str = "") -> Path:
     ]
     for data_file in sorted((root / "src" / "job_finder" / "config" / "archetypes").glob("*.yaml")):
         safe_data_files.append((data_file, "job_finder/config/archetypes"))
-    for data_file in sorted((root / "src" / "job_finder" / "tools" / "scrapers" / "data").glob("*.txt")):
-        safe_data_files.append((data_file, "job_finder/tools/scrapers/data"))
+    scraper_data = root / "src" / "job_finder" / "tools" / "scrapers" / "data"
+    for pattern in ("*.txt", "*.json"):
+        for data_file in sorted(scraper_data.glob(pattern)):
+            safe_data_files.append((data_file, "job_finder/tools/scrapers/data"))
     for source, destination in safe_data_files:
         command.extend(["--add-data", f"{source}{os.pathsep}{destination}"])
     if sys.platform == "darwin" and target_arch.strip():
