@@ -9,7 +9,19 @@ import type { ApplicationFilters } from '@/types/application';
 
 export type KindKey = string; /* a kind id from @questboard/kinds, or 'all' */
 
-export const KIND_KEYS: string[] = ['all', ...KINDS.map((k) => k.id)];
+/* Small jobs is a board lane, not a registry kind: odd jobs, skill gigs,
+   and delivery each run thin, so the rail shows them as one tile and the
+   list queries all three. Owner request, Oct 2026: "acting gigs or small
+   jobs in the meantime" were hard to find spread over three tiles. */
+export const SMALL_JOBS_KEY = 'small';
+export const SMALL_JOBS_KIND_IDS: readonly string[] = ['odd', 'skill', 'deliver'];
+const SMALL_JOBS = new Set(SMALL_JOBS_KIND_IDS);
+
+export function isSmallJobsKind(id: string | undefined): boolean {
+  return id !== undefined && SMALL_JOBS.has(id);
+}
+
+export const KIND_KEYS: string[] = ['all', SMALL_JOBS_KEY, ...KINDS.map((k) => k.id)];
 
 /* Career sits in its own lane, apart from the quest kinds. The default
    "All quests" board is side-quests only, so a wall of ordinary job
@@ -46,11 +58,14 @@ export function questRefreshVerticals(): string[] {
    career excluded */
 const ALL_QUEST_VALUES = questRefreshVerticals().join(',');
 
+function laneVerticals(key: KindKey): string {
+  if (key === 'all') return ALL_QUEST_VALUES;
+  if (key === SMALL_JOBS_KEY) return SMALL_JOBS_KIND_IDS.flatMap(verticalValuesFor).join(',');
+  return verticalValuesFor(key).join(',');
+}
+
 export function kindParams(key: KindKey): Pick<ApplicationFilters, 'vertical' | 'upcoming_only'> {
-  return {
-    vertical: key === 'all' ? ALL_QUEST_VALUES : verticalValuesFor(key).join(','),
-    upcoming_only: true,
-  };
+  return { vertical: laneVerticals(key), upcoming_only: true };
 }
 
 /* "All quests" counts side-quests only; the Jobs lane owns its own count.
@@ -67,11 +82,12 @@ export function sortByFor(kind: KindKey, newestFirst: boolean): 'date_found' | '
 }
 
 /** Old ?v= values (career, camera, study, lens) keep working: they resolve
-    to the kind that absorbed them. Unknown values fall back to All. */
+    to the kind that absorbed them, and odd, skill, and deliver land on
+    Small jobs. Unknown values fall back to All. */
 export function normalizeKindKey(raw: string | undefined): KindKey | undefined {
   if (!raw || raw === 'all') return undefined;
-  if (KIND_KEYS.includes(raw)) return raw;
-  return kindForVertical(raw)?.id;
+  const id = KIND_KEYS.includes(raw) ? raw : kindForVertical(raw)?.id;
+  return isSmallJobsKind(id) ? SMALL_JOBS_KEY : id;
 }
 
 /** Keep a ?f= facet only when the active kind actually carries it. */

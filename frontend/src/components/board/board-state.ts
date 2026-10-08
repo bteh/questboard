@@ -1,6 +1,7 @@
 /* The board's filter state, serialized two ways and pinned by
    board-state.test.ts:
-   - URL search params (?v, ?q, ?place, ?from, ?to, ?p, ?days, ?src, ?lvl) so a
+   - URL search params (?v, ?q, ?place, ?rem, ?paid, ?view, ?from, ?to, ?p, ?days, ?src,
+     ?lvl) so a
      filtered board is a shareable address and back/forward walks filter
      changes;
    - localStorage at questboard:board.v1 so Tuesday's board is already set
@@ -11,6 +12,7 @@
 
 import { normalizeFacetKey, normalizeKindKey, type KindKey } from '@/features/board/kind-params';
 import { normalizePostedDays, type PostedDaysKey } from '@/features/board/posted-filter';
+import { normalizeQuestView, type QuestView } from '@/features/board/quest-view';
 
 export const BOARD_STATE_KEY = 'questboard:board.v1';
 export const BOARD_NOTICE_KEY = 'questboard:board-notice';
@@ -24,8 +26,16 @@ export interface BoardParams {
   q?: string;
   /** Place text ("Los Angeles", "NV"); remote and no-place rows always pass. */
   place?: string;
-  /** "1" = near me only: with a place set, drop remote/placeless rows. */
+  /** "1" = near me only: with a place set, drop remote/placeless rows.
+      Find Work only; Side Quests are near-only by default. */
   near?: string;
+  /** "1" = Side Quests "+ remote": with a place set, add remote and
+      no-place quests back. */
+  rem?: string;
+  /** "1" = Side Quests "pay stated": keep rows that name an amount. */
+  paid?: string;
+  /** Side Quests view: 'wall' for the poster wall; absent = the list. */
+  view?: QuestView;
   /** Typed pay floor, as typed ("150k"). */
   from?: string;
   /** Typed pay ceiling, as typed. */
@@ -48,6 +58,11 @@ export interface BoardParams {
 /** The persisted shape: the URL params plus the sort toggle. */
 export interface SavedBoardState extends BoardParams {
   sort?: 'new' | 'score';
+}
+
+/** The router may hand a flag back as 1, "1", or true. */
+function cleanFlag(value: unknown): '1' | undefined {
+  return value === '1' || value === 1 || value === true ? '1' : undefined;
 }
 
 function cleanString(value: unknown): string | undefined {
@@ -81,10 +96,10 @@ export function validateBoardSearch(search: Record<string, unknown>): BoardParam
     f: normalizeFacetKey(v, cleanString(search.f)),
     q: cleanString(search.q),
     place: cleanString(search.place),
-    // the router may hand back near as the number 1, the string "1", or a
-    // boolean, depending on how it round-tripped the URL; treat them alike
-    near:
-      search.near === '1' || search.near === 1 || search.near === true ? '1' : undefined,
+    near: cleanFlag(search.near),
+    rem: cleanFlag(search.rem),
+    paid: cleanFlag(search.paid),
+    view: normalizeQuestView(search.view),
     from: cleanString(search.from),
     to: cleanString(search.to),
     p,
@@ -101,7 +116,7 @@ export function validateBoardSearch(search: Record<string, unknown>): BoardParam
 export function hasBoardParams(params: BoardParams): boolean {
   return Boolean(
     params.v || params.f || params.q || params.place || params.near ||
-      params.from || params.to || params.p || params.days || params.src || params.lvl,
+      params.rem || params.paid || params.view || params.from || params.to || params.p || params.days || params.src || params.lvl,
   );
 }
 
@@ -133,7 +148,7 @@ export function readSavedBoardState(): SavedBoardState | null {
 export function saveBoardState(state: SavedBoardState): void {
   try {
     const compact: Record<string, string> = {};
-    for (const key of ['v', 'f', 'q', 'place', 'near', 'from', 'to', 'p', 'days', 'src', 'lvl', 'sort'] as const) {
+    for (const key of ['v', 'f', 'q', 'place', 'near', 'rem', 'paid', 'from', 'to', 'p', 'days', 'src', 'lvl', 'sort'] as const) {
       const value = state[key];
       if (value) compact[key] = value;
     }

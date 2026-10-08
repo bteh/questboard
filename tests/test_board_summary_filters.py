@@ -202,3 +202,29 @@ def test_new_today_summary_and_list_share_the_local_calendar_predicate(api_clien
     assert listed.status_code == 200, listed.text
     assert summary["total"] == listed.json()["total"] == 3
     assert summary["new_today"] == summary["total"]
+
+
+def test_pay_stated_keeps_only_rows_that_name_an_amount(api_client) -> None:
+    """The Side Quests pay filter. Quest pay comes per hour, session, or
+    bonus, so the annual floor cannot compare it; "pay stated" can."""
+    client, jf_db = api_client
+    _seed(jf_db)
+
+    summary = _summary(client, pay_stated="true")
+    assert summary["total"] == 2
+    assert _kind(summary, "lookafter")["count"] == 1
+    assert _kind(summary, "house")["count"] == 1
+    assert _kind(summary, "think")["count"] == 0
+
+    listed = client.get(
+        "/api/v1/applications",
+        params={
+            "vertical": "study,lookafter,house",
+            "scope": "board",
+            "pay_stated": "true",
+            "page_size": 100,
+        },
+    )
+    assert listed.status_code == 200, listed.text
+    titles = {item["job_title"] for item in listed.json()["items"]}
+    assert titles == {"LA babysitting", "Nationwide bonus"}

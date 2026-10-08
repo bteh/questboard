@@ -256,6 +256,8 @@ export interface ApplicationFilters {
   upcoming_only?: boolean;
   /** true keeps only rows whose source stated a beginner-friendly signal. */
   first_quest_ok?: boolean;
+  /** true keeps only rows whose poster stated an amount, in any unit. */
+  pay_stated?: boolean;
   /** Keep only rows provably posted in the last N days; unverifiable dates drop. */
   posted_within_days?: number;
   /** Calendar window on Questboard's first-seen clock, interpreted here. */

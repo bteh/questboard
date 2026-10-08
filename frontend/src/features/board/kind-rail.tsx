@@ -2,6 +2,7 @@ import { KindStamp } from '@questboard/ui';
 import type { BoardSummaryFilters } from '@/api/board';
 import { useBoardSummary } from '@/hooks/use-board-summary';
 import { isCareerKind, questTotal, type KindKey } from '@/features/board/kind-params';
+import { railLanes } from '@/features/board/quest-lanes';
 
 /* The kind rail: a labeled, even grid of two-line tags (name over real
    examples), counts right-aligned, in registry order.
@@ -41,7 +42,7 @@ export function KindRail({
 }) {
   const { data } = useBoardSummary(filters);
   if (!data) return null;
-  const quests = data.kinds.filter((k) => k.count > 0 && !isCareerKind(k.id));
+  const quests = railLanes(data.kinds);
   const questCount = questTotal(data.kinds);
   const questNew = data.kinds.reduce((sum, k) => (isCareerKind(k.id) ? sum : sum + k.new_today), 0);
   return (
@@ -60,7 +61,7 @@ export function KindRail({
       <div className="qb-rail">
         {quests.map((kind) => (
           <Tag key={kind.id} active={selected === kind.id} onClick={() => onSelect(kind.id)}>
-            <KindStamp kind={kind.id} size={21} className="qb-ktag-stamp" />
+            <KindStamp kind={kind.stamp} size={21} className="qb-ktag-stamp" />
             <span className="qb-ktag-col">
               <b>{kind.label}</b>
               <span className="qb-ktag-sub">{kind.sub}</span>

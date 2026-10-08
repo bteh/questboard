@@ -366,6 +366,10 @@ def list_applications(
             "rows without the stated signal drop, never guessed in"
         ),
     ),
+    pay_stated: bool = Query(
+        False,
+        description="true keeps only rows whose poster stated an amount, in any unit",
+    ),
     posted_within_days: int | None = Query(
         None,
         ge=1,
@@ -434,6 +438,7 @@ def list_applications(
             exclude_dead=not include_dead,
             upcoming_only=upcoming_only,
             first_quest_ok=first_quest_ok,
+            pay_stated=pay_stated,
             posted_within_days=posted_within_days,
             found_within_days=found_within_days,
             timezone_name=timezone_name,

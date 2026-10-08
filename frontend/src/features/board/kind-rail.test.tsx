@@ -61,6 +61,20 @@ describe('the kind rail', () => {
     expect(onSelect).toHaveBeenCalledWith('think');
   });
 
+  it('shows odd jobs, skill gigs, and delivery as one Small jobs tile', () => {
+    kinds = [
+      { ...think, id: 'skill', label: 'Bring a skill', count: 1 },
+      { ...think, id: 'odd', label: 'Odd jobs', count: 3 },
+    ];
+    const onSelect = vi.fn();
+    render(<KindRail selected="all" onSelect={onSelect} />);
+
+    expect(screen.queryByText('Bring a skill')).toBeNull();
+    expect(screen.queryByText('Odd jobs')).toBeNull();
+    fireEvent.click(screen.getByText('Small jobs'));
+    expect(onSelect).toHaveBeenCalledWith('small');
+  });
+
   it('hides quest kinds with nothing live', () => {
     kinds = [{ ...think, count: 0 }];
     render(<KindRail selected="all" onSelect={() => {}} />);

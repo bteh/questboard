@@ -35,6 +35,8 @@ export function kindSearchForLane(
     p: presetKeysTo(keys, presetKeys),
     src: nextCareer ? prev.src : undefined,
     lvl: nextCareer ? prev.lvl : undefined,
+    rem: nextCareer ? undefined : prev.rem,
+    paid: nextCareer ? undefined : prev.paid,
     from: wasCareer === nextCareer ? prev.from : undefined,
     to: wasCareer === nextCareer ? prev.to : undefined,
   };

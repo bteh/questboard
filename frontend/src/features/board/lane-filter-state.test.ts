@@ -33,6 +33,13 @@ describe('kindSearchForLane', () => {
     }));
   });
 
+  it('drops the Side Quests + remote and pay flags when entering Work', () => {
+    expect(kindSearchForLane({ v: 'small', rem: '1', paid: '1' }, 'work', presets, keys))
+      .toMatchObject({ rem: undefined, paid: undefined });
+    expect(kindSearchForLane({ v: 'small', rem: '1', paid: '1' }, 'think', presets, keys))
+      .toMatchObject({ rem: '1', paid: '1' });
+  });
+
   it('keeps quest filters while moving between quest kinds', () => {
     expect(kindSearchForLane(
       { v: 'study', p: 'remote', q: 'research' },
