@@ -48,6 +48,7 @@ from job_finder.company_classifier import (
     location_matches_preferences,
 )
 from job_finder.company_signals import fill_funding_from_text
+from job_finder.place_areas import named_area_for, search_places
 from job_finder.scoring import score_job_basic, get_company_baselines, normalize_company_key
 from job_finder.scoring.dimensions import (
     _extract_level,
@@ -378,17 +379,54 @@ def _jobspy_board_key(task_boards: list[str] | None) -> str:
     return task_boards[0].strip().lower() if task_boards else "jobspy"
 
 
+def _place_major_search_tasks(
+    locations: list[str],
+    terms: list[str],
+) -> tuple[list[tuple[str, str]], dict[str, tuple[str, int | None]]]:
+    """(term, JobSpy location) tasks, place-major, plus each JobSpy location's
+    (saved place, radius). A named area ("San Gabriel Valley (626)") is never
+    sent to JobSpy literally: it runs as its anchor cities at the area radius,
+    each role at every anchor before the next role. Every anchor maps back to
+    the saved area, so the area keeps ONE place budget (_BoardPlaceBudget).
+    """
+    tasks: list[tuple[str, str]] = []
+    origin: dict[str, tuple[str, int | None]] = {}
+    for loc in locations:
+        queries = [
+            (query, radius) for query, radius in search_places(loc)
+            if query.strip().lower() not in origin
+        ]
+        for query, radius in queries:
+            origin[query.strip().lower()] = (loc, radius)
+        for term in terms:
+            for query, _radius in queries:
+                tasks.append((term, query))
+    return tasks, origin
+
+
 class _BoardPlaceBudget:
     """Volume budget for JobSpy queries, kept per (board, place).
 
     A board that fills ``max_unique`` in one place stops only that place's
     remaining queries; every other place still gets each role once. A place
-    may stop only after ``minimum_queries`` of its own queries ran.
+    may stop only after ``minimum_queries`` of its own queries ran, times its
+    anchor count when the place is an area searched at several anchor cities,
+    so an area can't stop after its first anchor and its anchors share one
+    cap instead of each taking a full place's worth.
     """
 
-    def __init__(self, max_unique: int, minimum_queries: int) -> None:
+    def __init__(
+        self,
+        max_unique: int,
+        minimum_queries: int,
+        anchors_per_place: dict[str, int] | None = None,
+    ) -> None:
         self._max_unique = max_unique
         self._minimum_queries = minimum_queries
+        self._anchors = {
+            key.strip().lower(): max(1, count)
+            for key, count in (anchors_per_place or {}).items()
+        }
         self._lock = threading.Lock()
         self._seen_urls: dict[tuple[str, str], set[str]] = {}
         self._unique_counts: dict[tuple[str, str], int] = {}
@@ -417,9 +455,10 @@ class _BoardPlaceBudget:
                     new_count += 1
             self._unique_counts[key] = self._unique_counts.get(key, 0) + new_count
             event = self._stop_events.setdefault(key, threading.Event())
+            minimum = self._minimum_queries * self._anchors.get(key[1], 1)
             if (
                 self._unique_counts[key] >= self._max_unique
-                and self._done_counts[key] >= self._minimum_queries
+                and self._done_counts[key] >= minimum
             ):
                 event.set()
             return event.is_set()
@@ -963,7 +1002,7 @@ def _resolve_location_filter_preferences(
             parsed = _parse_loc(value)
             if parsed.get("country") == "non-us":
                 name = parsed.get("country_name") or "non-us"
-            elif parsed.get("country") == "US" or parsed.get("state"):
+            elif parsed.get("country") == "US" or parsed.get("state") or named_area_for(value):
                 name = "united states"
             else:
                 continue
@@ -1746,16 +1785,27 @@ class JobFinderPipeline:
         # starved when a board's circuit breaker trips (rate limit) mid-run.
         specialty_kw = _get_specialty_keywords(self.config)
         prioritized = sorted(consolidated, key=lambda t: _search_query_priority(t, specialty_kw))
-        search_tasks: list[tuple[str, str]] = []
         # Cover every role in the primary place before spending a second query
         # on the same role elsewhere. The old role-major order could use the
         # entire task budget on the first few titles (city + remote) and never
         # ask a board about later saved roles at all. Each place keeps its own
         # volume budget (see _BoardPlaceBudget), so a full first place never
         # cancels the later places' queries.
-        for loc in locations:
-            for term in prioritized:
-                search_tasks.append((term, loc))
+        search_tasks, query_origin = _place_major_search_tasks(locations, prioritized)
+        anchors_per_place: dict[str, int] = {}
+        for saved_place, _radius in query_origin.values():
+            key = saved_place.strip().lower()
+            anchors_per_place[key] = anchors_per_place.get(key, 0) + 1
+        for saved_place in locations:
+            count = anchors_per_place.get(saved_place.strip().lower(), 1)
+            if count > 1 and progress:
+                progress(
+                    f"{saved_place}: searching {count} anchor cities, "
+                    f"{count * len(prioritized)} queries count toward the query cap"
+                )
+
+        def _origin(query_loc: str) -> tuple[str, int | None]:
+            return query_origin.get(query_loc.strip().lower(), (query_loc, None))
 
         # Hard cap on total search tasks to avoid 8+ minute searches. The cap
         # bounds keyword queries only: a saved role runs in every chosen place
@@ -1794,7 +1844,7 @@ class JobFinderPipeline:
                 int(settings.get("min_queries_per_source", len(prioritized)) or len(prioritized)),
             ),
         ) if total_combos else 0
-        budget = _BoardPlaceBudget(max_unique, minimum_queries_per_place)
+        budget = _BoardPlaceBudget(max_unique, minimum_queries_per_place, anchors_per_place)
         jobspy_outcomes: dict[str, list[dict[str, Any]]] = {}
         jobspy_started_at = datetime.now(timezone.utc).replace(tzinfo=None)
         jobspy_started_mono = time.monotonic()
@@ -1807,9 +1857,10 @@ class JobFinderPipeline:
         def _search_one(task: tuple[str, str, list[str] | None]) -> list[dict]:
             term, loc, task_boards = task
             board_key = _jobspy_board_key(task_boards)
+            place, area_radius = _origin(loc)
             # A cancelled future never runs; this catches tasks a worker
             # dequeued before the cancellation loop reached them.
-            if budget.stop_event(board_key, loc).is_set():
+            if budget.stop_event(board_key, place).is_set():
                 return []
             telemetry: dict[str, Any] = {
                 "term": term,
@@ -1820,7 +1871,8 @@ class JobFinderPipeline:
                 is_remote = True if loc.lower() == "remote" else None
                 country_by_location = settings.get("country_by_location", {}) or {}
                 task_country = str(
-                    country_by_location.get(loc.casefold())
+                    country_by_location.get(place.casefold())
+                    or country_by_location.get(loc.casefold())
                     or settings.get("country")
                     or "USA"
                 )
@@ -1837,7 +1889,7 @@ class JobFinderPipeline:
                     # Descriptions still come from Indeed, Glassdoor, Google.
                     # LinkedIn results keep title/company/location/salary/URL.
                     linkedin_fetch_description=False,
-                    distance=search_distance,
+                    distance=area_radius if area_radius is not None else search_distance,
                     # Cap each board scrape so one hung/CAPTCHA-walled board can't
                     # stall a worker for minutes. After a few timeouts the per-board
                     # circuit breaker opens and the board is skipped outright.
@@ -1868,10 +1920,10 @@ class JobFinderPipeline:
                 jobspy_outcomes.setdefault(board_key, []).append(telemetry)
                 counter["done"] += 1
                 n = counter["done"]
-            place_capped = budget.record(board_key, loc, jobs)
+            place_capped = budget.record(board_key, place, jobs)
             if progress:
                 sources = ", ".join(set(j.get("source", "?") for j in jobs)) if jobs else "no boards"
-                suffix = f" ({board_key} coverage complete for {loc})" if place_capped else ""
+                suffix = f" ({board_key} coverage complete for {place})" if place_capped else ""
                 progress(f"  [{n}/{total_tasks}] '{term}' in {loc} → {len(jobs)} results from {sources}{suffix}")
             return jobs
 
@@ -2014,7 +2066,9 @@ class JobFinderPipeline:
                         cancelled_places.add(capped_key)
                         cancelled = 0
                         for queued, (_, queued_loc, queued_boards) in futures.items():
-                            queued_key = _BoardPlaceBudget.key(_jobspy_board_key(queued_boards), queued_loc)
+                            queued_key = _BoardPlaceBudget.key(
+                                _jobspy_board_key(queued_boards), _origin(queued_loc)[0]
+                            )
                             if queued_key == capped_key and queued.cancel():
                                 cancelled += 1
                         if cancelled:

@@ -7,6 +7,8 @@ from typing import Any
 
 import requests
 
+from job_finder.place_areas import NAMED_AREAS
+
 from app.config import get_settings
 from app.schemas.workspace import LocationSuggestion
 
@@ -49,6 +51,18 @@ _LOCAL_PLACES: list[dict[str, Any]] = [
     {"label": "Sao Paulo, Brazil", "kind": "city", "city": "Sao Paulo", "region": "Sao Paulo", "country": "Brazil", "country_code": "BR", "lat": -23.5558, "lon": -46.6396},
     {"label": "Mexico City, Mexico", "kind": "city", "city": "Mexico City", "region": "Mexico City", "country": "Mexico", "country_code": "MX", "lat": 19.4326, "lon": -99.1332},
     {"label": "Cape Town, South Africa", "kind": "city", "city": "Cape Town", "region": "Western Cape", "country": "South Africa", "country_code": "ZA", "lat": -33.9249, "lon": 18.4241},
+]
+# No "region" on an area: a region of California would widen the saved
+# place to the whole state in the pipeline's location gate.
+_LOCAL_PLACES += [
+    {
+        "label": area.label,
+        "kind": "region",
+        "country": "United States",
+        "country_code": "US",
+        "aliases": [*area.names, *area.aliases],
+    }
+    for area in NAMED_AREAS
 ]
 
 
@@ -111,6 +125,7 @@ def _search_local(query: str, limit: int) -> list[LocationSuggestion]:
             item.get("region", ""),
             item.get("country", ""),
             item.get("country_code", ""),
+            *item.get("aliases", ()),
         ]
         if any(normalized in _normalize(value) for value in haystacks if value):
             matches.append(item)

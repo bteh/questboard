@@ -6,7 +6,9 @@ path's JobSpy wrapper, Indeed only, with Indeed's own part-time filter and
 a tight radius around the saved place. Indeed ignores the part-time filter
 when a posted-within window is set, so the window is applied here on
 date_posted instead. No saved place means no fetch: a
-nationwide part-time firehose is not "near you".
+nationwide part-time firehose is not "near you". A saved area ("San Gabriel
+Valley (626)") runs at its anchor cities (job_finder.place_areas), each term
+at every anchor, and repeats across anchors drop in filter_rows.
 
 A row stays only when it reads as an hourly shift: Indeed's job type is
 not full-time alone, the title doesn't say full-time or name a salaried
@@ -22,6 +24,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 
+from job_finder.place_areas import search_places
 from job_finder.tools.scrapers._registry import register_scraper
 from job_finder.tools.scrapers._utils import _parse_posted_date, publish_partial
 
@@ -48,6 +51,7 @@ _MIN_MAX_DAYS = 30
 _PER_TERM = 100
 RESULT_CEILING = 500
 _WORKERS = 3
+_MAX_WORKERS = 6
 _TERM_TIMEOUT_S = 30.0
 # run_scrapers stops waiting at 100s: no new term starts after 80s, and no
 # term may run past 95s
@@ -180,26 +184,31 @@ def search_indeed_parttime(
     days = max(max_days_old or 0, _MIN_MAX_DAYS)
     started = time.monotonic()
 
-    def _fetch(term: str) -> list[dict]:
+    anchors = search_places(where)
+    tasks = [(term, anchor, radius) for term in SEARCH_TERMS for anchor, radius in anchors]
+
+    def _fetch(task: tuple[str, str, int | None]) -> list[dict]:
+        term, anchor, radius = task
         elapsed = time.monotonic() - started
         if elapsed > _TOTAL_BUDGET_S:
-            logger.info("indeed-parttime: time budget spent before %r", term)
+            logger.info("indeed-parttime: time budget spent before %r in %s", term, anchor)
             return []
         rows = search_jobs(
             search_term=term,
-            location=where,
+            location=anchor,
             results_wanted=_PER_TERM,
             hours_old=None,
             boards=["indeed"],
-            distance=DISTANCE_MILES,
+            distance=max(DISTANCE_MILES, radius or 0),
             job_type="parttime",
             scrape_timeout=max(1.0, min(_TERM_TIMEOUT_S, _HARD_STOP_S - elapsed)),
         )
         publish_partial(partial_sink, filter_rows(rows, max_results, days))
         return rows
 
-    with ThreadPoolExecutor(max_workers=_WORKERS) as pool:
-        per_term = list(pool.map(_fetch, SEARCH_TERMS))
+    workers = min(_MAX_WORKERS, _WORKERS * len(anchors))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        per_term = list(pool.map(_fetch, tasks))
 
     raw = [row for rows in per_term for row in rows]
     results = filter_rows(raw, max_results, days)
