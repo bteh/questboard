@@ -124,7 +124,7 @@ wrapper, Indeed only, `job_type=parttime`, 10 miles around the saved
 place, eight fixed terms (barista, cafe, boba, server, host, retail
 associate, cashier, event staff). Indeed drops the part-time filter
 whenever `hours_old` is sent, so the source sends none and keeps the
-last 14 days by `date_posted` itself. It drops full-time-only rows,
+last 30 days by `date_posted` itself (owner call, 2026-10-08: cafe posts stay open for weeks). It drops full-time-only rows,
 titles that say full-time or name a salaried role (manager, supervisor,
 sous chef), and yearly pay. No saved place means no fetch.
 

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -248,3 +248,25 @@ def test_declared_ceiling_survives_the_quest_refresh_cap(mod) -> None:
     for r in rows:
         by_source[r["source"]] = by_source.get(r["source"], 0) + 1
     assert by_source == {"indeed-parttime": mod.RESULT_CEILING, "other-parttime": 100}
+
+
+def test_keeps_shifts_up_to_30_days_old_even_under_the_refresh_14_day_window(mod) -> None:
+    # Owner chose 30 days on Oct 8 2026: cafe posts stay open for weeks, and
+    # a 14-day cut dropped about half the barista posts near LA. run_scrapers
+    # always passes max_days_old=14, so the source owns this floor.
+    today = date.today()
+
+    def fake_search_jobs(**kw):
+        if kw["search_term"] != "barista":
+            return []
+        return [
+            _row(url="https://www.indeed.com/viewjob?jk=a", company="A",
+                 date_posted=(today - timedelta(days=25)).isoformat()),
+            _row(url="https://www.indeed.com/viewjob?jk=b", company="B",
+                 date_posted=(today - timedelta(days=40)).isoformat()),
+        ]
+
+    with patch("job_finder.tools.job_search_tool.search_jobs", fake_search_jobs):
+        rows = mod.search_indeed_parttime(place="Los Angeles, CA", max_days_old=14)
+
+    assert [r["company"] for r in rows] == ["A"]

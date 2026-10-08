@@ -42,7 +42,7 @@ SEARCH_TERMS: tuple[str, ...] = (
 )
 
 DISTANCE_MILES = 10
-_DEFAULT_MAX_DAYS = 14
+_MIN_MAX_DAYS = 30
 # Live probe near Koreatown, Oct 8 2026: barista 90, coffee 84 part-time
 # posts within 10 miles, each term answering in 10-20s.
 _PER_TERM = 100
@@ -124,7 +124,7 @@ def _too_old(row: dict, cutoff: datetime) -> bool:
 def filter_rows(
     rows: list[dict],
     max_results: int,
-    max_days_old: int = _DEFAULT_MAX_DAYS,
+    max_days_old: int = _MIN_MAX_DAYS,
     now: datetime | None = None,
 ) -> list[dict]:
     """Keep recent part-time shifts, drop repeats across search terms."""
@@ -177,7 +177,7 @@ def search_indeed_parttime(
 
     from job_finder.tools.job_search_tool import search_jobs
 
-    days = max_days_old or _DEFAULT_MAX_DAYS
+    days = max(max_days_old or 0, _MIN_MAX_DAYS)
     started = time.monotonic()
 
     def _fetch(term: str) -> list[dict]:
