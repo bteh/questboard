@@ -71,6 +71,6 @@ describe('the kinds registry', () => {
     expect(facetsFor('nope')).toEqual([]);
     // legacy spellings resolve to their kind's facets
     expect(facetsFor('camera').map((f) => f.id)).toEqual(['casting', 'voice', 'music', 'asian']);
-    expect(facetsFor('parttime').map((f) => f.id)).toEqual(['cafe', 'restaurant', 'retail', 'events']);
+    expect(facetsFor('parttime').map((f) => f.id)).toEqual(['cafe', 'restaurant', 'retail', 'events', 'office']);
   });
 });

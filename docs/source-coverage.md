@@ -133,6 +133,15 @@ Angeles, CA": 50 of 50 rows part-time (33 part-time, 17 part or full),
 32 with stated hourly pay. The whole eight-term sweep took 6s and kept
 100 rows (the per-source cap).
 
+Office & data (owner ask 2026-10-08: part-time work that can lead to a
+career, "mainly office work or data"): five more terms after the cafe
+ones (receptionist, office assistant, data entry, bookkeeper, research
+assistant) and an `office` facet on the lane. Bare "clerk" and
+"coordinator" are out of the facet: live near LA, 11 of 15 clerk titles
+were grocery clerks, and descriptions name "the Site Coordinator" on
+cashier and after-school posts. "Assistant to the Director" no longer
+trips the salaried-title drop.
+
 Declined in the same pass, each fetched live 2026-10-08:
 
 - **Culinary Agents**: listings are in plain HTML and robots.txt allows

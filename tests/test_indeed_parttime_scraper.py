@@ -109,6 +109,28 @@ def test_salaried_manager_titles_drop(mod) -> None:
     assert not mod.keep_row(_row(salary_min=52000.0, salary_period="yearly"))
 
 
+def test_office_terms_keep_assistants_and_drop_office_managers(mod) -> None:
+    # Owner, Oct 8 2026: part-time office/data work that leads to a career.
+    # Titles from the live LA sweep that day.
+    for title in ("Office Manager", "Office Manager and Assistant", "Assistant Office Manager"):
+        assert not mod.keep_row(_row(title=title)), title
+    for title in (
+        "Research Assistant (Part-Time)",
+        "Research Assistant",
+        "Receptionist",
+        "Data Entry / Customer Service Clerk",
+        "Administrative Assistant to the Director of Operations",
+        "Executive Assistant",
+    ):
+        assert mod.keep_row(_row(title=title)), title
+
+
+def test_office_terms_run_right_after_the_cafe_terms(mod) -> None:
+    assert mod.SEARCH_TERMS[4:9] == (
+        "receptionist", "office assistant", "data entry", "bookkeeper", "research assistant",
+    )
+
+
 def test_same_ad_same_place_under_a_new_url_drops(mod) -> None:
     twins = [
         _row(url="https://www.indeed.com/viewjob?jk=a"),

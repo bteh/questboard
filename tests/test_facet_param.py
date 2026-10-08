@@ -182,3 +182,43 @@ def test_asian_roles_facet_finds_calls_seeking_asian_talent(api_client) -> None:
         "Commercial, AAPI family",
         "Mom role, sitcom pilot",
     }
+
+
+def _seed_parttime(jf_db) -> None:
+    rows = (
+        ("Front Desk Receptionist", "https://x.example/p1", "Answer phones, greet patients", "parttime"),
+        ("Part-Time Admin Assistant", "https://x.example/p2", "Filing and data entry for a small firm", "parttime"),
+        ("Research Assistant (Part-Time)", "https://x.example/p3", "Help a USC lab run studies", "parttime"),
+        ("Part-Time Invoice Clerk", "https://x.example/p4", "Match invoices to purchase orders", "parttime"),
+        ("Produce Clerk", "https://x.example/p5", "Stock and rotate produce", "parttime"),
+        ("After School Program Leader", "https://x.example/p6",
+         "Under the direct supervision of the Program Coordinator", "parttime"),
+        ("Marketing Events Coordinator", "https://x.example/p7", "Run pop-ups on weekends", "parttime"),
+        ("Barista", "https://x.example/p8", "Espresso bar, mornings", "parttime"),
+    )
+    for title, url, description, vertical in rows:
+        jf_db.save_application(
+            job_title=title, company="Fixture", job_url=url,
+            description=description, vertical=vertical,
+        )
+
+
+def test_office_facet_finds_part_time_office_and_data_work(api_client) -> None:
+    # Owner, Oct 8 2026: part-time office/data work that can lead to a career.
+    # Bare "clerk" and "coordinator" stay out: near LA most clerk posts were
+    # grocery clerks, and cashier and after-school posts mention reporting
+    # to a coordinator in their descriptions.
+    client, jf_db = api_client
+    _seed_parttime(jf_db)
+
+    resp = client.get(
+        "/api/v1/applications", params={"vertical": "parttime", "facet": "office"}
+    )
+    assert resp.status_code == 200, resp.text
+    titles = {item["job_title"] for item in resp.json()["items"]}
+    assert titles == {
+        "Front Desk Receptionist",
+        "Part-Time Admin Assistant",
+        "Research Assistant (Part-Time)",
+        "Part-Time Invoice Clerk",
+    }

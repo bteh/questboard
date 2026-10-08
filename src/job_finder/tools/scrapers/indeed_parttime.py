@@ -34,6 +34,11 @@ SEARCH_TERMS: tuple[str, ...] = (
     "coffee",
     "cafe",
     "boba",
+    "receptionist",
+    "office assistant",
+    "data entry",
+    "bookkeeper",
+    "research assistant",
     "server",
     "host",
     "retail associate",
@@ -61,6 +66,10 @@ _SALARIED_TITLE_RE = re.compile(
     r"|district|regional|salaried)\b",
     re.IGNORECASE,
 )
+_ASSISTS_THE_BOSS_RE = re.compile(
+    r"\bto (?:the |our |an? )?(?:[\w-]+ ){0,3}?(?:manager|director|supervisor)\b",
+    re.IGNORECASE,
+)
 _REMOTE_PLACES = {"", "remote", "anywhere", "online", "us", "usa", "united states"}
 
 
@@ -80,7 +89,7 @@ def keep_row(row: dict) -> bool:
         return False
     if _FULL_TIME_TITLE_RE.search(title) and not _PART_TIME_TITLE_RE.search(title):
         return False
-    if _SALARIED_TITLE_RE.search(title):
+    if _SALARIED_TITLE_RE.search(_ASSISTS_THE_BOSS_RE.sub(" ", title)):
         return False
     if str(row.get("salary_period") or "").lower() == "yearly":
         return False
@@ -151,7 +160,7 @@ def filter_rows(
     name=SOURCE,
     display_name="Indeed",
     url="https://www.indeed.com",
-    description="Part-time cafe, restaurant, retail, and event shifts within 10 miles of your place",
+    description="Part-time cafe, restaurant, retail, event, and office shifts within 10 miles of your place",
     category="jobspy",
     kind="parttime",
     enabled_by_default=False,

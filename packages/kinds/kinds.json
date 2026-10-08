@@ -1,5 +1,5 @@
 {
-  "$comment": "The single source of truth for Questboard's quest kinds. Both the TypeScript wrapper (packages/kinds/src/index.ts) and the Python loader (src/job_finder/kinds.py) read this file; sync tests on both sides fail if either drifts. Adding a kind: add an entry here (id, label, sub, hue, order) plus a stamp in @questboard/ui. legacy_verticals maps historical DB vertical values onto kinds at read time so old rows never need a migration. A kind may carry facets: its own sub-filters (id, label, terms), where terms are the words the API matches against a row's title and description. Taxonomy rationale lives in docs/sidequest-research.md and docs/quest-taxonomy-rework.md.",
+  "$comment": "The single source of truth for Questboard's quest kinds. Both the TypeScript wrapper (packages/kinds/src/index.ts) and the Python loader (src/job_finder/kinds.py) read this file; sync tests on both sides fail if either drifts. Adding a kind: add an entry here (id, label, sub, hue, order) plus a stamp in @questboard/ui. legacy_verticals maps historical DB vertical values onto kinds at read time so old rows never need a migration. A kind may carry facets: its own sub-filters (id, label, terms), where terms are the words the API matches against a row's title and description. Terms match descriptions too, so a bare word that descriptions use for someone else's job (clerk: grocery clerks; coordinator: 'report to the Site Coordinator') is spelled out as the office phrases instead. Taxonomy rationale lives in docs/sidequest-research.md and docs/quest-taxonomy-rework.md.",
   "kinds": [
     {
       "id": "think",
@@ -388,6 +388,35 @@
             "event staff",
             "catering",
             "banquet"
+          ]
+        },
+        {
+          "id": "office",
+          "label": "Office & data",
+          "terms": [
+            "receptionist",
+            "front desk",
+            "office assistant",
+            "administrative assistant",
+            "admin assistant",
+            "data entry",
+            "bookkeep",
+            "clerical",
+            "office clerk",
+            "invoice clerk",
+            "billing clerk",
+            "file clerk",
+            "records clerk",
+            "accounting clerk",
+            "research assistant",
+            "lab assistant",
+            "scheduler",
+            "office coordinator",
+            "patient coordinator",
+            "treatment coordinator",
+            "case coordinator",
+            "admissions coordinator",
+            "scheduling coordinator"
           ]
         }
       ]
