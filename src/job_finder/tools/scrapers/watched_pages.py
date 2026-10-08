@@ -10,7 +10,9 @@ Part-time lane, with the shop as the company and "Their site" as the
 source.
 
 How a page is read lives in _careers_page.py (hosted board hand-off,
-JobPosting JSON-LD, known listing shapes). What stays is decided here:
+JobPosting JSON-LD, known listing shapes) and _hosted_boards.py (Rippling,
+Workday, ADP, and Paylocity boards read through their APIs). What stays
+is decided here:
 in-person rows near the saved place (Los Angeles when none is saved)
 that state part-time or hourly pay. Full-time salaried roles drop. Pay
 shows only when the page states it. No LLM.
@@ -33,6 +35,7 @@ from typing import Callable
 from urllib.parse import urlsplit
 
 from job_finder.tools.scrapers import _careers_page as pages
+from job_finder.tools.scrapers import _hosted_boards as boards
 from job_finder.tools.scrapers._polite_fetch import FetchError, fetch_html
 from job_finder.tools.scrapers._reddit import LA_LABEL, stated_place
 from job_finder.tools.scrapers._registry import register_scraper
@@ -64,12 +67,32 @@ _PART_TIME_TEXT_RE = re.compile(r"\bpart[- ]?time\b", re.IGNORECASE)
 _HOURLY_TEXT_RE = re.compile(r"\bhourly\b|\bper hour\b|/\s*(?:hr|hour)\b", re.IGNORECASE)
 
 
+def _area_verdict(where: str, place: str | None) -> bool | None:
+    """The board place filter's own area table (job_finder.place_areas):
+    True inside the saved area or metro, False outside a named area ("San
+    Gabriel Valley (626)", "North Orange County"), None to fall through.
+    Always None until that module lands."""
+    try:
+        from job_finder.place_areas import area_for, location_in_area, named_area_for
+    except ImportError:
+        return None
+    area = area_for(place or "")
+    if area is None:
+        return None
+    if location_in_area(where, area):
+        return True
+    return False if named_area_for(place or "") else None
+
+
 def place_reachable(location: str, place: str | None) -> bool:
-    """Whether a row's stated location is the saved place's metro."""
-    target = stated_place(place or "") or stated_place(DEFAULT_PLACE)
+    """Whether a row's stated location is the saved place's metro or area."""
     where = (location or "").strip()
     if not where:
         return True
+    verdict = _area_verdict(where, place)
+    if verdict is not None:
+        return verdict
+    target = stated_place(place or "") or stated_place(DEFAULT_PLACE)
     metro = stated_place(where)
     if metro == "Remote":
         return False
@@ -171,6 +194,13 @@ def starter_list() -> list[dict]:
     ]
 
 
+def starter_name(url: str) -> str:
+    """The suggestion's shop name for a starter URL. A hosted board names
+    its tenant ("fastretailing"), not the shop the user picked."""
+    key = (url or "").rstrip("/").lower()
+    return next((s["name"] for s in starter_list() if s["url"].rstrip("/").lower() == key), "")
+
+
 def check_page(
     url: str,
     place: str | None = None,
@@ -178,6 +208,7 @@ def check_page(
     *,
     fetch: Callable[[str], str] = fetch_html,
     ats_fetch: Callable[[str, str], list[dict]] = _ats_rows,
+    board_read: Callable[..., tuple[int, list[dict]]] = boards.read_board,
 ) -> dict:
     """Read one watched page.
 
@@ -185,18 +216,40 @@ def check_page(
     the page lists, ``rows`` are the quest rows kept for the Part-time lane,
     ``error`` is a plain reason when the page could not be read.
     """
+    name = name or starter_name(url)
     result: dict = {"name": name, "found": 0, "rows": [], "error": "", "via": ""}
-    board = pages.find_ats_board(url)
+    hosted = boards.find_board(url)
+    board = None if hosted else pages.find_ats_board(url)
     html = ""
-    if board is None:
+    if hosted is None and board is None:
         try:
             html = fetch(url)
         except FetchError as exc:
             result["error"] = str(exc)
             return result
         board = pages.find_ats_board(html)
+        hosted = None if board else boards.find_board(html)
     shop = name or (pages.shop_name(html, url) if html else "")
     result["name"] = shop
+
+    if hosted:
+        result["via"] = hosted.kind
+        try:
+            result["found"], raw = board_read(
+                hosted, lambda where: place_reachable(where, place),
+            )
+        except Exception as exc:
+            logger.warning("watched page %s: %s board failed: %s", url, hosted.kind, exc)
+            result["error"] = (
+                str(exc) if isinstance(exc, FetchError)
+                else "Could not read the job board that page links to."
+            )
+            return result
+        if not shop:
+            shop = next((str(r.get("company") or "") for r in raw if r.get("company")), "")
+            result["name"] = shop or hosted.kind.capitalize()
+        result["rows"] = [to_quest_row(r, result["name"]) for r in raw if keep_row(r)]
+        return result
 
     if board:
         ats, slug = board

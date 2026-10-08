@@ -1,0 +1,2334 @@
+{
+ "captured": "2026-10-08",
+ "exchanges": [
+  {
+   "url": "https://fastretailing.wd3.myworkdayjobs.com/wday/cxs/fastretailing/retail_us_Uniqlo/jobs",
+   "body": {
+    "appliedFacets": {},
+    "limit": 20,
+    "offset": 0,
+    "searchText": ""
+   },
+   "json": {
+    "total": 336,
+    "jobPostings": [
+     {
+      "title": "UNIQLO Retail Sales Associate (Full Time & Part Time) - Woodfield Mall",
+      "externalPath": "/job/Schaumburg-IL/UNIQLO-Retail-Sales-Associate--Full-Time---Part-Time----Woodfield-Mall_R00000004177654",
+      "locationsText": "Schaumburg, IL",
+      "postedOn": "Posted Today"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal)- Woodfield Mall",
+      "externalPath": "/job/Schaumburg-IL/UNIQLO-Retail-Sales-Associate--Seasonal---Woodfield-Mall_R00000004177298",
+      "locationsText": "Schaumburg, IL",
+      "postedOn": "Posted Today"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full Time)  - The Shops at Mission Viejo",
+      "externalPath": "/job/Mission-Viejo-CA/UNIQLO-Full-Time-Retail-Sales-Associate---Shops-at-Mission-Viejo_R00000004174938",
+      "locationsText": "Mission Viejo, CA",
+      "postedOn": "Posted Today"
+     },
+     {
+      "title": "UNIQLO Sales Associate - Pentagon City",
+      "externalPath": "/job/ArlingtonVA/Retail-Sales-Associate--Full-Time-or-Part-Time--NEW-STORE_R00000004140665",
+      "locationsText": "Arlington,VA",
+      "postedOn": "Posted Today"
+     },
+     {
+      "title": "UNIQLO Loss Prevention Agent (Full-Time) - World Trade Center (New Store Opening)",
+      "externalPath": "/job/New-York-NY/UNIQLO-Loss-Prevention-Agent--Full-Time----World-Trade-Center--New-Store-Opening-_R00000004175164",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted Yesterday"
+     },
+     {
+      "title": "UNIQLO Sales Associate - Union Station",
+      "externalPath": "/job/Washington-DC/DC-Union-Station---Sales-Associate_R00000004124749",
+      "locationsText": "Washington, DC",
+      "postedOn": "Posted Yesterday"
+     },
+     {
+      "title": "UNIQLO Loss Prevention Agent (Full Time) - Bay Plaza",
+      "externalPath": "/job/UNIQLO-NY-Mall-at-Bay-PlazaUQUS/UNIQLO-Loss-Prevention-Agent--Full-Time----Bay-Plaza_R00000004182876",
+      "locationsText": "UNIQLO NY Mall at Bay Plaza(UQUS)",
+      "postedOn": "Posted Yesterday"
+     },
+     {
+      "title": "UNIQLO Loss Prevention Agent (Full Time) - Skyview Center",
+      "externalPath": "/job/Flushing-NY/UNIQLO-Loss-Prevention-Agent--Full-Time----Skyview-Center_R00000004182859",
+      "locationsText": "Flushing, NY",
+      "postedOn": "Posted Yesterday"
+     },
+     {
+      "title": "Disney Springs - Retail Housekeeping (Part Time)",
+      "externalPath": "/job/Lake-Buena-Vista-FL/Disney-Springs---Retail-Housekeeping--Part-Time-_R00000004168691",
+      "locationsText": "Lake Buena Vista, FL",
+      "postedOn": "Posted Yesterday"
+     },
+     {
+      "title": "Disney Springs - Retail Sales Associate (Part-Time)",
+      "externalPath": "/job/Orlando-FL/Disney-Springs---Retail-Sales-Associate--Part-Time-_R00000004100166",
+      "locationsText": "Orlando, FL",
+      "postedOn": "Posted Yesterday"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Disney Springs, FL",
+      "externalPath": "/job/Orlando-FL/UNIQLO-Retail-Sales-Associate--Seasonal----Disney-Springs--FL_R00000004181813",
+      "locationsText": "Orlando, FL",
+      "postedOn": "Posted Yesterday"
+     },
+     {
+      "title": "UNIQLO Sales Associate (Full Time) - Tysons Corner",
+      "externalPath": "/job/Mclean-VA/Tysons-Corner-Sales-Associate--Full-Time-_R00000004168389",
+      "locationsText": "Mclean, VA",
+      "postedOn": "Posted 2 Days Ago"
+     },
+     {
+      "title": "UNIQLO Sales Associate (Part Time) - Tysons Corner",
+      "externalPath": "/job/Mclean-VA/Tysons-Corner-Sales-Associate--Part-Time-_R00000004168391",
+      "locationsText": "Mclean, VA",
+      "postedOn": "Posted 2 Days Ago"
+     },
+     {
+      "title": "UNIQLO Seasonal Sales Associate - Tysons Corner",
+      "externalPath": "/job/Mclean-VA/Tysons-Corner-Seasonal-Sales-Associate_R00000004167933",
+      "locationsText": "Mclean, VA",
+      "postedOn": "Posted 2 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Westfield Culver City",
+      "externalPath": "/job/Culver-CityCA/UNIQLO-Retail-Sales-Associate--Seasonal----Westfield-Culver-City_R00000004182863",
+      "locationsText": "Culver City,CA",
+      "postedOn": "Posted 2 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part Time) - King of Prussia",
+      "externalPath": "/job/King-of-Prussia-PA/UNIQLO-Retail-Sales-Associate--Part-Time----King-of-Prussia_R00000004179082",
+      "locationsText": "King of Prussia, PA",
+      "postedOn": "Posted 2 Days Ago"
+     },
+     {
+      "title": "Seasonal Sales Associate-Michigan Avenue",
+      "externalPath": "/job/Chicago-IL/Seasonal-Sales-Associate-Michigan-Avenue_R00000004175222",
+      "locationsText": "Chicago, IL",
+      "postedOn": "Posted 2 Days Ago"
+     },
+     {
+      "title": "Part-Time Uniqlo Retail Associate - SOHO",
+      "externalPath": "/job/New-York-NY/Part-Time-Uniqlo-Retail-Associate---SOHO_R00000004175549",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 3 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal Part-Time) - Parks at Arlington",
+      "externalPath": "/job/ArlingtonTX/UNIQLO-Retail-Sales-Associate--Seasonal-Part-Time----Parks-at-Arlington_R00000004178460",
+      "locationsText": "Arlington,TX",
+      "postedOn": "Posted 3 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal Part-Time) - Stonebriar Centre",
+      "externalPath": "/job/FriscoTX/UNIQLO-Retail-Sales-Associate--Seasonal-Part-Time----Stonebriar-Centre_R00000004178459",
+      "locationsText": "Frisco,TX",
+      "postedOn": "Posted 3 Days Ago"
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://fastretailing.wd3.myworkdayjobs.com/wday/cxs/fastretailing/retail_us_Uniqlo/jobs",
+   "body": {
+    "appliedFacets": {},
+    "limit": 20,
+    "offset": 20,
+    "searchText": ""
+   },
+   "json": {
+    "total": 0,
+    "jobPostings": [
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal Part-Time) - Dallas Galleria",
+      "externalPath": "/job/Dallas-TX/UNIQLO-Retail-Sales-Associate--Seasonal-Part-Time----Dallas-Galleria_R00000004178427",
+      "locationsText": "Dallas, TX",
+      "postedOn": "Posted 3 Days Ago"
+     },
+     {
+      "title": "UNIQLO Visual Merchandising Area Manager (Full-Time) - Roosevelt Field",
+      "externalPath": "/job/Garden-City-NY/UNIQLO-Visual-Merchandising-Area-Manager--Full-Time----Roosevelt-Field_R00000004182763",
+      "locationsText": "Garden City, NY",
+      "postedOn": "Posted 6 Days Ago"
+     },
+     {
+      "title": "UNIQLO Visual Merchandising Associate (Full-Time) - Roosevelt Field",
+      "externalPath": "/job/Garden-City-NY/UNIQLO-Visual-Merchandising-Associate--Full-Time----Roosevelt-Field_R00000004182762",
+      "locationsText": "Garden City, NY",
+      "postedOn": "Posted 6 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal)- State Street",
+      "externalPath": "/job/Chicago-IL/UNIQLO-Retail-Sales-Associate--Seasonal---State-Street_R00000004177300",
+      "locationsText": "Chicago, IL",
+      "postedOn": "Posted 6 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Supervisor In Training - Westfield Oakridge",
+      "externalPath": "/job/San-JoseCA/UNIQLO-Retail-Supervisor-In-Training---Westfield-Oakridge_R00000004177404",
+      "locationsText": "San Jose,CA",
+      "postedOn": "Posted 6 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Supervisor in Training (Full-Time)",
+      "externalPath": "/job/Boston-MA/Newbury-Street---Retail-Supervisor-in-Training--Full-Time-_R00000004100152",
+      "locationsText": "Boston, MA",
+      "postedOn": "Posted 6 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal)",
+      "externalPath": "/job/Boston-MA/Seasonal-Sales-Associate-Newbury_R00000004175223",
+      "locationsText": "Boston, MA",
+      "postedOn": "Posted 6 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full-Time or Part-Time)",
+      "externalPath": "/job/Boston-MA/Seasonal-Retail-Sales-Associate--Part-Time-_R00000004144852",
+      "locationsText": "Boston, MA",
+      "postedOn": "Posted 6 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Mission Viejo",
+      "externalPath": "/job/Mission-Viejo-CA/UNIQLO-Retail-Sales-Associate--Seasonal----Mission-Viejo_R00000004182734",
+      "locationsText": "2 Locations",
+      "postedOn": "Posted 7 Days Ago"
+     },
+     {
+      "title": "Uniqlo Housekeeper / Retail Cleaner -Michigan Avenue - (Full-Time)",
+      "externalPath": "/job/UNIQLO-IL-Michigan-AvenueUQUS/Uniqlo-Housekeeper---Retail-Cleaner--Michigan-Avenue----Full-Time-_R00000004182729",
+      "locationsText": "UNIQLO IL Michigan Avenue(UQUS)",
+      "postedOn": "Posted 7 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part Time) - Menlo Park",
+      "externalPath": "/job/Edison-NJ/Menlo-Park---Retail-Sales-Associate--Full-Time-_R00000004100130",
+      "locationsText": "Edison, NJ",
+      "postedOn": "Posted 7 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate - Christiana Mall",
+      "externalPath": "/job/NewarkDE/UNIQLO-Retail-Sales-Associate---Christiana-Mall_R00000004181049",
+      "locationsText": "Newark,DE",
+      "postedOn": "Posted 7 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal Part-Time) - Topanga",
+      "externalPath": "/job/UNIQLO-CA-Westfield-TopangaUQUS/UNIQLO-Retail-Sales-Associate--Seasonal-Part-Time----Topanga_R00000004182684",
+      "locationsText": "UNIQLO CA Westfield Topanga(UQUS)",
+      "postedOn": "Posted 7 Days Ago"
+     },
+     {
+      "title": "UNIQLO Loss Prevention Agent - Bellevue Collection",
+      "externalPath": "/job/Bellevue-WA/UNIQLO-Loss-Prevention-Agent---Bellevue-Collection_R00000004182635",
+      "locationsText": "Bellevue, WA",
+      "postedOn": "Posted 8 Days Ago"
+     },
+     {
+      "title": "Loss Prevention Supervisor- Westfield Valley Fair Mall",
+      "externalPath": "/job/Santa-Clara-CA/Loss-Prevention-Supervisor--Westfield-Valley-Fair-Mall_R00000004182123",
+      "locationsText": "Santa Clara, CA",
+      "postedOn": "Posted 8 Days Ago"
+     },
+     {
+      "title": "UNIQLO Visual Merchandising Supervisor (Full-time) - The Shops at Georgetown",
+      "externalPath": "/job/Washington-DC/UNIQLO-Visual-Merchandising-Supervisor--Full-time----The-Shops-at-Georgetown_R00000004175224",
+      "locationsText": "Washington, DC",
+      "postedOn": "Posted 8 Days Ago"
+     },
+     {
+      "title": "UNIQLO Visual Merchandising Supervisor (Full Time) - Tysons Corner",
+      "externalPath": "/job/Mclean-VA/Visual-Merchandising-Supervisor_R00000004123738",
+      "locationsText": "Mclean, VA",
+      "postedOn": "Posted 8 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full-Time) - Westfield Topanga",
+      "externalPath": "/job/Los-Angeles-CA/UNIQLO-Retail-Sales-Associate--Full-Time----Westfield-Topanga_R00000004182683",
+      "locationsText": "Los Angeles, CA",
+      "postedOn": "Posted 8 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full Time) - Newport Centre",
+      "externalPath": "/job/Jersey-City-NJ/Retail-Sales-Associate--Full-Time-or-Part-Time-_R00000004115742",
+      "locationsText": "Jersey City, NJ",
+      "postedOn": "Posted 8 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal Part-Time) - Cherry Hill",
+      "externalPath": "/job/Cherry-Hill-NJ/UNIQLO-Retail-Sales-Associate--Seasonal-Part-Time----Cherry-Hill_R00000004182643",
+      "locationsText": "Cherry Hill, NJ",
+      "postedOn": "Posted 9 Days Ago"
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://fastretailing.wd3.myworkdayjobs.com/wday/cxs/fastretailing/retail_us_Uniqlo/jobs",
+   "body": {
+    "appliedFacets": {},
+    "limit": 20,
+    "offset": 40,
+    "searchText": ""
+   },
+   "json": {
+    "total": 0,
+    "jobPostings": [
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Hillsdale",
+      "externalPath": "/job/San-Mateo-CA/UNIQLO-Retail-Sales-Associate--Seasonal----Hillsdale_R00000004182502",
+      "locationsText": "San Mateo, CA",
+      "postedOn": "Posted 10 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part-Time) - Willowbrook Mall",
+      "externalPath": "/job/Wayne-NJ/Part-Time-Sales-Associate-Willowbrook-UNIQLO_R00000004100134",
+      "locationsText": "Wayne, NJ",
+      "postedOn": "Posted 10 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate - Southcenter Mall",
+      "externalPath": "/job/TukwilaWA/UNIQLO-Retail-Sales-Associate---Southcenter-Tukwila_R00000004176044",
+      "locationsText": "Tukwila,WA",
+      "postedOn": "Posted 13 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate - Tacoma Mall",
+      "externalPath": "/job/Tacoma-WA/UNIQLO-Sales-Associate---Tacoma_R00000004177248",
+      "locationsText": "Tacoma, WA",
+      "postedOn": "Posted 13 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Tacoma Mall",
+      "externalPath": "/job/Tacoma-WA/UNIQLO-Seasonal-Retail-Sales-Associate---Tacoma-Mall_R00000004182108",
+      "locationsText": "Tacoma, WA",
+      "postedOn": "Posted 14 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Southcenter Mall",
+      "externalPath": "/job/TukwilaWA/UNIQLO-Seasonal-Retail-Sales-Associate---Southcenter-Mall_R00000004182105",
+      "locationsText": "Tukwila,WA",
+      "postedOn": "Posted 14 Days Ago"
+     },
+     {
+      "title": "Loss Prevention Supervisor - Southcenter Mall",
+      "externalPath": "/job/TukwilaWA/Loss-Prevention-Supervisor_R00000004177157",
+      "locationsText": "Tukwila,WA",
+      "postedOn": "Posted 14 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Pine Street",
+      "externalPath": "/job/Seattle-WA/UNIQLO-Seasonal-Retail-Sales-Associate---Pine-Street_R00000004182103",
+      "locationsText": "Seattle, WA",
+      "postedOn": "Posted 14 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate - Pine Street",
+      "externalPath": "/job/Seattle-WA/UNIQLO-Retail-Sales-Associate---Pine-Street_R00000004174435",
+      "locationsText": "Seattle, WA",
+      "postedOn": "Posted 14 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal)- Issaquah Commons",
+      "externalPath": "/job/IssaquahWA/UNIQLO-Seasonal-Retail-Sales-Associate---Issaquah-Commons_R00000004182104",
+      "locationsText": "Issaquah,WA",
+      "postedOn": "Posted 14 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate - Issaquah Commons",
+      "externalPath": "/job/IssaquahWA/UNIQLO-Retail-Sales-Associate---Issaquah-Commons_R00000004177301",
+      "locationsText": "Issaquah,WA",
+      "postedOn": "Posted 14 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Supervisor In Training - Issaquah Commons",
+      "externalPath": "/job/IssaquahWA/UNIQLO-Retail-Supervisor-In-Training---Issaquah-Commons_R00000004177069",
+      "locationsText": "Issaquah,WA",
+      "postedOn": "Posted 14 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Alderwood Mall",
+      "externalPath": "/job/Lynnwood-WA/UNIQLO-Retail-Sales-Associate---Alderwood-Mall_R00000004182102",
+      "locationsText": "Lynnwood, WA",
+      "postedOn": "Posted 14 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Bellevue Collection",
+      "externalPath": "/job/Bellevue-WA/UNIQLO-Seasonal-Retail-Sales-Associate---Bellevue-Collection_R00000004177356",
+      "locationsText": "Bellevue, WA",
+      "postedOn": "Posted 14 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part-Time) - Bellevue Collection",
+      "externalPath": "/job/Bellevue-WA/UNIQLO-Retail-Sales-Associate---Bellevue-Collection_R00000004174551",
+      "locationsText": "Bellevue, WA",
+      "postedOn": "Posted 14 Days Ago"
+     },
+     {
+      "title": "UNIQLO Loss Prevention Supervisor - Alderwood Mall",
+      "externalPath": "/job/Lynnwood-WA/UNIQLO-Loss-Prevention-Supervisor---Alderwood-Mall_R00000004178740",
+      "locationsText": "Lynnwood, WA",
+      "postedOn": "Posted 14 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate - Alderwood Mall",
+      "externalPath": "/job/Lynnwood-WA/UNIQLO-Retail-Sales-Associate---Alderwood-Mall_R00000004174553",
+      "locationsText": "Lynnwood, WA",
+      "postedOn": "Posted 14 Days Ago"
+     },
+     {
+      "title": "UNIQLO Loss Prevention Supervisor (Full-Time) - Atlantic Terminal",
+      "externalPath": "/job/Brooklyn-NY/UNIQLO-Loss-Prevention-Supervisor--Full-Time----Atlantic-Terminal_R00000004182548",
+      "locationsText": "Brooklyn, NY",
+      "postedOn": "Posted 14 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - The Shops at Georgetown Park",
+      "externalPath": "/job/Washington-DC/UNIQLO-Retail-Sales-Associate--Seasonal----The-Shops-at-Georgetown-Park_R00000004182547",
+      "locationsText": "Washington, DC",
+      "postedOn": "Posted 14 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Sun Valley",
+      "externalPath": "/job/Concord-CA/UNIQLO-Retail-Sales-Associate--Seasonal----Sun-Valley_R00000004182500",
+      "locationsText": "Concord, CA",
+      "postedOn": "Posted 16 Days Ago"
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://fastretailing.wd3.myworkdayjobs.com/wday/cxs/fastretailing/retail_us_Uniqlo/jobs",
+   "body": {
+    "appliedFacets": {},
+    "limit": 20,
+    "offset": 60,
+    "searchText": ""
+   },
+   "json": {
+    "total": 0,
+    "jobPostings": [
+     {
+      "title": "UNIQLO Loss Prevention Agent (Full-time) - Christiana Mall",
+      "externalPath": "/job/NewarkDE/UNIQLO-Loss-Prevention-Agent--Full-time----Christiana-Mall_R00000004177483",
+      "locationsText": "Newark,DE",
+      "postedOn": "Posted 16 Days Ago"
+     },
+     {
+      "title": "UNIQLO  Loss Prevention Agent (Full-Time) - King of Prussia",
+      "externalPath": "/job/King-of-Prussia-PA/King-of-Prussia---Loss-Prevention-Agent_R00000004175728",
+      "locationsText": "King of Prussia, PA",
+      "postedOn": "Posted 16 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal Part-time) – American Dream Mall",
+      "externalPath": "/job/East-Rutherford-NJ/Retail-Sales-Associate---Seasonal-_R00000004127472",
+      "locationsText": "East Rutherford, NJ",
+      "postedOn": "Posted 16 Days Ago"
+     },
+     {
+      "title": "Uniqlo Human Resources Assistant Manager - Aventura Mall, Miami, Florida",
+      "externalPath": "/job/Miami-FL/Uniqlo-Human-Resources-Assistant-Manager---Aventura-Mall--Miami--Florida_R00000004182490",
+      "locationsText": "Miami, FL",
+      "postedOn": "Posted 16 Days Ago"
+     },
+     {
+      "title": "UNIQLO Visual Merchandising Associate (Full-time) - American Dream",
+      "externalPath": "/job/East-Rutherford-NJ/American-Dream-Visuals-Associate_R00000004106032",
+      "locationsText": "East Rutherford, NJ",
+      "postedOn": "Posted 17 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Bay Street",
+      "externalPath": "/job/Emeryville-CA/UNIQLO-Retail-Sales-Associate--Seasonal----Bay-Street_R00000004182397",
+      "locationsText": "Emeryville, CA",
+      "postedOn": "Posted 20 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Stoneridge",
+      "externalPath": "/job/Pleasanton-CA/UNIQLO-Retail-Sales-Associate--Seasonal----Stoneridge_R00000004182401",
+      "locationsText": "Pleasanton, CA",
+      "postedOn": "Posted 20 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full Time) - Stoneridge",
+      "externalPath": "/job/Pleasanton-CA/UNIQLO-Retail-Sales-Associate--Full-Time----Stoneridge_R00000004182398",
+      "locationsText": "Pleasanton, CA",
+      "postedOn": "Posted 20 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full Time) - Sun Valley",
+      "externalPath": "/job/Concord-CA/UNIQLO-Retail-Sales-Associate--Full-Time----Sun-Valley_R00000004182400",
+      "locationsText": "Concord, CA",
+      "postedOn": "Posted 20 Days Ago"
+     },
+     {
+      "title": "Full Time Retail Visual Associate - Great Mall",
+      "externalPath": "/job/Milpitas-CA/Full-Time-Retail-Visual-Associate---Great-Mall_R00000004181997",
+      "locationsText": "Milpitas, CA",
+      "postedOn": "Posted 20 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Great Mall",
+      "externalPath": "/job/Milpitas-CA/UNIQLO-Retail-Sales-Associate--Seasonal----Great-Mall_R00000004182004",
+      "locationsText": "Milpitas, CA",
+      "postedOn": "Posted 20 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Oakridge",
+      "externalPath": "/job/San-JoseCA/UNIQLO-Retail-Sales-Associate--Seasonal----Oakridge_R00000004182311",
+      "locationsText": "San Jose,CA",
+      "postedOn": "Posted 20 Days Ago"
+     },
+     {
+      "title": "UNIQLO Seasonal Sales Associate  - Arden Fair",
+      "externalPath": "/job/SacramentoCA/UNIQLO-Seasonal-Sales-Associate----Arden-Fair_R00000004182101",
+      "locationsText": "Sacramento,CA",
+      "postedOn": "Posted 20 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Supervisor In Training (Full Time)",
+      "externalPath": "/job/Boston-MA/UNIQLO-Supervisor-In-Training--Full-Time----Downtown-Crossing_R00000004168454",
+      "locationsText": "Boston, MA",
+      "postedOn": "Posted 20 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full-Time or Part-Time)",
+      "externalPath": "/job/Boston-MA/UNIQLO-Retail-Sales-Associate--Full-Time---Part-Time----Downtown-Crossing_R00000004168435",
+      "locationsText": "Boston, MA",
+      "postedOn": "Posted 20 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Westfield Valley Fair",
+      "externalPath": "/job/Santa-Clara-CA/Retail-Seasonal-Sales-Associate---Westfield-Valley-Fair_R00000004182000",
+      "locationsText": "Santa Clara, CA",
+      "postedOn": "Posted 20 Days Ago"
+     },
+     {
+      "title": "Uniqlo Human Resources Coordinator",
+      "externalPath": "/job/Orlando-FL/Uniqlo-Human-Resources-Coordinator_R00000004182097",
+      "locationsText": "Orlando, FL",
+      "postedOn": "Posted 21 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (full time) - Westfield Fashion Square Mall",
+      "externalPath": "/job/Sherman-Oaks-CA/UNIQLO-Retail-Sales-Associate--full-time----Westfield-Fashion-Square-Mall_R00000004182128",
+      "locationsText": "Sherman Oaks, CA",
+      "postedOn": "Posted 21 Days Ago"
+     },
+     {
+      "title": "Uniqlo Loss Prevention Agent - First Colony Mall, Houston, TX",
+      "externalPath": "/job/UNIQLO-TX-First-Colony-MallUQUS/Uniqlo-Loss-Prevention-Agent---First-Colony-Mall--Houston--TX_R00000004182318",
+      "locationsText": "UNIQLO TX First Colony Mall(UQUS)",
+      "postedOn": "Posted 22 Days Ago"
+     },
+     {
+      "title": "Uniqlo Loss Prevention Agent - The Colony, Houston, TX",
+      "externalPath": "/job/UNIQLO-TX-First-Colony-MallUQUS/Uniqlo-Loss-Prevention-Agent---Memorial-City--Houston--TX_R00000004182316",
+      "locationsText": "UNIQLO TX First Colony Mall(UQUS)",
+      "postedOn": "Posted 22 Days Ago"
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://fastretailing.wd3.myworkdayjobs.com/wday/cxs/fastretailing/retail_us_Uniqlo/jobs",
+   "body": {
+    "appliedFacets": {},
+    "limit": 20,
+    "offset": 80,
+    "searchText": ""
+   },
+   "json": {
+    "total": 0,
+    "jobPostings": [
+     {
+      "title": "UNIQLO Loss Prevention Agent (full-time) - Westfield Topanga",
+      "externalPath": "/job/UNIQLO-CA-Westfield-TopangaUQUS/UNIQLO-Loss-Prevention-Agent--full-time----Westfield-Topanga_R00000004182314",
+      "locationsText": "UNIQLO CA Westfield Topanga(UQUS)",
+      "postedOn": "Posted 22 Days Ago"
+     },
+     {
+      "title": "UNIQLO Visual Merchandise Display Supervisor (VMD) (Full-Time) - University Town Center",
+      "externalPath": "/job/San-DiegoCA/UNIQLO-Visual-Merchandise-Display-Supervisor--VMD---Full-Time----University-Town-Center_R00000004182312",
+      "locationsText": "San Diego,CA",
+      "postedOn": "Posted 22 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part-time) - Chestnut St",
+      "externalPath": "/job/Philadelphia-PA/Philadelphia-UNIQLO-Chestnut-Street-Retail-Sales-Associate--Part-Time-_R00000004100167",
+      "locationsText": "Philadelphia, PA",
+      "postedOn": "Posted 23 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part-Time) - Paramus Park",
+      "externalPath": "/job/Paramus-NJ/Retail-Sales-Associate--Full-Time----Paramus-Park--Paramus-NJ_R00000004100132",
+      "locationsText": "Paramus, NJ",
+      "postedOn": "Posted 23 Days Ago"
+     },
+     {
+      "title": "UNIQLO Loss Prevention Supervisor (Full-Time) - Westfield Culver City",
+      "externalPath": "/job/Culver-CityCA/UNIQLO-Loss-Prevention-Supervisor--Full-Time----Westfield-Culver-City_R00000004181083",
+      "locationsText": "Culver City,CA",
+      "postedOn": "Posted 27 Days Ago"
+     },
+     {
+      "title": "UNIQLO Bryant Park on 5th Ave Full-time Retail Sales Associate",
+      "externalPath": "/job/New-York-NY/UNIQLO-Bryant-Park-on-5th-Ave-Full-time-Retail-Sales-Associate_R00000004177117",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 28 Days Ago"
+     },
+     {
+      "title": "UNIQLO Bryant Park on 5th Ave Part-time Retail Sales Associate",
+      "externalPath": "/job/New-York-NY/UNIQLO-Bryant-Park-on-5th-Ave-Part-time-Retail-Sales-Associate_R00000004177118",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 28 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Bryant Park on 5th",
+      "externalPath": "/job/New-York-NY/UNIQLO-Retail-Sales-Associate--Seasonal----Bryant-Park-on-5th_R00000004177770",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 28 Days Ago"
+     },
+     {
+      "title": "Loss Prevention Agent (Full-Time) - Westfield Santa Anita",
+      "externalPath": "/job/Arcadia-CA/Loss-Prevention-Agent--Full-Time----Westfield-Santa-Anita_R00000004182127",
+      "locationsText": "Arcadia, CA",
+      "postedOn": "Posted 28 Days Ago"
+     },
+     {
+      "title": "UNIQLO Supervisor In Training (Full-Time) - Walt Whiman",
+      "externalPath": "/job/Huntington-Station-New-York/UNIQLO-Supervisor-In-Training--Full-Time----Walt-Whiman_R00000004182100",
+      "locationsText": "Huntington Station, New York",
+      "postedOn": "Posted 29 Days Ago"
+     },
+     {
+      "title": "UNIQLO Loss Prevention Agent (Full-Time)",
+      "externalPath": "/job/Boston-MA/Loss-Prevention-Agent--Full-Time-_R00000004126463",
+      "locationsText": "Boston, MA",
+      "postedOn": "Posted 29 Days Ago"
+     },
+     {
+      "title": "UNIQLO Loss Prevention Agent - Lincoln Road, Miami, FL",
+      "externalPath": "/job/Miami-FL/UNIQLO-Loss-Prevention-Agent---Lincoln-Road--Miami--FL_R00000004181862",
+      "locationsText": "Miami, FL",
+      "postedOn": "Posted 29 Days Ago"
+     },
+     {
+      "title": "UNIQLO Loss Prevention Supervisor - Ala Moana",
+      "externalPath": "/job/Honolulu-HI/Loss-Prevention-Supervisor_R00000004168959",
+      "locationsText": "Honolulu, HI",
+      "postedOn": "Posted 29 Days Ago"
+     },
+     {
+      "title": "Uniqlo Loss Prevention Agent - Aventura Mall, Miami, FL",
+      "externalPath": "/job/Miami-FL/Uniqlo-Loss-Prevention-Agent---Aventura-Mall--Miami--FL_R00000004181863",
+      "locationsText": "Miami, FL",
+      "postedOn": "Posted 29 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Loss Prevention Manager - Aventura Mall, FL",
+      "externalPath": "/job/Miami-FL/UNIQLO-Retail-Loss-Prevention-Manager---Aventural-Mall--FL_R00000004177599",
+      "locationsText": "Miami, FL",
+      "postedOn": "Posted 29 Days Ago"
+     },
+     {
+      "title": "Uniqlo Human Resources Coordinator - Aventura Mall, Miami, FL",
+      "externalPath": "/job/Miami-FL/Uniqlo-Human-Resources-Coordinator---Aventura-Mall--Miami--FL_R00000004182096",
+      "locationsText": "Miami, FL",
+      "postedOn": "Posted 29 Days Ago"
+     },
+     {
+      "title": "Uniqlo Human Resources Assistant Manager - Bryant Park, New York",
+      "externalPath": "/job/New-York-NY/Uniqlo-Human-Resources-Assistant-Manager---Bryant-Park--New-York_R00000004182093",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 29 Days Ago"
+     },
+     {
+      "title": "UNIQLO Seasonal Sales Associate (part time) - Del Amo Fashion Center",
+      "externalPath": "/job/Torrance-CA/UNIQLO-Seasonal-Sales-Associate--part-time----Del-Amo-Fashion-Center_R00000004177361",
+      "locationsText": "Torrance, CA",
+      "postedOn": "Posted 29 Days Ago"
+     },
+     {
+      "title": "Florida Mall - Retail Sales Associate (Part Time)",
+      "externalPath": "/job/Orlando-FL/Florida-Mall---Retail-Sales-Associate--Part-Time-_R00000004114400",
+      "locationsText": "Orlando, FL",
+      "postedOn": "Posted 29 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part Time) - Brea Mall",
+      "externalPath": "/job/BreaCA/UNIQLO-Retail-Sales-Associate--Part-Time----Brea-Mall_R00000004178525",
+      "locationsText": "Brea,CA",
+      "postedOn": "Posted 30 Days Ago"
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://fastretailing.wd3.myworkdayjobs.com/wday/cxs/fastretailing/retail_us_Uniqlo/jobs",
+   "body": {
+    "appliedFacets": {},
+    "limit": 20,
+    "offset": 100,
+    "searchText": ""
+   },
+   "json": {
+    "total": 0,
+    "jobPostings": [
+     {
+      "title": "UNIQLO Visual Merchandising and Display Associate (Part-time/Full-time)- 660 5th Avenue",
+      "externalPath": "/job/New-York-NY/UNIQLO-Visual-Merchandising-and-Display-Associate--Part-time-Full-time---660-5th-Avenue_R00000004182076",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30 Days Ago"
+     },
+     {
+      "title": "UNIQLO Loss Prevention Agent (FULL-TIME) - 660 5th Avenue",
+      "externalPath": "/job/New-York-NY/Full-Time-Loss-Prevention-Agent--660-5th-Avenue-_R00000004167339",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal Part-Time) - King of Prussia",
+      "externalPath": "/job/King-of-Prussia-PA/Seasonal-Retail-Sales-Associate--Part-Time-_R00000004148465",
+      "locationsText": "King of Prussia, PA",
+      "postedOn": "Posted 30 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal Part-Time) - Christiana Mall",
+      "externalPath": "/job/NewarkDE/Seasonal-Retail-Sales-Associate--Part-Time-_R00000004166969",
+      "locationsText": "Newark,DE",
+      "postedOn": "Posted 30 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal Part-time) - Newport Centre",
+      "externalPath": "/job/Jersey-City-NJ/Retail-Sales-Associate--Seasonal-_R00000004127468",
+      "locationsText": "Jersey City, NJ",
+      "postedOn": "Posted 30 Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal Part-Time) - Paramus Park",
+      "externalPath": "/job/Paramus-NJ/Retail-Sales-Associate--Seasonal-_R00000004127471",
+      "locationsText": "Paramus, NJ",
+      "postedOn": "Posted 30 Days Ago"
+     },
+     {
+      "title": "UNIQLO Loss Prevention Supervisor (Full-Time) - South Coast Plaza",
+      "externalPath": "/job/Costa-Mesa-CA/UNIQLO-Loss-Prevention-Supervisor--Full-Time----South-Coast-Plaza_R00000004182003",
+      "locationsText": "Costa Mesa, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Loss Prevention Agent (full time) - Del Amo Fashion Center",
+      "externalPath": "/job/Torrance-CA/UNIQLO-Loss-Prevention-Agent--full-time----Del-Amo-Fashion-Center_R00000004182002",
+      "locationsText": "Torrance, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Loss Prevention Agent (full time) - Ontario Mills",
+      "externalPath": "/job/Ontario-CA/Loss-Prevention-Agent_R00000004176415",
+      "locationsText": "Ontario, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Seasonal Sales Associate  - Roseville",
+      "externalPath": "/job/UNIQLO-CA-Westfield-RosevilleUQUS/UNIQLO-Seasonal-Sales-Associate----Roseville_R00000004181998",
+      "locationsText": "UNIQLO CA Westfield Roseville(UQUS)",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Loss Prevention Supervisor (Full-Time)",
+      "externalPath": "/job/Boston-MA/UNIQLO-Loss-Prevention-Supervisor--Full-Time----Downtown-Crossing_R00000004168461",
+      "locationsText": "Boston, MA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Florida Mall, FL",
+      "externalPath": "/job/Orlando-FL/UNIQLO-Retail-Sales-Associate--Seasonal----Florida-Mall--FL_R00000004181814",
+      "locationsText": "Orlando, FL",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal)",
+      "externalPath": "/job/Braintree-Massachusetts/Seasonal-Retail-Sales-Associate--Part-Time-_R00000004144855",
+      "locationsText": "Braintree, Massachusetts",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal)",
+      "externalPath": "/job/Boston-MA/UNIQLO-Retail-Sales-Associate--Seasonal-_R00000004177351",
+      "locationsText": "Boston, MA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Loss Prevention Agent - Oakbrook Center",
+      "externalPath": "/job/Oak-Brook-IL/Loss-Prevention-Agent---Oakbrook-Center_R00000004179081",
+      "locationsText": "Oak Brook, IL",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Loss Prevention Supervisor (Full-time) - The Shops at Georgetown",
+      "externalPath": "/job/Washington-DC/UNIQLO-Loss-Prevention-Supervisor--Full-time----The-Shops-at-Georgetown_R00000004176875",
+      "locationsText": "Washington, DC",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Loss Prevention Supervisor (Full Time) – Tysons Corner",
+      "externalPath": "/job/Mclean-VA/UNIQLO-Loss-Prevention-Supervisor-Full-Time---Tysons-Corner_R00000004132822",
+      "locationsText": "Mclean, VA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Sales Associate (Full-time) - The Shops at Georgetown",
+      "externalPath": "/job/Washington-DC/UNIQLO-Sales-Associate--Full-time----The-Shops-at-Georgetown_R00000004175191",
+      "locationsText": "Washington, DC",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Sales Associate (Part-time) - The Shops at Georgetown",
+      "externalPath": "/job/Washington-DC/UNIQLO-Sales-Associate--Part-time----The-Shops-at-Georgetown_R00000004175192",
+      "locationsText": "Washington, DC",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Loss Prevention Agent (Full Time) - Green Acres",
+      "externalPath": "/job/Valley-Stream-New-York/UNIQLO-Loss-Prevention-Agent--Full-Time----Green-Acres_R00000004180410",
+      "locationsText": "Valley Stream, New York",
+      "postedOn": "Posted 30+ Days Ago"
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://fastretailing.wd3.myworkdayjobs.com/wday/cxs/fastretailing/retail_us_Uniqlo/jobs",
+   "body": {
+    "appliedFacets": {},
+    "limit": 20,
+    "offset": 120,
+    "searchText": ""
+   },
+   "json": {
+    "total": 0,
+    "jobPostings": [
+     {
+      "title": "UNIQLO Loss Prevention Agent (Full Time) - Roosevelt Field",
+      "externalPath": "/job/Garden-City-NY/UNIQLO-Loss-Prevention-Agent--Full-Time----Roosevelt-Field_R00000004168795",
+      "locationsText": "Garden City, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Loss Prevention Agent (Full Time) - Union Square",
+      "externalPath": "/job/New-York-NY/UNIQLO-Loss-Prevention-Agent--Full-Time----Union-Square--New-Store-Opening-_R00000004168127",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Loss Prevention Supervisor (Full-Time) - Union Square",
+      "externalPath": "/job/New-York-NY/UNIQLO-Loss-Prevention-Supervisor--Full-Time----Union-Square--New-Store-Opening-_R00000004168126",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Full-Time Loss Prevention Agent - Fashion Valley",
+      "externalPath": "/job/San-DiegoCA/UNIQLO-Full-Time-Loss-Prevention-Agent---Fashion-Valley_R00000004176969",
+      "locationsText": "San Diego,CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal)",
+      "externalPath": "/job/BurlingtonMA/Seasonal-Sales-Associate--Burlington_R00000004175225",
+      "locationsText": "Burlington,MA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part-Time & Full-Time) - Stonebriar Centre",
+      "externalPath": "/job/FriscoTX/Retail-Sales-Associate---Stonebriar-Centre_R00000004142120",
+      "locationsText": "Frisco,TX",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate - Westfield Culver City",
+      "externalPath": "/job/UNIQLO-CA-Westfield-Culver-CityUQUS/UNIQLO-Retail-Sales-Associate---Westfield-Culver-City_R00000004181886",
+      "locationsText": "UNIQLO CA Westfield Culver City(UQUS)",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Memorial City",
+      "externalPath": "/job/Houston-TX/Retail-Sales-Associate--Seasonal-_R00000004166871",
+      "locationsText": "Houston, TX",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part-Time) - Bay Street",
+      "externalPath": "/job/Emeryville-CA/UNIQLO-Retail-Sales-Associate--Part-Time----Bay-Street_R00000004181822",
+      "locationsText": "Emeryville, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Uniqlo Retail Alteration (Full-Time or Part-Time)",
+      "externalPath": "/job/UNIQLO-MA-Burlington-MallUQUS/Uniqlo-Retail-Alteration--Full-Time-or-Part-Time-_R00000004181817",
+      "locationsText": "UNIQLO MA Burlington Mall(UQUS)",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Alterations Specialist (Full-Time or Part-Time)",
+      "externalPath": "/job/Providence-RI/Retail-Alterations-Specialist--Full-Time-or-Part-Time----New-Store_R00000004134815",
+      "locationsText": "Providence, RI",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Houston Galleria",
+      "externalPath": "/job/UNIQLO-TX-The-Galleria-in-HoustonUQUS/UNIQLO-Retail-Sales-Associate--Seasonal----Houston-Galleria_R00000004181816",
+      "locationsText": "UNIQLO TX The Galleria in Houston(UQUS)",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Supervisor In Training - Westfield Valley Fair",
+      "externalPath": "/job/Santa-Clara-CA/UNIQLO-Retail-Supervisor-In-Training---Westfield-Valley-Fair_R00000004181676",
+      "locationsText": "Santa Clara, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate - Westfield Valley Fair",
+      "externalPath": "/job/Santa-Clara-CA/UNIQLO-Retail-Sales-Associate---Westfield-Valley-Fair_R00000004181675",
+      "locationsText": "Santa Clara, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Chestnut Street",
+      "externalPath": "/job/Philadelphia-PA/Seasonal-Retail-Sales-Associate--Part-Time-_R00000004148461",
+      "locationsText": "Philadelphia, PA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Alterations Specialist (Full-time) - Newport Centre",
+      "externalPath": "/job/Jersey-City-NJ/UNIQLO-Alterations-Specialist--Full-time----Newport-Centre_R00000004181192",
+      "locationsText": "Jersey City, NJ",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Alterations Specialist (Full-time) - Menlo Park",
+      "externalPath": "/job/Edison-NJ/UNIQLO-Alterations-Specialist--Full-time----Menlo-Park_R00000004181191",
+      "locationsText": "Edison, NJ",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate Part Time - Ala Moana",
+      "externalPath": "/job/Honolulu-HI/UNIQLO-Retail-Sales-Associate-Part-Time---Ala-Moana_R00000004178970",
+      "locationsText": "Honolulu, HI",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Management Candidate (UMC) - Mid Career",
+      "externalPath": "/job/New-York-NY/UNIQLO-Management-Candidate--Mid-Career-_R00000004180751",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Management Candidate (UMC) - New Grad",
+      "externalPath": "/job/New-York-NY/UNIQLO-Management-Candidate--New-Grad-_R00000004180747",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://fastretailing.wd3.myworkdayjobs.com/wday/cxs/fastretailing/retail_us_Uniqlo/jobs",
+   "body": {
+    "appliedFacets": {},
+    "limit": 20,
+    "offset": 140,
+    "searchText": ""
+   },
+   "json": {
+    "total": 0,
+    "jobPostings": [
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal Part-Time) - The Shops at Santa Anita",
+      "externalPath": "/job/Arcadia-CA/UNIQLO-Retail-Sales-Associate--Seasonal-Part-Time----The-Shops-at-Santa-Anita_R00000004177343",
+      "locationsText": "Arcadia, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal Part-Time) - Glendale Galleria",
+      "externalPath": "/job/Glendale-CA/UNIQLO-Retail-Sales-Associate--Seasonal-Part-Time----Glendale-Galleria_R00000004177342",
+      "locationsText": "Glendale, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Loss Prevention Supervisor (Full-Time) - American Dream",
+      "externalPath": "/job/East-Rutherford-NJ/UNIQLO-Loss-Prevention-Supervisor--Full-Time----American-Dream_R00000004181052",
+      "locationsText": "East Rutherford, NJ",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate - Westfield Century City",
+      "externalPath": "/job/Los-Angeles-CA/UNIQLO-Retail-Sales-Associate---Westfield-Century-City_R00000004177659",
+      "locationsText": "Los Angeles, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal Part-Time) - Century City",
+      "externalPath": "/job/Los-Angeles-CA/UNIQLO-Retail-Sales-Associate--Seasonal-Part-Time----Century-City_R00000004177656",
+      "locationsText": "Los Angeles, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full Time) - Florida Mall",
+      "externalPath": "/job/Orlando-FL/UNIQLO-Retail-Sales-Associate--Full-Time----Florida-Mall_R00000004178878",
+      "locationsText": "Orlando, FL",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal)",
+      "externalPath": "/job/Framingham-MA/Seasonal-Retail-Sales-Associate--Part-time-_R00000004132388",
+      "locationsText": "Framingham, MA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part-Time)- 660 5th Avenue",
+      "externalPath": "/job/New-York-NY/UNIQLO-Retail-Sales-Associate--Part-Time---660-5th-Avenue_R00000004178736",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Visual Area Manager",
+      "externalPath": "/job/Chestnut-Hill-MA/Visual-Area-Manager_R00000004149865",
+      "locationsText": "Chestnut Hill, MA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part-Time)",
+      "externalPath": "/job/Chestnut-Hill-MA/Retail-Sales-Associate--Part-Time-_R00000004176295",
+      "locationsText": "Chestnut Hill, MA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full-Time)",
+      "externalPath": "/job/Chestnut-Hill-MA/The-Mall-at-Chestnut-Hill---Retail-Sales-Associate--Part-Time-_R00000004100149",
+      "locationsText": "Chestnut Hill, MA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Alterations Specialist (Full-Time or Part-Time)",
+      "externalPath": "/job/Chestnut-Hill-MA/Uniqlo-Chestnut-Hill-part-time----Retail-Alterations-Specialist_R00000004100145",
+      "locationsText": "Chestnut Hill, MA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Supervisor in Training (Full-Time)",
+      "externalPath": "/job/Chestnut-Hill-MA/The-Mall-at-Chestnut-Hill---Retail-Supervisor-in-Training--Full-Time-_R00000004100148",
+      "locationsText": "Chestnut Hill, MA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full-Time or Part-Time)",
+      "externalPath": "/job/BurlingtonMA/Retail-Sales-Associate--Full-Time-or-Part-Time----New-Store_R00000004144410",
+      "locationsText": "Burlington,MA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Supervisor in Training (Full-Time)",
+      "externalPath": "/job/BurlingtonMA/Retail-Supervisor-in-Training--New-Store-_R00000004144412",
+      "locationsText": "Burlington,MA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full Time and Part Time)",
+      "externalPath": "/job/Providence-RI/Retail-Sales-Associate--Full-Time-or-Part-Time-_R00000004134757",
+      "locationsText": "Providence, RI",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Supervisor in Training (Full-Time)",
+      "externalPath": "/job/Providence-RI/Retail-Supervisor-in-Training--New-Store-_R00000004134812",
+      "locationsText": "Providence, RI",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Visual Associate (Full-Time or Part-Time)",
+      "externalPath": "/job/Providence-RI/Visual-Associate--Full-Time-or-Part-Time----New-Store_R00000004134813",
+      "locationsText": "Providence, RI",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Human Resources Assistant (Full-Time)",
+      "externalPath": "/job/Providence-RI/Human-Resources-Assistant--Full-Time-_R00000004139919",
+      "locationsText": "Providence, RI",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal)",
+      "externalPath": "/job/Providence-RI/Seasonal-Retail-Sales-Associate--Part-Time-_R00000004144856",
+      "locationsText": "Providence, RI",
+      "postedOn": "Posted 30+ Days Ago"
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://fastretailing.wd3.myworkdayjobs.com/wday/cxs/fastretailing/retail_us_Uniqlo/jobs",
+   "body": {
+    "appliedFacets": {},
+    "limit": 20,
+    "offset": 160,
+    "searchText": ""
+   },
+   "json": {
+    "total": 0,
+    "jobPostings": [
+     {
+      "title": "UNIQLO Retail Sales Associate (Full-Time)",
+      "externalPath": "/job/Braintree-Massachusetts/Retail-Sales-Associate--Full-Time-or-Part-Time----New-Store_R00000004134592",
+      "locationsText": "Braintree, Massachusetts",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full-Time or Part-Time)",
+      "externalPath": "/job/Framingham-MA/Retail-Sales-Associate--Full-Time-or-Part-Time-_R00000004133104",
+      "locationsText": "Framingham, MA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Loss Prevention Manager (Full-Time)",
+      "externalPath": "/job/Boston-MA/UNIQLO-Loss-Prevention-Manager--Downtown-Crossing_R00000004168462",
+      "locationsText": "Boston, MA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Montgomery Mall",
+      "externalPath": "/job/BethesdaMD/Seasonal-Retail-Sales-Associate_R00000004167224",
+      "locationsText": "Bethesda,MD",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Silver Spring",
+      "externalPath": "/job/Silver-Spring-MD/Seasonal-Retail-Sales-Associate_R00000004144548",
+      "locationsText": "Silver Spring, MD",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Pike & Rose",
+      "externalPath": "/job/North-Bethesda-MD/Seasonal-Sales-Associate_R00000004114392",
+      "locationsText": "North Bethesda, MD",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Uniqlo Retail Sales Associate (Full-time/Part-time) - Michigan Avenue, Chicago",
+      "externalPath": "/job/Chicago-IL/Uniqlo-Retail-Sales-Associate--Full-time---Part-time----Chicago-IL_R00000004165575",
+      "locationsText": "Chicago, IL",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part Time) - Montgomery Mall",
+      "externalPath": "/job/BethesdaMD/Retail-Sales-Associate--Full-Time-or-Part-Time----New-Store_R00000004151892",
+      "locationsText": "Bethesda,MD",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full Time & Part Time) - Bryant Park on 5th Ave",
+      "externalPath": "/job/UNIQLO-NY-Bryant-Park-on-5th-AvenueUQUS/UNIQLO-Retail-Sales-Associate--Full-Time---Part-Time----Bryant-Park-on-5th-Ave_R00000004180390",
+      "locationsText": "UNIQLO NY Bryant Park on 5th Avenue(UQUS)",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Uniqlo Retail Sales Associate (Full-time & Part-time) - Oakbrook Center",
+      "externalPath": "/job/Oak-Brook-IL/Uniqlo-Retail-Sales-Associate--Full-time---Part-time----Oakbrook--IL_R00000004167981",
+      "locationsText": "Oak Brook, IL",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Visual Merchandising Associate (Full Time) - Oakbrook, IL",
+      "externalPath": "/job/Oak-Brook-IL/Visual-Merchandising-Associate--Full-Time----Oakbrook--IL_R00000004176159",
+      "locationsText": "Oak Brook, IL",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part Time) - Stonestown Galleria",
+      "externalPath": "/job/San-Francisco-CA/UNIQLO-Part-Time-Retail-Sales-Associate---Stonestown-Galleria_R00000004174317",
+      "locationsText": "San Francisco, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full Time) - Stonestown Galleria",
+      "externalPath": "/job/San-Francisco-CA/UNIQLO-Full-Time-Retail-Sales-Associate---Stonestown-Galleria_R00000004172593",
+      "locationsText": "San Francisco, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate - Serramonte",
+      "externalPath": "/job/Daly-City-CA/Uniqlo-Retail-Sales-Associate---Serramonte_R00000004168736",
+      "locationsText": "Daly City, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal Part-Time) - Westfield Fashion Square",
+      "externalPath": "/job/Sherman-Oaks-CA/UNIQLO-Retail-Sales-Associate--Seasonal-Part-Time----Westfield-Fashion-Square_R00000004178974",
+      "locationsText": "Sherman Oaks, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Supervisor In Training - Ala Moana",
+      "externalPath": "/job/Honolulu-HI/UNIQLO-Retail-Supervisor-In-Training---Ala-Moana_R00000004178973",
+      "locationsText": "Honolulu, HI",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part Time) - Del Amo Fashion Center",
+      "externalPath": "/job/Torrance-CA/UNIQLO-Retail-Sales-Associate--Part-Time----Del-Amo-Fashion-Center_R00000004178741",
+      "locationsText": "Torrance, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full-Time) - Memorial City Mall",
+      "externalPath": "/job/Houston-TX/Retail-Sales-Associate---Memorial-City-Mall_R00000004142089",
+      "locationsText": "Houston, TX",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Supervisor in Training (Full-Time) - Menlo Park",
+      "externalPath": "/job/Edison-NJ/Retail-Supervisor-in-Training--Full-Time---Menlo-Park-Mall--Edison-NJ_R00000004105259",
+      "locationsText": "Edison, NJ",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Seasonal Retail Sales Associate (Part Time) - Ala Moana",
+      "externalPath": "/job/Honolulu-HI/UNIQLO-Seasonal-Retail-Sales-Associate--Part-Time----Ala-Moana_R00000004177370",
+      "locationsText": "Honolulu, HI",
+      "postedOn": "Posted 30+ Days Ago"
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://fastretailing.wd3.myworkdayjobs.com/wday/cxs/fastretailing/retail_us_Uniqlo/jobs",
+   "body": {
+    "appliedFacets": {},
+    "limit": 20,
+    "offset": 180,
+    "searchText": ""
+   },
+   "json": {
+    "total": 0,
+    "jobPostings": [
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal Part-Time) - The Mills at Jersey Gardens",
+      "externalPath": "/job/Elizabeth-NJ/The-Mills-at-Jersey-Gardens---Retail-Sales-Associate--Seasonal-Part-Time-_R00000004162724",
+      "locationsText": "Elizabeth, NJ",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part-Time) - The Mills at Jersey Gardens",
+      "externalPath": "/job/Elizabeth-NJ/NEW-STORE-OPENING--The-Mills-at-Jersey-Gardens---Retail-Sales-Associate--Full-Time-or-Part-Time-_R00000004151635",
+      "locationsText": "Elizabeth, NJ",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part Time) - Cherry Hill Mall",
+      "externalPath": "/job/Cherry-Hill-NJ/Retail-Sales-Associate--Full-Time-_R00000004168390",
+      "locationsText": "Cherry Hill, NJ",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part Time) - Ontario Mills",
+      "externalPath": "/job/Ontario-CA/UNIQLO-Retail-Sales-Associate--Part-Time----Ontario-Mills_R00000004178428",
+      "locationsText": "Ontario, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Uniqlo Retail Sales Associate (Full-time) - Houston Galleria",
+      "externalPath": "/job/Houston-TX/Uniqlo-Retail-Sales-Associate--Full-time---Part-time----Houston-Galleria_R00000004177650",
+      "locationsText": "Houston, TX",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Uniqlo Retail Sales Associate (Part-time) - Houston Galleria",
+      "externalPath": "/job/Houston-TX/Uniqlo-Retail-Sales-Associate--Part-time----Houston-Galleria_R00000004178426",
+      "locationsText": "Houston, TX",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate  (Seasonal Part-time) - Willowbrook Mall",
+      "externalPath": "/job/Wayne-NJ/Retail-Sales-Associate---Seasonal-_R00000004127470",
+      "locationsText": "Wayne, NJ",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal Part-Time) - Menlo Park",
+      "externalPath": "/job/Edison-NJ/Retail-Sales-Associate--Seasonal-_R00000004144544",
+      "locationsText": "Edison, NJ",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Full Time Retail Sales Associate - Westfield Oakridge",
+      "externalPath": "/job/San-JoseCA/UNIQLO-Full-Time-Retail-Sales-Associate---Westfield-Oakridge_R00000004175521",
+      "locationsText": "San Jose,CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Sales Associate (Seasonal) - World Trade Center",
+      "externalPath": "/job/New-York-NY/UNIQLO-Sales-Associate--Seasonal----World-Trade-Center_R00000004177556",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Roosevelt Field Mall",
+      "externalPath": "/job/Garden-City-NY/Seasonal-Retail-Sales-Associate--Full-Time-or-Part-Time-_R00000004127378",
+      "locationsText": "Garden City, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate - Stoneridge",
+      "externalPath": "/job/Pleasanton-CA/UNIQLO-Retail-Sales-Associate---Stoneridge_R00000004177552",
+      "locationsText": "Pleasanton, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part-time) - Memorial City Mall",
+      "externalPath": "/job/Houston-TX/Uniqlo-Retail-Sales-Associate--Part-time----Memorial-City-Mall_R00000004177067",
+      "locationsText": "Houston, TX",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Visual Merchandising Associate - Tysons Corner",
+      "externalPath": "/job/Mclean-VA/Visual-Merchandising-Associate_R00000004123735",
+      "locationsText": "Mclean, VA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate - Fair Lakes",
+      "externalPath": "/job/Fairfax-VA/Uniqlo-Retail-Sales-Associate-Full-and-Part-Time---New-Store---Fair-Lakes_R00000004107193",
+      "locationsText": "Fairfax, VA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part-Time) - American Dream Mall",
+      "externalPath": "/job/East-Rutherford-NJ/Retail-Sales-Associate--Part-Time----American-Dream-1_R00000004100129",
+      "locationsText": "East Rutherford, NJ",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate - Great Mall",
+      "externalPath": "/job/Milpitas-CA/UNIQLO-Part-Time-Retail-Sales-Associate---Great-Mall_R00000004174853",
+      "locationsText": "Milpitas, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate - Ala Moana",
+      "externalPath": "/job/Honolulu-HI/UQHI-Sales-Associate---Full-Time--Part-Time---Seasonal_R00000004114805",
+      "locationsText": "Honolulu, HI",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full Time) - Ala Moana",
+      "externalPath": "/job/Honolulu-HI/Retail-Sales-Associate-Full-Time_R00000004161905",
+      "locationsText": "Honolulu, HI",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Seasonal Sales Associate (part time) - Los Cerritos Center",
+      "externalPath": "/job/Cerritos-CA/UNIQLO-Seasonal-Sales-Associate--part-time----Los-Cerritos-Center_R00000004177360",
+      "locationsText": "Cerritos, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://fastretailing.wd3.myworkdayjobs.com/wday/cxs/fastretailing/retail_us_Uniqlo/jobs",
+   "body": {
+    "appliedFacets": {},
+    "limit": 20,
+    "offset": 200,
+    "searchText": ""
+   },
+   "json": {
+    "total": 0,
+    "jobPostings": [
+     {
+      "title": "UNIQLO Seasonal Sales Associate (part time) - Ontario Mills",
+      "externalPath": "/job/Ontario-CA/UNIQLO-Seasonal-Sales-Associate--part-time----Ontario-Mills_R00000004177359",
+      "locationsText": "Ontario, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Seasonal Sales Associate (part time) - South Coast Plaza",
+      "externalPath": "/job/Costa-Mesa-CA/UNIQLO-Seasonal-Sales-Associate--part-time----South-Coast-Plaza_R00000004177358",
+      "locationsText": "Costa Mesa, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Seasonal Sales Associate (part time) - Brea Mall",
+      "externalPath": "/job/BreaCA/UNIQLO-Seasonal-Sales-Associate--part-time----Brea-Mall_R00000004177357",
+      "locationsText": "Brea,CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full-time) - 660 5th Avenue",
+      "externalPath": "/job/New-York-NY/UNIQLO-660-5th-Avenue-Full-time-Retail-Sales-Associate_R00000004168596",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate - South Coast Plaza",
+      "externalPath": "/job/Costa-Mesa-CA/UNIQLO-Retail-Sales-Associate--Full-Part-Time----South-Coast-Plaza_R00000004171890",
+      "locationsText": "Costa Mesa, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Loss Prevention Agent (Full Time) - Hudson Yards",
+      "externalPath": "/job/New-York-NY/Loss-Prevention-Agent--Full-Time----Hudson-Yards_R00000004140777",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part Time) - The Mall in Columbia",
+      "externalPath": "/job/ColumbiaMD/Retail-Sales-Associate--Full-Time-or-Part-Time----New-Store_R00000004160796",
+      "locationsText": "Columbia,MD",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part-Time) - Downtown Silver Spring",
+      "externalPath": "/job/Silver-Spring-MD/UNIQLO-Retail-Sales-Associate_R00000004151571",
+      "locationsText": "Silver Spring, MD",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Visual Merchandising Supervisor (Full-Time) - World Trade Center (New Store Opening)",
+      "externalPath": "/job/New-York-NY/UNIQLO-Visual-Merchandising-Supervisor--Full-Time----World-Trade-Center--New-Store-Opening-_R00000004175790",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Visual Merchandising Associate (Full-Time) - World Trade Center (New Store Opening)",
+      "externalPath": "/job/New-York-NY/UNIQLO-Visual-Merchandising-Associate--Full-Time----World-Trade-Center--New-Store-Opening-_R00000004175165",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Alteration Specialist (Full-Time) - World Trade Center (New Store Opening)",
+      "externalPath": "/job/New-York-NY/UNIQLO-Alteration-Specialist--Full-Time----World-Trade-Center--New-Store-Opening-_R00000004175162",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Sales Associate (Full-Time) - World Trade Center (New Store Opening)",
+      "externalPath": "/job/New-York-NY/UNIQLO-Sales-Associate--Full-Time----World-Trade-Center--New-Store-Opening-_R00000004175161",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Sales Associate (Part-Time) - World Trade Center (New Store Opening)",
+      "externalPath": "/job/New-York-NY/UNIQLO-Sales-Associate--Part-Time----World-Trade-Center--New-Store-Opening-_R00000004175160",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Seasonal Part-Time Retail Sales Associate - University Town Center",
+      "externalPath": "/job/San-DiegoCA/UNIQLO-Seasonal-Part-Time-Retail-Sales-Associate---University-Town-Center_R00000004177144",
+      "locationsText": "San Diego,CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Human Resources Coordinator",
+      "externalPath": "/job/Mclean-VA/Human-Resources-Associate_R00000004174516",
+      "locationsText": "Mclean, VA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Seasonal Uniqlo Retail Associate - SOHO",
+      "externalPath": "/job/New-York-NY/Uniqlo-Sales-Associate--Part-time--Soho_R00000004113745",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Visual Merchandising Associate - Lincoln Road, Miami Beach, FL",
+      "externalPath": "/job/Miami-FL/Visual-Merchandising-Associate---Lincoln-Road--Miami-Beach--FL_R00000004177036",
+      "locationsText": "Miami, FL",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Visual Merchandising Associate - Aventura Mall, Miami, FL",
+      "externalPath": "/job/Miami-FL/Visual-Merchandising-Associate---Aventura-Mall--Miami--FL_R00000004177034",
+      "locationsText": "Miami, FL",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Visual Merchandising Manager - Aventura Mall, Miami, FL",
+      "externalPath": "/job/Miami-FL/Visual-Merchandising-Manager---Aventura-Mall--Miami--FL_R00000004177032",
+      "locationsText": "Miami, FL",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate - Westfield Roseville",
+      "externalPath": "/job/RosevilleCA/UNIQLO-Retail-Sales-Associate---Westfield-Roseville_R00000004177029",
+      "locationsText": "Roseville,CA",
+      "postedOn": "Posted 30+ Days Ago"
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://fastretailing.wd3.myworkdayjobs.com/wday/cxs/fastretailing/retail_us_Uniqlo/jobs",
+   "body": {
+    "appliedFacets": {},
+    "limit": 20,
+    "offset": 220,
+    "searchText": ""
+   },
+   "json": {
+    "total": 0,
+    "jobPostings": [
+     {
+      "title": "UNIQLO Loss Prevention Supervisor - Hillsdale",
+      "externalPath": "/job/San-Mateo-CA/UNIQLO-Loss-Prevention-Supervisor---Hillsdale_R00000004176944",
+      "locationsText": "San Mateo, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Uniqlo Alterations Specialist",
+      "externalPath": "/job/New-York-NY/Uniqlo-Alterations-Specialist_R00000004176382",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Full Time Retail Sales Associate - Dallas Galleria",
+      "externalPath": "/job/Dallas-TX/Full-Time-Retail-Sales-Associate---Dallas-Galleria_R00000004166934",
+      "locationsText": "Dallas, TX",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full-Time) - Market Street",
+      "externalPath": "/job/San-Francisco-CA/UNIQLO-Retail-Sales-Associate--Full-Time----Market-Street_R00000004176945",
+      "locationsText": "San Francisco, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Alterations/Repair Specialist",
+      "externalPath": "/job/New-York-NY/Alterations-Repair-Specialist_R00000004176913",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Union Square",
+      "externalPath": "/job/New-York-NY/UNIQLO-Retail-Sales-Associate--Seasonal----Union-Square_R00000004176779",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Williamsburg",
+      "externalPath": "/job/Brooklyn-NY/UNIQLO-Retail-Sales-Associate--Seasonal----Williamsburg_R00000004176778",
+      "locationsText": "Brooklyn, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Part Time Retail Sales Associate - Memorial City",
+      "externalPath": "/job/Houston-TX/Part-Time-Retail-Sales-Associate---Memorial-City_R00000004167748",
+      "locationsText": "Houston, TX",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Uniqlo Retail Sales Associate",
+      "externalPath": "/job/SacramentoCA/Uniqlo-Retail-Sales-Associate_R00000004175345",
+      "locationsText": "Sacramento,CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Uniqlo Retail Sales Associate (Full-time & Part-time) - The Galleria in Houston, TX",
+      "externalPath": "/job/Houston-TX/Uniqlo-Retail-Sales-Associate--Full-time---Part-time----The-Galleria-in-Houston--TX_R00000004176710",
+      "locationsText": "Houston, TX",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Supervisor In Training (Full Time) - University Town Center",
+      "externalPath": "/job/San-DiegoCA/UNIQLO-Supervisor-In-Training--Full-Time----University-Town-Center_R00000004176091",
+      "locationsText": "San Diego,CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Full-Time Retail Sales Associate - University Town Center",
+      "externalPath": "/job/San-DiegoCA/UNIQLO-Retail-Sales-Associate--Full-Part-Time----University-Town-Center_R00000004174247",
+      "locationsText": "San Diego,CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part Time) - The Westchester Mall",
+      "externalPath": "/job/White-Plains-NY/NEW-STORE-OPENING--Westchester-Mall---Retail-Sales-Associate--Full-Time-or-Part-Time-_R00000004150890",
+      "locationsText": "White Plains, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full Time) - The Westchester Mall",
+      "externalPath": "/job/White-Plains-NY/Retail-Sales-Associate--Full-Time-_R00000004161690",
+      "locationsText": "White Plains, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Loss Prevention Agent",
+      "externalPath": "/job/Concord-CA/Loss-Prevention-Agent_R00000004176464",
+      "locationsText": "Concord, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Loss Prevention Agent",
+      "externalPath": "/job/SacramentoCA/Loss-Prevention-Agent_R00000004176465",
+      "locationsText": "Sacramento,CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Human Resources Coordinator",
+      "externalPath": "/job/Santa-Clara-CA/Human-Resources-Coordinator_R00000004176459",
+      "locationsText": "Santa Clara, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Loss Prevention Supervisor",
+      "externalPath": "/job/Daly-City-CA/Loss-Prevention-Supervisor_R00000004176426",
+      "locationsText": "Daly City, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full Time & Part Time) - Bryant Park on 5th Ave",
+      "externalPath": "/job/New-York-NY/UNIQLO-Retail-Sales-Associate--Full-Time---Part-Time----Bryant-Park-on-5th-Ave_R00000004176292",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Supervisor In Training - Market Street",
+      "externalPath": "/job/San-Francisco-CA/UNIQLO-Retail-Supervisor-In-Training---Market-Street_R00000004175696",
+      "locationsText": "San Francisco, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://fastretailing.wd3.myworkdayjobs.com/wday/cxs/fastretailing/retail_us_Uniqlo/jobs",
+   "body": {
+    "appliedFacets": {},
+    "limit": 20,
+    "offset": 240,
+    "searchText": ""
+   },
+   "json": {
+    "total": 0,
+    "jobPostings": [
+     {
+      "title": "UNIQLO Chestnut St - Loss Prevention Agent (Full Time)",
+      "externalPath": "/job/Philadelphia-PA/Loss-Prevention-Agent--Full-Time-_R00000004168081",
+      "locationsText": "Philadelphia, PA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Retail Sales Associate - The Parks Mall at Arlington",
+      "externalPath": "/job/ArlingtonTX/Retail-Sales-Associate---The-Parks-Mall-at-Arlington_R00000004142117",
+      "locationsText": "Arlington,TX",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Human Resources Coordinator",
+      "externalPath": "/job/Sherman-Oaks-CA/UNIQLO-Human-Resources-Coordinator_R00000004175914",
+      "locationsText": "Sherman Oaks, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Loss Prevention Agent - Market Street",
+      "externalPath": "/job/San-Francisco-CA/UNIQLO-Loss-Prevention-Agent---Market-Street_R00000004175700",
+      "locationsText": "San Francisco, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Loss Prevention Supervisor - Market Street",
+      "externalPath": "/job/San-Francisco-CA/UNIQLO-Loss-Prevention-Supervisor---Market-Street_R00000004175699",
+      "locationsText": "San Francisco, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate - Market Street",
+      "externalPath": "/job/San-Francisco-CA/UNIQLO-Retail-Sales-Associate---Market-Street_R00000004175695",
+      "locationsText": "San Francisco, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Visual Manager (Full-time) - The Shops at Georgetown",
+      "externalPath": "/job/Washington-DC/UNIQLO-Visual-Manager--Full-time----The-Shops-at-Georgetown_R00000004175638",
+      "locationsText": "Washington, DC",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Human Resources Assistant Manager - Miami, FL",
+      "externalPath": "/job/Miami-FL/Human-Resources-Assistant-Manager---Miami--FL_R00000004175624",
+      "locationsText": "Miami, FL",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Visual Merchandising Associate (Full-time) - The Shops at Georgetown",
+      "externalPath": "/job/Washington-DC/UNIQLO-Visual-Merchandising-Associate--Full-time----The-Shops-at-Georgetown_R00000004175195",
+      "locationsText": "Washington, DC",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Uniqlo Human Resources Coordinator - Orlando, FL",
+      "externalPath": "/job/Orlando-FL/Uniqlo-Human-Resources-Coordinator---Orlando--FL_R00000004175040",
+      "locationsText": "Orlando, FL",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Visual Merchandiser- SOHO (Full-Time)",
+      "externalPath": "/job/New-York-NY/Visual-Merchandiser--SOHO--Full-Time-_R00000004167387",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Visual Merchandising Associate- Chestnut Street",
+      "externalPath": "/job/Philadelphia-PA/Visual-Merchandising-Associate--Chestnut-Street_R00000004126649",
+      "locationsText": "Philadelphia, PA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Visual Manager - Tysons Corner",
+      "externalPath": "/job/Mclean-VA/Visual-Manager---Tysons-Corner_R00000004166697",
+      "locationsText": "Mclean, VA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Retail Sales Associate - Galleria Dallas",
+      "externalPath": "/job/Dallas-TX/Retail-Sales-Associate---Galleria-Dallas_R00000004142084",
+      "locationsText": "Dallas, TX",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Supervisor In Training (Full-Time) - Santa Monica",
+      "externalPath": "/job/Santa-Monica-CA/UNIQLO-Retail-Supervisor-In-Training--Full-Time----Santa-Monica_R00000004172613",
+      "locationsText": "Santa Monica, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Retail Supervisor in Training (Full Time)",
+      "externalPath": "/job/King-of-Prussia-PA/Retail-Supervisor-in-Training--Full-Time-_R00000004167076",
+      "locationsText": "King of Prussia, PA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Seasonal Retail Sales Associate (Part-Time)",
+      "externalPath": "/job/Chestnut-Hill-MA/Seasonal-Retail-Sales-Associate--Part-Time-_R00000004144853",
+      "locationsText": "Chestnut Hill, MA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Visual Associate (Part-time or Full-Time)",
+      "externalPath": "/job/Framingham-MA/Visual-Associate--Part-time-or-Full-Time-_R00000004134089",
+      "locationsText": "Framingham, MA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Full Time Retail Sales Associate - Hillsdale",
+      "externalPath": "/job/San-Mateo-CA/UNIQLO-Full-Time-Retail-Sales-Associate---Hillsdale_R00000004170786",
+      "locationsText": "San Mateo, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate - Hillsdale",
+      "externalPath": "/job/San-Mateo-CA/UNIQLO-Retail-Sales-Associate---Hillsdale_R00000004170785",
+      "locationsText": "San Mateo, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://fastretailing.wd3.myworkdayjobs.com/wday/cxs/fastretailing/retail_us_Uniqlo/jobs",
+   "body": {
+    "appliedFacets": {},
+    "limit": 20,
+    "offset": 260,
+    "searchText": ""
+   },
+   "json": {
+    "total": 0,
+    "jobPostings": [
+     {
+      "title": "Alterations/Repair Specialist",
+      "externalPath": "/job/New-York-NY/Alterations-Repair-Specialist_R00000004169679",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Visual Merchandising Associate (Full-time)-Michigan Ave, Chicago IL",
+      "externalPath": "/job/Chicago-IL/Visual-Merchandising-Associate--Full-time--Michigan-Ave--Chicago-IL_R00000004167799",
+      "locationsText": "Chicago, IL",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Uniqlo Bryant Park: Overnight Stock Supervisor (Part-time/Seasonal)",
+      "externalPath": "/job/New-York-NY/Uniqlo-Bryant-Park--Overnight-Stock-Supervisor--Part-time-Seasonal-_R00000004168957",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part Time) - Union Square (New Store Opening)",
+      "externalPath": "/job/New-York-NY/UNIQLO-Retail-Sales-Associate--Full-Time-or-Part-Time----Union-Square--New-Store-Opening-_R00000004168121",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full Time) - Union Square",
+      "externalPath": "/job/New-York-NY/UNIQLO-Retail-Sales-Associate--Full-Time----Union-Square_R00000004168797",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Loss Prevention Agent (Full Time) - The Westchester",
+      "externalPath": "/job/White-Plains-NY/UNIQLO-Loss-Prevention-Agent--Full-Time----The-Westchester_R00000004168796",
+      "locationsText": "White Plains, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "TX Human Resources Assistant Manager",
+      "externalPath": "/job/Dallas-TX/TX-Human-Resources-Assistant-Manager_R00000004168624",
+      "locationsText": "Dallas, TX",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Visual Merchandising Associate (Full Time) - Atlantic Terminal",
+      "externalPath": "/job/Brooklyn-NY/Visual-Merchandising-Associate--Full-Time-_R00000004149612",
+      "locationsText": "Brooklyn, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Atlantic Terminal",
+      "externalPath": "/job/Brooklyn-NY/Seasonal-Retail-Sales-Associate--Full-Time-or-Part-Time-_R00000004127375",
+      "locationsText": "Brooklyn, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full Time) - Green Acres Mall",
+      "externalPath": "/job/Valley-Stream-New-York/Retail-Sales-Associate--Full-Time-_R00000004161727",
+      "locationsText": "Valley Stream, New York",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Green Acres Mall",
+      "externalPath": "/job/Valley-Stream-New-York/Seasonal-Retail-Sales-Associate--Part-Time-_R00000004144437",
+      "locationsText": "Valley Stream, New York",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Alterations Specialist - The Mall at Bay Plaza",
+      "externalPath": "/job/Bronx-NY/UNIQLO-Alterations-Specialist---The-Mall-at-Bay-Plaza_R00000004167359",
+      "locationsText": "Bronx, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full Time) - The Mall at Bay Plaza",
+      "externalPath": "/job/Bronx-NY/Retail-Sales-Associate--Full-Time-_R00000004161689",
+      "locationsText": "Bronx, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - The Mall at Bay Plaza",
+      "externalPath": "/job/Bronx-NY/Seasonal-Retail-Sales-Associate--Full-Time-or-Part-Time-_R00000004127376",
+      "locationsText": "Bronx, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part Time) - The Mall at Bay Plaza",
+      "externalPath": "/job/Bronx-NY/Bay-Plaza---Retail-Sales-Associate--Part-Time-_R00000004100135",
+      "locationsText": "Bronx, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full Time) - Ridge Hill",
+      "externalPath": "/job/Yonkers-NY/UNIQLO-Retail-Sales-Associate--Full-Time----Ridge-Hill_R00000004168128",
+      "locationsText": "Yonkers, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Ridge Hill",
+      "externalPath": "/job/Yonkers-NY/Seasonal-Retail-Sales-Associate--Full-Time-or-Part-Time-_R00000004127377",
+      "locationsText": "Yonkers, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Visual Merchandising Associate (Full-Time) - Skyview Center",
+      "externalPath": "/job/Flushing-NY/UNIQLO-Visual-Merchandising-Associate--Full-Time----Skyview-Center_R00000004166799",
+      "locationsText": "Flushing, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full Time) - Skyview Center",
+      "externalPath": "/job/Flushing-NY/Retail-Sales-Associate--Full-Time-_R00000004161688",
+      "locationsText": "Flushing, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Skyview Center",
+      "externalPath": "/job/Flushing-NY/Seasonal-Retail-Sales-Associate--Full-Time-or-Part-Time-_R00000004127379",
+      "locationsText": "Flushing, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://fastretailing.wd3.myworkdayjobs.com/wday/cxs/fastretailing/retail_us_Uniqlo/jobs",
+   "body": {
+    "appliedFacets": {},
+    "limit": 20,
+    "offset": 280,
+    "searchText": ""
+   },
+   "json": {
+    "total": 0,
+    "jobPostings": [
+     {
+      "title": "UNIQLO Retail Sales Associate (Part Time) - Skyview Center",
+      "externalPath": "/job/Flushing-NY/Retail-Sales-Associate--Part-Time---Skyview-Center_R00000004105340",
+      "locationsText": "Flushing, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full Time) - Staten Island Mall",
+      "externalPath": "/job/Staten-Island-NY/Retail-Sales-Associate--Full-Time-_R00000004161691",
+      "locationsText": "Staten Island, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Staten Island Mall",
+      "externalPath": "/job/Staten-Island-NY/Seasonal-Retail-Sales-Associate--Part-Time-_R00000004144439",
+      "locationsText": "Staten Island, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part Time) - Staten Island Mall",
+      "externalPath": "/job/Staten-Island-NY/Retail-Sales-Associate--Full-Time-or-Part-Time--NEW-STORE_R00000004135184",
+      "locationsText": "Staten Island, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full Time) - Walt Whitman Shops",
+      "externalPath": "/job/Huntington-Station-New-York/Retail-Sales-Associate--Full-Time-_R00000004161728",
+      "locationsText": "Huntington Station, New York",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Walt Whitman Shops",
+      "externalPath": "/job/Huntington-Station-New-York/Seasonal-Retail-Sales-Associate--Part-Time-_R00000004144438",
+      "locationsText": "Huntington Station, New York",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - The Westchester Mall",
+      "externalPath": "/job/White-Plains-NY/Seasonal-Retail-Sales-Associate--Part-Time-_R00000004162810",
+      "locationsText": "White Plains, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part Time) - Walt Whitman Shops",
+      "externalPath": "/job/Huntington-Station-New-York/Retail-Sales-Associate--Full-Time-or-Part-Time---NEW-STORE-_R00000004127382",
+      "locationsText": "Huntington Station, New York",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Alteration Specialist (Full Time) - Williamsburg (New Store Opening)",
+      "externalPath": "/job/Brooklyn-NY/UNIQLO-Alteration-Specialist--Full-Time----Williamsburg--New-Store-Opening-_R00000004167228",
+      "locationsText": "Brooklyn, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Visual Merchandising Associate (Full Time) - Williamsburg (New Store Opening)",
+      "externalPath": "/job/Brooklyn-NY/UNIQLO-Visual-Merchandising-Associate--Full-Time----Williamsburg--New-Store-Opening-_R00000004167221",
+      "locationsText": "Brooklyn, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full Time or Part Time) - Williamsburg (New Store Opening)",
+      "externalPath": "/job/Brooklyn-NY/UNIQLO-Retail-Sales-Associate--Full-Time-or-Part-Time----Williamsburg--New-Store-Opening-_R00000004167220",
+      "locationsText": "Brooklyn, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part Time) - Green Acres Mall",
+      "externalPath": "/job/Valley-Stream-New-York/Retail-Sales-Associate--Full-Time-or-Part-Time---NEW-STORE-_R00000004127374",
+      "locationsText": "Valley Stream, New York",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full Time) - Atlantic Terminal",
+      "externalPath": "/job/Brooklyn-NY/Retail-Sales-Associate--Full-Time-_R00000004161715-1",
+      "locationsText": "Brooklyn, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part Time) - Ridge Hill",
+      "externalPath": "/job/Yonkers-NY/Ridge-Hill---Retail-Sales-Associate--Part-Time-_R00000004100137",
+      "locationsText": "Yonkers, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part Time) - Roosevelt Field Mall",
+      "externalPath": "/job/Garden-City-NY/Roosevelt-Field---Retail-Sales-Associate--Full-Time-_R00000004103141",
+      "locationsText": "Garden City, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full Time) - Roosevelt Field Mall",
+      "externalPath": "/job/Garden-City-NY/Retail-Sales-Associate--Full-Time-_R00000004161726-1",
+      "locationsText": "Garden City, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Visual Merchandising Associate (Full Time) - Union Square (New Store Opening)",
+      "externalPath": "/job/New-York-NY/UNIQLO-Visual-Merchandising-Associate--Full-Time----Union-Square--New-Store-Opening-_R00000004168123",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Alteration Specialist (Full Time) - Union Square (New Store Opening)",
+      "externalPath": "/job/New-York-NY/UNIQLO-Alteration-Specialist--Full-Time----Union-Square--New-Store-Opening-_R00000004168122",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Visual Supervisor",
+      "externalPath": "/job/Santa-Clara-CA/UNIQLO-Visual-Supervisor_R00000004167754",
+      "locationsText": "Santa Clara, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Full-Time Loss Prevention Agent (SOHO)",
+      "externalPath": "/job/New-York-NY/Part-Time-Loss-Prevention-Agent--SOHO-_R00000004167051",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://fastretailing.wd3.myworkdayjobs.com/wday/cxs/fastretailing/retail_us_Uniqlo/jobs",
+   "body": {
+    "appliedFacets": {},
+    "limit": 20,
+    "offset": 300,
+    "searchText": ""
+   },
+   "json": {
+    "total": 0,
+    "jobPostings": [
+     {
+      "title": "Uniqlo Housekeeper / Retail Cleaner - Soho - (Full-Time)",
+      "externalPath": "/job/New-York-NY/Uniqlo-Housekeeper---Retail-Cleaner---Soho----Full-Time-_R00000004167091",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Visual Merchandising Associate (Full Time) - Hudson Yards",
+      "externalPath": "/job/New-York-NY/Visual-Merchandising-Associate--Full-Time-_R00000004160187",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full Time) - Hudson Yards",
+      "externalPath": "/job/New-York-NY/Retail-Sales-Associate--Full-Time-_R00000004161714",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part Time) - Hudson Yards",
+      "externalPath": "/job/New-York-NY/Hudson-Yards-Retail-Sales-Associate--Part-Time-_R00000004104985",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Seasonal) - Hudson Yards",
+      "externalPath": "/job/New-York-NY/Seasonal-Retail-Sales-Associate--Part-Time-_R00000004144436",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Loss Prevention Agent (Full-Time) - Westfield Fashion Square",
+      "externalPath": "/job/Sherman-Oaks-CA/UNIQLO-Loss-Prevention-Agent---Westfield-Fashion-Square_R00000004166467",
+      "locationsText": "Sherman Oaks, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Full-Time) - Westfield Fashion Square",
+      "externalPath": "/job/Sherman-Oaks-CA/Retail-Sales-Associate--Part-Time-_R00000004160224",
+      "locationsText": "Sherman Oaks, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Retail Sales Associate (Part Time) - Atlantic Terminal",
+      "externalPath": "/job/Brooklyn-NY/Atlantic-Terminal---Retail-Sales-Associate--Part-Time-_R00000004100163",
+      "locationsText": "Brooklyn, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Supervisor In Training (Full Time) - Green Acres Mall",
+      "externalPath": "/job/Valley-Stream-New-York/Retail-Supervisor-in-Training--Full-Time-_R00000004127439",
+      "locationsText": "Valley Stream, New York",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Visual Merchandising Associate (FT)",
+      "externalPath": "/job/ArlingtonVA/Visual-Merchandising-Associate--FT----New-Store-_R00000004140669",
+      "locationsText": "Arlington,VA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Loss Prevention Supervisor - Great Mall, Milpitas CA",
+      "externalPath": "/job/Milpitas-CA/Loss-Prevention-Supervisor---Great-Mall--Milpitas-CA_R00000004150181",
+      "locationsText": "Milpitas, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Visual Merchandising Associate (FT)",
+      "externalPath": "/job/Fairfax-VA/Visual-Merchandising-Associate--FT-_R00000004142389",
+      "locationsText": "Fairfax, VA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Visual Merchandising Associate",
+      "externalPath": "/job/King-of-Prussia-PA/Visual-Merchandising-Associate---New-Store_R00000004115406",
+      "locationsText": "King of Prussia, PA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Retail Supervisor in Training (Full Time)",
+      "externalPath": "/job/Braintree-Massachusetts/Retail-Supervisor-in-Training--Full-Time----New-Store_R00000004134594",
+      "locationsText": "Braintree, Massachusetts",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Uniqlo: Loss Prevention Supervisor- 5th Avenue",
+      "externalPath": "/job/New-York-NY/Uniqlo--Loss-Prevention-Supervisor--5th-Avenue_R00000004149382",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Visual Associate (Full Time)",
+      "externalPath": "/job/BurlingtonMA/Visual-Associate--Part-Time----New-Store_R00000004144413",
+      "locationsText": "Burlington,MA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "5th Ave Visual Associate (Part-Time)",
+      "externalPath": "/job/New-York-NY/XMLNAME-5th-Ave-Visual-Associate_R00000004159185",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Retail Alterations Specialist (Full Time or Part Time)",
+      "externalPath": "/job/BurlingtonMA/Job-Posting-Title-Retail-Alterations-Specialist--Full-Time-or-Part-Time-_R00000004144411",
+      "locationsText": "Burlington,MA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Retail Alterations Specialist (Full-time or Part-time)",
+      "externalPath": "/job/Framingham-MA/Retail-Alterations-Specialist--Full-time-or-Part-time-_R00000004151069",
+      "locationsText": "Framingham, MA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Loss Prevention Supervisor",
+      "externalPath": "/job/Glendale-CA/Loss-Prevention-Supervisor_R00000004150331",
+      "locationsText": "Glendale, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://fastretailing.wd3.myworkdayjobs.com/wday/cxs/fastretailing/retail_us_Uniqlo/jobs",
+   "body": {
+    "appliedFacets": {},
+    "limit": 20,
+    "offset": 320,
+    "searchText": ""
+   },
+   "json": {
+    "total": 0,
+    "jobPostings": [
+     {
+      "title": "Visual Merchandising Supervisor - Stonebriar Centre",
+      "externalPath": "/job/FriscoTX/Visual-Merchandising-Supervisor---Stonebriar-Centre_R00000004142456",
+      "locationsText": "Frisco,TX",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Loss Prevention Supervisor",
+      "externalPath": "/job/GU-NY-SOHOGUUS/Loss-Prevention-Supervisor_R00000004141871-1",
+      "locationsText": "GU NY SOHO(GUUS)",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Loss Prevention Supervisor",
+      "externalPath": "/job/San-JoseCA/Loss-Prevention-Supervisor_R00000004141614",
+      "locationsText": "San Jose,CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Retail Alterations Specialist (Full-time or Part-time)",
+      "externalPath": "/job/Framingham-MA/Retail-Alterations-Specialist--Full-time-or-Part-time-_R00000004108422",
+      "locationsText": "Framingham, MA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Retail Visual Associate",
+      "externalPath": "/job/San-JoseCA/Retail-Visual-Associate_R00000004141414",
+      "locationsText": "San Jose,CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Alterations/Repair Specialist",
+      "externalPath": "/job/New-York-NY/Alterations-Repair-Specialist_R00000004140608",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Uniqlo 5th Avenue Alterations Specialist Part-time and Full-time",
+      "externalPath": "/job/New-York-NY/Re-Uniqlo-Specialist-Part-time-and-Full-time_R00000004135243",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Loss Prevention Supervisor",
+      "externalPath": "/job/Santa-Clara-CA/Loss-Prevention-Supervisor_R00000004140377",
+      "locationsText": "Santa Clara, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Retail Supervisor in Training (Full Time)",
+      "externalPath": "/job/Framingham-MA/Natick-Mall---Retail-Supervisor-in-Training--Full-TIme-_R00000004100154",
+      "locationsText": "Framingham, MA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Uniqlo Visual Merchandising Associate Full Time",
+      "externalPath": "/job/Fairfax-VA/Uniqlo-Visual-Merchandising-Associate-Full-Time---New-Store---Fair-Lakes_R00000004107352",
+      "locationsText": "Fairfax, VA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "UNIQLO Loss Prevention Agent- Chestnut Street",
+      "externalPath": "/job/Philadelphia-PA/UNIQLO-Loss-Prevention-Agent--Chestnut-Street_R00000004125043",
+      "locationsText": "Philadelphia, PA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Visual Merchandising Associate - SOHO",
+      "externalPath": "/job/New-York-NY/Soho-Visual-Associate_R00000004105970",
+      "locationsText": "New York, NY",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Visual Associate - Westfield Valley Fair Mall, Santa Clara CA",
+      "externalPath": "/job/Santa-Clara-CA/Visual-Associate---Westfield-Valley-Fair-Mall--Santa-Clara-CA_R00000004107799",
+      "locationsText": "Santa Clara, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Loss Prevention Supervisor - Great Mall, Milpitas CA",
+      "externalPath": "/job/Milpitas-CA/Loss-Prevention-Supervisor---Great-Mall--Milpitas-CA_R00000004108142",
+      "locationsText": "Milpitas, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Loss Prevention Supervisor- Bay Street",
+      "externalPath": "/job/Emeryville-CA/Los-Prevention-Supervisor--Bay-Street--Emeryville-CA_R00000004105151",
+      "locationsText": "Emeryville, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     },
+     {
+      "title": "Visual Associate - Great Mall, Milpitas CA",
+      "externalPath": "/job/Milpitas-CA/Visual-Merchandising-Associate---Great-Mall--Milpitas-CA_R00000004105225",
+      "locationsText": "Milpitas, CA",
+      "postedOn": "Posted 30+ Days Ago"
+     }
+    ]
+   }
+  },
+  {
+   "url": "https://fastretailing.wd3.myworkdayjobs.com/wday/cxs/fastretailing/retail_us_Uniqlo/job/Culver-CityCA/UNIQLO-Retail-Sales-Associate--Seasonal----Westfield-Culver-City_R00000004182863",
+   "body": null,
+   "json": {
+    "jobPostingInfo": {
+     "title": "UNIQLO Retail Sales Associate (Seasonal) - Westfield Culver City",
+     "jobDescription": "<p><b>Salary: $18.50 / hour </b> </p><p><b>Culver City, CA</b> </p><br /><p><b>*This is a Seasonal, Part-Time role with the position expecting to end in December 2026. *</b> </p><br /><p><b><u>Position Overview:</u></b> </p><p>Reporting to the Store Manager, the <b>Seasonal Sales Associate</b> is the customer service specialist of the store. They are responsible for exceeding customer expectations by listening to customer needs, finding products that meet their needs, providing in depth product information about the goods they are interested in and closing the sale. </p><br /><p>You must be available to work on the following restricted holiday dates: </p><ul><li><b>Black Friday Period:</b> Friday, November 20th - Sunday, November 22nd &amp; Friday November 27th, 2026 </li></ul><ul><li><b>Holiday Period: </b>Friday, December 18th - Saturday, December 26th, 2026 <br />  </li></ul><p><b><u>Key Responsibilities:</u> </b></p><ul><li>Meet and exceed sales goals </li></ul><ul><li>Maintain brand and operational standards (visual, cleanliness, etc.) </li></ul><ul><li>Manage customer needs and exceed expectations by utilizing the UNIQLO service standard, following the UNIQLO Fundamental Principles and saying the 6 standard phrases. </li></ul><ul><li>Be knowledgeable of fitting room standards and assist when needed </li></ul><ul><li>Act as cashier when required by following cashier protocol </li></ul><ul><li>Process shipment and ensure all merchandise is represented on the floor in full",
+     "location": "Culver City,CA",
+     "startDate": "2026-10-06",
+     "timeType": "Part time",
+     "remoteType": null,
+     "externalUrl": "https://fastretailing.wd3.myworkdayjobs.com/retail_us_Uniqlo/job/Culver-CityCA/UNIQLO-Retail-Sales-Associate--Seasonal----Westfield-Culver-City_R00000004182863"
+    }
+   }
+  },
+  {
+   "url": "https://fastretailing.wd3.myworkdayjobs.com/wday/cxs/fastretailing/retail_us_Uniqlo/job/Arcadia-CA/Loss-Prevention-Agent--Full-Time----Westfield-Santa-Anita_R00000004182127",
+   "body": null,
+   "json": {
+    "jobPostingInfo": {
+     "title": "Loss Prevention Agent (Full-Time) - Westfield Santa Anita",
+     "jobDescription": "<p><b><u>Salary:</u> $28.00 / hour</b></p><div><div><div><div><p><b>Arcadia, CA</b></p></div><p></p></div></div></div><p><u><b>Position Overview:</b></u><br />UNIQLO Loss Prevention is responsible for maintaining a safe shopping environment for all customers and employees. The Loss Prevention Agent plays a critical role in inventory management and shortage reduction. Daily LP tasks at store are focused on safety, inventory management and shortage reduction. Loss Prevention Agent will be reporting to Loss Prevention Manager and Store Manager, serve as an asset for protection and safety specialist of our stores.</p><p></p><p><u><b>Key Responsibilities:</b></u></p><ul><li><p>Train store team members on loss prevention and safety policies, procedures and standards: ensure compliance from all store team, notifying store management/Loss Prevention Manager of any violations.</p></li><li><p>Ensure LP team can successfully identify, apprehend and detain shoplifters by following company guidelines.</p></li><li><p>Build productive relationships with store leadership team and associates.</p></li><li><p>Lead associate awareness efforts and generate leads pertaining to internal investigations.</p></li><li><p>Focus on importance of proper inventory management. Investigate issues and educate team on proper procedures.</p></li><li><p>Ensure compliance and understanding of the shortage reduction strategies.</p></li><li><p>Work with Leadership to strengthen LP culture</p></li><li><p>Partner wit",
+     "location": "Arcadia, CA",
+     "startDate": "2026-09-10",
+     "timeType": "Full time",
+     "remoteType": null,
+     "externalUrl": "https://fastretailing.wd3.myworkdayjobs.com/retail_us_Uniqlo/job/Arcadia-CA/Loss-Prevention-Agent--Full-Time----Westfield-Santa-Anita_R00000004182127"
+    }
+   }
+  },
+  {
+   "url": "https://fastretailing.wd3.myworkdayjobs.com/wday/cxs/fastretailing/retail_us_Uniqlo/job/Arcadia-CA/UNIQLO-Retail-Sales-Associate--Seasonal-Part-Time----The-Shops-at-Santa-Anita_R00000004177343",
+   "body": null,
+   "json": {
+    "jobPostingInfo": {
+     "title": "UNIQLO Retail Sales Associate (Seasonal Part-Time) - The Shops at Santa Anita",
+     "jobDescription": "<p><b>Salary:<span> </span><b>$18.50 / hour</b></b></p><p>Arcadia, CA</p><p></p><p><b>Available in the Fall/Winter? We are looking for holiday seasonal staff members to work from the months of October to December 2026.</b></p><p></p><p>You must be available to work on the following restricted holiday dates:</p><p><br /><b>Black Friday Period:</b><span> </span>Friday, November 20th - Sunday, November 22nd &amp; Friday November 27th</p><p><br /><b>Holiday period:<span> </span></b>Friday, December 18th - Saturday, December 26th</p><p></p><p><u><b>Position Overview:</b></u></p><p>Reporting to the Store Manager, the <b>seasonal </b><b>sales associate </b>is the customer service specialist of the store. They are responsible to exceed customer expectations by listening to customer needs, finding products that meet their needs, providing in depth product information about the goods they are interested in and closing the sale.</p><p></p><p><u><b>Key Responsibilities:</b></u></p><ul><li><p>Meet and exceed sales goals</p></li><li><p>Maintain brand and operational standards (visual, cleanliness, etc.)</p></li><li><p>Pro-actively manage customer needs and exceed expectations by utilizing the UNIQLO service standard, following the UNIQLO Fundamental Principles and saying the 6 standard phrases.</p></li><li><p>Be knowledgeable of fitting room standards and assist when needed</p></li><li><p>Act as cashier when required by following cashier protocol</p></li><li><p>Process shipment and ensure ",
+     "location": "Arcadia, CA",
+     "startDate": "2026-08-25",
+     "timeType": "Part time",
+     "remoteType": null,
+     "externalUrl": "https://fastretailing.wd3.myworkdayjobs.com/retail_us_Uniqlo/job/Arcadia-CA/UNIQLO-Retail-Sales-Associate--Seasonal-Part-Time----The-Shops-at-Santa-Anita_R00000004177343"
+    }
+   }
+  },
+  {
+   "url": "https://fastretailing.wd3.myworkdayjobs.com/wday/cxs/fastretailing/retail_us_Uniqlo/job/BreaCA/UNIQLO-Retail-Sales-Associate--Part-Time----Brea-Mall_R00000004178525",
+   "body": null,
+   "json": {
+    "jobPostingInfo": {
+     "title": "UNIQLO Retail Sales Associate (Part Time) - Brea Mall",
+     "jobDescription": "<h1><b>Salary: $17.50 / hour </b></h1><p><b>Brea, CA</b></p><p></p><p><u><b>Position Overview:</b></u></p><p>Reporting to the Store Manager, the<span> <b> Part Time</b> </span><b>Sales Associate</b><span> are</span> the customer service specialist of the store. They are responsible to exceed customer expectations by listening to customer needs, finding products that meet their needs, providing in depth product information about the goods they are interested in and closing the sale.</p><p></p><p><b><u>Key Responsibilities:</u></b></p><ul><li>Meet and exceed sales goals</li><li>Maintain brand and operational standards (visual, cleanliness, etc.)</li><li>Pro-actively manage customer needs and exceed expectations by utilizing the U.N.I.Q.L.O. service standard, following the Uniqlo Fundamental Principles and saying the 6 standard phrases.</li><li>Be knowledgeable of fitting room standards and assist when needed</li><li>Act as cashier when required by following cashier protocol</li><li>Process shipment and ensure all merchandise is represented on the floor in full size runs</li><li>Assist management to identify and resolve issues in the store</li><li>Provide product and brand knowledge to customers</li><li>Follow all company policy and procedures &amp; notify management of any infractions</li><li>Assist with special projects as assigned by management</li></ul><p></p><p><u><b>Required Skills and Abilities:</b></u></p><ul><li>Strong communication skills</li><li>Ability to calculate f",
+     "location": "Brea,CA",
+     "startDate": "2026-09-08",
+     "timeType": "Part time",
+     "remoteType": null,
+     "externalUrl": "https://fastretailing.wd3.myworkdayjobs.com/retail_us_Uniqlo/job/BreaCA/UNIQLO-Retail-Sales-Associate--Part-Time----Brea-Mall_R00000004178525"
+    }
+   }
+  },
+  {
+   "url": "https://fastretailing.wd3.myworkdayjobs.com/wday/cxs/fastretailing/retail_us_Uniqlo/job/BreaCA/UNIQLO-Seasonal-Sales-Associate--part-time----Brea-Mall_R00000004177357",
+   "body": null,
+   "json": {
+    "jobPostingInfo": {
+     "title": "UNIQLO Seasonal Sales Associate (part time) - Brea Mall",
+     "jobDescription": "<p><b>Salary: $17.50 per hour</b></p><p><b>Brea, CA</b></p><p></p><p></p><p><u><b>Position Overview:</b></u></p><p>Reporting to the Store Manager, the<span> </span><b>seasonal sales associates</b><span> are</span> the customer service specialist of the store. They are responsible to exceed customer expectations by listening to customer needs, finding products that meet their needs, providing in depth product information about the goods they are interested in and closing the sale.</p><p></p><p><b><u>Key Responsibilities:</u></b></p><ul><li><p>Meet and exceed sales goals</p></li><li><p>Maintain brand and operational standards (visual, cleanliness, etc.)</p></li><li><p>Pro-actively manage customer needs and exceed expectations by utilizing the U.N.I.Q.L.O. service standard, following the Uniqlo Fundamental Principles and saying the 6 standard phrases.</p></li><li><p>Be knowledgeable of fitting room standards and assist when needed</p></li><li><p>Act as cashier when required by following cashier protocol</p></li><li><p>Process shipment and ensure all merchandise is represented on the floor in full size runs</p></li><li><p>Assist management to identify and resolve issues in the store</p></li><li><p>Provide product and brand knowledge to customers</p></li><li><p>Follow all company policy and procedures &amp; notify management of any infractions</p></li><li><p>Assist with special projects as assigned by management</p></li></ul><p></p><p><u><b>Required Skills and Abilities:</b></u></",
+     "location": "Brea,CA",
+     "startDate": "2026-07-30",
+     "timeType": "Part time",
+     "remoteType": null,
+     "externalUrl": "https://fastretailing.wd3.myworkdayjobs.com/retail_us_Uniqlo/job/BreaCA/UNIQLO-Seasonal-Sales-Associate--part-time----Brea-Mall_R00000004177357"
+    }
+   }
+  }
+ ]
+}

@@ -102,17 +102,37 @@ def clear_robots_cache() -> None:
         _robots.clear()
 
 
-def fetch_html(url: str) -> str:
-    """The page's HTML. Raises FetchError with a user-facing reason."""
+def _fetch(url: str, send) -> requests.Response:
     if not robots_allows(url):
         raise FetchError("That site's robots.txt asks tools not to read this page.")
     try:
-        resp = _paced(
-            url, lambda: requests.get(url, headers=_HEADERS, timeout=_TIMEOUT)
-        )
+        resp = _paced(url, send)
     except requests.RequestException as exc:
         logger.info("fetch failed for %s: %s", url, exc)
         raise FetchError("Could not reach that page.") from exc
     if resp.status_code != 200:
         raise FetchError(f"That page answered {resp.status_code}, not a page we can read.")
+    return resp
+
+
+def fetch_html(url: str) -> str:
+    """The page's HTML. Raises FetchError with a user-facing reason."""
+    resp = _fetch(url, lambda: requests.get(url, headers=_HEADERS, timeout=_TIMEOUT))
     return resp.text or ""
+
+
+def fetch_json(url: str, body: dict | None = None):
+    """A job board API's JSON: GET, or POST when ``body`` is given. Same
+    robots.txt check and host pacing as fetch_html."""
+    headers = {**_HEADERS, "Accept": "application/json"}
+
+    def send() -> requests.Response:
+        if body is None:
+            return requests.get(url, headers=headers, timeout=_TIMEOUT)
+        return requests.post(url, json=body, headers=headers, timeout=_TIMEOUT)
+
+    resp = _fetch(url, send)
+    try:
+        return resp.json()
+    except ValueError as exc:
+        raise FetchError("That job board answered with something other than job data.") from exc

@@ -187,23 +187,52 @@ ELOREA 6 listed, 2 kept (Barista (LA) $22-25/hr, Scent Advisor LA
 $20-25/hr); Blue Bottle 78 listed, 3 kept (two baristas $20/hr, shift
 supervisor $21.25/hr); MUJI US 24 listed, 0 kept.
 
-Needs an adapter before it can be suggested (researched 2026-10-08):
+Hosted-board adapters (added 2026-10-08, for the San Gabriel Valley and
+North Orange County search): `scrapers/_hosted_boards.py` reads four
+boards through their own APIs, robots.txt checked per host through
+`_polite_fetch` and paced one request per host per second. Only openings
+near the saved place get a detail request (at most 25 per board). The
+keep rule is the same as every watched page: part-time or hourly pay,
+which keeps entry-level full-time hourly roles (sales associate, barista,
+shift lead) and drops salaried and manager roles. Starter suggestions,
+live read 2026-10-08:
 
-- **Uniqlo** (Century City, Glendale, Cerritos, Del Amo): Workday
-  `fastretailing` / `retail_us_Uniqlo`; careers-us.uniqlo.com has no
-  JobPosting on its front page. The Workday fetcher is role-query based,
-  so a watched-page hand-off needs its own entry point.
-- **Alfred** (LA cafes): Rippling, public JSON at
-  api.rippling.com/platform/api/ats/v1/board/alfred/jobs.
-- **H Mart**: UKG Pro (HMA1000HMGBC).
-- **Daiso**: UKG Pro (DAI1003DAIS).
-- **Verve Coffee**: ADP Workforce Now.
-- **Bluestone Lane**: Paylocity.
+- **Uniqlo**: Workday `fastretailing` / `retail_us_Uniqlo`, CXS search
+  paged with no search text (336 listed, 17 pages). LA 17 nearby, 17 kept
+  (Culver City seasonal associate $18.50/hr); San Gabriel Valley 2 kept
+  (Santa Anita, Arcadia: seasonal part-time associate $18.50/hr, loss
+  prevention agent $28/hr); North Orange County 2 kept (Brea Mall
+  part-time associates $17.50/hr).
+- **Bluestone Lane**: Paylocity board page (`window.pageData.Jobs`, 88
+  listed), pay from each detail page's JobPosting JSON-LD. LA 6 kept
+  (Santa Monica and LA baristas $19-26/hr); North Orange County 2 kept
+  (Old Towne Orange: cook $18/hr, service professional $20-25/hr).
+- **Alfred**: Rippling, api.rippling.com/platform/api/ats/v1/board/alfred/jobs
+  (10 listed), job type and pay from each detail. LA 3 kept (Beverly &
+  Martel PT shift lead $19.42/hr, Canon Drive PT barista $18.67/hr,
+  payroll specialist $27-32/hr). No SGV or OC cafes.
+- **Verve Coffee**: ADP Workforce Now public job-requisitions for cid
+  6915c399-128d-4976-932a-0870c48dc09d (27 listed, pay type and range in
+  the list). LA 8 kept (Barista - West 3rd $18.40-19.65/hr). No SGV or
+  OC cafes. ADP's robots.txt redirects to a login page, which states no
+  rules.
+
+The Bluestone Lane and Uniqlo LA counts above read Beverly Hills, Culver
+City, and Santa Monica as LA through `job_finder.place_areas` (branch
+feat/sgv-oc-places); `place_reachable` uses that table when it is
+present, so the SGV and North OC areas work once it merges.
+
+Still needs an adapter:
+
 - **Mitsuwa**: own WordPress, recruit.mitsuwa.com/explore-jobs.
 - **99 Ranch**: Betterteam, behind Cloudflare.
 
-Declined: **Tokyo Central** (saashr robots.txt `Disallow: /`), **Olive
-Young** (Cloudflare), **Rōk Coffee & Tea** (no careers page).
+Declined: **H Mart** (UKG Pro, HMA1000HMGBC) and **Daiso** (UKG Pro,
+DAI1003DAIS): recruiting.ultipro.com's robots.txt opens with
+`Disallow: /` for every agent and also disallows `*/JobBoardView`, the
+path of the `LoadSearchResults` search API (checked 2026-10-08).
+**Tokyo Central** (saashr robots.txt `Disallow: /`), **Olive Young**
+(Cloudflare), **Rōk Coffee & Tea** (no careers page).
 
 ## Public employers for Find Work (2026-10-08)
 

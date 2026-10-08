@@ -19,5 +19,33 @@
     "url": "https://muji.us/pages/career-opportunities",
     "hosting": "Shopify page, Smoothie job app",
     "note": "Retail shifts. No California roles listed on Oct 8 2026."
+  },
+  {
+    "name": "Uniqlo",
+    "area": "Santa Anita (Arcadia), Brea Mall, LA stores",
+    "url": "https://fastretailing.wd3.myworkdayjobs.com/retail_us_Uniqlo",
+    "hosting": "Workday fastretailing / retail_us_Uniqlo",
+    "note": "Sales associate shifts, part-time and full-time hourly, $17.50-18.50/hr stated."
+  },
+  {
+    "name": "Bluestone Lane",
+    "area": "Old Towne Orange, Santa Monica, Westwood",
+    "url": "https://recruiting.paylocity.com/recruiting/jobs/All/1e51c5cd-10b5-429d-a2d3-1ea0e01bb49c/BLUESTONE-LANE-NY-LLC",
+    "hosting": "Paylocity board",
+    "note": "Barista, cook, and service shifts, hourly pay stated."
+  },
+  {
+    "name": "Alfred",
+    "area": "LA cafes (Beverly Hills, West Hollywood, Calabasas)",
+    "url": "https://ats.rippling.com/alfred/jobs",
+    "hosting": "Rippling board alfred",
+    "note": "Part-time barista and shift lead, $18.67-19.42/hr plus tips."
+  },
+  {
+    "name": "Verve Coffee",
+    "area": "LA cafes (West 3rd, Arts District, West Hollywood)",
+    "url": "https://workforcenow.adp.com/mascsr/default/mdf/recruitment/recruitment.html?cid=6915c399-128d-4976-932a-0870c48dc09d&ccId=19000101_000001&lang=en_US",
+    "hosting": "ADP Workforce Now",
+    "note": "Barista and shift lead, hourly range stated."
   }
 ]
