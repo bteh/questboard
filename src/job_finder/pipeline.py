@@ -58,6 +58,7 @@ from job_finder.scoring.helpers import annualize_amount
 from job_finder.scoring.score_cache import cache_key as ai_score_cache_key
 from job_finder.scoring.score_cache import load_cached as load_cached_ai_score
 from job_finder.scoring.score_cache import save_cached as save_cached_ai_score
+from job_finder.entry_level import is_entry_level
 from job_finder.staffing import STAFFING_AGENCY_NAMES, is_staffing_agency
 from job_finder.tools.job_search_tool import search_jobs
 from job_finder.tools.resume_parser_tool import find_resume, parse_resume
@@ -1365,7 +1366,9 @@ def _filter_jobs_by_level(
     Platform") is a stronger statement of intent than the band derived from
     current_title: a matching title at that role's level always survives.
     Level-agnostic roles ("Data Scientist") don't widen the band; the level
-    filter is exactly how a broad role gets refined.
+    filter is exactly how a broad role gets refined. A seeker whose level is
+    entry (Settings, Current level) keeps every posting that
+    job_finder.entry_level flags.
     """
     career_cfg = career_cfg or {}
     current_title = str(career_cfg.get("current_title", "") or "").strip()
@@ -1404,18 +1407,25 @@ def _filter_jobs_by_level(
         return False
 
     current_level = resolve_current_level(career_cfg)
+    seeker_is_entry = current_level <= 1
+
+    def _kept_anyway(job: dict) -> bool:
+        if seeker_is_entry and is_entry_level(job.get("title"), job.get("description")):
+            return True
+        return _explicitly_wanted(job)
+
     pre_count = len(jobs)
     if current_level >= 3:
         filtered = [
             job for job in jobs
             if _extract_level(job.get("title", "")) >= current_level - tol_senior
-            or _explicitly_wanted(job)
+            or _kept_anyway(job)
         ]
     else:
         filtered = [
             job for job in jobs
             if _extract_level(job.get("title", "")) <= current_level + tol_junior
-            or _explicitly_wanted(job)
+            or _kept_anyway(job)
         ]
 
     dropped = pre_count - len(filtered)

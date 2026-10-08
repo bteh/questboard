@@ -150,7 +150,7 @@ After search, jobs pass through 5 filters in order:
 1. **Deduplication** -- URL-based cross-source dedup, keeps richest record
 2. **Location filter** -- Matches preferred states/cities; remote passes only when its stated country scope is compatible
 3. **Salary filter** -- Hard floor at 70% of `min_base` (keeps jobs with unknown salary)
-4. **Level filter** -- Rejects jobs 2+ levels above/below current title
+4. **Level filter** -- Rejects jobs 2+ levels above/below current title. A seeker whose current level is entry keeps every posting `src/job_finder/entry_level.py` flags (that module also drives the board's "Entry level" chip)
 5. **Role relevance filter** -- Uses `_match_roles()` to reject titles that don't match target roles (catches JobSpy noise like "Software Engineer" appearing in nurse searches)
 6. **Staffing agency filter** -- Removes known staffing/recruitment agencies
 

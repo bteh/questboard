@@ -4,19 +4,23 @@
    Counts come from the API over the visible lane before any level
    narrowing, so they stay put while one chip is selected.
    Sep 21 2026: 249 individual-contributor rows had no chip, so the counts
-   never reached the lane total; the ic chip leads the ladder now. */
+   never reached the lane total; the ic chip leads the ladder now.
+   Oct 8 2026: an IT job seeker needed the roles he could get without years
+   of seniority. Entry level overlaps ic (job_finder/entry_level.py decides),
+   so its count is extra and sits right after it. */
 
 import { chipActiveClass, chipClass, chipCountClass, chipInactiveClass, chipRowLabelClass } from './chip-classes';
 
 const LEVEL_LABELS: Record<string, string> = {
   ic: 'Individual contributor',
+  entry: 'Entry level',
   lead: 'Lead',
   manager: 'Manager',
   director: 'Director',
   vp: 'VP',
   chief: 'Chief',
 };
-const LEVEL_ORDER = ['ic', 'lead', 'manager', 'director', 'vp', 'chief'];
+const LEVEL_ORDER = ['ic', 'entry', 'lead', 'manager', 'director', 'vp', 'chief'];
 
 interface LevelChipsProps {
   counts: Record<string, number> | undefined;
