@@ -147,3 +147,38 @@ def test_unknown_facet_is_a_400(api_client) -> None:
         "/api/v1/applications", params={"vertical": "lookafter", "facet": "nope"}
     )
     assert resp.status_code == 400
+
+
+def _seed_casting(jf_db) -> None:
+    rows = (
+        ("Asian American lead, indie short", "https://x.example/a1", "Paid, Los Angeles", "camera"),
+        ("Background extras, Burbank", "https://x.example/a2", "Seeking Korean speakers, 20s to 30s", "camera"),
+        ("Commercial, AAPI family", "https://x.example/a3", "Two-day shoot", "camera"),
+        ("Mom role, sitcom pilot", "https://x.example/a4", "Mandarin-speaking, any ethnicity", "camera"),
+        ("Bartender type, feature", "https://x.example/a5", "Seeking Caucasian male, 40s", "camera"),
+        ("Voiceover, cartoon", "https://x.example/a6", "Open to all", "camera"),
+    )
+    for title, url, description, vertical in rows:
+        jf_db.save_application(
+            job_title=title, company="Fixture", job_url=url,
+            description=description, vertical=vertical,
+        )
+
+
+def test_asian_roles_facet_finds_calls_seeking_asian_talent(api_client) -> None:
+    # Owner is Asian American in LA and wanted casting calls that ask for them.
+    # "asian" sits inside "caucasian", so the leading word boundary must hold.
+    client, jf_db = api_client
+    _seed_casting(jf_db)
+
+    resp = client.get(
+        "/api/v1/applications", params={"vertical": "perform,camera", "facet": "asian"}
+    )
+    assert resp.status_code == 200, resp.text
+    titles = {item["job_title"] for item in resp.json()["items"]}
+    assert titles == {
+        "Asian American lead, indie short",
+        "Background extras, Burbank",
+        "Commercial, AAPI family",
+        "Mom role, sitcom pilot",
+    }

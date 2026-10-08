@@ -225,6 +225,29 @@
             "singer",
             "vocalist"
           ]
+        },
+        {
+          "id": "asian",
+          "label": "Asian roles",
+          "terms": [
+            "asian",
+            "aapi",
+            "pacific islander",
+            "chinese",
+            "korean",
+            "japanese",
+            "vietnamese",
+            "filipino",
+            "filipina",
+            "taiwanese",
+            "thai",
+            "cambodian",
+            "hmong",
+            "indonesian",
+            "mandarin",
+            "cantonese",
+            "tagalog"
+          ]
         }
       ]
     },
