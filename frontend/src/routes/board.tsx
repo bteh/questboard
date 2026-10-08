@@ -5,7 +5,7 @@ import { Route as appRoute } from './app';
 import { Chip, StampDefs } from '@questboard/ui';
 import { getApplications, getProfileWork } from '@/api/applications';
 import { useApplications } from '@/hooks/use-applications';
-import { useSourceLabels, resolveSourceLabel } from '@/hooks/use-scrapers';
+import { useSourceLabels } from '@/hooks/use-scrapers';
 import { ExplainSheet } from '@/components/board/explain-sheet';
 import { RestockLine } from '@/components/board/restock-line';
 import { QuestRestockButton } from '@/components/board/quest-restock';

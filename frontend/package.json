@@ -20,7 +20,7 @@
     "test": "vitest run",
     "preview": "vite preview",
     "generate-types": "openapi-typescript http://localhost:8000/openapi.json -o src/types/api.generated.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc -b"
   },
   "dependencies": {
     "@base-ui/react": "^1.2.0",
