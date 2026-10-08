@@ -29,6 +29,28 @@ describe('UpdatePill', () => {
     expect(hook.restart).toHaveBeenCalledTimes(1);
   });
 
+  it('reads "Update ready" with a bold Restart in the accent style', () => {
+    hook.state = { kind: 'ready', version: '0.2.6' };
+    render(<UpdatePill />);
+    const button = screen.getByRole('button');
+    expect(button.textContent).toBe('Update ready Restart');
+    expect(button.querySelector('b')?.textContent).toBe('Restart');
+    expect(button.className).toContain('qb-update-pill-ready');
+    expect(button.getAttribute('title')).toMatch(/0\.2\.6/);
+  });
+
+  it('keeps the failed-install retry in the quiet style', () => {
+    hook.state = { kind: 'install_failed', version: '0.2.6' };
+    render(<UpdatePill />);
+    expect(screen.getByRole('button').className).not.toContain('qb-update-pill-ready');
+  });
+
+  it('shows nothing when there is no update', () => {
+    hook.state = { kind: 'up_to_date' };
+    const { container } = render(<UpdatePill />);
+    expect(container.textContent).toBe('');
+  });
+
   it('says a failed install left the app working and offers Try again', () => {
     hook.state = { kind: 'install_failed', version: '0.2.6' };
     render(<UpdatePill />);

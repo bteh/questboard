@@ -1,8 +1,8 @@
 import { useAppUpdate } from '@/hooks/use-app-update';
-import { updateActionText, updateBannerText } from '@/lib/updater-logic';
+import { updateActionText, updateBannerLabel, updateBannerText } from '@/lib/updater-logic';
 
 /**
- * A quiet "restart to get the new version" affordance in the topbar.
+ * The "restart to get the new version" button beside the search box.
  *
  * It appears only once a signed update is already downloaded, so clicking
  * it costs a relaunch and nothing else. Nothing here interrupts: no modal,
@@ -18,9 +18,17 @@ export function UpdatePill() {
   const action = updateActionText(state);
   if (!action) return <span className="qb-update-pill">{text}</span>;
 
+  const ready = state.kind === 'ready';
+  const label = updateBannerLabel(state) ?? text;
   return (
-    <button type="button" className="qb-update-pill" onClick={restart}>
-      {text} <b>{action}</b>
+    <button
+      type="button"
+      className={ready ? 'qb-update-pill qb-update-pill-ready' : 'qb-update-pill'}
+      onClick={restart}
+      aria-label={ready ? label : undefined}
+      title={ready ? label : undefined}
+    >
+      <span className="qb-update-pill-text">{text}</span> <b>{action}</b>
     </button>
   );
 }

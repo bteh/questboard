@@ -27,6 +27,13 @@
 .qb-update-pill:hover { transform: translateY(-1px); color: var(--ink); }
 .qb-update-pill b { color: var(--ink); font-weight: 600; }
 span.qb-update-pill { cursor: default; }
+.qb-update-pill { white-space: nowrap; }
+.qb-update-pill-ready {
+  background: var(--sage); border-color: var(--sage); border-bottom-color: var(--sage-dark);
+  color: var(--paper); font-size: 13px;
+}
+.qb-update-pill-ready b { color: var(--paper); font-weight: 700; }
+.qb-update-pill-ready:hover { background: var(--sage-dark); color: var(--paper); }
 span.qb-update-pill:hover { transform: none; color: var(--soft); }
 .qb-fold, .qb-xbtn {
   width: 34px; height: 34px; flex: none;
@@ -263,6 +270,7 @@ button.qb-prof-card { cursor: pointer; }
 @media (max-width: 880px) {
   .qb-stubbar { display: flex; }
   .qb-search { width: min(240px, 55%); }
+  .qb-update-pill-ready .qb-update-pill-text { display: none; }
   /* the page's own scroll ends above the strip */
   .qb-main { padding-bottom: 78px; }
 }

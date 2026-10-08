@@ -19,17 +19,43 @@ export type UpdateState =
   | { kind: 'installed'; version: string }
   | { kind: 'failed' };
 
-export const CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
+/** How often an open app wakes up to look for a release. */
+export const CHECK_INTERVAL_MS = 30 * 60 * 1000;
+
+/** The one throttle: no check within this long of the last one, whatever
+ *  asked for it (the timer, or the reader coming back to the window). */
+export const RECHECK_AFTER_MS = 15 * 60 * 1000;
+
+/** Past these states a check would only restart work already done or under way. */
+export function isUpdateBusy(state: UpdateState): boolean {
+  switch (state.kind) {
+    case 'checking':
+    case 'downloading':
+    case 'ready':
+    case 'installing':
+    case 'install_failed':
+    case 'installed':
+      return true;
+    case 'idle':
+    case 'up_to_date':
+    case 'failed':
+      return false;
+  }
+}
 
 /**
- * Throttle for the background timer only. Every launch checks regardless:
- * a person who quits and reopens the app to "see the update" must see it,
- * and the check is one small file. The timer is what a sleeping machine
- * would otherwise fire many times on wake.
+ * Throttle for the timer and window focus. Every launch checks regardless
+ * of time: a person who quits and reopens the app to "see the update" must
+ * see it, and the check is one small file.
  */
-export function shouldCheck(lastCheckedAt: number | null, now: number): boolean {
+export function shouldCheck(
+  lastCheckedAt: number | null,
+  now: number,
+  state: UpdateState = { kind: 'idle' },
+): boolean {
+  if (isUpdateBusy(state)) return false;
   if (lastCheckedAt === null) return true;
-  return now - lastCheckedAt >= CHECK_INTERVAL_MS;
+  return now - lastCheckedAt >= RECHECK_AFTER_MS;
 }
 
 function installedText(version: string): string {
@@ -65,7 +91,7 @@ export function checkStatusText(state: UpdateState, currentVersion: string): str
 export function updateBannerText(state: UpdateState): string | null {
   switch (state.kind) {
     case 'ready':
-      return `Version ${state.version} is ready.`;
+      return 'Update ready';
     case 'installing':
       return `Installing ${state.version}…`;
     case 'install_failed':
@@ -82,6 +108,13 @@ export function updateBannerText(state: UpdateState): string | null {
     case 'idle':
       return null;
   }
+}
+
+/** The full sentence for screen readers and the hover title; the pill
+ *  itself drops the version to stay short. */
+export function updateBannerLabel(state: UpdateState): string | null {
+  if (state.kind === 'ready') return `Version ${state.version} is ready. Restart to update.`;
+  return updateBannerText(state);
 }
 
 /** The word on the pill's button. Null means nothing to click. */

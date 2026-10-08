@@ -2,20 +2,48 @@ import { describe, expect, it } from 'vitest';
 
 import {
   CHECK_INTERVAL_MS,
+  RECHECK_AFTER_MS,
   checkStatusText,
   downloadPercent,
   shouldCheck,
+  updateActionText,
+  updateBannerLabel,
   updateBannerText,
 } from './updater-logic';
+import type { UpdateState } from './updater-logic';
 
 describe('shouldCheck', () => {
   it('checks on a machine that has never checked', () => {
     expect(shouldCheck(null, 1_000)).toBe(true);
   });
 
-  it('does not re-check inside the interval', () => {
+  it('does not re-check inside the throttle window', () => {
     const now = 10 * CHECK_INTERVAL_MS;
     expect(shouldCheck(now - 60_000, now)).toBe(false);
+  });
+
+  it('lets the half-hour timer through, so an open app finds a release within the hour', () => {
+    expect(RECHECK_AFTER_MS).toBeLessThanOrEqual(CHECK_INTERVAL_MS);
+    expect(CHECK_INTERVAL_MS).toBeLessThanOrEqual(60 * 60 * 1000);
+    const now = 10 * CHECK_INTERVAL_MS;
+    expect(shouldCheck(now - CHECK_INTERVAL_MS, now)).toBe(true);
+  });
+
+  it('never checks while an update is in flight or waiting on a restart', () => {
+    const busy: UpdateState[] = [
+      { kind: 'checking' },
+      { kind: 'downloading', percent: 10 },
+      { kind: 'ready', version: '0.3.0' },
+      { kind: 'installing', version: '0.3.0' },
+      { kind: 'install_failed', version: '0.3.0' },
+      { kind: 'installed', version: '0.3.0' },
+    ];
+    for (const state of busy) expect(shouldCheck(null, 1_000, state)).toBe(false);
+  });
+
+  it('checks again after a failed or empty check', () => {
+    expect(shouldCheck(null, 1_000, { kind: 'failed' })).toBe(true);
+    expect(shouldCheck(null, 1_000, { kind: 'up_to_date' })).toBe(true);
   });
 
   it('checks once after a long sleep, not once per missed interval', () => {
@@ -40,9 +68,15 @@ describe('updateBannerText', () => {
     expect(updateBannerText({ kind: 'failed' })).toBeNull();
   });
 
-  it('names the version once it is downloaded and ready', () => {
-    expect(updateBannerText({ kind: 'ready', version: '0.3.0' })).toBe(
-      'Version 0.3.0 is ready.',
+  it('keeps the ready pill short, with Restart as the action', () => {
+    const ready: UpdateState = { kind: 'ready', version: '0.3.0' };
+    expect(updateBannerText(ready)).toBe('Update ready');
+    expect(updateActionText(ready)).toBe('Restart');
+  });
+
+  it('keeps the version in the full label', () => {
+    expect(updateBannerLabel({ kind: 'ready', version: '0.3.0' })).toBe(
+      'Version 0.3.0 is ready. Restart to update.',
     );
   });
 });
