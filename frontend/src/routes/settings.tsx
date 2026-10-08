@@ -12,6 +12,7 @@ import {
   resolveSettingsTab,
   type SettingsTab,
 } from '@/components/settings/settings-tabs';
+import { WatchedPagesSection } from '@/features/watched-pages/WatchedPagesSection';
 import { useOnboardingState } from '@/hooks/use-workspace';
 import { cx } from '@questboard/ui';
 import '@/components/settings/settings.css';
@@ -112,7 +113,12 @@ function SettingsPage() {
           <SearchPrefsTab onboarding={onboarding} navigate={navigate} />
         )}
 
-        {activeTab === 'companies' && <CompaniesTab />}
+        {activeTab === 'companies' && (
+          <>
+            <CompaniesTab />
+            <WatchedPagesSection />
+          </>
+        )}
 
         {activeTab === 'privacy' && <PrivacyTab navigate={navigate} />}
       </div>

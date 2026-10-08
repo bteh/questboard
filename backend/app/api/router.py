@@ -16,6 +16,7 @@ from app.api import (
     search,
     session,
     settings,
+    watched_pages,
     watchlist,
     workspace_companies,
 )
@@ -42,3 +43,4 @@ api_router.include_router(local_agent.router, prefix="/api/v1")
 api_router.include_router(scrapers.router, prefix="/api/v1")
 api_router.include_router(watchlist.router, prefix="/api/v1")
 api_router.include_router(workspace_companies.router, prefix="/api/v1")
+api_router.include_router(watched_pages.router, prefix="/api/v1")

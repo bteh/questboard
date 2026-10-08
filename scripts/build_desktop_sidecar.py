@@ -172,7 +172,8 @@ def build_sidecar(*, target_arch: str = "") -> Path:
     ]
     for data_file in sorted((root / "src" / "job_finder" / "config" / "archetypes").glob("*.yaml")):
         safe_data_files.append((data_file, "job_finder/config/archetypes"))
-    for data_file in sorted((root / "src" / "job_finder" / "tools" / "scrapers" / "data").glob("*.txt")):
+    scraper_data = root / "src" / "job_finder" / "tools" / "scrapers" / "data"
+    for data_file in sorted([*scraper_data.glob("*.txt"), *scraper_data.glob("*.json")]):
         safe_data_files.append((data_file, "job_finder/tools/scrapers/data"))
     for source, destination in safe_data_files:
         command.extend(["--add-data", f"{source}{os.pathsep}{destination}"])

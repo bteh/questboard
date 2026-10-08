@@ -1749,3 +1749,7 @@ def backfill_scores(
         raise
     finally:
         _close_session()
+
+
+# Registers watched_pages on Base.metadata (create_all + alembic parity).
+from job_finder.models.watched_pages import WatchedPageRecord  # noqa: E402,F401

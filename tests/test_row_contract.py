@@ -124,6 +124,7 @@ class TestRegistryContracts:
         "bankrewards",        # rows land on each bank's own offer page
         "callingallpapers",   # submission links span sessionize + one-off conference hosts
         "cagrants",           # GrantURLs span many *.ca.gov subdomains + vendor hosts
+        "watched-pages",      # rows land on each shop's own careers site the user pasted
     }
 
     def test_every_schedulable_source_declares_where_its_rows_point(self) -> None:

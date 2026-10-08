@@ -71,7 +71,7 @@ false actionability. Debate record:
 | perform | AuditionsFree, Casting Networks, Project Casting, Standing Room Only, r/castingcalls (2026-10-08 carve-out), Central Casting LA link card | stated when posted |
 | audience | 1iota, On Camera Audiences | never; seats are free tickets, not paid gigs |
 | odd | r/LAjobs (2026-10-08 carve-out), Qwick LA link card | stated when posted |
-| parttime | **Indeed part-time** (JobSpy, 2026-10-08) | hourly, only when Indeed states an amount |
+| parttime | **Indeed part-time** (JobSpy, 2026-10-08), **Their site** (watched careers pages, 2026-10-08) | hourly, only when the posting states an amount |
 | flip | none, paused by curation verdict (was r/PKMNTCGDeals) | n/a |
 | deliver | none, by verdict (see below) | n/a |
 | lookafter | **Sittercity** (429 postmortem fixed), **Care.com**, **UrbanSitter** | poster-set hourly ranges only |
@@ -150,6 +150,51 @@ Declined in the same pass, each fetched live 2026-10-08:
   `/api/` and `/job-search/`, and the terms
   (https://legal.snagajob.com/#terms-of-use) ban spiders, robots,
   scrapers, and crawlers, exempting only public search engines.
+
+## Places I'd work at: watched careers pages (2026-10-08)
+
+Owner ask: "why didnt this show up? https://elorea.com/pages/barista-la".
+ELOREA posts its Koreatown barista and scent advisor shifts only on its
+own Shopify page, never on Indeed. Settings > Companies now has "Places
+I'd work at": paste a careers page, Questboard reads it once to show what
+it holds, then `watched-pages` (card label "Their site") reads every
+watched page each quest refresh and keeps in-person rows near the saved
+place (LA when none) that state part-time or hourly pay. Storage is the
+local `watched_pages` table. robots.txt is checked per host before any
+fetch, one request per host per second.
+
+How a page is read lives in `scrapers/_careers_page.py`, one rule per
+real site, each pinned in `tests/test_careers_page.py`: hand-off to the
+existing Greenhouse, Lever, Ashby, or Workable fetcher when the page is
+or links a board; schema.org JobPosting JSON-LD; the Smoothie job app
+cards (ELOREA, MUJI US). Lever rows now carry Lever's stated
+`salaryRange` and commitment.
+
+Starter suggestions (one click to add, never auto-added) live in
+`scrapers/data/watched_pages_starter.json`: ELOREA (Smoothie), Blue
+Bottle Coffee (Lever `bluebottlecoffee`), MUJI US (Smoothie, no
+California roles on 2026-10-08). Live read 2026-10-08 near Koreatown:
+ELOREA 6 listed, 2 kept (Barista (LA) $22-25/hr, Scent Advisor LA
+$20-25/hr); Blue Bottle 78 listed, 3 kept (two baristas $20/hr, shift
+supervisor $21.25/hr); MUJI US 24 listed, 0 kept.
+
+Needs an adapter before it can be suggested (researched 2026-10-08):
+
+- **Uniqlo** (Century City, Glendale, Cerritos, Del Amo): Workday
+  `fastretailing` / `retail_us_Uniqlo`; careers-us.uniqlo.com has no
+  JobPosting on its front page. The Workday fetcher is role-query based,
+  so a watched-page hand-off needs its own entry point.
+- **Alfred** (LA cafes): Rippling, public JSON at
+  api.rippling.com/platform/api/ats/v1/board/alfred/jobs.
+- **H Mart**: UKG Pro (HMA1000HMGBC).
+- **Daiso**: UKG Pro (DAI1003DAIS).
+- **Verve Coffee**: ADP Workforce Now.
+- **Bluestone Lane**: Paylocity.
+- **Mitsuwa**: own WordPress, recruit.mitsuwa.com/explore-jobs.
+- **99 Ranch**: Betterteam, behind Cloudflare.
+
+Declined: **Tokyo Central** (saashr robots.txt `Disallow: /`), **Olive
+Young** (Cloudflare), **Rōk Coffee & Tea** (no careers page).
 
 ## Declined, with reasons (do not re-add without new facts)
 
