@@ -66,7 +66,7 @@ false actionability. Debate record:
 
 | kind | sources | pay shape |
 |---|---|---|
-| skill | 18 career scrapers + JobSpy boards | stated ranges |
+| skill | 20 career scrapers (incl. **EdJoin**, **CSU Careers**, 2026-10-08) + JobSpy boards | stated ranges |
 | think | FocusGroups.org, **User Interviews** | per-session, stated |
 | perform | AuditionsFree, Casting Networks, Project Casting, Standing Room Only, r/castingcalls (2026-10-08 carve-out), Central Casting LA link card | stated when posted |
 | audience | 1iota, On Camera Audiences | never; seats are free tickets, not paid gigs |
@@ -204,6 +204,82 @@ Needs an adapter before it can be suggested (researched 2026-10-08):
 
 Declined: **Tokyo Central** (saashr robots.txt `Disallow: /`), **Olive
 Young** (Cloudflare), **Rōk Coffee & Tea** (no careers page).
+
+## Public employers for Find Work (2026-10-08)
+
+Owner ask: entry IT and analyst roles in the San Gabriel Valley and North
+Orange County. Public employers post many of these with clear pay, and
+Indeed/LinkedIn miss a lot of them. Every candidate was fetched live and
+its robots.txt and terms read before anything was built.
+
+**Built** (career kind, `category="public"`, shared rules in
+`_public_sector.py`, each rule pinned in `tests/test_public_sector_rules.py`):
+
+- **EdJoin** (`edjoin.py`). The statewide school job board run by the San
+  Joaquin County Office of Education. robots.txt is `Allow: /`, the site
+  has no terms page banning automation (only /Home/Privacy), and the
+  search page itself reads the JSON endpoint we call
+  (`/Home/LoadJobs`). Covers Pasadena USD, El Monte City SD, Azusa,
+  Walnut Valley, Rowland, Hacienda La Puente, Bonita, Brea Olinda,
+  Fullerton SD, Anaheim, Placentia-Yorba Linda, LACOE, OCDE, and some
+  community college districts (Rancho Santiago). Pay comes from the
+  structured pay box (Pay Range or Single Rate plus a stated period);
+  "Dependent" rows keep the stated text in the description. Postings
+  open only to current employees are dropped.
+- **CSU Careers** (`csu_careers.py`). All 23 Cal State campuses on one
+  PageUp board; the RSS feed at
+  `careers.pageuppeople.com/873/cw/en-us/rss` is the whole board (2,568
+  items, ~38MB, ~17s) with full posting text. robots.txt only disallows
+  test/staging paths. Campus labels map to employer and city in
+  `data/csu_campuses.json` (Cal State LA, Cal Poly Pomona, Cal State
+  Fullerton...). Pay is parsed only after a pay label, preferring the
+  anticipated hiring range over the classification band; 866 of 2,279
+  non-student rows got pay in the live check, and the rest are mostly
+  lecturer rank tables that state several ranges at once (left blank on
+  purpose). Student-assistant jobs are dropped.
+
+Both skip the fetch when no saved place is in California. Live dry run,
+roles IT Support Specialist / Data Analyst / Business Analyst, places
+Arcadia + Fullerton: EdJoin 8 rows (8 with pay, 1.3s), CSU Careers 61
+rows (33 with pay, 17s), before the pipeline's place filter.
+
+**Declined, with evidence:**
+
+- **NEOGOV / GovernmentJobs.com** (LA County, OC, Pasadena, Arcadia,
+  Alhambra, Monterey Park, El Monte, West Covina, Fullerton, Anaheim,
+  Brea). This would cover the most target employers, and the tech is
+  trivial: `SearchEngine/JobsFeed?agency=lacounty` returns RSS with
+  min/max salary on every item. But robots.txt is `User-agent: *
+  Disallow: /` (only named search engines and IndeedJobBot allowed), and
+  the terms (https://www.governmentjobs.com/home/termsofuse, section 6)
+  ban any "page-scrape, robot, spider" and say the restrictions cover
+  career pages at governmentjobs.com/careers "regardless of whether such
+  content is public", prohibit "data harvesting", and limit use to
+  "personal, non-commercial use". The Craigslist shape. Re-entry bar:
+  written permission or a partnership with NEOGOV.
+- **PeopleAdmin** (Mt. SAC at hrjobs.mtsac.edu, NOCCCD for Fullerton
+  College): an open Atom feed exists (`/postings/search.atom`), but
+  robots.txt is `User-Agent: * Disallow: /` with allows only for named
+  social and search bots. Same re-entry bar.
+- **Hospitals and labs, deferred as a research task:** City of Hope
+  careers 403s plain clients; Kaiser's robots.txt disallows
+  `/search-jobs/`; Caltech runs Taleo; JPL runs Phenom; Methodist
+  Arcadia's careers link redirects to Keck Medicine; Providence (St. Jude
+  Fullerton) answers with a bot challenge. Each is a different ATS, so
+  none is one-file cheap.
+
+**Queued (allowed, not built yet):**
+
+- **CalCareers** (State of California). robots.txt has every line
+  commented out and CalHR's conditions of use
+  (https://www.calhr.ca.gov/conditions-of-use) call site information
+  public domain. But search is ASP.NET WebForms postbacks with no JSON or
+  RSS, so it needs viewstate replay. The next public-sector build.
+- **LA County DHR's own RSS** (listed at
+  https://hr.lacounty.gov/2015/10/09/hr-rss-feed/, e.g.
+  `m.hr.lacounty.gov/rss/technical`). Published by the county for
+  subscription, but it holds only the 20 newest per category with no pay
+  and links into governmentjobs.com. Low value; a ride-along at best.
 
 ## Declined, with reasons (do not re-add without new facts)
 
