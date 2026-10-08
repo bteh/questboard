@@ -1,0 +1,1427 @@
+{
+ "captured": "2026-10-08",
+ "exchanges": [
+  {
+   "url": "https://workforcenow.adp.com/mascsr/default/careercenter/public/events/staffing/v1/job-requisitions?cid=6915c399-128d-4976-932a-0870c48dc09d&lang=en_US&locale=en_US&$top=20&$skip=0",
+   "body": null,
+   "json": {
+    "jobRequisitions": [
+     {
+      "itemID": "434269623_1",
+      "requisitionTitle": "Production Manager",
+      "postDate": "2026-10-07T15:59:00.000-04:00",
+      "payGradeRange": {
+       "minimumRate": {
+        "amountValue": 76000.0,
+        "currencyCode": "USD"
+       },
+       "maximumRate": {
+        "amountValue": 82000.0,
+        "currencyCode": "USD"
+       }
+      },
+      "customFieldGroup": {
+       "codeFields": [
+        {
+         "codeValue": "AN",
+         "shortName": "Annually",
+         "nameCode": {
+          "codeValue": "SalaryType"
+         }
+        },
+        {
+         "codeValue": "RANGE",
+         "shortName": "RANGE",
+         "nameCode": {
+          "codeValue": "SalaryRangeType"
+         }
+        }
+       ]
+      },
+      "requisitionLocations": [
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Santa Cruz",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "95062"
+        },
+        "nameCode": {
+         "shortName": "104 Bronson Street, Santa Cruz, CA, US"
+        }
+       }
+      ]
+     },
+     {
+      "itemID": "422789246_1",
+      "requisitionTitle": "Shift Lead - University ",
+      "postDate": "2026-10-05T16:25:00.000-04:00",
+      "payGradeRange": {
+       "minimumRate": {
+        "amountValue": 20.0,
+        "currencyCode": "USD"
+       },
+       "maximumRate": {
+        "amountValue": 22.75,
+        "currencyCode": "USD"
+       }
+      },
+      "customFieldGroup": {
+       "codeFields": [
+        {
+         "codeValue": "HR",
+         "shortName": "Hourly",
+         "nameCode": {
+          "codeValue": "SalaryType"
+         }
+        },
+        {
+         "codeValue": "RANGE",
+         "shortName": "RANGE",
+         "nameCode": {
+          "codeValue": "SalaryRangeType"
+         }
+        }
+       ]
+      },
+      "requisitionLocations": [
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Palo Alto",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "94301"
+        },
+        "nameCode": {
+         "shortName": " Palo Alto, CA, US"
+        }
+       }
+      ]
+     },
+     {
+      "itemID": "422730180_1",
+      "requisitionTitle": "Culinary Shift Lead",
+      "postDate": "2026-10-02T20:45:00.000-04:00",
+      "payGradeRange": {
+       "minimumRate": {
+        "amountValue": 0.0,
+        "currencyCode": "USD"
+       },
+       "maximumRate": {
+        "amountValue": 22.0,
+        "currencyCode": "USD"
+       }
+      },
+      "customFieldGroup": {
+       "codeFields": [
+        {
+         "codeValue": "HR",
+         "shortName": "Hourly",
+         "nameCode": {
+          "codeValue": "SalaryType"
+         }
+        },
+        {
+         "codeValue": "RANGE",
+         "shortName": "RANGE",
+         "nameCode": {
+          "codeValue": "SalaryRangeType"
+         }
+        }
+       ]
+      },
+      "requisitionLocations": [
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Los Angeles",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "90013"
+        },
+        "nameCode": {
+         "shortName": " Los Angeles, CA, US"
+        }
+       }
+      ]
+     },
+     {
+      "itemID": "409646248_1",
+      "requisitionTitle": "Shift Lead - Slac and Meta ",
+      "postDate": "2026-10-01T14:39:00.000-04:00",
+      "payGradeRange": {
+       "minimumRate": {
+        "amountValue": 20.0,
+        "currencyCode": "USD"
+       },
+       "maximumRate": {
+        "amountValue": 22.75,
+        "currencyCode": "USD"
+       }
+      },
+      "customFieldGroup": {
+       "codeFields": [
+        {
+         "codeValue": "HR",
+         "shortName": "Hourly",
+         "nameCode": {
+          "codeValue": "SalaryType"
+         }
+        },
+        {
+         "codeValue": "RANGE",
+         "shortName": "RANGE",
+         "nameCode": {
+          "codeValue": "SalaryRangeType"
+         }
+        }
+       ]
+      },
+      "requisitionLocations": [
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Menlo Park",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "94025"
+        },
+        "nameCode": {
+         "shortName": " Menlo Park, CA, US"
+        }
+       },
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "West Menlo Park",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "94025"
+        },
+        "nameCode": {
+         "shortName": " West Menlo Park, CA, US"
+        }
+       }
+      ]
+     },
+     {
+      "itemID": "386585558_1",
+      "requisitionTitle": "Chief Growth Officer",
+      "postDate": "2026-09-14T18:03:00.000-04:00",
+      "payGradeRange": {
+       "minimumRate": {
+        "amountValue": 0.0,
+        "currencyCode": "USD"
+       },
+       "maximumRate": {
+        "amountValue": 200000.0,
+        "currencyCode": "USD"
+       }
+      },
+      "customFieldGroup": {
+       "codeFields": [
+        {
+         "codeValue": "AN",
+         "shortName": "Annually",
+         "nameCode": {
+          "codeValue": "SalaryType"
+         }
+        },
+        {
+         "codeValue": "RANGE",
+         "shortName": "RANGE",
+         "nameCode": {
+          "codeValue": "SalaryRangeType"
+         }
+        }
+       ]
+      },
+      "requisitionLocations": [
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Los Angeles",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "90013"
+        },
+        "nameCode": {
+         "shortName": "Mateo St - Arts District, Los Angeles, CA, US"
+        }
+       },
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Santa Cruz",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "95062"
+        },
+        "nameCode": {
+         "shortName": "104 Bronson Street, Santa Cruz, CA, US"
+        }
+       }
+      ]
+     },
+     {
+      "itemID": "386633049_1",
+      "requisitionTitle": "Quality Assurance Technician",
+      "postDate": "2026-09-14T14:58:00.000-04:00",
+      "payGradeRange": {
+       "minimumRate": {
+        "amountValue": 22.0,
+        "currencyCode": "USD"
+       },
+       "maximumRate": {
+        "amountValue": 24.0,
+        "currencyCode": "USD"
+       }
+      },
+      "customFieldGroup": {
+       "codeFields": [
+        {
+         "codeValue": "HR",
+         "shortName": "Hourly",
+         "nameCode": {
+          "codeValue": "SalaryType"
+         }
+        },
+        {
+         "codeValue": "RANGE",
+         "shortName": "RANGE",
+         "nameCode": {
+          "codeValue": "SalaryRangeType"
+         }
+        }
+       ]
+      },
+      "requisitionLocations": [
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Santa Cruz",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "95062"
+        },
+        "nameCode": {
+         "shortName": "104 Bronson Street, Santa Cruz, CA, US"
+        }
+       }
+      ]
+     },
+     {
+      "itemID": "386492261_1",
+      "requisitionTitle": "Production Lead - HQ",
+      "postDate": "2026-09-11T14:41:00.000-04:00",
+      "payGradeRange": {
+       "minimumRate": {
+        "amountValue": 22.0,
+        "currencyCode": "USD"
+       },
+       "maximumRate": {
+        "amountValue": 24.0,
+        "currencyCode": "USD"
+       }
+      },
+      "customFieldGroup": {
+       "codeFields": [
+        {
+         "codeValue": "HR",
+         "shortName": "Hourly",
+         "nameCode": {
+          "codeValue": "SalaryType"
+         }
+        },
+        {
+         "codeValue": "RANGE",
+         "shortName": "RANGE",
+         "nameCode": {
+          "codeValue": "SalaryRangeType"
+         }
+        }
+       ]
+      },
+      "requisitionLocations": [
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Santa Cruz",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "95062"
+        },
+        "nameCode": {
+         "shortName": "104 Bronson Street, Santa Cruz, CA, US"
+        }
+       }
+      ]
+     },
+     {
+      "itemID": "386490177_1",
+      "requisitionTitle": "Production Supervisor - HQ",
+      "postDate": "2026-09-11T14:35:00.000-04:00",
+      "payGradeRange": {
+       "minimumRate": {
+        "amountValue": 72000.0,
+        "currencyCode": "USD"
+       },
+       "maximumRate": {
+        "amountValue": 78000.0,
+        "currencyCode": "USD"
+       }
+      },
+      "customFieldGroup": {
+       "codeFields": [
+        {
+         "codeValue": "AN",
+         "shortName": "Annually",
+         "nameCode": {
+          "codeValue": "SalaryType"
+         }
+        },
+        {
+         "codeValue": "RANGE",
+         "shortName": "RANGE",
+         "nameCode": {
+          "codeValue": "SalaryRangeType"
+         }
+        }
+       ]
+      },
+      "requisitionLocations": [
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Santa Cruz",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "95062"
+        },
+        "nameCode": {
+         "shortName": "104 Bronson Street, Santa Cruz, CA, US"
+        }
+       }
+      ]
+     },
+     {
+      "itemID": "229273507_1",
+      "requisitionTitle": "RTD Production Operator ",
+      "postDate": "2026-09-09T17:22:00.000-04:00",
+      "payGradeRange": {
+       "minimumRate": {
+        "amountValue": 20.0,
+        "currencyCode": "USD"
+       },
+       "maximumRate": {
+        "amountValue": 22.5,
+        "currencyCode": "USD"
+       }
+      },
+      "customFieldGroup": {
+       "codeFields": [
+        {
+         "codeValue": "HR",
+         "shortName": "Hourly",
+         "nameCode": {
+          "codeValue": "SalaryType"
+         }
+        },
+        {
+         "codeValue": "RANGE",
+         "shortName": "RANGE",
+         "nameCode": {
+          "codeValue": "SalaryRangeType"
+         }
+        }
+       ]
+      },
+      "requisitionLocations": [
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Santa Cruz",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "95062"
+        },
+        "nameCode": {
+         "shortName": " Santa Cruz, CA, US"
+        }
+       }
+      ]
+     },
+     {
+      "itemID": "238818676_1",
+      "requisitionTitle": "Regional Wholesale Sales Manager SoCal",
+      "postDate": "2026-09-09T15:33:00.000-04:00",
+      "payGradeRange": {
+       "minimumRate": {
+        "amountValue": 0.0,
+        "currencyCode": "USD"
+       },
+       "maximumRate": {
+        "amountValue": 85000.0,
+        "currencyCode": "USD"
+       }
+      },
+      "customFieldGroup": {
+       "codeFields": [
+        {
+         "codeValue": "AN",
+         "shortName": "Annually",
+         "nameCode": {
+          "codeValue": "SalaryType"
+         }
+        },
+        {
+         "codeValue": "RANGE",
+         "shortName": "RANGE",
+         "nameCode": {
+          "codeValue": "SalaryRangeType"
+         }
+        }
+       ]
+      },
+      "requisitionLocations": [
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Los Angeles",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "90013"
+        },
+        "nameCode": {
+         "shortName": "Mateo St - Arts District, Los Angeles, CA, US"
+        }
+       }
+      ]
+     },
+     {
+      "itemID": "375251465_1",
+      "requisitionTitle": "Shift Lead - Market St. ",
+      "postDate": "2026-09-04T16:57:00.000-04:00",
+      "payGradeRange": {
+       "minimumRate": {
+        "amountValue": 0.0,
+        "currencyCode": "USD"
+       },
+       "maximumRate": {
+        "amountValue": 21.61,
+        "currencyCode": "USD"
+       }
+      },
+      "customFieldGroup": {
+       "codeFields": [
+        {
+         "codeValue": "HR",
+         "shortName": "Hourly",
+         "nameCode": {
+          "codeValue": "SalaryType"
+         }
+        },
+        {
+         "codeValue": "RANGE",
+         "shortName": "RANGE",
+         "nameCode": {
+          "codeValue": "SalaryRangeType"
+         }
+        }
+       ]
+      },
+      "requisitionLocations": [
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "San Francisco",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "94114"
+        },
+        "nameCode": {
+         "shortName": "Market Street, San Francisco, CA, US"
+        }
+       }
+      ]
+     },
+     {
+      "itemID": "182037133_1",
+      "requisitionTitle": "Shift Lead - 41st Ave. ",
+      "postDate": "2026-08-24T17:04:00.000-04:00",
+      "payGradeRange": {
+       "minimumRate": {
+        "amountValue": 18.5,
+        "currencyCode": "USD"
+       },
+       "maximumRate": {
+        "amountValue": 19.25,
+        "currencyCode": "USD"
+       }
+      },
+      "customFieldGroup": {
+       "codeFields": [
+        {
+         "codeValue": "HR",
+         "shortName": "Hourly",
+         "nameCode": {
+          "codeValue": "SalaryType"
+         }
+        },
+        {
+         "codeValue": "RANGE",
+         "shortName": "RANGE",
+         "nameCode": {
+          "codeValue": "SalaryRangeType"
+         }
+        }
+       ]
+      },
+      "requisitionLocations": [
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Santa Cruz",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "95062"
+        },
+        "nameCode": {
+         "shortName": " Santa Cruz, CA, US"
+        }
+       }
+      ]
+     },
+     {
+      "itemID": "59763336_1",
+      "requisitionTitle": "Barista - Market St. ",
+      "postDate": "2026-08-17T13:23:00.000-04:00",
+      "payGradeRange": {
+       "minimumRate": {
+        "amountValue": 0.0,
+        "currencyCode": "USD"
+       },
+       "maximumRate": {
+        "amountValue": 20.11,
+        "currencyCode": "USD"
+       }
+      },
+      "customFieldGroup": {
+       "codeFields": [
+        {
+         "codeValue": "HR",
+         "shortName": "Hourly",
+         "nameCode": {
+          "codeValue": "SalaryType"
+         }
+        },
+        {
+         "codeValue": "RANGE",
+         "shortName": "RANGE",
+         "nameCode": {
+          "codeValue": "SalaryRangeType"
+         }
+        }
+       ]
+      },
+      "requisitionLocations": [
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "San Francisco",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "94114"
+        },
+        "nameCode": {
+         "shortName": "Market Street, San Francisco, CA, US"
+        }
+       }
+      ]
+     },
+     {
+      "itemID": "351166807_1",
+      "requisitionTitle": "Shift Lead - West 3rd ",
+      "postDate": "2026-08-17T13:22:00.000-04:00",
+      "payGradeRange": {
+       "minimumRate": {
+        "amountValue": 19.0,
+        "currencyCode": "USD"
+       },
+       "maximumRate": {
+        "amountValue": 20.7,
+        "currencyCode": "USD"
+       }
+      },
+      "customFieldGroup": {
+       "codeFields": [
+        {
+         "codeValue": "HR",
+         "shortName": "Hourly",
+         "nameCode": {
+          "codeValue": "SalaryType"
+         }
+        },
+        {
+         "codeValue": "RANGE",
+         "shortName": "RANGE",
+         "nameCode": {
+          "codeValue": "SalaryRangeType"
+         }
+        }
+       ]
+      },
+      "requisitionLocations": [
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Los Angeles",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "90048"
+        },
+        "nameCode": {
+         "shortName": "West 3rd, Los Angeles, CA, US"
+        }
+       }
+      ]
+     },
+     {
+      "itemID": "64296058_1",
+      "requisitionTitle": "Barista - West 3rd ",
+      "postDate": "2026-08-16T15:05:00.000-04:00",
+      "payGradeRange": {
+       "minimumRate": {
+        "amountValue": 18.4,
+        "currencyCode": "USD"
+       },
+       "maximumRate": {
+        "amountValue": 19.65,
+        "currencyCode": "USD"
+       }
+      },
+      "customFieldGroup": {
+       "codeFields": [
+        {
+         "codeValue": "HR",
+         "shortName": "Hourly",
+         "nameCode": {
+          "codeValue": "SalaryType"
+         }
+        },
+        {
+         "codeValue": "RANGE",
+         "shortName": "RANGE",
+         "nameCode": {
+          "codeValue": "SalaryRangeType"
+         }
+        }
+       ]
+      },
+      "requisitionLocations": [
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Los Angeles",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "90048"
+        },
+        "nameCode": {
+         "shortName": "West 3rd, Los Angeles, CA, US"
+        }
+       }
+      ]
+     },
+     {
+      "itemID": "64296880_1",
+      "requisitionTitle": "Barista - Mateo",
+      "postDate": "2026-08-10T15:56:00.000-04:00",
+      "payGradeRange": {
+       "minimumRate": {
+        "amountValue": 18.4,
+        "currencyCode": "USD"
+       },
+       "maximumRate": {
+        "amountValue": 19.65,
+        "currencyCode": "USD"
+       }
+      },
+      "customFieldGroup": {
+       "codeFields": [
+        {
+         "codeValue": "HR",
+         "shortName": "Hourly",
+         "nameCode": {
+          "codeValue": "SalaryType"
+         }
+        },
+        {
+         "codeValue": "RANGE",
+         "shortName": "RANGE",
+         "nameCode": {
+          "codeValue": "SalaryRangeType"
+         }
+        }
+       ]
+      },
+      "requisitionLocations": [
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Los Angeles",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "90013"
+        },
+        "nameCode": {
+         "shortName": "Mateo St - Arts District, Los Angeles, CA, US"
+        }
+       }
+      ]
+     },
+     {
+      "itemID": "141671557_1",
+      "requisitionTitle": "Full Time Barista, Santa Cruz Locations",
+      "postDate": "2026-07-17T13:27:00.000-04:00",
+      "payGradeRange": {
+       "minimumRate": {
+        "amountValue": 17.0,
+        "currencyCode": "USD"
+       },
+       "maximumRate": {
+        "amountValue": 18.25,
+        "currencyCode": "USD"
+       }
+      },
+      "customFieldGroup": {
+       "codeFields": [
+        {
+         "codeValue": "HR",
+         "shortName": "Hourly",
+         "nameCode": {
+          "codeValue": "SalaryType"
+         }
+        },
+        {
+         "codeValue": "RANGE",
+         "shortName": "RANGE",
+         "nameCode": {
+          "codeValue": "SalaryRangeType"
+         }
+        }
+       ]
+      },
+      "requisitionLocations": [
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Santa Cruz",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "95062"
+        },
+        "nameCode": {
+         "shortName": " Santa Cruz, CA, US"
+        }
+       },
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Santa Cruz",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "95060"
+        },
+        "nameCode": {
+         "shortName": " Santa Cruz, CA, US"
+        }
+       },
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Santa Cruz",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "95062"
+        },
+        "nameCode": {
+         "shortName": " Santa Cruz, CA, US"
+        }
+       },
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Santa Cruz",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "95062"
+        },
+        "nameCode": {
+         "shortName": " Santa Cruz, CA, US"
+        }
+       }
+      ]
+     },
+     {
+      "itemID": "182038204_1",
+      "requisitionTitle": "Full Time Shift Lead - Pac Ave. ",
+      "postDate": "2026-07-17T12:29:00.000-04:00",
+      "payGradeRange": {
+       "minimumRate": {
+        "amountValue": 18.5,
+        "currencyCode": "USD"
+       },
+       "maximumRate": {
+        "amountValue": 19.25,
+        "currencyCode": "USD"
+       }
+      },
+      "customFieldGroup": {
+       "codeFields": [
+        {
+         "codeValue": "HR",
+         "shortName": "Hourly",
+         "nameCode": {
+          "codeValue": "SalaryType"
+         }
+        },
+        {
+         "codeValue": "RANGE",
+         "shortName": "RANGE",
+         "nameCode": {
+          "codeValue": "SalaryRangeType"
+         }
+        }
+       ]
+      },
+      "requisitionLocations": [
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Santa Cruz",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "95062"
+        },
+        "nameCode": {
+         "shortName": " Santa Cruz, CA, US"
+        }
+       }
+      ]
+     },
+     {
+      "itemID": "60148728_1",
+      "requisitionTitle": "Barista, University Ave. ",
+      "postDate": "2026-07-16T19:20:00.000-04:00",
+      "payGradeRange": {
+       "minimumRate": {
+        "amountValue": 0.0,
+        "currencyCode": "USD"
+       },
+       "maximumRate": {
+        "amountValue": 20.67,
+        "currencyCode": "USD"
+       }
+      },
+      "customFieldGroup": {
+       "codeFields": [
+        {
+         "codeValue": "HR",
+         "shortName": "Hourly",
+         "nameCode": {
+          "codeValue": "SalaryType"
+         }
+        },
+        {
+         "codeValue": "RANGE",
+         "shortName": "RANGE",
+         "nameCode": {
+          "codeValue": "SalaryRangeType"
+         }
+        }
+       ]
+      },
+      "requisitionLocations": [
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Palo Alto",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "94301"
+        },
+        "nameCode": {
+         "shortName": "University Ave, Palo Alto, CA, US"
+        }
+       }
+      ]
+     }
+    ],
+    "meta": {
+     "totalNumber": 26
+    }
+   }
+  },
+  {
+   "url": "https://workforcenow.adp.com/mascsr/default/careercenter/public/events/staffing/v1/job-requisitions?cid=6915c399-128d-4976-932a-0870c48dc09d&lang=en_US&locale=en_US&$top=20&$skip=19",
+   "body": null,
+   "json": {
+    "jobRequisitions": [
+     {
+      "itemID": "60148728_1",
+      "requisitionTitle": "Barista, University Ave. ",
+      "postDate": "2026-07-16T19:20:00.000-04:00",
+      "payGradeRange": {
+       "minimumRate": {
+        "amountValue": 0.0,
+        "currencyCode": "USD"
+       },
+       "maximumRate": {
+        "amountValue": 20.67,
+        "currencyCode": "USD"
+       }
+      },
+      "customFieldGroup": {
+       "codeFields": [
+        {
+         "codeValue": "HR",
+         "shortName": "Hourly",
+         "nameCode": {
+          "codeValue": "SalaryType"
+         }
+        },
+        {
+         "codeValue": "RANGE",
+         "shortName": "RANGE",
+         "nameCode": {
+          "codeValue": "SalaryRangeType"
+         }
+        }
+       ]
+      },
+      "requisitionLocations": [
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Palo Alto",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "94301"
+        },
+        "nameCode": {
+         "shortName": "University Ave, Palo Alto, CA, US"
+        }
+       }
+      ]
+     },
+     {
+      "itemID": "77675962_1",
+      "requisitionTitle": "Barista - Santa Cruz",
+      "postDate": "2026-07-16T13:44:00.000-04:00",
+      "payGradeRange": {
+       "minimumRate": {
+        "amountValue": 17.0,
+        "currencyCode": "USD"
+       },
+       "maximumRate": {
+        "amountValue": 18.25,
+        "currencyCode": "USD"
+       }
+      },
+      "customFieldGroup": {
+       "codeFields": [
+        {
+         "codeValue": "HR",
+         "shortName": "Hourly",
+         "nameCode": {
+          "codeValue": "SalaryType"
+         }
+        },
+        {
+         "codeValue": "RANGE",
+         "shortName": "RANGE",
+         "nameCode": {
+          "codeValue": "SalaryRangeType"
+         }
+        }
+       ]
+      },
+      "requisitionLocations": [
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Santa Cruz",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "95062"
+        },
+        "nameCode": {
+         "shortName": " Santa Cruz, CA, US"
+        }
+       },
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Santa Cruz",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "95060"
+        },
+        "nameCode": {
+         "shortName": " Santa Cruz, CA, US"
+        }
+       },
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Santa Cruz",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "95062"
+        },
+        "nameCode": {
+         "shortName": " Santa Cruz, CA, US"
+        }
+       },
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Santa Cruz",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "95062"
+        },
+        "nameCode": {
+         "shortName": " Santa Cruz, CA, US"
+        }
+       }
+      ]
+     },
+     {
+      "itemID": "287702924_1",
+      "requisitionTitle": "Delivery Driver and Production Operator ",
+      "postDate": "2026-07-06T13:42:00.000-04:00",
+      "payGradeRange": {
+       "minimumRate": {
+        "amountValue": 20.25,
+        "currencyCode": "USD"
+       },
+       "maximumRate": {
+        "amountValue": 24.0,
+        "currencyCode": "USD"
+       }
+      },
+      "customFieldGroup": {
+       "codeFields": [
+        {
+         "codeValue": "HR",
+         "shortName": "Hourly",
+         "nameCode": {
+          "codeValue": "SalaryType"
+         }
+        },
+        {
+         "codeValue": "RANGE",
+         "shortName": "RANGE",
+         "nameCode": {
+          "codeValue": "SalaryRangeType"
+         }
+        }
+       ]
+      },
+      "requisitionLocations": [
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Santa Cruz",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "95062"
+        },
+        "nameCode": {
+         "shortName": "104 Bronson Street, Santa Cruz, CA, US"
+        }
+       }
+      ]
+     },
+     {
+      "itemID": "248089369_1",
+      "requisitionTitle": "Part Time Production Operator ",
+      "postDate": "2026-06-09T19:44:00.000-04:00",
+      "payGradeRange": {
+       "minimumRate": {
+        "amountValue": 17.0,
+        "currencyCode": "USD"
+       },
+       "maximumRate": {
+        "amountValue": 22.0,
+        "currencyCode": "USD"
+       }
+      },
+      "customFieldGroup": {
+       "codeFields": [
+        {
+         "codeValue": "HR",
+         "shortName": "Hourly",
+         "nameCode": {
+          "codeValue": "SalaryType"
+         }
+        },
+        {
+         "codeValue": "RANGE",
+         "shortName": "RANGE",
+         "nameCode": {
+          "codeValue": "SalaryRangeType"
+         }
+        }
+       ]
+      },
+      "requisitionLocations": [
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Santa Cruz",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "95062"
+        },
+        "nameCode": {
+         "shortName": " Santa Cruz, CA, US"
+        }
+       }
+      ]
+     },
+     {
+      "itemID": "228406926_1",
+      "requisitionTitle": "Reg Op/ Cashier",
+      "postDate": "2026-05-26T15:57:00.000-04:00",
+      "payGradeRange": {
+       "minimumRate": {
+        "amountValue": 17.4,
+        "currencyCode": "USD"
+       },
+       "maximumRate": {
+        "amountValue": 17.65,
+        "currencyCode": "USD"
+       }
+      },
+      "customFieldGroup": {
+       "codeFields": [
+        {
+         "codeValue": "HR",
+         "shortName": "Hourly",
+         "nameCode": {
+          "codeValue": "SalaryType"
+         }
+        },
+        {
+         "codeValue": "RANGE",
+         "shortName": "RANGE",
+         "nameCode": {
+          "codeValue": "SalaryRangeType"
+         }
+        }
+       ]
+      },
+      "requisitionLocations": [
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Manhattan Beach",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "90266"
+        },
+        "nameCode": {
+         "shortName": " Manhattan Beach, CA, US"
+        }
+       }
+      ]
+     },
+     {
+      "itemID": "200592001_1",
+      "requisitionTitle": "Prep Cook - Mateo",
+      "postDate": "2026-04-30T12:46:00.000-04:00",
+      "payGradeRange": {
+       "minimumRate": {
+        "amountValue": 19.9,
+        "currencyCode": "USD"
+       },
+       "maximumRate": {
+        "amountValue": 20.9,
+        "currencyCode": "USD"
+       }
+      },
+      "customFieldGroup": {
+       "codeFields": [
+        {
+         "codeValue": "HR",
+         "shortName": "Hourly",
+         "nameCode": {
+          "codeValue": "SalaryType"
+         }
+        },
+        {
+         "codeValue": "RANGE",
+         "shortName": "RANGE",
+         "nameCode": {
+          "codeValue": "SalaryRangeType"
+         }
+        }
+       ]
+      },
+      "requisitionLocations": [
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Los Angeles",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "90013"
+        },
+        "nameCode": {
+         "shortName": "Mateo St - Arts District, Los Angeles, CA, US"
+        }
+       }
+      ]
+     },
+     {
+      "itemID": "165736048_1",
+      "requisitionTitle": "Line Cook - Mateo St., Los Angeles",
+      "postDate": "2026-04-09T19:43:00.000-04:00",
+      "payGradeRange": {
+       "minimumRate": {
+        "amountValue": 21.4,
+        "currencyCode": "USD"
+       },
+       "maximumRate": {
+        "amountValue": 22.4,
+        "currencyCode": "USD"
+       }
+      },
+      "customFieldGroup": {
+       "codeFields": [
+        {
+         "codeValue": "HR",
+         "shortName": "Hourly",
+         "nameCode": {
+          "codeValue": "SalaryType"
+         }
+        },
+        {
+         "codeValue": "RANGE",
+         "shortName": "RANGE",
+         "nameCode": {
+          "codeValue": "SalaryRangeType"
+         }
+        }
+       ]
+      },
+      "requisitionLocations": [
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Los Angeles",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "90013"
+        },
+        "nameCode": {
+         "shortName": " Los Angeles, CA, US"
+        }
+       }
+      ]
+     },
+     {
+      "itemID": "165733093_1",
+      "requisitionTitle": "Dishwasher - Mateo St., Los Angeles",
+      "postDate": "2026-04-09T19:28:00.000-04:00",
+      "payGradeRange": {
+       "minimumRate": {
+        "amountValue": 18.4,
+        "currencyCode": "USD"
+       },
+       "maximumRate": {
+        "amountValue": 19.4,
+        "currencyCode": "USD"
+       }
+      },
+      "customFieldGroup": {
+       "codeFields": [
+        {
+         "codeValue": "HR",
+         "shortName": "Hourly",
+         "nameCode": {
+          "codeValue": "SalaryType"
+         }
+        },
+        {
+         "codeValue": "RANGE",
+         "shortName": "RANGE",
+         "nameCode": {
+          "codeValue": "SalaryRangeType"
+         }
+        }
+       ]
+      },
+      "requisitionLocations": [
+       {
+        "aliasNames": [],
+        "address": {
+         "cityName": "Los Angeles",
+         "countrySubdivisionLevel1": {
+          "codeValue": "CA"
+         },
+         "postalCode": "90013"
+        },
+        "nameCode": {
+         "shortName": " Los Angeles, CA, US"
+        }
+       }
+      ]
+     }
+    ],
+    "meta": {
+     "totalNumber": 26
+    }
+   }
+  }
+ ]
+}
