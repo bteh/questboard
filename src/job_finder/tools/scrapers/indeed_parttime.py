@@ -19,10 +19,11 @@ from __future__ import annotations
 import logging
 import re
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 
 from job_finder.tools.scrapers._registry import register_scraper
-from job_finder.tools.scrapers._utils import _parse_posted_date
+from job_finder.tools.scrapers._utils import _parse_posted_date, publish_partial
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ SOURCE = "indeed-parttime"
 
 SEARCH_TERMS: tuple[str, ...] = (
     "barista",
+    "coffee",
     "cafe",
     "boba",
     "server",
@@ -41,10 +43,16 @@ SEARCH_TERMS: tuple[str, ...] = (
 
 DISTANCE_MILES = 10
 _DEFAULT_MAX_DAYS = 14
-_PER_TERM = 25
-_TERM_TIMEOUT_S = 25.0
-# run_scrapers stops waiting at 100s; stop starting new terms well before
+# Live probe near Koreatown, Oct 8 2026: barista 90, coffee 84 part-time
+# posts within 10 miles, each term answering in 10-20s.
+_PER_TERM = 100
+RESULT_CEILING = 500
+_WORKERS = 3
+_TERM_TIMEOUT_S = 30.0
+# run_scrapers stops waiting at 100s: no new term starts after 80s, and no
+# term may run past 95s
 _TOTAL_BUDGET_S = 80.0
+_HARD_STOP_S = 95.0
 
 _FULL_TIME_TITLE_RE = re.compile(r"\bfull[- ]?time\b", re.IGNORECASE)
 _PART_TIME_TITLE_RE = re.compile(r"\bpart[- ]?time\b", re.IGNORECASE)
@@ -150,12 +158,14 @@ def filter_rows(
     stale_after_days=10,
     refresh_hours=12,
     allowed_url_hosts=("indeed.com",),
+    result_ceiling=RESULT_CEILING,
 )
 def search_indeed_parttime(
     roles: list[str] | None = None,
-    max_results: int = 100,
+    max_results: int = RESULT_CEILING,
     max_days_old: int | None = None,
     place: str | None = None,
+    partial_sink: list[dict] | None = None,
     **kwargs,
 ) -> list[dict]:
     """Search Indeed for part-time shifts near ``place``. ``roles`` is
@@ -169,24 +179,29 @@ def search_indeed_parttime(
 
     days = max_days_old or _DEFAULT_MAX_DAYS
     started = time.monotonic()
-    raw: list[dict] = []
-    for term in SEARCH_TERMS:
-        if time.monotonic() - started > _TOTAL_BUDGET_S:
-            logger.info("indeed-parttime: time budget spent before %r", term)
-            break
-        raw.extend(
-            search_jobs(
-                search_term=term,
-                location=where,
-                results_wanted=_PER_TERM,
-                hours_old=None,
-                boards=["indeed"],
-                distance=DISTANCE_MILES,
-                job_type="parttime",
-                scrape_timeout=_TERM_TIMEOUT_S,
-            )
-        )
 
+    def _fetch(term: str) -> list[dict]:
+        elapsed = time.monotonic() - started
+        if elapsed > _TOTAL_BUDGET_S:
+            logger.info("indeed-parttime: time budget spent before %r", term)
+            return []
+        rows = search_jobs(
+            search_term=term,
+            location=where,
+            results_wanted=_PER_TERM,
+            hours_old=None,
+            boards=["indeed"],
+            distance=DISTANCE_MILES,
+            job_type="parttime",
+            scrape_timeout=max(1.0, min(_TERM_TIMEOUT_S, _HARD_STOP_S - elapsed)),
+        )
+        publish_partial(partial_sink, filter_rows(rows, max_results, days))
+        return rows
+
+    with ThreadPoolExecutor(max_workers=_WORKERS) as pool:
+        per_term = list(pool.map(_fetch, SEARCH_TERMS))
+
+    raw = [row for rows in per_term for row in rows]
     results = filter_rows(raw, max_results, days)
     logger.info("indeed-parttime: %d of %d rows kept near %s", len(results), len(raw), where)
     return results

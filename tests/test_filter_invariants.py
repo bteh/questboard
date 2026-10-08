@@ -820,3 +820,45 @@ def test_koreatown_means_the_la_metro_near_only():
     for typed in ("Koreatown", "Koreatown, Los Angeles, CA", "ktown", "K-Town LA"):
         assert _place_matches(s, typed, strict=True) == {"ktown-cafe", "pasadena"}, typed
     assert _place_matches(s, "Ktownsend", strict=True) == set()
+
+
+def test_la_metro_covers_the_county_cities_part_time_rows_carry():
+    """Owner, Oct 8 2026: part-time rows near Koreatown came back as South
+    Gate, Downey, San Gabriel, Commerce, Montebello, Maywood, and Pico Rivera,
+    and an LA seeker in strict mode never saw them."""
+    s = _fresh_session()
+    inside = [
+        "South Gate, CA, US", "Downey, CA, US", "San Gabriel, CA, US",
+        "Commerce, CA, US", "Montebello, CA, US", "Maywood, CA, US",
+        "Pico Rivera, CA, US", "Huntington Park, CA, US", "Bell, CA, US",
+        "Vernon, CA, US", "East Los Angeles, CA, US", "Silver Lake, CA",
+        "Echo Park, Los Angeles, CA", "Los Feliz, CA", "Koreatown, CA",
+        "Mid-Wilshire, CA", "Highland Park, CA, US", "Eagle Rock, California",
+        "Boyle Heights, CA",
+    ]
+    # Each one shares a name or a substring with an LA County place.
+    outside = [
+        "Bellflower, CA, US",        # bell
+        "Bellevue, WA, US",          # bell
+        "Campbell, CA, US",          # bell, and it is in California
+        "Bell, FL, US",              # bell, wrong state
+        "Commerce, TX, US",          # commerce
+        "E-commerce Hub, Dallas, TX",  # commerce in prose
+        "Mount Vernon, WA, US",      # vernon
+        "Vernon Hills, IL, US",      # vernon
+        "Maywood, NJ, US",           # maywood
+        "Downey, ID, US",            # downey
+        "Montebello, NY, US",        # montebello
+        "Highland Park, IL, US",     # highland park
+        "Eagle Rock, VA, US",        # eagle rock
+        "Silver Lake, OH, US",       # silver lake
+        "Koreatown, New York, NY",   # koreatown
+    ]
+    for loc in inside + outside:
+        _add(s, job_title=loc, location=loc)
+    for typed in ("Los Angeles, CA", "Koreatown"):
+        got = _place_matches(s, typed, strict=True)
+        for loc in inside:
+            assert loc in got, (typed, loc)
+        for loc in outside:
+            assert loc not in got, (typed, loc)

@@ -133,7 +133,7 @@ def test_search_runs_each_term_near_the_place_with_the_part_time_filter(mod, raw
     with patch("job_finder.tools.job_search_tool.search_jobs", fake_search_jobs):
         rows = mod.search_indeed_parttime(place="Koreatown, Los Angeles, CA", max_days_old=3650)
 
-    assert [c["search_term"] for c in calls] == list(mod.SEARCH_TERMS)
+    assert sorted(c["search_term"] for c in calls) == sorted(mod.SEARCH_TERMS)
     for c in calls:
         assert c["location"] == "Koreatown, Los Angeles, CA"
         assert c["boards"] == ["indeed"]
@@ -169,3 +169,82 @@ def test_place_reaches_only_sources_that_declare_it() -> None:
     geo = {"query": None, "lat": None, "lon": None, "radius_miles": None, "place": "Koreatown"}
     assert _accepted_geo_kwargs(search_indeed_parttime, geo) == {"place": "Koreatown"}
     assert _accepted_geo_kwargs(search_reddit_lajobs, geo) == {}
+
+
+def test_deep_supply_is_not_capped_at_25_a_term_or_100_total(mod) -> None:
+    # Owner, Oct 8 2026, on 0.2.17: "why is there so few". A live probe near
+    # Koreatown found 90 part-time barista and 84 coffee posts within 10 miles,
+    # but the app held 20 cafe rows: 25 asked per term, 100 kept in total.
+    def fake_search_jobs(**kw):
+        term = kw["search_term"].replace(" ", "-")
+        n = min(kw["results_wanted"], 90)
+        return [
+            _row(
+                title=f"Part-time {kw['search_term']} {i}",
+                company=f"{term} shop {i}",
+                url=f"https://www.indeed.com/viewjob?jk={term}{i}",
+            )
+            for i in range(n)
+        ]
+
+    with patch("job_finder.tools.job_search_tool.search_jobs", fake_search_jobs):
+        rows = mod.search_indeed_parttime(place="Koreatown, Los Angeles, CA", max_days_old=3650)
+
+    barista = [r for r in rows if "barista" in r["title"].lower()]
+    assert len(barista) == 90
+    assert len(rows) > 300
+
+
+def test_cafe_terms_run_first(mod) -> None:
+    # Same Oct 8 report: cafe shifts are what the owner wanted, so when the
+    # time budget runs out it is the restaurant and retail terms that drop.
+    assert mod.SEARCH_TERMS[:4] == ("barista", "coffee", "cafe", "boba")
+    assert {"server", "host", "retail associate", "cashier", "event staff"} <= set(mod.SEARCH_TERMS)
+
+
+def test_declared_ceiling_survives_the_quest_refresh_cap(mod) -> None:
+    # run_quest_search hands every source max_results=100. The part-time
+    # source declares 500 for itself; other sources keep 100.
+    import importlib
+
+    from job_finder.models import database as database_module
+
+    _registry = importlib.import_module("job_finder.tools.scrapers._registry")
+
+    def fake_search_jobs(**kw):
+        term = kw["search_term"].replace(" ", "-")
+        return [
+            _row(
+                title=f"Part-time {kw['search_term']} {i}",
+                company=f"{term} shop {i}",
+                url=f"https://www.indeed.com/viewjob?jk={term}{i}",
+            )
+            for i in range(kw["results_wanted"])
+        ]
+
+    def other(**kw):
+        return [
+            {**_row(url=f"https://www.indeed.com/viewjob?jk=o{i}", company=f"o{i}"),
+             "source": "other-parttime", "vertical": "parttime"}
+            for i in range(kw["max_results"])
+        ]
+
+    other_meta = _registry.ScraperMeta(
+        name="other-parttime", display_name="Other", url="https://www.indeed.com",
+        description="", category="jobspy", enabled_by_default=False,
+        search_fn=other, vertical="parttime", allowed_url_hosts=("indeed.com",),
+    )
+    with patch("job_finder.tools.job_search_tool.search_jobs", fake_search_jobs), \
+         patch.dict(_registry._REGISTRY, {"other-parttime": other_meta}), \
+         patch.object(database_module, "record_scrape_runs"):
+        rows = _registry.run_scrapers(
+            names=["indeed-parttime", "other-parttime"],
+            max_results=100,
+            max_days_old=3650,
+            scraper_kwargs={"indeed-parttime": {"place": "Koreatown, Los Angeles, CA"}},
+        )
+
+    by_source: dict[str, int] = {}
+    for r in rows:
+        by_source[r["source"]] = by_source.get(r["source"], 0) + 1
+    assert by_source == {"indeed-parttime": mod.RESULT_CEILING, "other-parttime": 100}

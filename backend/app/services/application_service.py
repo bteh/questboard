@@ -25,6 +25,8 @@ _METRO_CITIES: dict[str, tuple[str, ...]] = {
         "playa vista", "venice", "westwood", "century city", "sherman oaks",
         "studio city", "north hollywood", "van nuys", "woodland hills", "el monte",
         "alhambra", "monterey park", "redondo beach", "santa clarita", "universal city",
+        "south gate", "san gabriel", "pico rivera", "huntington park", "east los angeles",
+        "echo park", "los feliz", "mid-wilshire", "mid wilshire", "boyle heights",
     ),
     "san francisco": (
         "san francisco", "oakland", "berkeley", "san mateo", "palo alto", "mountain view",
@@ -53,16 +55,42 @@ _METRO_NEIGHBORHOODS: dict[str, str] = {
 }
 
 
-def _metro_cities_for(location: str) -> tuple[str, ...] | None:
-    """The metro's city list if `location` names a known metro, else None."""
+# Metro places whose bare name is also part of another place or word: Bell
+# sits inside Bellflower, Bellevue, and Campbell; Commerce, Vernon, Maywood,
+# Downey, Montebello, Highland Park, Eagle Rock, Silver Lake, and Koreatown
+# all exist in other states. These match only as a whole word on a row that
+# also says California.
+_METRO_WORD_CITIES: dict[str, tuple[str, ...]] = {
+    "los angeles": (
+        "bell", "vernon", "commerce", "maywood", "downey", "montebello",
+        "highland park", "eagle rock", "silver lake", "koreatown",
+    ),
+}
+_METRO_WORD_REGION: dict[str, tuple[str, ...]] = {
+    "los angeles": ("ca", "california"),
+}
+
+
+def _metro_for(location: str) -> str | None:
     low = " ".join((location or "").lower().split())
-    for metro, cities in _METRO_CITIES.items():
+    for metro in _METRO_CITIES:
         if metro in low:
-            return cities
+            return metro
     for hood, metro in _METRO_NEIGHBORHOODS.items():
         if re.search(rf"\b{re.escape(hood)}\b", low):
-            return _METRO_CITIES[metro]
+            return metro
     return None
+
+
+def _metro_place_match(model, metro: str):
+    """SQL clause: the row's location names one of the metro's places."""
+    clauses = [model.location.ilike(f"%{c}%") for c in _METRO_CITIES[metro]]
+    words = _METRO_WORD_CITIES.get(metro, ())
+    if words:
+        padded = _word_padded_location(model)
+        in_region = or_(*[padded.ilike(f"% {r} %") for r in _METRO_WORD_REGION[metro]])
+        clauses.append(and_(or_(*[padded.ilike(f"% {w} %") for w in words]), in_region))
+    return or_(*clauses)
 
 _ALLOWED_SORT_BY = frozenset({
     "overall_score", "date_found", "company", "job_title", "salary_min", "salary_max",
@@ -390,7 +418,7 @@ def place_filter(model, location: str | None, location_strict: bool = False):
         return None
     from job_finder.us_states import STATE_TO_ABBR, state_aliases
 
-    metro = _metro_cities_for(location)
+    metro = _metro_for(location)
     aliases = state_aliases(location)
     # A US city or state means US-nationwide postings ("United States" with no
     # city) are reachable for this seeker.
@@ -398,7 +426,7 @@ def place_filter(model, location: str | None, location_strict: bool = False):
     if metro:
         # "Los Angeles" also finds Beverly Hills / Santa Monica / etc. — the
         # seeker means the metro, not only rows that name the core city.
-        place_match = or_(*[model.location.ilike(f"%{c}%") for c in metro])
+        place_match = _metro_place_match(model, metro)
     elif aliases:
         full_name, abbr = aliases
         token_match = model.state_codes.like(f"%,{abbr},%")

@@ -55,6 +55,10 @@ class ScraperMeta:
     # (real title, parseable URL, no future dates) apply regardless.
     allowed_url_hosts: tuple[str, ...] | None = None
     allowed_url_paths: tuple[str, ...] | None = None
+    # How many rows one run of this source may keep, declared by the source
+    # when its real supply is deeper than the caller's shared max_results.
+    # A caller's max_results_by_source entry still wins.
+    result_ceiling: int | None = None
 
 
 _REGISTRY: dict[str, ScraperMeta] = {}
@@ -80,6 +84,7 @@ def register_scraper(
     refresh_hours: int | None = None,
     allowed_url_hosts: tuple[str, ...] | None = None,
     allowed_url_paths: tuple[str, ...] | None = None,
+    result_ceiling: int | None = None,
 ) -> Callable:
     """Decorator that registers a scraper function with its metadata.
 
@@ -113,6 +118,7 @@ def register_scraper(
             refresh_hours=refresh_hours,
             allowed_url_hosts=allowed_url_hosts,
             allowed_url_paths=allowed_url_paths,
+            result_ceiling=result_ceiling,
         )
         return fn
     return decorator
@@ -311,7 +317,11 @@ def run_scrapers(
     sinks_lock = threading.Lock()
 
     def _source_cap(name: str) -> int:
-        return max(1, int((max_results_by_source or {}).get(name, max_results)))
+        if max_results_by_source and name in max_results_by_source:
+            return max(1, int(max_results_by_source[name]))
+        meta = _REGISTRY.get(name)
+        declared = meta.result_ceiling if meta else None
+        return max(1, int(declared or max_results))
 
     def _claim_harvest(name: str) -> list[dict]:
         """Take a hung source's sink rows; its own thread must not settle later."""

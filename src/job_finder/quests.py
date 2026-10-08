@@ -170,7 +170,8 @@ def run_quest_search(
         max_results=100,
         # A source that declares full_snapshot must actually fetch its entire
         # live set or absence can never be evidence. High-volume windowed
-        # feeds stay at 100 and are labeled partial when they hit that cap.
+        # feeds stay at 100 and are labeled partial when they hit that cap,
+        # unless the source declares a deeper result_ceiling of its own.
         max_results_by_source={
             name: 1000 for name in names if registry[name].full_snapshot
         },
