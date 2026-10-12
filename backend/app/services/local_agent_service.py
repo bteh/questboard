@@ -35,6 +35,7 @@ from job_finder.job_trust import is_direct_source
 from job_finder.kinds import get_kinds, kind_for_vertical, vertical_values_for
 from job_finder.models.database import ScrapeRunRecord
 from job_finder.tools.scrapers._utils import _strip_html
+from job_finder.title_aliases import expand_title_abbreviations
 
 _WORK_KIND = "work"
 # One cap for every list the assistant hands us: saved roles, proposals, and
@@ -907,7 +908,7 @@ def _conflict_scope_tokens(title: str | None) -> set[str]:
 
 def _role_tokens(value: str | None) -> set[str]:
     tokens: set[str] = set()
-    for raw in re.findall(r"[a-z0-9]+", str(value or "").lower()):
+    for raw in re.findall(r"[a-z0-9]+", expand_title_abbreviations(value)):
         if raw in _ROLE_FILLER_TOKENS:
             continue
         tokens.add(_ROLE_TOKEN_ALIASES.get(raw, raw))

@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from job_finder.models.database import APPLICATION_VERTICALS, scoped_applications
 from job_finder.place_areas import WORD_EXCLUDES, Area, area_for
 from job_finder.staffing import STAFFING_AGENCY_NAMES
+from job_finder.title_aliases import TITLE_ABBREVIATIONS, abbreviations_for
 from app.models.application import ApplicationRecord
 
 
@@ -643,8 +644,8 @@ def publishable_source_condition(model):
 
 
 # LIKE has no word boundary and "cto" sits inside "director", so the chief
-# acronyms only match at the start of the title or after a separator.
-_ANCHORED_ACRONYMS = frozenset({"cto", "cdo", "cio"})
+# acronyms and title abbreviations only match at the start of the title or after a separator.
+_ANCHORED_ACRONYMS = frozenset({"cto", "cdo", "cio", *TITLE_ABBREVIATIONS})
 _ACRONYM_SEPARATORS = (" ", ",", "/", "(", "-", "|", ":")
 
 
@@ -861,7 +862,7 @@ def get_applications(
                         or_(
                             *(
                                 lowered_title.like(pattern)
-                                for variant in variants.get(token, (token,))
+                                for variant in variants.get(token, (token,)) + abbreviations_for(token)
                                 for pattern in _title_like_patterns(variant)
                             )
                         )

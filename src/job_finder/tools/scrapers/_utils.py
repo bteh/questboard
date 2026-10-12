@@ -17,6 +17,8 @@ from typing import NamedTuple
 import requests
 from requests.adapters import HTTPAdapter
 
+from job_finder.title_aliases import expand_title_abbreviations
+
 logger = logging.getLogger(__name__)
 
 # How many company boards an ATS scraper fetches at once. These are one-shot
@@ -1108,7 +1110,8 @@ def _match_roles(
     """
     if not roles:
         return True
-    title_lower = title.lower()
+    title_lower = expand_title_abbreviations(title)
+    roles = [expand_title_abbreviations(r) for r in roles]
     raw_title_words = set(_WORD_RE.findall(title_lower))
     if include_founding and _is_founding_title(title_lower, raw_title_words):
         return True
