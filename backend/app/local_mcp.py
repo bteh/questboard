@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import functools
+import logging
 import os
 from contextlib import contextmanager
 from pathlib import Path
@@ -27,6 +28,8 @@ from app.services import (
     pipeline_service,
     workspace_service,
 )
+
+logger = logging.getLogger(__name__)
 
 
 INSTRUCTIONS = (
@@ -408,6 +411,14 @@ async def refresh_work(
             snapshot=snapshot,
             durable=True,
         )
+        if roles is not None:
+            try:
+                local_agent_service.propose_searched_roles(
+                    db, effective_roles, workspace_id=workspace.id
+                )
+            except Exception:
+                db.rollback()
+                logger.warning("Could not record the searched-roles proposal", exc_info=True)
     return {
         "run_id": run.run_id,
         "status": run.status,
