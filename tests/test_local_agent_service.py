@@ -933,18 +933,19 @@ def test_set_work_fit_writes_verdicts_and_preserves_current_prior(local_agent_db
     assert fit0["verdict"] == "strong" and fit0["rank"] == 1 and "Exact" in fit0["why"]
 
     # A second run keeps unchanged judgments and inserts its requested global
-    # rank, shifting the prior row without another model pass.
+    # rank inside its verdict tier, shifting the prior row without another
+    # model pass.
     from app.services import agent_run_progress
 
     agent_run_progress.clear()
     out2 = local_agent_service.set_work_fit(
-        db, [{"opportunity_id": ids[2], "rank": 1, "verdict": "good", "why": "Now this one."}]
+        db, [{"opportunity_id": ids[2], "rank": 1, "verdict": "strong", "why": "Now this one."}]
     )
     assert out2["applied"] == 1
     prior = json.loads(db.get(ApplicationRecord, ids[0]).agent_fit_json)
     latest = json.loads(db.get(ApplicationRecord, ids[2]).agent_fit_json)
     assert prior["verdict"] == "strong" and prior["rank"] == 2
-    assert latest["verdict"] == "good" and latest["rank"] == 1
+    assert latest["verdict"] == "strong" and latest["rank"] == 1
 
 
 def test_set_work_fit_rejects_bad_verdict(local_agent_db) -> None:

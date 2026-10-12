@@ -28,6 +28,7 @@ from app.schemas.application import (
 from app.schemas.apply import KitRequest, KitResponse, PrepareResponse
 from app.services import application_service, local_agent_service
 from app.services import apply_service
+from app.services.fit_order import fit_sort_key, split_by_tier
 from app.dependencies import (
     get_active_workspace_context,
     get_active_workspace_context_csrf,
@@ -624,24 +625,27 @@ def list_profile_work(
         _narrow_by_source_category(db, ordered, source_category), level
     )
 
-    # Coherent global order BEFORE pagination: current ranked picks, reviewed
-    # non-skips without an integer rank, unreviewed/stale rows, then skips.
-    # The old two-way split treated a skip (rank=None) as ordinary unranked, so
+    # Coherent global order BEFORE pagination: current ranked picks (verdict
+    # tier, then rank, per fit_order), reviewed non-skips without an integer
+    # rank, unreviewed/stale rows, then skips. The old two-way split treated a skip (rank=None) as ordinary unranked, so
     # folded-away skips consumed page one while useful unreviewed rows waited on
     # later pages. Declump each segment without crossing its semantic boundary.
     fit_states = {
         record.id: local_agent_service.fit_review_state(record, profile_hash)
         for record in ordered
     }
+    def _verdict(record) -> str | None:
+        return fit_states[record.id]["fit"].get("verdict")
+
     ranked = sorted(
         (
             record
             for record in ordered
             if fit_states[record.id]["current"]
-            and fit_states[record.id]["fit"].get("verdict") != "skip"
+            and _verdict(record) != "skip"
             and _agent_rank(record, profile_hash) < 10_000
         ),
-        key=lambda record: _agent_rank(record, profile_hash),
+        key=lambda record: fit_sort_key(_verdict(record), _agent_rank(record, profile_hash)),
     )
     reviewed_unranked = [
         record
@@ -660,7 +664,11 @@ def list_profile_work(
         and fit_states[record.id]["fit"].get("verdict") == "skip"
     ]
     ordered = (
-        _declump_by_source(ranked, max_run=3)
+        [
+            record
+            for tier in split_by_tier(ranked, _verdict)
+            for record in _declump_by_source(tier, max_run=3)
+        ]
         + _declump_by_source(reviewed_unranked, max_run=3)
         + _declump_by_source(unreviewed, max_run=3)
         + _declump_by_source(skips, max_run=3)
