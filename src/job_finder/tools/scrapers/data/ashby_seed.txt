@@ -81,6 +81,12 @@ n8n
 alchemy
 magiceden
 phantom
+circle
+oplabs
+polygon-labs
+wormholelabs
+turnkey
+succinct
 
 # --- Healthcare / climate / hardware -------------------------------------
 crusoe

@@ -310,6 +310,34 @@ rows (33 with pay, 17s), before the pipeline's place filter.
   subscription, but it holds only the 20 newest per category with no pay
   and links into governmentjobs.com. Low value; a ride-along at best.
 
+## Startup identity and YC boards (2026-10-12)
+
+Brian: "I don't have a lot of startup companies." The "Startups & founding"
+chip showed 204 companies while ~90% of Find Work rows were "Unknown":
+nothing fills headcount, funding stage was set on ~3% of rows, and the
+search-only save path (Run search) never saved funding at all.
+YC Work at a Startup only shows a ~26-job teaser without a login.
+
+- **YC directory snapshot.** `scripts/build_startup_boards.py` reads the
+  public YC company directory (https://yc-oss.github.io/api/companies/all.json,
+  an unofficial daily export of YC's own Algolia index; facts only) and
+  probes each active company's Ashby, Greenhouse and Lever boards. A board is
+  kept only when its own postings name the company (board name == website
+  name) or its website domain (any other board name). Output:
+  `src/job_finder/config/startup_boards.json`, bundled in the sidecar.
+- **Tagging.** `src/job_finder/startup_boards.py` looks a posting's board up
+  in that snapshot and `fill_funding_from_text` stamps "YC W19 (early)" as
+  funding_stage, which `classify_company` reads as Early Startup or Growth
+  Stage. `models/startup_board_repair.py` applies it to stored rows; its
+  version is the snapshot date, so a rebuilt snapshot re-runs it once.
+- **Supply.** 429 YC boards (187 in no catalog before) rotate on their own
+  lane, 120 per ATS per pull (`startup_rotation_slugs`), so the ~330 Ashby
+  ones come round every ~3 pulls (all 429 fetch in ~8s). Seed files stop reading at the bulk
+  marker by design (450-700 boards per pull blew the deadline), so boards
+  appended below it are dead. Oct 12 crypto-audit boards (Circle, OP Labs,
+  Bybit, Superstate...) and Stripe went into the curated sections.
+- Rebuild the snapshot every month or two (about 15 minutes).
+
 ## Declined, with reasons (do not re-add without new facts)
 
 - **Craigslist gigs**: technically trivial (an open JSON search API

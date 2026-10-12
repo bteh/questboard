@@ -233,11 +233,13 @@ def run_scrapers(
         try:
             from job_finder.tools.scrapers._ats_discovery import (
                 discover_and_cache,
+                startup_rotation_slugs,
                 verified_rotation_slugs,
             )
         except ImportError as exc:
             logger.warning("ATS discovery unavailable: %s", exc)
             discover_and_cache = None
+            startup_rotation_slugs = None
             verified_rotation_slugs = None
         if discover_and_cache is not None:
             # Each host's discovery is independent.  A cold first run used to
@@ -269,6 +271,15 @@ def run_scrapers(
                         exc,
                     )
                     rotated = set()
+                try:
+                    if startup_rotation_slugs is not None:
+                        rotated |= startup_rotation_slugs(ats_name)
+                except Exception as exc:
+                    logger.warning(
+                        "Startup board rotation for %s failed (non-fatal): %s",
+                        ats_name,
+                        exc,
+                    )
                 return ats_name, discovered, rotated
 
             with ThreadPoolExecutor(max_workers=max(1, len(active_ats))) as discovery_pool:

@@ -1,0 +1,4296 @@
+{
+ "source": "https://yc-oss.github.io/api/companies/all.json",
+ "built_at": "2026-10-12",
+ "boards": [
+  {
+   "ats": "ashby",
+   "slug": "abacum",
+   "name": "Abacum",
+   "stage": "Growth",
+   "batch": "Winter 2021",
+   "team_size": 125,
+   "website": "https://www.abacum.ai/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "abundant",
+   "name": "Abundant",
+   "stage": "Early",
+   "batch": "Fall 2024",
+   "team_size": 7,
+   "website": "https://www.abundant.ai/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "accord",
+   "name": "Accord",
+   "stage": "Growth",
+   "batch": "Winter 2020",
+   "team_size": 20,
+   "website": "https://inaccord.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "afterquery",
+   "name": "AfterQuery",
+   "stage": "Growth",
+   "batch": "Winter 2025",
+   "team_size": 30,
+   "website": "https://afterquery.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "agave",
+   "name": "Agave",
+   "stage": "Early",
+   "batch": "Winter 2022",
+   "team_size": 50,
+   "website": "https://www.useagave.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "agentmail",
+   "name": "AgentMail",
+   "stage": "Early",
+   "batch": "Summer 2025",
+   "team_size": 10,
+   "website": "https://agentmail.to",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "aios",
+   "name": "AIOS",
+   "stage": "Early",
+   "batch": "Winter 2020",
+   "team_size": 100,
+   "website": "https://www.aiosmedical.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "aiprise",
+   "name": "AiPrise",
+   "stage": "Early",
+   "batch": "Summer 2022",
+   "team_size": 65,
+   "website": "https://aiprise.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "airbyte",
+   "name": "Airbyte",
+   "stage": "Early",
+   "batch": "Winter 2020",
+   "team_size": 90,
+   "website": "https://airbyte.com/",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "airgoods",
+   "name": "Airgoods",
+   "stage": "Early",
+   "batch": "Summer 2023",
+   "team_size": 10,
+   "website": "https://airgoods.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "ambral",
+   "name": "Ambral",
+   "stage": "Early",
+   "batch": "Summer 2025",
+   "team_size": 4,
+   "website": "https://www.ambral.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "answerthis",
+   "name": "AnswerThis",
+   "stage": "Early",
+   "batch": "Fall 2025",
+   "team_size": 6,
+   "website": "https://answerthis.io/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "anthrogen",
+   "name": "Anthrogen",
+   "stage": "Early",
+   "batch": "Summer 2024",
+   "team_size": 15,
+   "website": "https://anthrogen.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "apolink",
+   "name": "Apolink",
+   "stage": "Early",
+   "batch": "Fall 2024",
+   "team_size": 7,
+   "website": "https://apolink.space",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "archil",
+   "name": "Archil",
+   "stage": "Growth",
+   "batch": "Fall 2024",
+   "team_size": 11,
+   "website": "https://archil.com",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "arini",
+   "name": "Arini",
+   "stage": "Early",
+   "batch": "Winter 2024",
+   "team_size": 17,
+   "website": "https://www.arini.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "arketa",
+   "name": "Arketa",
+   "stage": "Growth",
+   "batch": "Summer 2020",
+   "team_size": 55,
+   "website": "https://arketa.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "artie",
+   "name": "Artie",
+   "stage": "Growth",
+   "batch": "Summer 2023",
+   "team_size": 20,
+   "website": "https://www.artie.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "artisan",
+   "name": "Artisan",
+   "stage": "Growth",
+   "batch": "Winter 2024",
+   "team_size": 50,
+   "website": "https://artisan.co/?utm_source=ycombinator",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "artosai",
+   "name": "Artos",
+   "stage": "Early",
+   "batch": "Winter 2024",
+   "team_size": 7,
+   "website": "https://www.artosai.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "ashby",
+   "name": "Ashby",
+   "stage": "Growth",
+   "batch": "Winter 2019",
+   "team_size": 110,
+   "website": "https://www.ashbyhq.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "aspora",
+   "name": "Aspora",
+   "stage": "Growth",
+   "batch": "Winter 2022",
+   "team_size": 85,
+   "website": "https://aspora.com",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "assemble",
+   "name": "Assemble",
+   "stage": "Early",
+   "batch": "Summer 2026",
+   "team_size": 4,
+   "website": "https://www.assemble.ai/",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "assembly",
+   "name": "Assembly",
+   "stage": "Early",
+   "batch": "Winter 2018",
+   "team_size": 25,
+   "website": "https://www.assembly.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "astro-mechanica",
+   "name": "Astro Mechanica",
+   "stage": "Growth",
+   "batch": "Winter 2024",
+   "team_size": 52,
+   "website": "https://astromecha.co/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "atlas",
+   "name": "Atlas",
+   "stage": "Early",
+   "batch": "Summer 2021",
+   "team_size": 12,
+   "website": "https://atlas.kitchen",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "atob",
+   "name": "AtoB",
+   "stage": "Growth",
+   "batch": "Summer 2020",
+   "team_size": 75,
+   "website": "https://atob.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "aurelian",
+   "name": "Aurelian",
+   "stage": "Growth",
+   "batch": "Summer 2022",
+   "team_size": 45,
+   "website": "https://www.aurelian.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "authzed",
+   "name": "authzed",
+   "stage": "Growth",
+   "batch": "Winter 2021",
+   "team_size": 31,
+   "website": "https://authzed.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "avoca",
+   "name": "Avoca",
+   "stage": "Growth",
+   "batch": "Winter 2023",
+   "team_size": 85,
+   "website": "https://www.avoca.ai/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "axiom",
+   "name": "Axiom.ai",
+   "stage": "Early",
+   "batch": "Winter 2021",
+   "team_size": 8,
+   "website": "https://axiom.ai",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "axiom",
+   "name": "Axiom",
+   "stage": "Early",
+   "batch": "Winter 2025",
+   "team_size": 2,
+   "website": "https://axiom.trade",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "axle-health",
+   "name": "Axle Health",
+   "stage": "Growth",
+   "batch": "Winter 2021",
+   "team_size": 28,
+   "website": "https://www.axlehealth.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "belvo",
+   "name": "Belvo",
+   "stage": "Early",
+   "batch": "Winter 2020",
+   "team_size": 100,
+   "website": "https://belvo.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "benchling",
+   "name": "Benchling",
+   "stage": "Growth",
+   "batch": "Summer 2012",
+   "team_size": 750,
+   "website": "http://benchling.com",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "benepass",
+   "name": "Benepass",
+   "stage": "Early",
+   "batch": "Winter 2020",
+   "team_size": 45,
+   "website": "http://www.getbenepass.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "beyondreachlabs",
+   "name": "Beyond Reach Labs",
+   "stage": "Early",
+   "batch": "Winter 2026",
+   "team_size": 15,
+   "website": "https://www.beyondreachlabs.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "bild-ai",
+   "name": "Bild AI",
+   "stage": "Early",
+   "batch": "Winter 2025",
+   "team_size": 9,
+   "website": "https://www.bild.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "blacksmith",
+   "name": "Blacksmith",
+   "stage": "Growth",
+   "batch": "Winter 2024",
+   "team_size": 3,
+   "website": "https://blacksmith.sh/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "bland",
+   "name": "Bland AI",
+   "stage": "Growth",
+   "batch": "Summer 2023",
+   "team_size": 65,
+   "website": "https://bland.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "blee",
+   "name": "Blee",
+   "stage": "Growth",
+   "batch": "Summer 2022",
+   "team_size": 15,
+   "website": "https://www.blee.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "blissway",
+   "name": "Blissway",
+   "stage": "Early",
+   "batch": "Summer 2020",
+   "team_size": 22,
+   "website": "https://www.blissway.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "blueberrypediatrics",
+   "name": "Blueberry Pediatrics",
+   "stage": "Growth",
+   "batch": "Winter 2018",
+   "team_size": 15,
+   "website": "https://blueberrypediatrics.com",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "bootloop",
+   "name": "BootLoop",
+   "stage": "Early",
+   "batch": "Summer 2025",
+   "team_size": 3,
+   "website": "https://bootloop.ai/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "brainbaselabs",
+   "name": "Brainbase Labs",
+   "stage": "Early",
+   "batch": "Winter 2024",
+   "team_size": 4,
+   "website": "https://brainbaselabs.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "broccoli",
+   "name": "Broccoli AI",
+   "stage": "Growth",
+   "batch": "Winter 2022",
+   "team_size": 85,
+   "website": "https://www.broccoli.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "brumby",
+   "name": "Brumby (Formerly GrazeMate)",
+   "stage": "Early",
+   "batch": "Winter 2026",
+   "team_size": 3,
+   "website": "https://brumby",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "bunkerhillhealth",
+   "name": "Bunkerhill Health",
+   "stage": "Growth",
+   "batch": "Winter 2019",
+   "team_size": 30,
+   "website": "http://bunkerhillhealth.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "camber",
+   "name": "Camber",
+   "stage": "Growth",
+   "batch": "Winter 2021",
+   "team_size": 101,
+   "website": "https://www.camber.health/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "cambio",
+   "name": "Cambio",
+   "stage": "Growth",
+   "batch": "Summer 2022",
+   "team_size": 60,
+   "website": "https://www.cambio.ai/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "cambly",
+   "name": "Cambly",
+   "stage": "Growth",
+   "batch": "Winter 2014",
+   "team_size": 200,
+   "website": "http://www.cambly.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "campfire",
+   "name": "Campfire",
+   "stage": "Growth",
+   "batch": "Summer 2023",
+   "team_size": 105,
+   "website": "https://campfire.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "capimoney",
+   "name": "Capi Money",
+   "stage": "Growth",
+   "batch": "Summer 2023",
+   "team_size": 40,
+   "website": "https://www.capimoney.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "capy",
+   "name": "Capy",
+   "stage": "Early",
+   "batch": "Fall 2024",
+   "team_size": 6,
+   "website": "https://capy.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "cardboard",
+   "name": "Cardboard",
+   "stage": "Early",
+   "batch": "Winter 2026",
+   "team_size": 8,
+   "website": "https://cardboard.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "casco",
+   "name": "Casco",
+   "stage": "Early",
+   "batch": "Spring 2025",
+   "team_size": 10,
+   "website": "https://casco.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "castle",
+   "name": "Castle",
+   "stage": "Growth",
+   "batch": "Winter 2016",
+   "team_size": 20,
+   "website": "https://castle.io",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "charge-robotics",
+   "name": "Charge Robotics",
+   "stage": "Early",
+   "batch": "Summer 2021",
+   "team_size": 25,
+   "website": "https://chargerobotics.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "chariot",
+   "name": "Chariot",
+   "stage": "Growth",
+   "batch": "Summer 2022",
+   "team_size": 24,
+   "website": "https://givechariot.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "cinder",
+   "name": "Cinder",
+   "stage": "Growth",
+   "batch": "Winter 2022",
+   "team_size": 30,
+   "website": "https://cinder.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "circleback",
+   "name": "Circleback",
+   "stage": "Early",
+   "batch": "Winter 2024",
+   "team_size": 8,
+   "website": "https://circleback.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "circuithub",
+   "name": "CircuitHub",
+   "stage": "Early",
+   "batch": "Winter 2012",
+   "team_size": 58,
+   "website": "https://circuithub.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "claim-health",
+   "name": "Claim Health",
+   "stage": "Early",
+   "batch": "Spring 2025",
+   "team_size": 6,
+   "website": "https://www.claimhealth.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "claimsorted",
+   "name": "ClaimSorted",
+   "stage": "Early",
+   "batch": "Summer 2024",
+   "team_size": 20,
+   "website": "https://claimsorted.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "classdojo",
+   "name": "ClassDojo",
+   "stage": "Early",
+   "batch": "Summer 2012",
+   "team_size": 100,
+   "website": "http://www.classdojo.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "clearly-ai",
+   "name": "Clearly AI",
+   "stage": "Early",
+   "batch": "Summer 2024",
+   "team_size": 17,
+   "website": "https://clearly-ai.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "close",
+   "name": "Close",
+   "stage": "Early",
+   "batch": "Winter 2011",
+   "team_size": 120,
+   "website": "https://close.com",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "codes-health",
+   "name": "Codes Health",
+   "stage": "Early",
+   "batch": "Summer 2024",
+   "team_size": 35,
+   "website": "https://www.codeshealth.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "comena",
+   "name": "Comena",
+   "stage": "Early",
+   "batch": "Summer 2025",
+   "team_size": 8,
+   "website": "https://comena.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "complete",
+   "name": "Complete",
+   "stage": "Early",
+   "batch": "Winter 2022",
+   "team_size": 5,
+   "website": "https://complete.so",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "complir",
+   "name": "Complir",
+   "stage": "Early",
+   "batch": "Spring 2026",
+   "team_size": 13,
+   "website": "https://complir.io/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "concourse",
+   "name": "Concourse",
+   "stage": "Early",
+   "batch": "Winter 2023",
+   "team_size": 15,
+   "website": "https://concourse.ai/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "conductor",
+   "name": "Conductor",
+   "stage": "Growth",
+   "batch": "Summer 2024",
+   "team_size": 8,
+   "website": "https://conductor.build",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "conduit",
+   "name": "Conduit",
+   "stage": "Early",
+   "batch": "Winter 2024",
+   "team_size": 15,
+   "website": "https://conduit.ai/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "conveo",
+   "name": "Conveo",
+   "stage": "Growth",
+   "batch": "Summer 2024",
+   "team_size": 90,
+   "website": "https://conveo.ai/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "coperniq",
+   "name": "Coperniq",
+   "stage": "Early",
+   "batch": "Winter 2023",
+   "team_size": 6,
+   "website": "https://coperniq.io",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "corvus-robotics",
+   "name": "Corvus Robotics",
+   "stage": "Growth",
+   "batch": "Summer 2018",
+   "team_size": 30,
+   "website": "https://www.corvus-robotics.com",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "cosine",
+   "name": "Cosine",
+   "stage": "Early",
+   "batch": "Winter 2023",
+   "team_size": 12,
+   "website": "http://www.cosine.sh",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "cosmic-robotics",
+   "name": "Cosmic Robotics",
+   "stage": "Early",
+   "batch": "Summer 2026",
+   "team_size": 8,
+   "website": "https://www.cosmicrobotics.com/",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "credal",
+   "name": "Credal.ai",
+   "stage": "Early",
+   "batch": "Winter 2023",
+   "team_size": 14,
+   "website": "https://credal.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "ctgt",
+   "name": "CTGT",
+   "stage": "Early",
+   "batch": "Fall 2024",
+   "team_size": 10,
+   "website": "https://www.ctgt.ai/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "curri",
+   "name": "Curri",
+   "stage": "Growth",
+   "batch": "Summer 2019",
+   "team_size": 104,
+   "website": "http://www.curri.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "datafold",
+   "name": "Datafold",
+   "stage": "Growth",
+   "batch": "Summer 2020",
+   "team_size": 30,
+   "website": "https://datafold.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "dataleap",
+   "name": "Dataleap",
+   "stage": "Early",
+   "batch": "Summer 2024",
+   "team_size": 6,
+   "website": "https://dataleap.ai/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "david-ai",
+   "name": "David AI",
+   "stage": "Growth",
+   "batch": "Summer 2024",
+   "team_size": 10,
+   "website": "https://www.withdavid.ai/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "decodahealth",
+   "name": "Decoda Health",
+   "stage": "Early",
+   "batch": "Summer 2023",
+   "team_size": 19,
+   "website": "https://decodahealth.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "dedalus-labs",
+   "name": "Dedalus Labs",
+   "stage": "Early",
+   "batch": "Summer 2025",
+   "team_size": 8,
+   "website": "https://www.dedaluslabs.ai/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "deepgram",
+   "name": "Deepgram",
+   "stage": "Growth",
+   "batch": "Winter 2016",
+   "team_size": 115,
+   "website": "https://www.deepgram.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "deepnote",
+   "name": "Deepnote",
+   "stage": "Growth",
+   "batch": "Summer 2019",
+   "team_size": 0,
+   "website": "https://www.deepnote.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "diligencesquared",
+   "name": "DiligenceSquared",
+   "stage": "Early",
+   "batch": "Fall 2025",
+   "team_size": 3,
+   "website": "https://diligencesquared.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "dispatch",
+   "name": "Dispatch",
+   "stage": "Early",
+   "batch": "Spring 2026",
+   "team_size": 4,
+   "website": "https://dispatch.space/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "docker",
+   "name": "Docker",
+   "stage": "Growth",
+   "batch": "Summer 2010",
+   "team_size": 201,
+   "website": "http://docker.com",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "domu",
+   "name": "Domu Technology Inc.",
+   "stage": "Growth",
+   "batch": "Summer 2024",
+   "team_size": 50,
+   "website": "https://www.domu.ai/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "doppler",
+   "name": "Doppler",
+   "stage": "Growth",
+   "batch": "Winter 2019",
+   "team_size": 25,
+   "website": "https://doppler.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "double",
+   "name": "Double \u2013 Coding Copilot",
+   "stage": "Early",
+   "batch": "Winter 2023",
+   "team_size": 2,
+   "website": "https://double.bot",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "doublezero",
+   "name": "Doublezero",
+   "stage": "Early",
+   "batch": "Summer 2024",
+   "team_size": 2,
+   "website": "https://doublezero.tech",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "duffel",
+   "name": "Duffel",
+   "stage": "Growth",
+   "batch": "Summer 2018",
+   "team_size": 55,
+   "website": "https://duffel.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "eightsleep",
+   "name": "Eight Sleep",
+   "stage": "Growth",
+   "batch": "Summer 2015",
+   "team_size": 100,
+   "website": "http://eightsleep.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "ekho",
+   "name": "Ekho",
+   "stage": "Growth",
+   "batch": "Summer 2022",
+   "team_size": 30,
+   "website": "https://www.ekho.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "electricair",
+   "name": "Electric Air",
+   "stage": "Early",
+   "batch": "Summer 2023",
+   "team_size": 18,
+   "website": "https://www.electricair.io/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "ello",
+   "name": "Ello",
+   "stage": "Early",
+   "batch": "Winter 2020",
+   "team_size": 45,
+   "website": "https://www.ello.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "eloquentai",
+   "name": "Eloquent AI",
+   "stage": "Early",
+   "batch": "Spring 2025",
+   "team_size": 5,
+   "website": "https://www.eloquentai.co/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "elyos",
+   "name": "Elyos AI",
+   "stage": "Growth",
+   "batch": "Summer 2023",
+   "team_size": 20,
+   "website": "https://www.elyos.ai/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "encord",
+   "name": "Encord",
+   "stage": "Growth",
+   "batch": "Winter 2021",
+   "team_size": 150,
+   "website": "https://encord.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "enode",
+   "name": "Enode",
+   "stage": "Growth",
+   "batch": "Winter 2021",
+   "team_size": 70,
+   "website": "http://www.enode.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "escape",
+   "name": "Escape",
+   "stage": "Growth",
+   "batch": "Winter 2023",
+   "team_size": 29,
+   "website": "https://escape.tech",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "event-horizon-labs",
+   "name": "Event Horizon Labs",
+   "stage": "Early",
+   "batch": "Winter 2024",
+   "team_size": 10,
+   "website": "https://www.ehl.markets/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "exa",
+   "name": "Exa",
+   "stage": "Growth",
+   "batch": "Summer 2021",
+   "team_size": 75,
+   "website": "https://exa.ai",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "extend",
+   "name": "Extend",
+   "stage": "Early",
+   "batch": "Winter 2023",
+   "team_size": 25,
+   "website": "https://www.extend.ai/",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "fathom",
+   "name": "Fathom",
+   "stage": "Growth",
+   "batch": "Winter 2021",
+   "team_size": 95,
+   "website": "https://www.fathom.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "fernstone",
+   "name": "Fernstone",
+   "stage": "Early",
+   "batch": "Fall 2025",
+   "team_size": 5,
+   "website": "https://www.fernstone.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "fieldguide",
+   "name": "Fieldguide",
+   "stage": "Growth",
+   "batch": "Summer 2020",
+   "team_size": 200,
+   "website": "http://fieldguide.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "finary",
+   "name": "Finary.com",
+   "stage": "Early",
+   "batch": "Winter 2021",
+   "team_size": 80,
+   "website": "https://finary.com/en",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "finni-health",
+   "name": "Finni Health",
+   "stage": "Growth",
+   "batch": "Winter 2023",
+   "team_size": 40,
+   "website": "https://www.finnihealth.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "firecrawl",
+   "name": "Firecrawl",
+   "stage": "Growth",
+   "batch": "Summer 2022",
+   "team_size": 3,
+   "website": "https://www.firecrawl.dev",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "firstwork",
+   "name": "FirstWork",
+   "stage": "Growth",
+   "batch": "Summer 2024",
+   "team_size": 9,
+   "website": "https://firstwork.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "fleetline",
+   "name": "Fleetline",
+   "stage": "Early",
+   "batch": "Summer 2025",
+   "team_size": 11,
+   "website": "https://fleetline.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "fleetworks",
+   "name": "FleetWorks",
+   "stage": "Early",
+   "batch": "Summer 2023",
+   "team_size": 20,
+   "website": "https://fleetworks.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "float",
+   "name": "Float",
+   "stage": "Early",
+   "batch": "Summer 2021",
+   "team_size": 2,
+   "website": "https://float.xyz",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "flowtel",
+   "name": "Flowtel",
+   "stage": "Early",
+   "batch": "Winter 2025",
+   "team_size": 5,
+   "website": "https://flowtel.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "flutterflow",
+   "name": "FlutterFlow",
+   "stage": "Growth",
+   "batch": "Winter 2021",
+   "team_size": 55,
+   "website": "https://flutterflow.io",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "formance",
+   "name": "Formance",
+   "stage": "Growth",
+   "batch": "Summer 2021",
+   "team_size": 33,
+   "website": "https://formance.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "fortuna-health",
+   "name": "Fortuna Health",
+   "stage": "Growth",
+   "batch": "Summer 2023",
+   "team_size": 29,
+   "website": "https://fortunahealth.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "foundation",
+   "name": "Foundation",
+   "stage": "Early",
+   "batch": "Summer 2023",
+   "team_size": 4,
+   "website": "https://buildwithfoundation.com/",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "freshpaint",
+   "name": "Freshpaint",
+   "stage": "Growth",
+   "batch": "Summer 2019",
+   "team_size": 120,
+   "website": "https://freshpaint.io",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "furtherai",
+   "name": "FurtherAI",
+   "stage": "Growth",
+   "batch": "Winter 2024",
+   "team_size": 36,
+   "website": "https://www.furtherai.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "gecko-robotics",
+   "name": "Gecko Robotics",
+   "stage": "Growth",
+   "batch": "Winter 2016",
+   "team_size": 230,
+   "website": "https://www.geckorobotics.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "gigs",
+   "name": "Gigs",
+   "stage": "Growth",
+   "batch": "Winter 2021",
+   "team_size": 150,
+   "website": "https://gigs.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "golinks",
+   "name": "GoLinks",
+   "stage": "Growth",
+   "batch": "Winter 2019",
+   "team_size": 70,
+   "website": "https://www.golinks.io",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "goteleport",
+   "name": "Teleport",
+   "stage": "Growth",
+   "batch": "Summer 2015",
+   "team_size": 255,
+   "website": "https://goteleport.com",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "govdash",
+   "name": "GovDash",
+   "stage": "Growth",
+   "batch": "Winter 2022",
+   "team_size": 56,
+   "website": "https://govdash.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "goveagle",
+   "name": "GovEagle",
+   "stage": "Early",
+   "batch": "Winter 2023",
+   "team_size": 25,
+   "website": "https://www.goveagle.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "greatquestion",
+   "name": "Great Question",
+   "stage": "Growth",
+   "batch": "Winter 2021",
+   "team_size": 41,
+   "website": "https://greatquestion.co",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "greenboard",
+   "name": "Greenboard",
+   "stage": "Growth",
+   "batch": "Winter 2024",
+   "team_size": 35,
+   "website": "https://www.greenboard.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "gumloop",
+   "name": "Gumloop",
+   "stage": "Growth",
+   "batch": "Winter 2024",
+   "team_size": 44,
+   "website": "https://www.gumloop.com/",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "h3x-technologies",
+   "name": "H3X Technologies",
+   "stage": "Early",
+   "batch": "Winter 2021",
+   "team_size": 58,
+   "website": "http://h3x.tech/",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "halluminate",
+   "name": "Halluminate",
+   "stage": "Early",
+   "batch": "Summer 2025",
+   "team_size": 5,
+   "website": "https://halluminate.ai/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "happl",
+   "name": "Happl",
+   "stage": "Growth",
+   "batch": "Winter 2022",
+   "team_size": 11,
+   "website": "https://happl.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "harperinsure",
+   "name": "Harper",
+   "stage": "Growth",
+   "batch": "Winter 2025",
+   "team_size": 25,
+   "website": "https://www.harperinsure.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "herondata",
+   "name": "Heron",
+   "stage": "Early",
+   "batch": "Summer 2020",
+   "team_size": 60,
+   "website": "https://www.herondata.io",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "hightouch",
+   "name": "Hightouch",
+   "stage": "Growth",
+   "batch": "Summer 2019",
+   "team_size": 200,
+   "website": "https://hightouch.com/",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "hivehealth",
+   "name": "Hive Health",
+   "stage": "Early",
+   "batch": "Summer 2021",
+   "team_size": null,
+   "website": "https://www.ourhivehealth.com",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "hockeystack",
+   "name": "HockeyStack",
+   "stage": "Growth",
+   "batch": "Summer 2023",
+   "team_size": 32,
+   "website": "https://hockeystack.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "honeydew",
+   "name": "Honeydew",
+   "stage": "Early",
+   "batch": "Winter 2023",
+   "team_size": 6,
+   "website": "https://honeydew.ai",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "hotplate",
+   "name": "Hotplate",
+   "stage": "Early",
+   "batch": "Summer 2020",
+   "team_size": 9,
+   "website": "http://www.hotplate.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "hud",
+   "name": "HUD",
+   "stage": "Early",
+   "batch": "Winter 2025",
+   "team_size": 24,
+   "website": "https://www.hud.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "hudu",
+   "name": "Hudu",
+   "stage": "Growth",
+   "batch": "Winter 2021",
+   "team_size": 26,
+   "website": "https://hudu.com",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "humaans",
+   "name": "Humaans",
+   "stage": "Growth",
+   "batch": "Winter 2021",
+   "team_size": 48,
+   "website": "https://humaans.io",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "humanarchive",
+   "name": "Human Archive",
+   "stage": "Early",
+   "batch": "Winter 2026",
+   "team_size": 100,
+   "website": "https://www.humanarchive.ai/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "hyperbound",
+   "name": "Hyperbound",
+   "stage": "Growth",
+   "batch": "Summer 2023",
+   "team_size": 30,
+   "website": "https://hyperbound.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "hypercubic",
+   "name": "Hypercubic",
+   "stage": "Early",
+   "batch": "Fall 2025",
+   "team_size": 3,
+   "website": "https://www.hypercubic.ai/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "hyperspell",
+   "name": "Hyperspell",
+   "stage": "Early",
+   "batch": "Fall 2025",
+   "team_size": 8,
+   "website": "https://hyperspell.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "idler",
+   "name": "idler",
+   "stage": "Early",
+   "batch": "Summer 2025",
+   "team_size": 12,
+   "website": "https://idler.ai/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "infinite",
+   "name": "Infinite",
+   "stage": "Early",
+   "batch": "Winter 2025",
+   "team_size": 4,
+   "website": "https://infinite.net",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "infisical",
+   "name": "Infisical",
+   "stage": "Growth",
+   "batch": "Winter 2023",
+   "team_size": 50,
+   "website": "https://infisical.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "influxdata",
+   "name": "InfluxData",
+   "stage": "Growth",
+   "batch": "Winter 2013",
+   "team_size": 210,
+   "website": "https://influxdata.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "inkeep",
+   "name": "Inkeep",
+   "stage": "Early",
+   "batch": "Winter 2023",
+   "team_size": 18,
+   "website": "https://inkeep.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "innate",
+   "name": "Innate",
+   "stage": "Early",
+   "batch": "Fall 2024",
+   "team_size": 7,
+   "website": "https://innate.bot",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "interfere",
+   "name": "Interfere",
+   "stage": "Early",
+   "batch": "Summer 2025",
+   "team_size": 8,
+   "website": "https://interfere.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "invopop",
+   "name": "Invopop",
+   "stage": "Early",
+   "batch": "Winter 2023",
+   "team_size": 7,
+   "website": "https://www.invopop.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "jiga",
+   "name": "Jiga",
+   "stage": "Early",
+   "batch": "Winter 2021",
+   "team_size": 25,
+   "website": "https://jiga.io",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "juicebox",
+   "name": "Juicebox",
+   "stage": "Growth",
+   "batch": "Summer 2022",
+   "team_size": 100,
+   "website": "https://juicebox.ai/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "julius",
+   "name": "Julius",
+   "stage": "Early",
+   "batch": "Summer 2022",
+   "team_size": 10,
+   "website": "https://julius.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "junction",
+   "name": "Junction",
+   "stage": "Growth",
+   "batch": "Winter 2020",
+   "team_size": 19,
+   "website": "https://www.junction.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "kalshi",
+   "name": "Kalshi",
+   "stage": "Growth",
+   "batch": "Winter 2019",
+   "team_size": 125,
+   "website": "https://www.kalshi.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "kastle",
+   "name": "Kastle",
+   "stage": "Growth",
+   "batch": "Summer 2024",
+   "team_size": 15,
+   "website": "https://kastle.ai/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "kernel",
+   "name": "KERNEL",
+   "stage": "Growth",
+   "batch": "Summer 2025",
+   "team_size": 22,
+   "website": "https://www.kernel.sh",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "kivo-health",
+   "name": "Kivo Health",
+   "stage": "Growth",
+   "batch": "Winter 2023",
+   "team_size": 40,
+   "website": "https://kivohealth.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "klarify",
+   "name": "Klarify",
+   "stage": "Early",
+   "batch": "Spring 2026",
+   "team_size": 3,
+   "website": "https://www.klarify.ca/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "knowtex",
+   "name": "Knowtex",
+   "stage": "Early",
+   "batch": "Summer 2022",
+   "team_size": null,
+   "website": "http://www.knowtex.ai/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "kombo",
+   "name": "Kombo",
+   "stage": "Early",
+   "batch": "Summer 2022",
+   "team_size": 77,
+   "website": "https://kombo.dev",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "lance",
+   "name": "Lance",
+   "stage": "Early",
+   "batch": "Winter 2026",
+   "team_size": 10,
+   "website": "https://www.lance.live",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "lancedb",
+   "name": "LanceDB",
+   "stage": "Growth",
+   "batch": "Winter 2022",
+   "team_size": 35,
+   "website": "https://lancedb.com",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "langdock",
+   "name": "Langdock",
+   "stage": "Early",
+   "batch": "Summer 2023",
+   "team_size": 55,
+   "website": "https://langdock.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "lapel",
+   "name": "Lapel",
+   "stage": "Early",
+   "batch": "Spring 2025",
+   "team_size": 14,
+   "website": "https://lapel.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "legionhealth",
+   "name": "Legion Health",
+   "stage": "Growth",
+   "batch": "Summer 2021",
+   "team_size": 11,
+   "website": "https://legionhealth.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "legora",
+   "name": "Legora",
+   "stage": "Growth",
+   "batch": "Winter 2024",
+   "team_size": 400,
+   "website": "https://www.legora.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "lemfi",
+   "name": "LemFi",
+   "stage": "Growth",
+   "batch": "Summer 2021",
+   "team_size": 500,
+   "website": "https://lemfi.com",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "lightdash",
+   "name": "Lightdash",
+   "stage": "Growth",
+   "batch": "Summer 2020",
+   "team_size": 23,
+   "website": "http://lightdash.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "litellm",
+   "name": "LiteLLM",
+   "stage": "Early",
+   "batch": "Winter 2023",
+   "team_size": 20,
+   "website": "https://www.litellm.ai/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "liveflow",
+   "name": "LiveFlow",
+   "stage": "Growth",
+   "batch": "Winter 2021",
+   "team_size": 51,
+   "website": "https://www.liveflow.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "lucis",
+   "name": "Lucis",
+   "stage": "Growth",
+   "batch": "Spring 2025",
+   "team_size": 17,
+   "website": "https://www.lucis.life",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "luminai",
+   "name": "Luminai",
+   "stage": "Growth",
+   "batch": "Summer 2020",
+   "team_size": 50,
+   "website": "https://www.luminai.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "mach9",
+   "name": "Mach9",
+   "stage": "Early",
+   "batch": "Summer 2021",
+   "team_size": 25,
+   "website": "https://www.mach9.ai/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "magicpatterns",
+   "name": "Magic Patterns",
+   "stage": "Early",
+   "batch": "Winter 2023",
+   "team_size": 10,
+   "website": "https://www.magicpatterns.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "mangodesk",
+   "name": "MangoDesk",
+   "stage": "Early",
+   "batch": "Summer 2025",
+   "team_size": 2,
+   "website": "https://www.mangodesk.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "mem0",
+   "name": "Mem0",
+   "stage": "Growth",
+   "batch": "Summer 2024",
+   "team_size": 10,
+   "website": "https://mem0.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "mercura",
+   "name": "Mercura",
+   "stage": "Early",
+   "batch": "Winter 2025",
+   "team_size": 20,
+   "website": "https://www.mercura.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "metal",
+   "name": "Metal",
+   "stage": "Early",
+   "batch": "Winter 2023",
+   "team_size": 17,
+   "website": "https://metal.ai/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "metal",
+   "name": "Metal",
+   "stage": "Early",
+   "batch": "Winter 2023",
+   "team_size": 21,
+   "website": "http://www.metal.so",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "meticulous",
+   "name": "Meticulous",
+   "stage": "Growth",
+   "batch": "Summer 2021",
+   "team_size": 15,
+   "website": "https://www.meticulous.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "metriport",
+   "name": "Metriport",
+   "stage": "Growth",
+   "batch": "Summer 2022",
+   "team_size": 29,
+   "website": "https://metriport.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "middesk",
+   "name": "Middesk",
+   "stage": "Growth",
+   "batch": "Winter 2019",
+   "team_size": 130,
+   "website": "http://www.middesk.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "mintlify",
+   "name": "Mintlify",
+   "stage": "Growth",
+   "batch": "Winter 2022",
+   "team_size": 75,
+   "website": "https://mintlify.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "misolabs",
+   "name": "Miso Labs",
+   "stage": "Early",
+   "batch": "Spring 2026",
+   "team_size": 3,
+   "website": "https://misolabs.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "moderntreasury",
+   "name": "Modern Treasury",
+   "stage": "Growth",
+   "batch": "Summer 2018",
+   "team_size": 160,
+   "website": "http://www.moderntreasury.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "momentic",
+   "name": "Momentic",
+   "stage": "Early",
+   "batch": "Winter 2024",
+   "team_size": 18,
+   "website": "https://momentic.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "moonshot",
+   "name": "Moonshot",
+   "stage": "Early",
+   "batch": "Summer 2026",
+   "team_size": 3,
+   "website": "https://moonshot.computer/",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "mosaic",
+   "name": "Mosaic",
+   "stage": "Early",
+   "batch": "Winter 2025",
+   "team_size": 5,
+   "website": "https://mosaic.so",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "mosaic",
+   "name": "Mosaic",
+   "stage": "Early",
+   "batch": "Summer 2026",
+   "team_size": 2,
+   "website": "https://mosaic.inc",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "moss",
+   "name": "Moss",
+   "stage": "Early",
+   "batch": "Fall 2025",
+   "team_size": 5,
+   "website": "https://moss.dev",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "mux",
+   "name": "Mux",
+   "stage": "Growth",
+   "batch": "Winter 2016",
+   "team_size": 95,
+   "website": "http://mux.com",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "nango",
+   "name": "Nango",
+   "stage": "Early",
+   "batch": "Winter 2023",
+   "team_size": 6,
+   "website": "https://nango.dev",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "new-story",
+   "name": "New Story",
+   "stage": "Early",
+   "batch": "Summer 2015",
+   "team_size": 20,
+   "website": "http://newstoryhomes.org",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "nomic",
+   "name": "Nomic Bio",
+   "stage": "Growth",
+   "batch": "Winter 2020",
+   "team_size": 100,
+   "website": "http://www.nomic.bio",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "notabene",
+   "name": "Notabene",
+   "stage": "Growth",
+   "batch": "Summer 2020",
+   "team_size": 47,
+   "website": "https://notabene.id",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "novig",
+   "name": "Novig",
+   "stage": "Growth",
+   "batch": "Summer 2022",
+   "team_size": 55,
+   "website": "https://www.novig.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "nowadays",
+   "name": "Nowadays",
+   "stage": "Early",
+   "batch": "Summer 2023",
+   "team_size": 6,
+   "website": "http://nowadays.ai/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "nox-metals",
+   "name": "Nox Metals",
+   "stage": "Early",
+   "batch": "Summer 2025",
+   "team_size": 52,
+   "website": "https://noxmetals.co/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "numeral",
+   "name": "Numeral",
+   "stage": "Growth",
+   "batch": "Winter 2023",
+   "team_size": 130,
+   "website": "https://www.numeral.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "odys-aviation",
+   "name": "Odys Aviation",
+   "stage": "Early",
+   "batch": "Summer 2021",
+   "team_size": 11,
+   "website": "https://www.odysaviation.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "offdeal",
+   "name": "OffDeal",
+   "stage": "Growth",
+   "batch": "Winter 2024",
+   "team_size": 15,
+   "website": "https://offdeal.io",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "onebrief",
+   "name": "Onebrief",
+   "stage": "Growth",
+   "batch": "Summer 2021",
+   "team_size": 200,
+   "website": "https://onebrief.com",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "onechronos",
+   "name": "OneChronos",
+   "stage": "Growth",
+   "batch": "Summer 2016",
+   "team_size": 75,
+   "website": "https://www.onechronos.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "oneleet",
+   "name": "Oneleet",
+   "stage": "Growth",
+   "batch": "Summer 2022",
+   "team_size": 75,
+   "website": "https://www.oneleet.com/?utm_source=yc&utm_medium=bookface",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "onerobot",
+   "name": "One Robot",
+   "stage": "Early",
+   "batch": "Winter 2026",
+   "team_size": 2,
+   "website": "https://www.onerobot.io/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "oneschema",
+   "name": "OneSchema",
+   "stage": "Early",
+   "batch": "Summer 2021",
+   "team_size": 20,
+   "website": "https://www.oneschema.co",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "opencall",
+   "name": "Opencall",
+   "stage": "Growth",
+   "batch": "Winter 2024",
+   "team_size": 7,
+   "website": "https://opencall.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "outset",
+   "name": "Outset",
+   "stage": "Early",
+   "batch": "Summer 2023",
+   "team_size": 30,
+   "website": "https://outset.ai/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "overview",
+   "name": "Overview",
+   "stage": "Growth",
+   "batch": "Winter 2019",
+   "team_size": 40,
+   "website": "https://overview.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "padlet",
+   "name": "Padlet",
+   "stage": "Growth",
+   "batch": "Winter 2013",
+   "team_size": 65,
+   "website": "https://padlet.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "paradigmai",
+   "name": "Paradigm",
+   "stage": "Early",
+   "batch": "Winter 2024",
+   "team_size": 8,
+   "website": "https://www.paradigmai.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "parallel-bio",
+   "name": "Parallel Bio",
+   "stage": "Early",
+   "batch": "Summer 2021",
+   "team_size": 20,
+   "website": "http://parallel.bio",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "parameter",
+   "name": "Parameter",
+   "stage": "Early",
+   "batch": "Winter 2026",
+   "team_size": 14,
+   "website": "https://parameter.ai?utm_source=ycombinator&utm_medium=referral&utm_campaign=parameter-profile",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "pax-historia",
+   "name": "Pax Historia",
+   "stage": "Early",
+   "batch": "Winter 2026",
+   "team_size": 6,
+   "website": "https://www.paxhistoria.co",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "permitflow",
+   "name": "PermitFlow",
+   "stage": "Growth",
+   "batch": "Winter 2022",
+   "team_size": 80,
+   "website": "http://www.permitflow.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "phoenix",
+   "name": "Phoenix",
+   "stage": "Growth",
+   "batch": "Winter 2021",
+   "team_size": 70,
+   "website": "https://phoenix.ca",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "phonely",
+   "name": "Phonely",
+   "stage": "Early",
+   "batch": "Summer 2024",
+   "team_size": 10,
+   "website": "https://phonely.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "photoroom",
+   "name": "Photoroom",
+   "stage": "Growth",
+   "batch": "Summer 2020",
+   "team_size": 100,
+   "website": "https://photoroom.com/",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "pirros",
+   "name": "Pirros",
+   "stage": "Early",
+   "batch": "Winter 2023",
+   "team_size": 44,
+   "website": "http://pirros.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "pivotrobotics",
+   "name": "Pivot Robotics",
+   "stage": "Early",
+   "batch": "Winter 2024",
+   "team_size": 8,
+   "website": "https://pivotrobotics.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "pointone",
+   "name": "PointOne",
+   "stage": "Early",
+   "batch": "Winter 2024",
+   "team_size": 35,
+   "website": "https://pointone.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "popl",
+   "name": "Popl",
+   "stage": "Early",
+   "batch": "Winter 2021",
+   "team_size": 60,
+   "website": "https://popl.co/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "posthog",
+   "name": "PostHog",
+   "stage": "Growth",
+   "batch": "Winter 2020",
+   "team_size": 150,
+   "website": "https://www.posthog.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "prelim",
+   "name": "Prelim",
+   "stage": "Growth",
+   "batch": "Summer 2017",
+   "team_size": 49,
+   "website": "https://prelim.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "probablygenetic",
+   "name": "Probably Genetic",
+   "stage": "Growth",
+   "batch": "Winter 2019",
+   "team_size": 17,
+   "website": "https://www.probablygenetic.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "provision",
+   "name": "Provision",
+   "stage": "Early",
+   "batch": "Summer 2022",
+   "team_size": 15,
+   "website": "https://provision.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "pulse",
+   "name": "Pulse",
+   "stage": "Early",
+   "batch": "Summer 2024",
+   "team_size": 22,
+   "website": "https://www.runpulse.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "quicknode",
+   "name": "Quicknode",
+   "stage": "Growth",
+   "batch": "Winter 2021",
+   "team_size": 115,
+   "website": "https://www.quicknode.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "quindar",
+   "name": "Quindar",
+   "stage": "Growth",
+   "batch": "Summer 2022",
+   "team_size": 57,
+   "website": "https://www.quindar.space",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "raindrop",
+   "name": "Raindrop",
+   "stage": "Growth",
+   "batch": "Winter 2024",
+   "team_size": 9,
+   "website": "https://www.raindrop.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "rallyuxr",
+   "name": "Rally",
+   "stage": "Early",
+   "batch": "Winter 2022",
+   "team_size": 35,
+   "website": "https://www.rallyuxr.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "ready",
+   "name": "Ready",
+   "stage": "Early",
+   "batch": "Summer 2020",
+   "team_size": 60,
+   "website": "https://ready.net",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "realitydefender",
+   "name": "Reality Defender",
+   "stage": "Growth",
+   "batch": "Winter 2022",
+   "team_size": 54,
+   "website": "http://www.realitydefender.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "recall",
+   "name": "Recall.ai",
+   "stage": "Growth",
+   "batch": "Winter 2020",
+   "team_size": 30,
+   "website": "https://www.recall.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "reducto",
+   "name": "Reducto",
+   "stage": "Growth",
+   "batch": "Winter 2024",
+   "team_size": 30,
+   "website": "https://reducto.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "relace",
+   "name": "Relace",
+   "stage": "Early",
+   "batch": "Winter 2023",
+   "team_size": 7,
+   "website": "https://relace.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "relling",
+   "name": "Relling",
+   "stage": "Early",
+   "batch": "Summer 2025",
+   "team_size": null,
+   "website": "https://relling.co",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "replit",
+   "name": "Replit",
+   "stage": "Growth",
+   "batch": "Winter 2018",
+   "team_size": 65,
+   "website": "https://replit.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "replo",
+   "name": "Replo",
+   "stage": "Early",
+   "batch": "Summer 2021",
+   "team_size": 20,
+   "website": "https://replo.app/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "rescale",
+   "name": "Rescale",
+   "stage": "Growth",
+   "batch": "Winter 2012",
+   "team_size": 250,
+   "website": "https://rescale.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "resend",
+   "name": "Resend",
+   "stage": "Growth",
+   "batch": "Winter 2023",
+   "team_size": 45,
+   "website": "https://resend.com",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "retell-ai",
+   "name": "Retell AI",
+   "stage": "Early",
+   "batch": "Winter 2024",
+   "team_size": 50,
+   "website": "https://retellai.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "revenuecat",
+   "name": "RevenueCat",
+   "stage": "Growth",
+   "batch": "Summer 2018",
+   "team_size": 160,
+   "website": "https://www.revenuecat.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "reviserobotics",
+   "name": "Revise Robotics",
+   "stage": "Early",
+   "batch": "Winter 2025",
+   "team_size": 3,
+   "website": "https://www.reviserobotics.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "rivet",
+   "name": "Rivet",
+   "stage": "Early",
+   "batch": "Winter 2023",
+   "team_size": 5,
+   "website": "https://rivet.dev",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "roboflow",
+   "name": "Roboflow",
+   "stage": "Growth",
+   "batch": "Summer 2020",
+   "team_size": 100,
+   "website": "https://roboflow.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "rollstack",
+   "name": "Rollstack",
+   "stage": "Growth",
+   "batch": "Winter 2023",
+   "team_size": 30,
+   "website": "https://www.rollstack.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "runway",
+   "name": "Runway",
+   "stage": "Early",
+   "batch": "Winter 2021",
+   "team_size": 20,
+   "website": "https://runway.team",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "rutter",
+   "name": "Rutter",
+   "stage": "Growth",
+   "batch": "Summer 2019",
+   "team_size": 24,
+   "website": "https://rutter.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "ryvn",
+   "name": "Ryvn",
+   "stage": "Early",
+   "batch": "Fall 2024",
+   "team_size": 5,
+   "website": "https://ryvn.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "safetykit",
+   "name": "SafetyKit",
+   "stage": "Growth",
+   "batch": "Summer 2023",
+   "team_size": 10,
+   "website": "https://www.safetykit.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "salespatriot",
+   "name": "SalesPatriot",
+   "stage": "Early",
+   "batch": "Winter 2025",
+   "team_size": 15,
+   "website": "https://www.salespatriot.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "salient",
+   "name": "Salient",
+   "stage": "Growth",
+   "batch": "Winter 2023",
+   "team_size": 40,
+   "website": "https://www.trysalient.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "serifhealth",
+   "name": "Serif Health",
+   "stage": "Early",
+   "batch": "Winter 2022",
+   "team_size": 20,
+   "website": "https://www.serifhealth.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "sf-tensor",
+   "name": "SF Tensor",
+   "stage": "Early",
+   "batch": "Fall 2025",
+   "team_size": 6,
+   "website": "https://sf-tensor.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "shadeform",
+   "name": "Shadeform",
+   "stage": "Early",
+   "batch": "Summer 2023",
+   "team_size": 11,
+   "website": "https://www.shadeform.ai/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "shepherd",
+   "name": "Shepherd",
+   "stage": "Early",
+   "batch": "Winter 2021",
+   "team_size": 60,
+   "website": "https://shepherdinsurance.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "sieve",
+   "name": "Sieve",
+   "stage": "Growth",
+   "batch": "Winter 2022",
+   "team_size": 34,
+   "website": "https://sievedata.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "sift",
+   "name": "Sift",
+   "stage": "Growth",
+   "batch": "Summer 2011",
+   "team_size": null,
+   "website": "https://sift.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "signoz",
+   "name": "SigNoz",
+   "stage": "Early",
+   "batch": "Winter 2021",
+   "team_size": 38,
+   "website": "https://signoz.io",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "sim",
+   "name": "Sim",
+   "stage": "Early",
+   "batch": "Spring 2025",
+   "team_size": 10,
+   "website": "https://sim.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "simple-ai",
+   "name": "Simple AI",
+   "stage": "Early",
+   "batch": "Summer 2024",
+   "team_size": 11,
+   "website": "https://www.usesimple.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "snapmagic",
+   "name": "SnapMagic",
+   "stage": "Early",
+   "batch": "Summer 2015",
+   "team_size": 23,
+   "website": "https://www.snapmagic.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "solidroad",
+   "name": "Solidroad",
+   "stage": "Growth",
+   "batch": "Winter 2025",
+   "team_size": 6,
+   "website": "https://solidroad.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "solveintelligence",
+   "name": "Solve Intelligence",
+   "stage": "Growth",
+   "batch": "Summer 2023",
+   "team_size": 50,
+   "website": "https://www.solveintelligence.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "spade",
+   "name": "Spade",
+   "stage": "Growth",
+   "batch": "Winter 2022",
+   "team_size": 30,
+   "website": "https://www.spade.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "speak",
+   "name": "Speak",
+   "stage": "Growth",
+   "batch": "Winter 2017",
+   "team_size": 40,
+   "website": "http://speak.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "spellbrush",
+   "name": "Spellbrush",
+   "stage": "Growth",
+   "batch": "Winter 2018",
+   "team_size": 30,
+   "website": "https://spellbrush.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "spruceid",
+   "name": "SpruceID",
+   "stage": "Early",
+   "batch": "Winter 2021",
+   "team_size": 25,
+   "website": "https://www.spruceid.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "stable",
+   "name": "Stable",
+   "stage": "Growth",
+   "batch": "Winter 2020",
+   "team_size": 30,
+   "website": "https://useStable.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "stepful",
+   "name": "Stepful",
+   "stage": "Growth",
+   "batch": "Summer 2021",
+   "team_size": 100,
+   "website": "https://www.stepful.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "stilta",
+   "name": "Stilta",
+   "stage": "Early",
+   "batch": "Winter 2026",
+   "team_size": 4,
+   "website": "https://stilta.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "stream",
+   "name": "Stream",
+   "stage": "Early",
+   "batch": "Summer 2022",
+   "team_size": 15,
+   "website": "http://www.stream.claims",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "subsets",
+   "name": "Subsets",
+   "stage": "Early",
+   "batch": "Summer 2023",
+   "team_size": 7,
+   "website": "https://www.subsets.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "substack",
+   "name": "Substack",
+   "stage": "Growth",
+   "batch": "Winter 2018",
+   "team_size": 90,
+   "website": "https://substack.com",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "substrate",
+   "name": "Substrate",
+   "stage": "Early",
+   "batch": "Summer 2024",
+   "team_size": 2,
+   "website": "https://www.substrate.cc/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "supabase",
+   "name": "Supabase",
+   "stage": "Growth",
+   "batch": "Summer 2020",
+   "team_size": 120,
+   "website": "https://supabase.com",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "svix",
+   "name": "Svix",
+   "stage": "Early",
+   "batch": "Winter 2021",
+   "team_size": 12,
+   "website": "https://www.svix.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "sweep",
+   "name": "Sweep",
+   "stage": "Early",
+   "batch": "Summer 2023",
+   "team_size": 4,
+   "website": "https://sweep.dev/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "sygaldry-technologies",
+   "name": "Sygaldry Technologies",
+   "stage": "Growth",
+   "batch": "Spring 2025",
+   "team_size": null,
+   "website": "https://www.sygaldry.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "tailor",
+   "name": "Tailor",
+   "stage": "Early",
+   "batch": "Summer 2022",
+   "team_size": 40,
+   "website": "https://www.tailor.tech/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "taktile",
+   "name": "Taktile",
+   "stage": "Early",
+   "batch": "Summer 2020",
+   "team_size": 150,
+   "website": "http://www.taktile.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "tank-payments",
+   "name": "Tank Payments",
+   "stage": "Early",
+   "batch": "Summer 2022",
+   "team_size": 10,
+   "website": "https://www.tankpayments.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "tavus",
+   "name": "Tavus",
+   "stage": "Growth",
+   "batch": "Summer 2021",
+   "team_size": 75,
+   "website": "https://www.tavus.io",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "tekton-dynamics",
+   "name": "Tekton Dynamics",
+   "stage": "Early",
+   "batch": "Winter 2024",
+   "team_size": 3,
+   "website": "https://www.tekton-dynamics.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "telli",
+   "name": "telli",
+   "stage": "Early",
+   "batch": "Fall 2024",
+   "team_size": 25,
+   "website": "https://telli.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "tempo",
+   "name": "Tempo",
+   "stage": "Growth",
+   "batch": "Winter 2015",
+   "team_size": 158,
+   "website": "https://tempo.fit/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "tempo",
+   "name": "Tempo",
+   "stage": "Early",
+   "batch": "Summer 2023",
+   "team_size": 8,
+   "website": "https://www.tempo.new",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "tennr",
+   "name": "Tennr",
+   "stage": "Growth",
+   "batch": "Winter 2023",
+   "team_size": 205,
+   "website": "https://www.tennr.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "terminal",
+   "name": "Terminal",
+   "stage": "Growth",
+   "batch": "Summer 2023",
+   "team_size": 17,
+   "website": "https://www.withterminal.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "thera",
+   "name": "Thera",
+   "stage": "Early",
+   "batch": "Summer 2022",
+   "team_size": 15,
+   "website": "https://www.getthera.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "thundercompute",
+   "name": "Thunder Compute",
+   "stage": "Early",
+   "batch": "Summer 2024",
+   "team_size": 10,
+   "website": "https://www.thundercompute.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "titan",
+   "name": "Titan",
+   "stage": "Growth",
+   "batch": "Summer 2018",
+   "team_size": 40,
+   "website": "http://www.titan.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "topline-pro",
+   "name": "Topline Pro",
+   "stage": "Early",
+   "batch": "Winter 2021",
+   "team_size": 28,
+   "website": "https://www.toplinepro.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "triomics",
+   "name": "Triomics",
+   "stage": "Growth",
+   "batch": "Winter 2021",
+   "team_size": 50,
+   "website": "https://triomics.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "trm-labs",
+   "name": "TRM Labs",
+   "stage": "Early",
+   "batch": "Summer 2019",
+   "team_size": 400,
+   "website": "https://trmlabs.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "tsenta",
+   "name": "Tsenta",
+   "stage": "Early",
+   "batch": "Summer 2026",
+   "team_size": 2,
+   "website": "https://tsenta.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "tuesday-labs",
+   "name": "Tuesday Labs",
+   "stage": "Early",
+   "batch": "Winter 2024",
+   "team_size": 7,
+   "website": "https://www.tuesdaylabs.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "turion-space",
+   "name": "Turion Space",
+   "stage": "Growth",
+   "batch": "Summer 2021",
+   "team_size": 15,
+   "website": "https://turionspace.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "twenty",
+   "name": "Twenty",
+   "stage": "Early",
+   "batch": "Summer 2023",
+   "team_size": 11,
+   "website": "https://twenty.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "ultra",
+   "name": "Ultra",
+   "stage": "Growth",
+   "batch": "Summer 2024",
+   "team_size": 4,
+   "website": "https://ultra.tech",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "uplane",
+   "name": "Uplane",
+   "stage": "Early",
+   "batch": "Fall 2025",
+   "team_size": 26,
+   "website": "https://uplane.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "usul",
+   "name": "Usul",
+   "stage": "Early",
+   "batch": "Summer 2024",
+   "team_size": 15,
+   "website": "https://www.usul.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "vanta",
+   "name": "Vanta",
+   "stage": "Growth",
+   "batch": "Winter 2018",
+   "team_size": 700,
+   "website": "https://vanta.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "vapi",
+   "name": "Vapi",
+   "stage": "Growth",
+   "batch": "Winter 2021",
+   "team_size": 50,
+   "website": "https://vapi.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "vector",
+   "name": "Vector",
+   "stage": "Early",
+   "batch": "Winter 2023",
+   "team_size": 20,
+   "website": "https://vector.co",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "verahealth",
+   "name": "Vera Health",
+   "stage": "Early",
+   "batch": "Summer 2024",
+   "team_size": 6,
+   "website": "https://www.vera-health.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "veritus",
+   "name": "Veritus",
+   "stage": "Early",
+   "batch": "Summer 2025",
+   "team_size": 10,
+   "website": "https://www.veritus.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "versemedical",
+   "name": "Verse Medical",
+   "stage": "Growth",
+   "batch": "Summer 2018",
+   "team_size": 200,
+   "website": "http://versemedical.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "vetcove",
+   "name": "Vetcove",
+   "stage": "Growth",
+   "batch": "Summer 2016",
+   "team_size": 170,
+   "website": "https://www.vetcove.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "vitalize",
+   "name": "Vitalize",
+   "stage": "Growth",
+   "batch": "Winter 2023",
+   "team_size": 28,
+   "website": "https://vitalize.care",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "voize",
+   "name": "voize",
+   "stage": "Growth",
+   "batch": "Winter 2022",
+   "team_size": 140,
+   "website": "https://voize.de/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "vooma",
+   "name": "Vooma",
+   "stage": "Growth",
+   "batch": "Winter 2023",
+   "team_size": 40,
+   "website": "https://www.vooma.ai",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "vori",
+   "name": "Vori",
+   "stage": "Growth",
+   "batch": "Winter 2020",
+   "team_size": 29,
+   "website": "https://www.vori.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "vorticity",
+   "name": "Vorticity",
+   "stage": "Growth",
+   "batch": "Summer 2019",
+   "team_size": 10,
+   "website": "http://vorticity.xyz/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "warp",
+   "name": "Warp",
+   "stage": "Early",
+   "batch": "Winter 2023",
+   "team_size": 80,
+   "website": "https://www.warp.co/",
+   "hiring": false
+  },
+  {
+   "ats": "ashby",
+   "slug": "webflow",
+   "name": "Webflow",
+   "stage": "Growth",
+   "batch": "Summer 2013",
+   "team_size": 600,
+   "website": "https://webflow.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "ycombinator",
+   "name": "Y Combinator",
+   "stage": "Early",
+   "batch": "Unspecified",
+   "team_size": 100,
+   "website": "https://www.ycombinator.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "zapier",
+   "name": "Zapier",
+   "stage": "Growth",
+   "batch": "Summer 2012",
+   "team_size": 700,
+   "website": "http://zapier.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "zeit-ai",
+   "name": "Zeit AI",
+   "stage": "Early",
+   "batch": "Summer 2024",
+   "team_size": 12,
+   "website": "https://zeit-ai.com/",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "zensors",
+   "name": "Zensors",
+   "stage": "Early",
+   "batch": "Summer 2021",
+   "team_size": 12,
+   "website": "https://www.zensors.com",
+   "hiring": true
+  },
+  {
+   "ats": "ashby",
+   "slug": "ziina",
+   "name": "Ziina",
+   "stage": "Growth",
+   "batch": "Winter 2021",
+   "team_size": 57,
+   "website": "https://www.ziina.com",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "aclu",
+   "name": "ACLU",
+   "stage": "Early",
+   "batch": "Winter 2017",
+   "team_size": 501,
+   "website": "https://www.aclu.org/",
+   "hiring": false
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "akidolabs",
+   "name": "Akido Labs",
+   "stage": "Early",
+   "batch": "Winter 2015",
+   "team_size": 1000,
+   "website": "http://akidolabs.com",
+   "hiring": false
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "albedo",
+   "name": "Albedo",
+   "stage": "Growth",
+   "batch": "Winter 2021",
+   "team_size": 55,
+   "website": "https://albedo.com",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "algolia",
+   "name": "Algolia",
+   "stage": "Growth",
+   "batch": "Winter 2014",
+   "team_size": 810,
+   "website": "http://www.algolia.com",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "alloy",
+   "name": "Alloy",
+   "stage": "Early",
+   "batch": "Winter 2023",
+   "team_size": 5,
+   "website": "https://alloy.app",
+   "hiring": false
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "alpaca",
+   "name": "Alpaca",
+   "stage": "Growth",
+   "batch": "Winter 2019",
+   "team_size": 150,
+   "website": "https://alpaca.markets/",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "aon3d",
+   "name": "AON3D",
+   "stage": "Growth",
+   "batch": "Winter 2017",
+   "team_size": 40,
+   "website": "https://www.aon3d.com",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "apolloio",
+   "name": "Apollo.io",
+   "stage": "Growth",
+   "batch": "Winter 2016",
+   "team_size": 800,
+   "website": "https://www.apollo.io/",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "assemblyai",
+   "name": "AssemblyAI",
+   "stage": "Growth",
+   "batch": "Summer 2017",
+   "team_size": 65,
+   "website": "https://www.assemblyai.com",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "astranis",
+   "name": "Astranis",
+   "stage": "Growth",
+   "batch": "Winter 2016",
+   "team_size": 500,
+   "website": "http://www.astranis.com",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "axle",
+   "name": "Axle",
+   "stage": "Early",
+   "batch": "Summer 2022",
+   "team_size": 20,
+   "website": "https://axle.insure",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "beam",
+   "name": "Beam",
+   "stage": "Early",
+   "batch": "Winter 2022",
+   "team_size": 5,
+   "website": "https://beam.cloud",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "bitmovin",
+   "name": "Bitmovin",
+   "stage": "Growth",
+   "batch": "Summer 2015",
+   "team_size": 145,
+   "website": "http://bitmovin.com",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "carbonchain",
+   "name": "CarbonChain",
+   "stage": "Growth",
+   "batch": "Summer 2020",
+   "team_size": 16,
+   "website": "https://carbonchain.com",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "carrotfertility",
+   "name": "Carrot Fertility",
+   "stage": "Growth",
+   "batch": "Summer 2017",
+   "team_size": null,
+   "website": "https://www.get-carrot.com/",
+   "hiring": false
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "checkr",
+   "name": "Checkr",
+   "stage": "Growth",
+   "batch": "Summer 2014",
+   "team_size": 800,
+   "website": "http://www.checkr.com",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "clear",
+   "name": "Clear",
+   "stage": "Growth",
+   "batch": "Summer 2014",
+   "team_size": 900,
+   "website": "https://clear.in/",
+   "hiring": false
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "daybreakhealth",
+   "name": "Daybreak Health",
+   "stage": "Growth",
+   "batch": "Summer 2020",
+   "team_size": 20,
+   "website": "https://www.daybreakhealth.com/",
+   "hiring": false
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "faire",
+   "name": "Faire",
+   "stage": "Growth",
+   "batch": "Winter 2017",
+   "team_size": 900,
+   "website": "https://www.faire.com/",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "fivetran",
+   "name": "Fivetran",
+   "stage": "Growth",
+   "batch": "Winter 2013",
+   "team_size": 1200,
+   "website": "http://fivetran.com",
+   "hiring": false
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "flexport",
+   "name": "Flexport",
+   "stage": "Growth",
+   "batch": "Winter 2014",
+   "team_size": 3000,
+   "website": "https://www.flexport.com/careers/jobs/",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "generalproximity",
+   "name": "General Proximity",
+   "stage": "Early",
+   "batch": "Winter 2020",
+   "team_size": 15,
+   "website": "https://www.generalproximity.bio/",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "givecampus",
+   "name": "GiveCampus",
+   "stage": "Early",
+   "batch": "Summer 2015",
+   "team_size": 130,
+   "website": "http://go.givecampus.com",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "goatgroup",
+   "name": "GOAT Group",
+   "stage": "Growth",
+   "batch": "Winter 2011",
+   "team_size": 1600,
+   "website": "https://www.goatgroup.com/",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "gocardless",
+   "name": "GoCardless",
+   "stage": "Growth",
+   "batch": "Summer 2011",
+   "team_size": 900,
+   "website": "http://gocardless.com",
+   "hiring": false
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "gusto",
+   "name": "Gusto",
+   "stage": "Growth",
+   "batch": "Winter 2012",
+   "team_size": 2400,
+   "website": "https://gusto.com",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "hackerrank",
+   "name": "HackerRank",
+   "stage": "Growth",
+   "batch": "Summer 2011",
+   "team_size": 300,
+   "website": "http://hackerrank.com",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "heartaerospace",
+   "name": "Heart Aerospace",
+   "stage": "Early",
+   "batch": "Winter 2019",
+   "team_size": 50,
+   "website": "http://www.heartaerospace.com",
+   "hiring": false
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "hive",
+   "name": "Hive",
+   "stage": "Early",
+   "batch": "Summer 2014",
+   "team_size": 65,
+   "website": "http://www.hive.co",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "humaninterest",
+   "name": "Human Interest",
+   "stage": "Growth",
+   "batch": "Summer 2015",
+   "team_size": 765,
+   "website": "http://humaninterest.com",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "icarus",
+   "name": "Icarus",
+   "stage": "Early",
+   "batch": "Fall 2025",
+   "team_size": 50,
+   "website": "https://www.icarus.one/",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "instawork",
+   "name": "Instawork",
+   "stage": "Growth",
+   "batch": "Summer 2015",
+   "team_size": 500,
+   "website": "http://instawork.com",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "kernalbio",
+   "name": "Kernal Biologics",
+   "stage": "Early",
+   "batch": "Summer 2020",
+   "team_size": 20,
+   "website": "https://www.kernalbio.com/",
+   "hiring": false
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "lattice",
+   "name": "Lattice",
+   "stage": "Growth",
+   "batch": "Winter 2016",
+   "team_size": 540,
+   "website": "https://lattice.com",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "legalist",
+   "name": "Legalist",
+   "stage": "Early",
+   "batch": "Summer 2016",
+   "team_size": 40,
+   "website": "https://www.legalist.com",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "lob",
+   "name": "Lob",
+   "stage": "Growth",
+   "batch": "Summer 2013",
+   "team_size": 150,
+   "website": "http://lob.com",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "mattermost",
+   "name": "Mattermost",
+   "stage": "Growth",
+   "batch": "Summer 2012",
+   "team_size": 120,
+   "website": "http://mattermost.com",
+   "hiring": false
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "maymobility",
+   "name": "May Mobility",
+   "stage": "Growth",
+   "batch": "Summer 2017",
+   "team_size": 260,
+   "website": "http://maymobility.com",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "meruhealth",
+   "name": "Meru Health",
+   "stage": "Growth",
+   "batch": "Summer 2018",
+   "team_size": 55,
+   "website": "http://www.meruhealth.com",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "mesh",
+   "name": "Mesh",
+   "stage": "Early",
+   "batch": "Summer 2020",
+   "team_size": 50,
+   "website": "https://mesh.ai/",
+   "hiring": false
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "modernhealth",
+   "name": "Modern Health",
+   "stage": "Growth",
+   "batch": "Winter 2018",
+   "team_size": 375,
+   "website": "https://www.modernhealth.com/",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "nabis",
+   "name": "Nabis",
+   "stage": "Growth",
+   "batch": "Winter 2019",
+   "team_size": 700,
+   "website": "https://www.nabis.com/",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "niraenergy",
+   "name": "Nira Energy",
+   "stage": "Early",
+   "batch": "Winter 2022",
+   "team_size": 20,
+   "website": "https://www.niraenergy.com/",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "novacredit",
+   "name": "Nova Credit",
+   "stage": "Growth",
+   "batch": "Summer 2016",
+   "team_size": 100,
+   "website": "http://www.novacredit.com/",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "observeai",
+   "name": "Observe.AI",
+   "stage": "Growth",
+   "batch": "Winter 2018",
+   "team_size": 240,
+   "website": "https://observe.ai",
+   "hiring": false
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "odeko",
+   "name": "Odeko",
+   "stage": "Growth",
+   "batch": "Summer 2019",
+   "team_size": 371,
+   "website": "http://www.odeko.com",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "ophelia",
+   "name": "Ophelia",
+   "stage": "Growth",
+   "batch": "Winter 2020",
+   "team_size": 250,
+   "website": "https://ophelia.com",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "osmosis",
+   "name": "Osmosis",
+   "stage": "Early",
+   "batch": "Winter 2025",
+   "team_size": 6,
+   "website": "https://osmosis.ai/",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "pairteam",
+   "name": "Pair Team",
+   "stage": "Growth",
+   "batch": "Summer 2019",
+   "team_size": 500,
+   "website": "https://pairteam.com/",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "papa",
+   "name": "Papa",
+   "stage": "Growth",
+   "batch": "Summer 2018",
+   "team_size": 500,
+   "website": "https://www.papa.com",
+   "hiring": false
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "porter",
+   "name": "Porter",
+   "stage": "Early",
+   "batch": "Summer 2020",
+   "team_size": 18,
+   "website": "https://porter.run",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "postscript",
+   "name": "Postscript",
+   "stage": "Growth",
+   "batch": "Winter 2019",
+   "team_size": 180,
+   "website": "https://postscript.io",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "prodigal",
+   "name": "Prodigal",
+   "stage": "Early",
+   "batch": "Summer 2018",
+   "team_size": 99,
+   "website": "https://prodigaltech.com/",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "prolific",
+   "name": "Prolific",
+   "stage": "Early",
+   "batch": "Summer 2019",
+   "team_size": 180,
+   "website": "https://www.prolific.com",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "qventus",
+   "name": "Qventus",
+   "stage": "Growth",
+   "batch": "Winter 2015",
+   "team_size": 230,
+   "website": "http://qventus.com",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "recidiviz",
+   "name": "Recidiviz",
+   "stage": "Early",
+   "batch": "Summer 2019",
+   "team_size": 120,
+   "website": "https://www.recidiviz.org/",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "reflex",
+   "name": "Reflex",
+   "stage": "Early",
+   "batch": "Winter 2023",
+   "team_size": 10,
+   "website": "https://reflex.dev",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "roofr",
+   "name": "Roofr",
+   "stage": "Early",
+   "batch": "Summer 2017",
+   "team_size": 40,
+   "website": "https://roofr.com/",
+   "hiring": false
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "scaleai",
+   "name": "Scale AI",
+   "stage": "Growth",
+   "batch": "Summer 2016",
+   "team_size": 500,
+   "website": "http://scale.com",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "sendbird",
+   "name": "Sendbird",
+   "stage": "Growth",
+   "batch": "Winter 2016",
+   "team_size": 300,
+   "website": "https://sendbird.com",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "singlestore",
+   "name": "SingleStore",
+   "stage": "Growth",
+   "batch": "Winter 2011",
+   "team_size": 150,
+   "website": "https://www.singlestore.com",
+   "hiring": false
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "smartasset",
+   "name": "SmartAsset",
+   "stage": "Growth",
+   "batch": "Summer 2012",
+   "team_size": 210,
+   "website": "http://smartasset.com",
+   "hiring": false
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "stripe",
+   "name": "Stripe",
+   "stage": "Growth",
+   "batch": "Summer 2009",
+   "team_size": 7000,
+   "website": "http://stripe.com",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "submittable",
+   "name": "Submittable",
+   "stage": "Growth",
+   "batch": "Summer 2012",
+   "team_size": 302,
+   "website": "https://www.submittable.com/",
+   "hiring": false
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "superset",
+   "name": "Superset",
+   "stage": "Early",
+   "batch": "Spring 2026",
+   "team_size": 4,
+   "website": "https://www.superset.sh/",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "swayable",
+   "name": "Swayable",
+   "stage": "Early",
+   "batch": "Winter 2018",
+   "team_size": 30,
+   "website": "http://swayable.com",
+   "hiring": true
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "veriff",
+   "name": "Veriff",
+   "stage": "Growth",
+   "batch": "Winter 2018",
+   "team_size": 600,
+   "website": "https://veriff.com/",
+   "hiring": false
+  },
+  {
+   "ats": "greenhouse",
+   "slug": "xendit",
+   "name": "Xendit",
+   "stage": "Growth",
+   "batch": "Summer 2015",
+   "team_size": 700,
+   "website": "https://www.xendit.co/",
+   "hiring": true
+  },
+  {
+   "ats": "lever",
+   "slug": "bloom",
+   "name": "Bloom",
+   "stage": "Early",
+   "batch": "Spring 2025",
+   "team_size": 2,
+   "website": "https://bloom.diy/",
+   "hiring": true
+  },
+  {
+   "ats": "lever",
+   "slug": "canarytechnologies",
+   "name": "Canary Technologies",
+   "stage": "Growth",
+   "batch": "Summer 2018",
+   "team_size": 150,
+   "website": "https://www.canarytechnologies.com",
+   "hiring": true
+  },
+  {
+   "ats": "lever",
+   "slug": "captivateiq",
+   "name": "CaptivateIQ",
+   "stage": "Growth",
+   "batch": "Winter 2018",
+   "team_size": 280,
+   "website": "https://www.captivateiq.com",
+   "hiring": true
+  },
+  {
+   "ats": "lever",
+   "slug": "culdesac",
+   "name": "Culdesac",
+   "stage": "Growth",
+   "batch": "Summer 2018",
+   "team_size": 100,
+   "website": "http://culdesac.com",
+   "hiring": true
+  },
+  {
+   "ats": "lever",
+   "slug": "doola",
+   "name": "doola",
+   "stage": "Early",
+   "batch": "Summer 2020",
+   "team_size": 43,
+   "website": "https://www.doola.com/",
+   "hiring": true
+  },
+  {
+   "ats": "lever",
+   "slug": "epsilon3",
+   "name": "Epsilon3",
+   "stage": "Growth",
+   "batch": "Summer 2021",
+   "team_size": 12,
+   "website": "https://www.epsilon3.io/",
+   "hiring": true
+  },
+  {
+   "ats": "lever",
+   "slug": "fampay",
+   "name": "FamPay",
+   "stage": "Early",
+   "batch": "Summer 2019",
+   "team_size": 24,
+   "website": "https://fampay.in",
+   "hiring": true
+  },
+  {
+   "ats": "lever",
+   "slug": "getsquire",
+   "name": "Squire Technologies",
+   "stage": "Growth",
+   "batch": "Summer 2016",
+   "team_size": 150,
+   "website": "http://getsquire.com/",
+   "hiring": false
+  },
+  {
+   "ats": "lever",
+   "slug": "getzuma",
+   "name": "Zuma",
+   "stage": "Growth",
+   "batch": "Summer 2021",
+   "team_size": 50,
+   "website": "https://www.getzuma.com/",
+   "hiring": true
+  },
+  {
+   "ats": "lever",
+   "slug": "gridware",
+   "name": "Gridware",
+   "stage": "Growth",
+   "batch": "Winter 2021",
+   "team_size": 125,
+   "website": "https://www.gridware.io",
+   "hiring": true
+  },
+  {
+   "ats": "lever",
+   "slug": "handoff",
+   "name": "Handoff",
+   "stage": "Early",
+   "batch": "Winter 2020",
+   "team_size": 20,
+   "website": "https://www.handoff.ai/",
+   "hiring": true
+  },
+  {
+   "ats": "lever",
+   "slug": "livingcarbon",
+   "name": "Living Carbon",
+   "stage": "Early",
+   "batch": "Winter 2020",
+   "team_size": 40,
+   "website": "https://www.livingcarbon.com",
+   "hiring": true
+  },
+  {
+   "ats": "lever",
+   "slug": "mashgin",
+   "name": "Mashgin",
+   "stage": "Growth",
+   "batch": "Winter 2015",
+   "team_size": 150,
+   "website": "http://mashgin.com",
+   "hiring": true
+  },
+  {
+   "ats": "lever",
+   "slug": "multiplylabs",
+   "name": "Multiply Labs",
+   "stage": "Growth",
+   "batch": "Summer 2016",
+   "team_size": 36,
+   "website": "http://multiplylabs.com/",
+   "hiring": true
+  },
+  {
+   "ats": "lever",
+   "slug": "mytos",
+   "name": "Mytos",
+   "stage": "Early",
+   "batch": "Summer 2018",
+   "team_size": 26,
+   "website": "https://www.mytos.bio",
+   "hiring": true
+  },
+  {
+   "ats": "lever",
+   "slug": "netomi",
+   "name": "Netomi",
+   "stage": "Early",
+   "batch": "Winter 2016",
+   "team_size": 3,
+   "website": "https://netomi.com",
+   "hiring": true
+  },
+  {
+   "ats": "lever",
+   "slug": "people-ai",
+   "name": "People.ai",
+   "stage": "Growth",
+   "batch": "Summer 2016",
+   "team_size": 300,
+   "website": "https://people.ai",
+   "hiring": true
+  },
+  {
+   "ats": "lever",
+   "slug": "postera",
+   "name": "PostEra",
+   "stage": "Growth",
+   "batch": "Winter 2020",
+   "team_size": 40,
+   "website": "https://postera.ai/",
+   "hiring": true
+  },
+  {
+   "ats": "lever",
+   "slug": "reachpower",
+   "name": "Reach",
+   "stage": "Growth",
+   "batch": "Summer 2015",
+   "team_size": 45,
+   "website": "https://reachpower.com",
+   "hiring": true
+  },
+  {
+   "ats": "lever",
+   "slug": "skyways",
+   "name": "Skyways",
+   "stage": "Growth",
+   "batch": "Summer 2017",
+   "team_size": 33,
+   "website": "http://skyways.com",
+   "hiring": true
+  },
+  {
+   "ats": "lever",
+   "slug": "snappr",
+   "name": "Snappr",
+   "stage": "Growth",
+   "batch": "Winter 2017",
+   "team_size": 250,
+   "website": "https://www.snappr.com",
+   "hiring": true
+  },
+  {
+   "ats": "lever",
+   "slug": "tendo",
+   "name": "Tendo",
+   "stage": "Early",
+   "batch": "Winter 2022",
+   "team_size": 15,
+   "website": "https://tendo.app/",
+   "hiring": false
+  },
+  {
+   "ats": "lever",
+   "slug": "tovala",
+   "name": "Tovala",
+   "stage": "Growth",
+   "batch": "Winter 2016",
+   "team_size": 375,
+   "website": "http://www.tovala.com",
+   "hiring": true
+  },
+  {
+   "ats": "lever",
+   "slug": "tryriot",
+   "name": "Riot",
+   "stage": "Growth",
+   "batch": "Winter 2020",
+   "team_size": 160,
+   "website": "https://tryriot.com/",
+   "hiring": true
+  },
+  {
+   "ats": "lever",
+   "slug": "twodots",
+   "name": "Two Dots",
+   "stage": "Growth",
+   "batch": "Summer 2022",
+   "team_size": 28,
+   "website": "https://www.twodots.com",
+   "hiring": true
+  },
+  {
+   "ats": "lever",
+   "slug": "unusual",
+   "name": "Unusual",
+   "stage": "Early",
+   "batch": "Fall 2024",
+   "team_size": 4,
+   "website": "https://unusual.ai",
+   "hiring": true
+  },
+  {
+   "ats": "lever",
+   "slug": "vergesense",
+   "name": "VergeSense",
+   "stage": "Growth",
+   "batch": "Summer 2017",
+   "team_size": 70,
+   "website": "http://www.vergesense.com",
+   "hiring": true
+  },
+  {
+   "ats": "lever",
+   "slug": "zippi",
+   "name": "Zippi",
+   "stage": "Early",
+   "batch": "Summer 2019",
+   "team_size": 60,
+   "website": "https://www.zippi.com.br",
+   "hiring": true
+  }
+ ]
+}

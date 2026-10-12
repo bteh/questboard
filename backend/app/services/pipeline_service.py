@@ -1003,11 +1003,15 @@ def _save_search_results(
     import json as _json
     from job_finder.models.database import ApplicationRecord, get_session, init_db, save_application
     from job_finder.company_classifier import classify_company, classify_work_type
+    from job_finder.company_signals import fill_funding_from_text
 
     init_db()
     progress_cb("Saving results to database...")
     before_count = get_session().query(ApplicationRecord).count()
     for job in jobs:
+        # Same signals as the scored path (pipeline.py Pass 0). This save used
+        # to skip them, so Run search rows never carried a funding stage.
+        fill_funding_from_text(job)
         ct = classify_company(
             job.get("company", ""),
             job.get("funding_stage"),
@@ -1041,6 +1045,8 @@ def _save_search_results(
             industry_tags=job.get("industry_tags"),
             ecosystem_tags=job.get("ecosystem_tags"),
             profile=pipeline.profile_name,
+            funding_stage=job.get("funding_stage"),
+            total_funding=job.get("total_funding"),
             company_type=ct,
             work_type=wt,
             search_run_id=search_run_id,

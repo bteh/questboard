@@ -1050,6 +1050,16 @@ def run_startup_repairs(engine) -> None:
             "company signal repair failed; will retry next launch", exc_info=True
         )
     try:
+        from job_finder.models.startup_board_repair import repair_startup_boards
+
+        stamped = repair_startup_boards(engine)
+        if stamped:
+            logger.info("startup board repair: tagged %d YC row(s)", stamped)
+    except Exception:
+        logger.warning(
+            "startup board repair failed; will retry next launch", exc_info=True
+        )
+    try:
         tombstoned = repair_research_only_rows(engine)
         if tombstoned:
             logger.info(

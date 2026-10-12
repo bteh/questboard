@@ -183,14 +183,20 @@ def fill_funding_from_text(job: dict[str, Any]) -> dict[str, Any]:
 
     Known-list companies (Amazon, Netflix) are skipped: a posting that names
     a round is talking about a customer or a fund, and the startup shelf
-    trusts funding_stage on its own.
+    trusts funding_stage on its own. A YC company's own job board outranks
+    the text: "YC W19 (early)" says more than a "backed by Y Combinator" seed.
     """
     from job_finder.company_classifier import known_list_tier
+    from job_finder.startup_boards import startup_stage_for_url
 
     if job.get("funding_stage") and job.get("total_funding"):
         return job
     if known_list_tier(str(job.get("company") or "")):
         return job
+    if not job.get("funding_stage"):
+        stage = startup_stage_for_url(job.get("url") or job.get("job_url"))
+        if stage:
+            job["funding_stage"] = stage
     found = funding_signals(str(job.get("description") or ""))
     for key, value in found.items():
         if not job.get(key):

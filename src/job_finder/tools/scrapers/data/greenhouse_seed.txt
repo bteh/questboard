@@ -68,6 +68,7 @@ robinhood
 sofi
 treasuryprime
 upstart
+stripe
 
 # --- Data / analytics / observability ------------------------------------
 datadog
@@ -117,6 +118,11 @@ ceribell
 diligentrobotics
 oscar
 samsara
+
+# --- Crypto / web3 -------------------------------------------------------
+bybit
+securitize
+coinme
 
 # --- Live-verified bulk expansion (2026-07, 450 companies) ------
 # Harvested via Common Crawl + Wayback, each validated live (returned >0 jobs).
