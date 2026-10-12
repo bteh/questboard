@@ -102,6 +102,9 @@ _CACHE_LOCK = threading.RLock()
 # contact all ~5,700 boards.  Eighty per ATS adds bounded latency because the
 # board scrapers already fetch concurrently.
 VERIFIED_ROTATION_BATCH_SIZE = 80
+# YC boards (job_finder.startup_boards) rotate on their own lane so ~330
+# Ashby startup boards come round every ~3 pulls instead of every ~21.
+STARTUP_ROTATION_BATCH_SIZE = 120
 
 # Slug values that some result URLs legitimately have but aren't valid
 # ATS boards (e.g. the ATS's own marketing pages).
@@ -306,6 +309,35 @@ def verified_rotation_slugs(
 
     return next_slice(
         host,
+        slugs,
+        batch_size=batch_size,
+        now=at or datetime.now(timezone.utc),
+        cache_dir=_CACHE_DIR,
+    )
+
+
+def startup_rotation_slugs(
+    host: str,
+    *,
+    batch_size: int = STARTUP_ROTATION_BATCH_SIZE,
+    at: datetime | None = None,
+) -> set[str]:
+    """This pull's slice of the YC companies' boards on ``host``."""
+    if host not in ATS_HOSTS or batch_size <= 0:
+        return set()
+    if os.environ.get("QUESTBOARD_DISABLE_ATS_CATALOG_ROTATION", "").strip().lower() in {
+        "1", "true", "yes",
+    }:
+        return set()
+    from job_finder.startup_boards import board_slugs
+
+    slugs = board_slugs(host)
+    if not slugs:
+        return set()
+    from job_finder.tools.scrapers._ats_rotation import next_slice
+
+    return next_slice(
+        f"{host}_startup",
         slugs,
         batch_size=batch_size,
         now=at or datetime.now(timezone.utc),

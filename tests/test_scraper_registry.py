@@ -59,7 +59,8 @@ class ScraperRegistryTest(unittest.TestCase):
 
         with patch.dict(registry_module._REGISTRY, registry, clear=True), \
              patch.object(_ats_discovery, "discover_and_cache", return_value=set()), \
-             patch.object(_ats_discovery, "verified_rotation_slugs", return_value=set()):
+             patch.object(_ats_discovery, "verified_rotation_slugs", return_value=set()), \
+             patch.object(_ats_discovery, "startup_rotation_slugs", return_value=set()):
             jobs = run_scrapers(
                 names=["greenhouse", "lever", "builtin"],
                 roles=["data engineer"],
@@ -102,7 +103,8 @@ class ScraperRegistryTest(unittest.TestCase):
 
         with patch.dict(registry_module._REGISTRY, registry, clear=True), \
              patch.object(_ats_discovery, "discover_and_cache", return_value=set()), \
-             patch.object(_ats_discovery, "verified_rotation_slugs", return_value=set()):
+             patch.object(_ats_discovery, "verified_rotation_slugs", return_value=set()), \
+             patch.object(_ats_discovery, "startup_rotation_slugs", return_value=set()):
             jobs = run_scrapers(
                 names=["greenhouse"],
                 roles=["research engineer"],
@@ -150,7 +152,8 @@ class ScraperRegistryTest(unittest.TestCase):
         with patch.dict(registry_module._REGISTRY, registry, clear=True), \
              patch.object(_ats_discovery, "discover_and_cache",
                           return_value={"discovered-co", "openai"}), \
-             patch.object(_ats_discovery, "verified_rotation_slugs", return_value=set()):
+             patch.object(_ats_discovery, "verified_rotation_slugs", return_value=set()), \
+             patch.object(_ats_discovery, "startup_rotation_slugs", return_value=set()):
             run_scrapers(
                 names=["greenhouse"],
                 roles=["research engineer"],

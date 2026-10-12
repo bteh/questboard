@@ -165,6 +165,7 @@ def build_sidecar(*, target_arch: str = "") -> Path:
     safe_data_files = [
         (root / "packages" / "kinds" / "kinds.json", "packages/kinds"),
         (root / "src" / "job_finder" / "config" / "search_config.yaml", "job_finder/config"),
+        (root / "src" / "job_finder" / "config" / "startup_boards.json", "job_finder/config"),
         (
             root / "src" / "job_finder" / "config" / "profiles" / "_template.yaml",
             "job_finder/config/profiles",

@@ -226,6 +226,10 @@ def _tier_from_funding_stage(
             return "Growth Stage"
         return "Early Startup"
 
+    # Board-derived YC stages (startup_boards): "yc w19 (early)".
+    if stage == "yc" or stage.startswith("yc "):
+        return "Growth Stage" if "growth" in stage else "Early Startup"
+
     # Text-derived stages (company_signals): a Series letter above still wins.
     if "unicorn" in stage:
         return "Elite Startup"

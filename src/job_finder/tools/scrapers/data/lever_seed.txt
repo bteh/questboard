@@ -36,6 +36,10 @@ outreach
 # --- Misc -----------------------------------------------------------------
 prismic
 
+# --- Crypto / web3 -------------------------------------------------------
+superstate
+animocabrands
+
 # --- Live-verified bulk expansion (2026-07, 240 companies) ------
 # Harvested via Common Crawl + Wayback, each validated live (returned >0 jobs).
 # Capped tighter than the other ATS seeds: Lever's API is ~2.5x slower per
