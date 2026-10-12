@@ -2260,6 +2260,7 @@ class JobFinderPipeline:
                     work_type=j.get("work_type", ""),
                     preferred_places=pref_places,
                     preferred_countries=pref_countries,
+                    title=j.get("title", ""),
                 )
             ]
             self._record_funnel_stage("location", "Location filter", pre_count, len(deduped))
@@ -2801,6 +2802,7 @@ class JobFinderPipeline:
                 preferred_places=pref_places,
                 preferred_countries=pref_countries,
                 nationwide_ok=id(job) not in downgraded_ids,
+                title=job.get("title", ""),
             ):
                 filtered.append(job)
         dropped = len(jobs) - len(filtered)

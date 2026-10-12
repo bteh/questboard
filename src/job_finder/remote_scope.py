@@ -12,6 +12,11 @@ Scopes:
 
 The classifier only ever acts on what the text states. Ambiguous wording
 returns "" and is never excluded.
+
+Some sources put the region in the title instead: Arbeitnow listed KD Pharma
+"Business Intelligence Manager (m/f/d) | Remote (Europe) | Full-time" at
+"Bexbach". When the location states nothing, an explicit remote/region
+qualifier in the title decides (title_remote_qualifier).
 """
 
 from __future__ import annotations
@@ -60,8 +65,76 @@ _INTL_RE = re.compile(
 )
 
 
-def classify_remote_scope(location: str | None) -> str:
-    """The stated scope of a location text; "" when nothing usable is stated."""
+# Title qualifiers: "Remote (Europe)", "Remote - EMEA", "Remote, India", and a
+# bare bracketed region like "(UK)". The captured text must then be made only
+# of region names, so "Remote - European Markets" or "(m/f/d)" never scope.
+_TITLE_REMOTE_BRACKET_RE = re.compile(r"\bremote\s*[(\[]([^)\]]{1,40})[)\]]", re.IGNORECASE)
+_TITLE_REMOTE_TAIL_RE = re.compile(
+    r"\bremote\s*(?:[-\u2013\u2014:,]|\bin\b)\s*([^|()\[\];]{1,40})", re.IGNORECASE,
+)
+_TITLE_BRACKET_RE = re.compile(r"[(\[]([^)\]]{1,40})[)\]]")
+_QUALIFIER_FILLER_RE = re.compile(
+    r"\b(remote|remotely|fully|only|based|in|within|from|first|work|wfh)\b", re.IGNORECASE,
+)
+_QUALIFIER_SPLIT_RE = re.compile(r"\s*(?:/|,|&|\+|\band\b|\bor\b)\s*", re.IGNORECASE)
+
+
+def _is_region_only(text: str) -> bool:
+    remainder = _QUALIFIER_FILLER_RE.sub(" ", text)
+    remainder = re.sub(r"[-\u2013\u2014:.]", " ", remainder)
+    parts = [" ".join(p.split()) for p in _QUALIFIER_SPLIT_RE.split(remainder)]
+    parts = [p for p in parts if p]
+    if not parts:
+        return False
+    return all(
+        _US_RE.fullmatch(p) or _WORLDWIDE_RE.fullmatch(p) or _INTL_RE.fullmatch(p)
+        for p in parts
+    )
+
+
+def _title_qualifier(title: str | None) -> tuple[str, bool]:
+    text = (title or "").strip()
+    if not text:
+        return "", False
+    for pattern in (_TITLE_REMOTE_BRACKET_RE, _TITLE_REMOTE_TAIL_RE, _TITLE_BRACKET_RE):
+        for match in pattern.finditer(text):
+            candidate = match.group(1).strip()
+            if _is_region_only(candidate):
+                return candidate, pattern is not _TITLE_BRACKET_RE
+    return "", False
+
+
+def title_remote_qualifier(title: str | None) -> str:
+    """The region text a title states for its remote scope; "" when none.
+
+    Conservative on purpose: only a remote qualifier or a bracketed region
+    counts, so "Data Team Lead, EMEA" and "European Markets Analyst" say
+    nothing about where the remote work may happen.
+    """
+    return _title_qualifier(title)[0]
+
+
+def title_states_remote(title: str | None) -> bool:
+    """True when the title says "Remote (<region>)" or "Remote - <region>".
+
+    A bare "remote" word is not enough ("Remote Sensing Analyst").
+    """
+    return _title_qualifier(title)[1]
+
+
+def classify_remote_scope(location: str | None, title: str | None = None) -> str:
+    """The stated scope of a posting; "" when nothing usable is stated.
+
+    The location decides when it states a scope; the title is read only when
+    the location is silent.
+    """
+    scope = _classify_location(location)
+    if scope or not title:
+        return scope
+    return _classify_location(title_remote_qualifier(title))
+
+
+def _classify_location(location: str | None) -> str:
     text = (location or "").strip()
     if not text:
         return ""

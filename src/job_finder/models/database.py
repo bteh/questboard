@@ -824,10 +824,10 @@ def _close_session() -> None:
         _SessionLocal.remove()
 
 
-def _remote_scope_field(location: str | None) -> str:
+def _remote_scope_field(location: str | None, title: str | None = None) -> str:
     from job_finder.remote_scope import classify_remote_scope
 
-    return classify_remote_scope(location)
+    return classify_remote_scope(location, title=title)
 
 
 def _newer_source_update(incoming: str | None, stored: str | None) -> bool:
@@ -1049,7 +1049,7 @@ def save_application(
 
                     existing.location = location
                     existing.state_codes = state_codes_field(location)
-                    existing.remote_scope = _remote_scope_field(location)
+                    existing.remote_scope = _remote_scope_field(location, existing.job_title)
                     changed = True
                 elif not existing.state_codes and existing.location:
                     # backfill: rows saved before this column existed
@@ -1172,7 +1172,7 @@ def save_application(
 
                                 cand.location = location
                                 cand.state_codes = state_codes_field(location)
-                                cand.remote_scope = _remote_scope_field(location)
+                                cand.remote_scope = _remote_scope_field(location, cand.job_title)
                             cand.is_remote = bool(is_remote)
                             if work_type:
                                 cand.work_type = work_type
@@ -1295,7 +1295,7 @@ def save_application(
             company=company,
             location=location,
             state_codes=state_codes_field(location),
-            remote_scope=_remote_scope_field(location),
+            remote_scope=_remote_scope_field(location, job_title),
             job_url=job_url,
             source=source,
             industry_tags=industry_tags_json,
@@ -1540,6 +1540,7 @@ def purge_non_matching_locations(
                 work_type=wt,
                 preferred_places=preferred_places,
                 preferred_countries=preferred_countries,
+                title=rec.job_title or "",
             ):
                 session.delete(rec)
                 deleted += 1

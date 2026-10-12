@@ -1077,6 +1077,22 @@ def run_startup_repairs(engine) -> None:
         logger.warning(
             "link status repair failed; will retry next launch", exc_info=True
         )
+    try:
+        from job_finder.models.remote_scope_title_repair import (
+            REMOTE_SCOPE_TITLE_REPAIR_VERSION,
+            repair_remote_scope_from_titles,
+        )
+
+        scoped = repair_remote_scope_from_titles(engine)
+        if scoped:
+            logger.info(
+                "remote scope title repair v%d: scoped %d row(s) from the title",
+                REMOTE_SCOPE_TITLE_REPAIR_VERSION, scoped,
+            )
+    except Exception:
+        logger.warning(
+            "remote scope title repair failed; will retry next launch", exc_info=True
+        )
 
 
 def main(argv: list[str] | None = None) -> int:
