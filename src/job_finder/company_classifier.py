@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 from job_finder.place_areas import COMMUTE_METROS, location_in_area, named_area_for
+from job_finder.remote_scope import title_remote_qualifier, title_states_remote
 
 # =========================================================================
 # Known-company lists (lowercase, normalized)
@@ -1009,6 +1010,7 @@ def location_matches_preferences(
     preferred_places: list[dict[str, Any]] | None = None,
     preferred_countries: list[str] | None = None,
     nationwide_ok: bool = True,
+    title: str = "",
 ) -> bool:
     """Check if a job location matches user preferences.
 
@@ -1029,6 +1031,10 @@ def location_matches_preferences(
 
     # Use work_type if provided, otherwise fall back to basic detection
     wt = work_type or classify_work_type(job_location, "", is_remote)
+    # Without a caller verdict, a board remote flag next to a town reads as
+    # hybrid; a title saying "Remote (US)" is the posting's own confirmation.
+    if not work_type and is_remote and wt != "remote" and title_states_remote(title):
+        wt = "remote"
 
     # Rule 1: remote_only mode — only truly remote passes
     if remote_only:
@@ -1046,6 +1052,8 @@ def location_matches_preferences(
     if wt == "remote":
         if preferred_countries:
             scope = _remote_region_scope(job_location)
+            if not scope and title:
+                scope = _remote_region_scope(title_remote_qualifier(title))
             if scope:
                 wants = {c.strip().lower() for c in preferred_countries}
                 if scope.lower() not in wants:

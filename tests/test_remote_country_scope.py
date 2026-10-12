@@ -68,3 +68,52 @@ def test_resolve_derives_us_from_us_cities():
 def test_resolve_no_scope_for_remote_only():
     result = _resolve_location_filter_preferences(["Remote"], {})
     assert result[6] == []  # no country signal → no scoping (don't over-drop)
+
+
+# ── Title-stated scope (Oct 12 2026: KD Pharma "| Remote (Europe) |" at "Bexbach") ──
+def _match_titled(loc, title, *, is_remote=True, work_type=""):
+    return location_matches_preferences(
+        loc, is_remote, preferred_states=CA, preferred_countries=US,
+        work_type=work_type, title=title,
+    )
+
+
+def test_title_region_does_not_override_a_us_location():
+    """Must-not: "Data Team Lead, EMEA" at "United States" is a US job; the
+    title names the team's market, not where the remote work may happen."""
+    from job_finder.remote_scope import classify_remote_scope
+
+    assert _match_titled("United States", "Data Team Lead, EMEA", work_type="remote") is True
+    assert _match_titled("Remote, United States", "Data Team Lead (EMEA)") is True
+    assert classify_remote_scope("United States", title="Data Team Lead, EMEA") == "us"
+
+
+@pytest.mark.parametrize("title", [
+    "European Markets Analyst",
+    "Remote - European Markets Analyst",
+    "Data Team Lead, EMEA",
+    "Remote Sensing Analyst (m/f/d)",
+])
+def test_title_words_that_are_not_a_remote_scope(title):
+    """Must-not: a region word in the job itself is not a remote qualifier."""
+    from job_finder.remote_scope import classify_remote_scope, title_remote_qualifier
+
+    assert title_remote_qualifier(title) == ""
+    assert classify_remote_scope("Remote", title=title) == ""
+    assert _match_titled("Remote", title) is True
+
+
+@pytest.mark.parametrize("title,scope", [
+    ("Business Intelligence Manager (m/f/d) | Remote (Europe) | Full-time", "intl"),
+    ("Account Executive, Remote - EMEA", "intl"),
+    ("Data Analyst (Remote, India)", "intl"),
+    ("Support Engineer (UK)", "intl"),
+    ("Product Manager | Remote (UK Based only)", "intl"),
+    ("Business Intelligence Manager | Remote (US)", "us"),
+    ("Engineer - Remote, US/Canada", "us"),
+])
+def test_title_remote_qualifier_scopes_a_silent_location(title, scope):
+    from job_finder.remote_scope import classify_remote_scope
+
+    assert classify_remote_scope("Bexbach", title=title) == scope
+    assert classify_remote_scope("", title=title) == scope
