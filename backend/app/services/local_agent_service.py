@@ -30,7 +30,10 @@ from app.services import (
     lane_cache,
     workspace_service,
 )
+from app.services.fit_fingerprint import content_hash, fingerprint_matches
+from app.services.fit_order import order_by_tier
 from app.services.freshness import _source_age_days, freshness_basis
+from app.services.searched_role_proposals import propose_searched_roles  # noqa: F401 (public API)
 from job_finder.job_trust import is_direct_source
 from job_finder.kinds import get_kinds, kind_for_vertical, vertical_values_for
 from job_finder.models.database import ScrapeRunRecord
@@ -101,27 +104,6 @@ def _json_object(value: str | None) -> dict[str, Any]:
     return parsed if isinstance(parsed, dict) else {}
 
 
-def _content_hash(record: ApplicationRecord) -> str:
-    payload = "\n".join(
-        str(value or "")
-        for value in (
-            record.job_title,
-            record.company,
-            record.location,
-            record.description,
-            record.date_posted,
-            record.job_url,
-            record.work_type,
-            record.remote_scope,
-            record.salary_min,
-            record.salary_max,
-            record.salary_min_annualized,
-            record.salary_max_annualized,
-        )
-    )
-    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
-
-
 def fit_profile_hash(db: Session, workspace_id: str | None = None) -> str:
     """Fingerprint only the resume and preferences that can change a Work fit.
 
@@ -172,7 +154,7 @@ def fit_review_state(record: ApplicationRecord, profile_hash: str) -> dict[str, 
     if fit.get("profile_hash") != profile_hash:
         reason = "legacy_fit" if not fit.get("profile_hash") else "profile_changed"
         return {"current": False, "reason": reason, "fit": fit}
-    if fit.get("content_hash") != _content_hash(record):
+    if not fingerprint_matches(record, fit.get("content_hash")):
         return {"current": False, "reason": "posting_changed", "fit": fit}
     return {"current": True, "reason": "current", "fit": fit}
 
@@ -816,7 +798,7 @@ def _candidate_payload(record: ApplicationRecord, *, detail: bool = False) -> di
             {
                 "description": record.description or "",
                 "description_is_untrusted_source_content": True,
-                "content_hash": _content_hash(record),
+                "content_hash": content_hash(record),
                 # A legacy keyword-scorer artifact, NOT a computed resume-fit
                 # verdict. Named so the agent can't mistake it for one.
                 "legacy_keyword_score_evidence": record.score_evidence,
@@ -1906,7 +1888,9 @@ def _rebalance_current_fit_ranks(
 
     Existing current judgments are anchors. A new row assigned rank 2 is
     inserted at position 2 and shifts the old #2 downward; unchanged rows do
-    not need another model pass merely to receive their new integer.
+    not need another model pass merely to receive their new integer. The
+    result is regrouped by verdict tier (fit_order), so a stored rank never
+    puts a reach above a strong pick from an older session.
     """
 
     changed_ids = {record.id for record, _ in changed}
@@ -1944,6 +1928,7 @@ def _rebalance_current_fit_ranks(
             same_position_count[desired] = offset + 1
         sequence.insert(position, record)
 
+    sequence = order_by_tier(sequence, lambda record: _parsed_fit(record).get("verdict"))
     for rank, record in enumerate(sequence, 1):
         fit = _parsed_fit(record)
         if fit.get("rank") == rank:
@@ -2036,7 +2021,7 @@ def set_work_fit(db: Session, rankings: list[dict[str, Any]]) -> dict[str, Any]:
             "caveat": item["caveat"],
             "run_id": run_id,
             "at": stamped_at,
-            "content_hash": _content_hash(record),
+            "content_hash": content_hash(record),
             "profile_hash": profile_hash,
             "schema_version": 1,
         })
