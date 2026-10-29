@@ -799,6 +799,18 @@ def _desc_has_hybrid_pattern(desc_lower: str) -> bool:
     return False
 
 
+def _location_lists_remote_option(loc_lower: str) -> bool:
+    """True when the location lists remote as one option beside other places.
+
+    Pinterest posts "San Francisco, CA, US; Remote, US": the remote segment is
+    an explicit option, so office boilerplate in the description ("In-Office
+    Requirement Statement") must not turn the role hybrid. A bare "Remote" is
+    board metadata, not a listed option, so its description still decides.
+    """
+    segments = [s.strip() for s in re.split(r"[;|\n]", loc_lower) if s.strip()]
+    return len(segments) > 1 and any(re.match(r"remote\b", s) for s in segments)
+
+
 # Explicit remote confirmations in description text. Any of these overrides
 # the "city in location -> probably hybrid" skepticism below.
 _EXPLICIT_REMOTE_DESC_RE = re.compile(
@@ -856,7 +868,12 @@ def classify_work_type(
     # Always scan description for hybrid/office signals — unless the ATS
     # reported a definitive remote flag, which outranks office chatter in
     # the description ("optional office", relocation blurbs, etc.).
-    if not has_hybrid and not has_onsite and not trusted_remote:
+    if (
+        not has_hybrid
+        and not has_onsite
+        and not trusted_remote
+        and not _location_lists_remote_option(loc_lower)
+    ):
         has_hybrid = _desc_has_hybrid_pattern(desc_lower)
 
     # Look for explicit remote confirmation in description

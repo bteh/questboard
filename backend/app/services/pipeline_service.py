@@ -392,11 +392,6 @@ def start_run(
     # desktop runs write into the one shared pool (workspace_id NULL) the
     # board reads, no matter which session started them.
     data_workspace_id = workspace_id if get_settings().hosted_mode else None
-    if config_override and isinstance(config_override.get("workspace"), dict):
-        config_override = {
-            **config_override,
-            "workspace": {**config_override["workspace"], "workspace_id": data_workspace_id},
-        }
 
     run = PipelineRun(
         run_id=run_id,
@@ -531,6 +526,14 @@ def _execute_pipeline(
         pipeline = get_pipeline(profile=run.profile)
         if llm_override is not None:
             pipeline.llm = llm_override if getattr(llm_override, "is_configured", False) else None
+        if config_override and isinstance(config_override.get("workspace"), dict):
+            # Lookups inside the pull (board companies, known URLs, purges)
+            # must hit the rows this run writes, which live in the shared
+            # NULL pool on desktop, not under the session's workspace id.
+            config_override = {
+                **config_override,
+                "workspace": {**config_override["workspace"], "workspace_id": data_workspace_id},
+            }
         if config_override:
             for key, value in config_override.items():
                 if isinstance(value, dict) and isinstance(pipeline.config.get(key), dict):

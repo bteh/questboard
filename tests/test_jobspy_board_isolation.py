@@ -300,7 +300,7 @@ def test_prolific_board_cannot_starve_other_board_or_later_roles(monkeypatch):
     # per (board, place): every role still runs once there and once in Remote.
     assert len(indeed_calls) >= len(roles)
     assert {term for _, term, _ in indeed_calls[:len(roles)]} == {
-        "data engineer",
+        "staff data engineer",
         "data engineering manager",
         "manager, analytics engineering",
     }

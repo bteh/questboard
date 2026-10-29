@@ -38,7 +38,18 @@ from job_finder.job_trust import is_direct_source
 from job_finder.kinds import get_kinds, kind_for_vertical, vertical_values_for
 from job_finder.models.database import ScrapeRunRecord
 from job_finder.tools.scrapers._utils import _strip_html
-from job_finder.title_aliases import expand_title_abbreviations
+from job_finder.role_bounds import (
+    IC_SENIORITIES,
+    LEVEL_VOCABULARY as _LEVEL_VOCABULARY,
+    ROLE_TOKEN_ALIASES as _ROLE_TOKEN_ALIASES,
+    TITLE_LEVELS,
+    ic_seniority,
+    role_tokens as _role_tokens,
+    title_bound_exclusion as _title_bound_exclusion,
+    title_level,
+    wanted_ic_seniorities as _wanted_ic_seniorities,
+    wanted_levels as _wanted_levels,
+)
 
 _WORK_KIND = "work"
 # One cap for every list the assistant hands us: saved roles, proposals, and
@@ -828,23 +839,6 @@ def clean_terms(values: list[str] | None, *, limit: int = 12) -> list[str]:
     return cleaned
 
 
-_ROLE_TOKEN_ALIASES = {
-    "architectural": "architect",
-    "engineering": "engineer",
-    "centers": "center",
-    "centres": "centre",
-    "mgr": "manager",
-    "operations": "ops",
-    "products": "product",
-    "programs": "program",
-    "projects": "project",
-    "scientist": "science",
-    "scientists": "science",
-    "stewardship": "steward",
-    "sr": "senior",
-    "jr": "junior",
-}
-_ROLE_FILLER_TOKENS = frozenset({"a", "an", "and", "of", "the"})
 # revenue/gtm: "Revenue Operations Lead", "Manager, GTM Analytics" are sales
 # operations, not data work. protection/insider: "Data Protection and Insider
 # Risk" is a security function that happens to contain the word "data".
@@ -888,15 +882,6 @@ def _conflict_scope_tokens(title: str | None) -> set[str]:
     return scope
 
 
-def _role_tokens(value: str | None) -> set[str]:
-    tokens: set[str] = set()
-    for raw in re.findall(r"[a-z0-9]+", expand_title_abbreviations(value)):
-        if raw in _ROLE_FILLER_TOKENS:
-            continue
-        tokens.add(_ROLE_TOKEN_ALIASES.get(raw, raw))
-    return tokens
-
-
 # Seniority / scaffolding words that carry no domain signal on their own. A
 # title that only shares one of these with a target role is not "in lane".
 _ROLE_GENERIC_TOKENS = frozenset({
@@ -927,20 +912,6 @@ _LEVEL_TOKENS = frozenset({
     "senior", "staff", "principal", "junior", "associate", "entry",
     "i", "ii", "iii", "iv", "v",
 })
-# Leadership levels, lowest first. A title's level is the highest one it
-# names ("Senior Vice President, Data" is vp). "officer" only counts behind
-# "chief", which is in the bucket already, so "Data Protection Officer" stays
-# an individual contributor. _role_tokens already folds "mgr" into "manager";
-# "vice president" is two words, so title_level matches it as a phrase.
-_LEVEL_VOCABULARY: tuple[tuple[str, frozenset[str]], ...] = (
-    ("lead", frozenset({"lead"})),
-    ("manager", frozenset({"manager"})),
-    ("director", frozenset({"director", "head"})),
-    ("vp", frozenset({"vp", "svp", "evp"})),
-    ("chief", frozenset({"chief", "cto", "cdo", "cio"})),
-)
-TITLE_LEVELS: tuple[str, ...] = tuple(name for name, _ in _LEVEL_VOCABULARY)
-_VICE_PRESIDENT_RE = re.compile(r"\bvice[\s-]+president\b")
 # The SQL word(s) that retrieve each level. application_service expands
 # "manager" to manager|mgr, "vp" to vp|vice president|vice-president and
 # "chief" to chief|cto|cdo|cio.
@@ -957,74 +928,9 @@ _LEADERSHIP_TOKENS = frozenset().union(*(words for _, words in _LEVEL_VOCABULARY
 }
 
 
-def title_level(title: str | None) -> str | None:
-    """The leadership level a title names (lead, manager, director, vp or
-    chief), or None for an individual-contributor title."""
-    tokens = _role_tokens(title)
-    if _VICE_PRESIDENT_RE.search(str(title or "").lower()):
-        tokens = tokens | {"vp"}
-    for level, words in reversed(_LEVEL_VOCABULARY):
-        if tokens & words:
-            return level
-    return None
-
-
-def _wanted_levels(terms: list[str]) -> set[str | None]:
-    return {title_level(term) for term in terms}
-
-
-# Individual-contributor seniorities, lowest first. "plain" is an IC title
-# with none of these words. _role_tokens folds "sr" into "senior" and "jr"
-# into "junior"; the digits catch "Data Engineer 2".
-_IC_SENIORITY_VOCABULARY: tuple[tuple[str, frozenset[str]], ...] = (
-    ("junior", frozenset({"junior", "entry", "intern", "associate", "i", "ii", "1", "2"})),
-    ("plain", frozenset()),
-    ("senior", frozenset({"senior"})),
-    ("staff", frozenset({"staff", "principal", "distinguished"})),
-)
-IC_SENIORITIES: tuple[str, ...] = tuple(name for name, _ in _IC_SENIORITY_VOCABULARY)
 # The level chips the board offers: one bucket for individual-contributor
 # rows plus every leadership level.
 LEVEL_FACETS: tuple[str, ...] = ("ic",) + TITLE_LEVELS
-
-
-def ic_seniority(title: str | None) -> str | None:
-    """The seniority an individual-contributor title names (junior, plain,
-    senior or staff), or None for a leadership title."""
-    if title_level(title) is not None:
-        return None
-    tokens = _role_tokens(title)
-    for seniority, words in reversed(_IC_SENIORITY_VOCABULARY):
-        if tokens & words:
-            return seniority
-    return "plain"
-
-
-def _wanted_ic_seniorities(terms: list[str]) -> set[str]:
-    """The IC seniorities the saved roles admit. A role with a seniority word
-    admits that seniority and above ("Staff Data Engineer" admits staff and
-    principal, not the 100 plain "Data Engineer" rows a manager once got);
-    a plain role admits every one."""
-    admitted: set[str] = set()
-    for term in terms:
-        seniority = ic_seniority(term)
-        if seniority is None:
-            continue
-        floor = 0 if seniority == "plain" else IC_SENIORITIES.index(seniority)
-        admitted.update(IC_SENIORITIES[floor:])
-    return admitted
-
-
-def _title_bound_exclusion(
-    title: str | None, wanted_levels: set[str | None], wanted_seniorities: set[str]
-) -> str | None:
-    """Which saved-role bound excludes ``title``: "level", "seniority" or None."""
-    level = title_level(title)
-    if wanted_levels and level not in wanted_levels:
-        return "level"
-    if level is None and wanted_seniorities and ic_seniority(title) not in wanted_seniorities:
-        return "seniority"
-    return None
 
 
 def _retrieval_token_groups(terms: list[str]) -> list[list[str]]:

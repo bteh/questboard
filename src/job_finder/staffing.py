@@ -20,6 +20,7 @@ STAFFING_AGENCY_NAMES: frozenset[str] = frozenset({
     "eleven recruiting",
     "express employment",
     "forward progress staffing",
+    "harnham",
     "hays",
     "insight global",
     "jobgether",

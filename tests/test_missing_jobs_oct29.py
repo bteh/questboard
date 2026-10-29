@@ -109,6 +109,14 @@ class RemoteOptionInLocationBeatsOfficeBoilerplate(unittest.TestCase):
             "hybrid",
         )
 
+    def test_bare_remote_with_weekly_office_days_stays_hybrid(self) -> None:
+        from job_finder.company_classifier import classify_work_type
+
+        self.assertEqual(
+            classify_work_type("Remote", "You will work 3 days per week in the office.", True),
+            "hybrid",
+        )
+
     def test_single_city_with_office_requirement_stays_hybrid(self) -> None:
         from job_finder.company_classifier import classify_work_type
 

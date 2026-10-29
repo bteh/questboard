@@ -136,7 +136,7 @@ def test_tech_profile_skill_keywords_still_dropped() -> None:
     }
     terms, _, _ = _build_search_terms(config)
     lowered = _lowered(terms)
-    assert "data engineer" in lowered
+    assert "lead data engineer" in lowered
     assert "data platform" in lowered
     for skill in ("rbac", "dbt", "sox compliance"):
         assert skill not in lowered, f"skill {skill!r} must not be a board query"
