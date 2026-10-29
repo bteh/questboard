@@ -49,6 +49,7 @@ from job_finder.company_classifier import (
 )
 from job_finder.company_signals import fill_funding_from_text
 from job_finder.place_areas import named_area_for, search_places
+from job_finder.role_bounds import saved_roles_reject
 from job_finder.scoring import score_job_basic, get_company_baselines, normalize_company_key
 from job_finder.scoring.dimensions import (
     _extract_level,
@@ -658,6 +659,7 @@ def _consolidate_with_provenance(
     provenance: dict[str, str] = {}
     queries, survivor_of_base = _group_roles_by_base(roles, provenance)
     queries = _merge_overlapping_bases(queries, survivor_of_base, provenance)
+    queries = _keep_bounded_roles(roles, queries, survivor_of_base, provenance)
     consolidated = _add_keyword_queries(
         queries, keywords, survivor_of_base, provenance, config,
     )
@@ -731,6 +733,40 @@ def _merge_overlapping_bases(
                 if value == old:
                     mapping[key] = new
     return merged
+
+
+def _keep_bounded_roles(
+    roles: list[str],
+    queries: list[str],
+    survivor_of_base: dict[str, str],
+    provenance: dict[str, str],
+) -> list[str]:
+    """Phase 1c: a saved role never stands under a query its own bounds hide.
+
+    Oct 29 2026: "Director of Data Engineering", "Staff Data Engineer" and
+    "Lead Data Engineer" all folded into "data engineer", whose plain IC rows
+    the board's level and seniority bounds reject (551 hidden), so no board
+    was ever asked for the leveled titles. Such a role searches under its own
+    spelling, and a query no role still points at is dropped along with the
+    base mapping that would let it absorb keywords.
+    """
+    saved = [r.strip() for r in roles if r.strip()]
+    rejected: set[str] = set()
+    for role in saved:
+        norm = _normalise_search_term(role)
+        target = provenance.get(norm, norm)
+        if target != norm and saved_roles_reject(target, saved):
+            provenance[norm] = norm
+            rejected.add(target)
+            if norm not in (_normalise_search_term(q) for q in queries):
+                queries.append(norm)
+                logger.info("Keeping '%s' as its own query: '%s' is outside its bounds", role, target)
+    still_used = set(provenance.values())
+    dropped = {t for t in rejected if t not in still_used}
+    for base, survivor in list(survivor_of_base.items()):
+        if survivor in dropped:
+            del survivor_of_base[base]
+    return [q for q in queries if _normalise_search_term(q) not in dropped]
 
 
 def _covering_query(term: str, kept: list[str]) -> str | None:
