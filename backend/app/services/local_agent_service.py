@@ -26,6 +26,7 @@ from app.models.workspace import (
 )
 from app.services import (
     agent_run_progress,
+    agent_sweep,
     application_service,
     lane_cache,
     workspace_service,
@@ -1296,8 +1297,9 @@ def _search_work_uncached(
     result_limit: int | None = None,
     browse_all: bool = False,
 ) -> dict[str, Any]:
-    # The MCP path stays compact. The human board opts into browse_all so its
-    # total and pagination describe every eligible row rather than a shortlist.
+    # Both paths gate the whole SQL candidate set, so the agent and the board
+    # agree on the lane. browse_all only changes the output: the board gets
+    # every eligible id, the MCP page stays compact (agent_sweep).
     (
         saved_terms,
         saved_location,
@@ -1362,7 +1364,7 @@ def _search_work_uncached(
         effective_freshness_window = max(1, min(int(saved_days), 365))
     effective_cap = max(1, int(result_limit)) if result_limit else _MAX_RESULTS
     page_size = max(1, min(int(page_size), effective_cap))
-    candidate_page_size = 1000 if browse_all else min(1000, max(page_size * 10, 200))
+    candidate_page_size = 1000
 
     # Saved roles retrieve as token groups, not exact phrases; a leadership
     # role widens to its whole family (see _retrieval_token_groups). The
@@ -1393,10 +1395,10 @@ def _search_work_uncached(
         verticals=["career", "work"],
     )
     rows, candidate_total = application_service.get_applications(db, **candidate_query)
-    if browse_all and candidate_total > len(rows):
-        # The old 1,000-row prefilter ceiling made the later Python title,
-        # freshness, and dedupe pass incapable of seeing the tail. Fetch the
-        # exact SQL total for the human board; the MCP shortlist stays bounded.
+    if candidate_total > len(rows):
+        # A bounded newest-first prefilter made the later Python title,
+        # freshness, and dedupe pass blind to the tail, and the agent never
+        # reviewed older in-lane rows. Fetch the exact SQL total.
         candidate_query["page_size"] = candidate_total
         rows, _ = application_service.get_applications(db, **candidate_query)
 
@@ -1577,28 +1579,14 @@ def _search_work_uncached(
             **shortlist_args,
             limit=max(matching_count, 1),
         )
-    elif needs_review_records:
-        # A static top-50 page permanently stranded row 51 onward once the
-        # first page had judgments. Retain a few current rows as global rank
-        # anchors and spend the rest of every tool page on the best unseen
-        # candidates. Repeated calls therefore resume the sweep.
-        anchor_limit = min(len(current_records), min(10, page_size // 5))
-        anchors = _select_work_shortlist(
-            current_records,
-            **shortlist_args,
-            limit=max(anchor_limit, 1),
-        )[:anchor_limit]
-        unseen = _select_work_shortlist(
-            needs_review_records,
-            **shortlist_args,
-            limit=max(page_size - len(anchors), 1),
-        )[: page_size - len(anchors)]
-        rows = anchors + unseen
     else:
-        rows = _select_work_shortlist(
+        rows = agent_sweep.sweep_page(
+            needs_review_records,
             current_records,
-            **shortlist_args,
-            limit=page_size,
+            page_size=page_size,
+            select=lambda records, limit: _select_work_shortlist(
+                records, **shortlist_args, limit=limit
+            )[:limit],
         )
     results: list[dict[str, Any]] = []
     reviewed_current = 0

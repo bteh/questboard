@@ -44,6 +44,11 @@ _ALNUM_RE = re.compile(r"[^a-z0-9]")
 # "alo" (3) may match "aloyoga"; "ge" (2) may never match "genentech".
 _MIN_PREFIX_LEN = 3
 
+# The shortest key allowed to suffix-match a longer one, so an ATS slug with a
+# brand prefix ("gohighlevel", "thinkahead") finds the display name. Five is
+# the floor that keeps "box"/"dropbox" and "snap"/"unsnap" apart.
+_MIN_SUFFIX_LEN = 5
+
 # Statuses a repair or auto-merge may collapse as duplicate losers. Anything
 # else (clipped, applied, interviewing, ...) records user work and always
 # survives its cluster.
@@ -123,16 +128,18 @@ def companies_match(key_a: str, key_b: str) -> bool:
 
     Exact match, or a guarded prefix match: aggregators shorten brand names
     ("ALO" for "Aloyoga"), so one key may be a prefix of the other as long as
-    the shorter side has at least _MIN_PREFIX_LEN characters. Combined with
-    the title and location gates this stays safe; on its own a prefix match
-    would be far too eager.
+    the shorter side has at least _MIN_PREFIX_LEN characters. A suffix match
+    needs _MIN_SUFFIX_LEN. Combined with the title and location gates this
+    stays safe; on its own either match would be far too eager.
     """
     if not key_a or not key_b:
         return False
     if key_a == key_b:
         return True
     shorter, longer = sorted((key_a, key_b), key=len)
-    return len(shorter) >= _MIN_PREFIX_LEN and longer.startswith(shorter)
+    if len(shorter) >= _MIN_PREFIX_LEN and longer.startswith(shorter):
+        return True
+    return len(shorter) >= _MIN_SUFFIX_LEN and longer.endswith(shorter)
 
 
 def city_token(location: str) -> str:

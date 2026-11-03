@@ -623,6 +623,21 @@ def source_category_condition(model, source_category: str):
     return source_predicate
 
 
+def live_row_condition(model):
+    """Rows that still belong on the board: the one tombstone test for every surface.
+
+    url_status dead/expired is a link or source verdict. status "expired" is
+    the cross-source dedupe loser (pipeline_service._auto_deduplicate and the
+    cross_source_dedup repair); the link checker can later read its URL as
+    alive, so url_status alone resurrected 8 duplicates on the Nov 3 2026
+    board (Carrot vs Carrotfertility, Hadrian vs Hadrian Automation).
+    """
+    return and_(
+        model.url_status.notin_(("dead", "expired")),
+        func.coalesce(model.status, "") != "expired",
+    )
+
+
 def publishable_source_condition(model):
     """Exclude sources explicitly registered as research, never content.
 
@@ -799,7 +814,7 @@ def get_applications(
         # Hide only CONFIRMED-dead postings; unknown/alive/never-checked stay.
         # expired rows (source stopped listing them) hide with the dead ones;
         # include_dead=true still surfaces both tombstone shapes
-        query = query.filter(ApplicationRecord.url_status.notin_(("dead", "expired")))
+        query = query.filter(live_row_condition(ApplicationRecord))
     if upcoming_only:
         # Drop quests whose taping/session already happened. NULL event_start
         # (career rows, rolling signups) always passes: "no date" is not
@@ -916,7 +931,7 @@ def live_rows_by_source(db: Session) -> dict[str, int]:
     rows = (
         db.query(ApplicationRecord.source, func.count(ApplicationRecord.id))
         .filter(ApplicationRecord.vertical.in_(("career", "work")))
-        .filter(ApplicationRecord.url_status.notin_(("dead", "expired")))
+        .filter(live_row_condition(ApplicationRecord))
         .group_by(ApplicationRecord.source)
         .all()
     )
@@ -1058,9 +1073,15 @@ def check_urls(
     from threading import Lock
     from urllib.parse import parse_qs, quote, unquote, urlparse
 
-    query = db.query(ApplicationRecord).filter(ApplicationRecord.job_url.isnot(None))
+    # A dedupe tombstone is never re-checked: an alive stamp would not bring
+    # it back (live_row_condition), and its url_status should keep the verdict.
+    query = (
+        db.query(ApplicationRecord)
+        .filter(ApplicationRecord.job_url.isnot(None))
+        .filter(func.coalesce(ApplicationRecord.status, "") != "expired")
+    )
     if live_only:
-        query = query.filter(ApplicationRecord.url_status.notin_(("dead", "expired")))
+        query = query.filter(live_row_condition(ApplicationRecord))
     if workspace_id:
         query = query.filter(ApplicationRecord.workspace_id == workspace_id)
     if search_run_id:
