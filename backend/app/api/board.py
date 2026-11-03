@@ -24,6 +24,7 @@ from app.services import workspace_service
 from app.services.application_service import (
     board_filter_conditions,
     found_window_condition,
+    live_row_condition,
     publishable_source_condition,
     time_sensitive_stale,
 )
@@ -89,8 +90,8 @@ def board_summary(
         .filter(ApplicationRecord.vertical != "personal")
         .filter(publishable_source_condition(ApplicationRecord))
         # dead = the link 404s; expired = the source stopped listing it
-        # (job_finder.expiry). Both are tombstones, both stay off the board.
-        .filter(ApplicationRecord.url_status.notin_(("dead", "expired")))
+        # (job_finder.expiry); status expired = a dedupe loser. All stay off.
+        .filter(live_row_condition(ApplicationRecord))
         # same upcoming semantics as the board list: a taping that already
         # happened is off the board, rows with no event date pass
         .filter(

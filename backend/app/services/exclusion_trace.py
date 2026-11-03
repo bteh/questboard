@@ -93,6 +93,7 @@ _SQL_COLUMNS: tuple[str, ...] = (
     "date_posted",
     "date_confidence",
     "url_status",
+    "status",
     "vertical",
 )
 
@@ -484,15 +485,13 @@ def _run_stage(stage, applied, one_row, db, row_data, filters, verticals, source
         )
 
     if stage == "dead_link":
-        # The exact production predicate from get_applications(exclude_dead=True):
-        # ApplicationRecord.url_status.notin_(("dead", "expired")).
-        cond = ApplicationRecord.url_status.notin_(("dead", "expired"))
+        cond = application_service.live_row_condition(ApplicationRecord)
         ok = one_row.passes(cond)
         return StageResult(
             stage, ok,
-            "link is not dead/expired" if ok
-            else f"url_status={row_data.get('url_status')!r} is dead/expired",
-            {"row_url_status": row_data.get("url_status")},
+            "row is not a tombstone" if ok
+            else f"url_status={row_data.get('url_status')!r} status={row_data.get('status')!r} is a tombstone",
+            {"row_url_status": row_data.get("url_status"), "row_status": row_data.get("status")},
         )
 
     if stage == "title_match":

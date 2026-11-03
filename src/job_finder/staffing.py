@@ -27,6 +27,7 @@ STAFFING_AGENCY_NAMES: frozenset[str] = frozenset({
     "jobot",
     "kelly services",
     "kforce",
+    "ladders",
     "manpowergroup",
     "michael page",
     "modis",
