@@ -16,7 +16,17 @@ export interface RefreshReceiptCopy {
 export type RefreshReceiptLike = Pick<
   CareerRefreshReceipt,
   'status' | 'jobs_found' | 'new_jobs' | 'error' | 'source_coverage'
->;
+> & { completed_at?: string | null };
+
+/* "2:14 PM" in the viewer's locale and zone. Without it every receipt read
+   the same after every run (Nov 5 2026). Bad or missing input gives null so
+   the sentence just drops the time. */
+export function receiptClock(completedAt: string | null | undefined): string | null {
+  if (!completedAt) return null;
+  const when = new Date(completedAt);
+  if (Number.isNaN(when.getTime())) return null;
+  return when.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
 
 export function receiptFromRunResult(result: RunResult): RefreshReceiptLike {
   return {
@@ -115,11 +125,13 @@ export function refreshReceiptCopy(receipt: RefreshReceiptLike): RefreshReceiptC
 
   const coverage = receipt.source_coverage;
   const newJobs = Math.max(0, receipt.new_jobs || 0);
+  const clock = receiptClock(receipt.completed_at);
+  const updated = clock ? `Board updated ${clock}` : 'Board updated';
   if (!coverage || coverage.total === 0) {
     return {
       text:
         newJobs > 0
-          ? `Board updated with ${jobsLabel(newJobs)}, but source coverage could not be verified.`
+          ? `${updated} with ${jobsLabel(newJobs)}, but source coverage could not be verified.`
           : 'Refresh finished, but source coverage could not be verified. This is not an all-clear.',
       tone: 'warn',
       provesNoNewJobs: false,
@@ -139,20 +151,20 @@ export function refreshReceiptCopy(receipt: RefreshReceiptLike): RefreshReceiptC
   }
   if (newJobs === 0) {
     return {
-      text: `No new jobs found. ${coverage.total} sources checked successfully.`,
+      text: `No new jobs found${clock ? ` as of ${clock}` : ''}. ${coverage.total} sources checked successfully.`,
       tone: 'quiet',
       provesNoNewJobs: true,
     };
   }
   if (!complete) {
     return {
-      text: `Board updated with ${jobsLabel(newJobs)}. ${coverageText}; ${problemSources(coverage)}.`,
+      text: `${updated} with ${jobsLabel(newJobs)}. ${coverageText}; ${problemSources(coverage)}.`,
       tone: 'warn',
       provesNoNewJobs: false,
     };
   }
   return {
-    text: `Board updated with ${jobsLabel(newJobs)}. ${coverageText}.`,
+    text: `${updated} with ${jobsLabel(newJobs)}. ${coverageText}.`,
     tone: 'good',
     provesNoNewJobs: false,
   };

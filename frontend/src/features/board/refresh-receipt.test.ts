@@ -174,4 +174,32 @@ describe('refresh-aware new-since line', () => {
     ).toBe('No jobs added since your last visit');
     expect(completeSourceCoverage(complete)).toBe(true);
   });
+
+  // Nov 5 2026: "Board updated with 3 new jobs" read the same after every
+  // run, so Brian could not tell a fresh board from a stale one. The persisted
+  // receipt names when it finished.
+  it('names the finish time when the receipt has one', () => {
+    const copy = refreshReceiptCopy({
+      status: 'completed',
+      jobs_found: 40,
+      new_jobs: 3,
+      error: null,
+      source_coverage: complete,
+      completed_at: '2026-11-05T22:14:00Z',
+    });
+    expect(copy.text).toMatch(/\b\d{1,2}:\d{2}\b/);
+    expect(copy.text).toContain('3 new jobs');
+  });
+
+  it('leaves the time out when the receipt has none', () => {
+    const copy = refreshReceiptCopy({
+      status: 'completed',
+      jobs_found: 40,
+      new_jobs: 3,
+      error: null,
+      source_coverage: complete,
+      completed_at: null,
+    });
+    expect(copy.text).not.toMatch(/\b\d{1,2}:\d{2}\b/);
+  });
 });

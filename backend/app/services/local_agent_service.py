@@ -39,9 +39,11 @@ from job_finder.job_trust import is_direct_source
 from job_finder.kinds import get_kinds, kind_for_vertical, vertical_values_for
 from job_finder.models.database import ScrapeRunRecord
 from job_finder.tools.scrapers._utils import _strip_html
+from job_finder.title_aliases import expand_title_abbreviations as _expand_title_abbreviations
 from job_finder.role_bounds import (
     IC_SENIORITIES,
     LEVEL_VOCABULARY as _LEVEL_VOCABULARY,
+    ROLE_FILLER_TOKENS as _ROLE_FILLER_TOKENS,
     ROLE_TOKEN_ALIASES as _ROLE_TOKEN_ALIASES,
     TITLE_LEVELS,
     ic_seniority,
@@ -843,10 +845,12 @@ def clean_terms(values: list[str] | None, *, limit: int = 12) -> list[str]:
 # revenue/gtm: "Revenue Operations Lead", "Manager, GTM Analytics" are sales
 # operations, not data work. protection/insider: "Data Protection and Insider
 # Risk" is a security function that happens to contain the word "data".
+# board: "Independent Board Director (ML-Driven Product & Data Platform
+# Leader)" (Nov 5 2026) is a governance seat, not a job on the data team.
 _OCCUPATION_CONFLICT_TOKENS = frozenset(
     {
         "center", "centre", "clinical", "product", "program", "project", "science",
-        "revenue", "gtm", "protection", "insider",
+        "revenue", "gtm", "protection", "insider", "board",
     }
 )
 # "Data Center/Centre" poisons the word "data" itself (facilities work), so
@@ -970,13 +974,67 @@ def _retrieval_token_groups(terms: list[str]) -> list[list[str]]:
     return groups
 
 
-def _shares_lane_anchor(query_tokens: set[str], title_tokens: set[str]) -> bool:
+# Profession words every business function also attaches to itself. Shared
+# alone, one counts only when it is the title's whole discipline: "Sr.
+# Manager, Compensation Analytics & Intelligence", "Senior Manager - Credit
+# Card Pricing & Profitability Analytics" and "Strategy & Analytics Manager"
+# shared just "analytics" with "Analytics Engineering Manager" (Nov 5 2026);
+# the unshared qualifier says whose analytics it is. A qualifier the user's
+# saved roles name still counts: "Manager, Business Analytics" stays for a
+# lane that saves "Manager, Business Intelligence" (Sep 22 2026).
+_WEAK_LANE_ANCHOR_TOKENS = frozenset({"analytics"})
+
+
+def _shares_lane_anchor(
+    query_tokens: set[str],
+    title_tokens: set[str],
+    role_scope: set[str],
+    lane_vocabulary: set[str],
+) -> bool:
     """Adjacent match: the title shares a domain word that names a
-    profession ("data", "analytics", "marketing"), or shares at least two
-    domain words. One context word alone ("operations", "business", "ai") is
-    not enough."""
+    profession ("data", "marketing"), or shares at least two domain words.
+    One context word alone ("operations", "business", "ai") is not enough,
+    and a weak anchor alone ("analytics") needs every other word in the
+    title's role segment to be one the saved roles name."""
     shared = (query_tokens - _ROLE_GENERIC_TOKENS) & title_tokens
-    return bool(shared - _LANE_CONTEXT_TOKENS) or len(shared) >= 2
+    if len(shared) >= 2:
+        return True
+    if shared - _LANE_CONTEXT_TOKENS - _WEAK_LANE_ANCHOR_TOKENS:
+        return True
+    if shared & _WEAK_LANE_ANCHOR_TOKENS:
+        return not (role_scope - _ROLE_GENERIC_TOKENS - lane_vocabulary)
+    return False
+
+
+def _domain_sequence(value: str | None) -> list[str]:
+    tokens = re.findall(r"[a-z0-9]+", _expand_title_abbreviations(value))
+    folded = (_ROLE_TOKEN_ALIASES.get(tok, tok) for tok in tokens)
+    return [
+        tok for tok in folded if tok not in _ROLE_FILLER_TOKENS and tok not in _ROLE_GENERIC_TOKENS
+    ]
+
+
+def _contains_run(haystack: list[str], needle: list[str]) -> bool:
+    width = len(needle)
+    return any(haystack[i : i + width] == needle for i in range(len(haystack) - width + 1))
+
+
+def _licensed_conflicts(query: str, query_tokens: set[str], title: str | None) -> set[str]:
+    """Occupation words a saved role licenses in this title.
+
+    A role licenses its occupation words only in the sense it uses them,
+    so the title must carry the role's whole domain phrase. "Manager, Data
+    Products" names products as the thing managed: it licenses "Product
+    Manager, Data Products" but not "Technical Product Manager, Data
+    Platform" (Nov 5 2026), where product is the occupation.
+    """
+    conflicts = query_tokens & _OCCUPATION_CONFLICT_TOKENS
+    if not conflicts:
+        return set()
+    phrase = _domain_sequence(query)
+    if phrase and _contains_run(_domain_sequence(title), phrase):
+        return conflicts
+    return set()
 
 
 def _title_is_in_lane(title: str | None, queries: list[str]) -> bool:
@@ -995,20 +1053,21 @@ def _title_is_in_lane(title: str | None, queries: list[str]) -> bool:
     title_tokens = _role_tokens(title)
     if not title_tokens:
         return False
+    role_scope = _conflict_scope_tokens(title)
     title_conflicts = (title_tokens & _GLOBAL_CONFLICT_TOKENS) | (
-        _conflict_scope_tokens(title) & _OCCUPATION_CONFLICT_TOKENS
+        role_scope & _OCCUPATION_CONFLICT_TOKENS
     )
+    lane_vocabulary = set().union(*(_role_tokens(query) for query in queries))
     for query in queries:
         query_tokens = _role_tokens(query)
         if not query_tokens:
             continue
-        query_conflicts = query_tokens & _OCCUPATION_CONFLICT_TOKENS
-        if title_conflicts - query_conflicts:
+        if title_conflicts - _licensed_conflicts(query, query_tokens, title):
             continue
         # primary: the whole role family is present
         if query_tokens.issubset(title_tokens):
             return True
-        if _shares_lane_anchor(query_tokens, title_tokens):
+        if _shares_lane_anchor(query_tokens, title_tokens, role_scope, lane_vocabulary):
             return True
     return False
 
