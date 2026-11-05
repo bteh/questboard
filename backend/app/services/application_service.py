@@ -1071,7 +1071,7 @@ def check_urls(
     """
     import requests as req
     from threading import Lock
-    from urllib.parse import parse_qs, quote, unquote, urlparse
+    from urllib.parse import quote, unquote, urlparse
 
     # A dedupe tombstone is never re-checked: an alive stamp would not bring
     # it back (live_row_condition), and its url_status should keep the verdict.
@@ -1099,7 +1099,7 @@ def check_urls(
     # remain unknown. 403/405/429/5xx are usually bot-blocks or
     # HEAD-not-supported, and timeouts/connection errors are transient, none
     # of those should mark a live job dead (that would hide good postings).
-    from job_finder.closed_pages import closed_page, needs_body
+    from job_finder.closed_pages import closed_page, dead_redirect, needs_body
     from job_finder.host_pacing import HostPacer
 
     pacer = HostPacer()
@@ -1121,25 +1121,8 @@ def check_urls(
         return any(host == suffix or host.endswith(f".{suffix}") for suffix in suffixes)
 
     def _dead_redirect(requested_url: str, response) -> bool:
-        final_url = str(getattr(response, "url", "") or requested_url)
-        requested = urlparse(requested_url)
-        final = urlparse(final_url)
-        query_values = {
-            key.casefold(): [str(value).casefold() for value in values]
-            for key, values in parse_qs(final.query).items()
-        }
-        if "true" in query_values.get("error", []):
-            return True
-        requested_host = (requested.hostname or "").casefold()
-        final_host = (final.hostname or "").casefold()
-        if (
-            _host_matches(requested_host, ("greenhouse.io",))
-            and _host_matches(final_host, ("greenhouse.io",))
-            and "/jobs/" in requested.path.casefold()
-            and "/jobs/" not in final.path.casefold()
-        ):
-            return True
-        return False
+        final_url = getattr(response, "url", "")
+        return dead_redirect(requested_url, final_url if isinstance(final_url, str) else "")
 
     def _get_page_status(url: str, inspect_content: bool) -> str:
         """Read only the beginning of a page, enough for closed-job banners."""

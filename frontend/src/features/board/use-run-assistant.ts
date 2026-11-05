@@ -1,14 +1,17 @@
 /* Runs the user's local Claude on the find_and_rank task: it reads the
    resume, refines roles, pulls the same fresh postings the plain button
    pulls, then ranks them. On success the posters and applications refetch so
-   verdicts land and ranked rows float first. The assistant's raw completion
-   summary stays out of the UI: it can contain role proposals and internal
-   review notes that do not belong in a success toast. A superset of the plain
+   verdicts land and ranked rows float first, and a fixed success toast says
+   so (Nov 5 2026: a silent reload looked identical to a stale board). The
+   assistant's raw completion summary stays out of the UI: it can contain
+   role proposals and internal review notes that do not belong in a toast. A superset of the plain
    pull, which is why the work lane keeps just one button. */
 
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRunAgent } from '@/hooks/use-agent-clients';
+
+export const ASSISTANT_DONE = 'Board updated. Ranked jobs are at the top.';
 
 export interface RunAssistant {
   start: () => void;
@@ -37,6 +40,7 @@ export function useRunAssistant(): RunAssistant {
             toast.error(data.error || 'The run did not finish. Try again.');
             return;
           }
+          toast.success(ASSISTANT_DONE);
         },
         onError: (err) => {
           void queryClient.invalidateQueries({ queryKey: ['profile-work'] });

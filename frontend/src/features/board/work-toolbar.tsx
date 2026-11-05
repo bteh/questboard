@@ -105,6 +105,9 @@ function RunStatusLine({ persistedReceipt }: { persistedReceipt?: CareerRefreshR
   // A running clock so the wait shows life, plus a toast on the running->done
   // transition so you know it finished even if you'd tabbed away.
   const [elapsed, setElapsed] = useState(0);
+  // RunResult carries no timestamp, so the line keeps the moment it saw the
+  // run finish and names it like a persisted receipt would.
+  const [finishedAt, setFinishedAt] = useState<string | null>(null);
   const prevState = useRef(state);
   useEffect(() => {
     if (state !== 'running') return;
@@ -113,8 +116,10 @@ function RunStatusLine({ persistedReceipt }: { persistedReceipt?: CareerRefreshR
   }, [state]);
   useEffect(() => {
     if (prevState.current === 'running' && state === 'completed') {
+      const now = new Date().toISOString();
+      setFinishedAt(now);
       if (result) {
-        const copy = refreshReceiptCopy(receiptFromRunResult(result));
+        const copy = refreshReceiptCopy({ ...receiptFromRunResult(result), completed_at: now });
         if (copy.tone === 'warn') toast.warning(copy.text);
         else toast.success(copy.text);
       }
@@ -167,7 +172,7 @@ function RunStatusLine({ persistedReceipt }: { persistedReceipt?: CareerRefreshR
   }
 
   if (state === 'completed' && result) {
-    const copy = refreshReceiptCopy(receiptFromRunResult(result));
+    const copy = refreshReceiptCopy({ ...receiptFromRunResult(result), completed_at: finishedAt });
     return (
       <p className="qb-workline qb-receipt" data-tone={copy.tone} role="status">
         {copy.text}
@@ -352,10 +357,9 @@ export function WorkToolbar({
           )}
         </span>
       </div>
-      {/* The assistant run has no SSE line of its own. Its inline progress
-          clears after completion and the refreshed ranking is the result.
-          Only a plain pull owns RunStatusLine, so its stale "N new" cannot
-          reappear under a rank. */}
+      {/* The assistant run has no SSE line of its own. When it finishes,
+          useRunAssistant toasts "Board updated" and the line falls back to
+          the persisted receipt, which names its finish time. */}
       {lastRun === 'assistant' && assistant.isPending ? (
         <AssistantRunLine />
       ) : (

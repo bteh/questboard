@@ -57,7 +57,23 @@ describe('useRunAssistant', () => {
 
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['profile-work'] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['applications'] });
-    expect(mocks.success).not.toHaveBeenCalled();
+    for (const call of mocks.success.mock.calls) {
+      expect(String(call[0])).not.toContain('Proposed adding');
+    }
+  });
+
+  // Nov 5 2026: Brian could not tell when an assistant run had finished; the
+  // success path reloaded the board silently, so the board before and after
+  // looked the same. A plain pull toasts on completion; so must this run.
+  it('says the board was updated when the run succeeds', () => {
+    const { rendered } = setup();
+
+    act(() => rendered.result.current.start());
+    const callbacks = mocks.mutate.mock.calls[0][1] as RunCallbacks;
+    act(() => callbacks.onSuccess({ ok: true, result: 'internal notes' }));
+
+    expect(mocks.success).toHaveBeenCalledTimes(1);
+    expect(String(mocks.success.mock.calls[0][0])).toMatch(/board updated/i);
   });
 
   it('still reports a failed run', () => {

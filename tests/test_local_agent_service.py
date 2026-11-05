@@ -977,3 +977,67 @@ def test_set_work_fit_does_not_wipe_prior_when_no_ids_match(local_agent_db) -> N
     assert out["applied"] == 0
     assert 999999 in out["missing_opportunity_ids"]
     assert json.loads(db.query(ApplicationRecord).get(ids[0]).agent_fit_json)["verdict"] == "strong"
+
+
+BRIAN_ROLES_NOV5 = [
+    "Data Engineering Manager",
+    "Senior Data Engineering Manager",
+    "Manager, Data Platform",
+    "Director of Data Engineering",
+    "Analytics Engineering Manager",
+    "Manager, Data Products",
+    "Engineering Manager, Data Infrastructure",
+    "Manager, AI Data Enablement",
+    "Lead Data Engineer",
+    "Staff Data Engineer",
+]
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        # Nov 5 2026, Brian's top 20: business-function analytics shares only
+        # "analytics" + a seniority word with "Analytics Engineering Manager".
+        "Sr. Manager, Compensation Analytics & Intelligence",
+        "Senior Manager - Credit Card Pricing & Profitability Analytics",
+        "Strategy & Analytics Manager",
+        # "Manager, Data Products" names products as the thing managed; it is
+        # not a request for Product Manager roles.
+        "Technical Product Manager, Data Platform",
+        # A governance seat, not a job on the data team.
+        "Independent Board Director (ML-Driven Product & Data Platform Leader)",
+    ],
+)
+def test_title_lane_drops_nov5_leaks_for_data_engineering_leaders(title: str) -> None:
+    from app.services.local_agent_service import _title_is_in_lane
+
+    assert not _title_is_in_lane(title, BRIAN_ROLES_NOV5)
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "Manager, Data Engineering",
+        "Director, Analytics Engineering",
+        "Engineering Manager, Data Streaming",
+        "Director, Data Platform",
+        "Lead, Data Governance",
+        "Manager, Data & Analytics",
+        "Head of Data Platform",
+        "Product Manager, Data Products",
+    ],
+)
+def test_title_lane_keeps_real_data_leadership_titles(title: str) -> None:
+    from app.services.local_agent_service import _title_is_in_lane
+
+    assert _title_is_in_lane(title, BRIAN_ROLES_NOV5)
+
+
+def test_weak_analytics_anchor_keeps_titles_whose_whole_discipline_is_analytics() -> None:
+    from app.services.local_agent_service import _title_is_in_lane
+
+    q = ["Analytics Engineering Manager"]
+    assert _title_is_in_lane("Senior Analytics Manager", q)
+    assert _title_is_in_lane("Head of Analytics", q)
+    # Nov 5 2026: the unshared qualifier makes it another function's analytics.
+    assert not _title_is_in_lane("People Analytics Manager", q)
