@@ -9,6 +9,11 @@ const mocks = vi.hoisted(() => ({
   mutate: vi.fn(),
   success: vi.fn(),
   error: vi.fn(),
+  activate: vi.fn(),
+}));
+
+vi.mock('@/contexts/search-context', () => ({
+  useSearchContext: () => ({ activate: mocks.activate, state: 'idle' }),
 }));
 
 vi.mock('sonner', () => ({
@@ -22,7 +27,12 @@ vi.mock('@/hooks/use-agent-clients', () => ({
 import { useRunAssistant } from './use-run-assistant';
 
 interface RunCallbacks {
-  onSuccess: (data: { ok: boolean; result?: string; error?: string }) => void;
+  onSuccess: (data: {
+    ok: boolean;
+    result?: string;
+    error?: string;
+    pull_run_id?: string | null;
+  }) => void;
   onError: (error: Error) => void;
 }
 
@@ -39,6 +49,7 @@ beforeEach(() => {
   mocks.mutate.mockReset();
   mocks.success.mockReset();
   mocks.error.mockReset();
+  mocks.activate.mockReset();
 });
 
 describe('useRunAssistant', () => {
@@ -74,6 +85,23 @@ describe('useRunAssistant', () => {
 
     expect(mocks.success).toHaveBeenCalledTimes(1);
     expect(String(mocks.success.mock.calls[0][0])).toMatch(/board updated/i);
+  });
+
+  // Nov 11 2026: the run ranked and returned at 17:49 while the pull it
+  // started kept going until 17:51. "Board updated" fired two minutes before
+  // the new jobs landed. A pull still in flight goes to the shared search
+  // runner, whose completion toast names the real finish and new-job count.
+  it('hands an unfinished pull to the search runner instead of saying done', () => {
+    const { rendered } = setup();
+
+    act(() => rendered.result.current.start());
+    const callbacks = mocks.mutate.mock.calls[0][1] as RunCallbacks;
+    act(() => callbacks.onSuccess({ ok: true, result: 'ranked', pull_run_id: 'pull1' }));
+
+    expect(mocks.activate.mock.calls[0]?.slice(0, 2)).toEqual(['pull1', 'search_only']);
+    for (const call of mocks.success.mock.calls) {
+      expect(String(call[0])).not.toMatch(/board updated/i);
+    }
   });
 
   it('still reports a failed run', () => {

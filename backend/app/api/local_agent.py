@@ -34,6 +34,7 @@ from app.services import (
     agent_run_progress,
     local_agent_service,
     resume_consent,
+    workspace_service,
 )
 
 router = APIRouter(prefix="/agent", tags=["agent"])
@@ -184,8 +185,8 @@ def run_agent(payload: AgentRunRequest, db: Session = Depends(get_db)) -> AgentR
     if task is None:
         raise HTTPException(status_code=400, detail=f"Unknown task: {payload.task}")
 
+    workspace = local_agent_service.resolve_local_workspace(db)
     if task["needs_resume"]:
-        workspace = local_agent_service.resolve_local_workspace(db)
         if workspace is None:
             raise HTTPException(status_code=400, detail="Upload a resume first so your assistant has something to match.")
         if not resume_consent.is_granted(workspace.id):
@@ -204,7 +205,10 @@ def run_agent(payload: AgentRunRequest, db: Session = Depends(get_db)) -> AgentR
         raise HTTPException(status_code=400, detail=str(exc))
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc))
-    return AgentRunResponse(**outcome)
+    # The prompt ranks while its pull runs, so the run can return mid-pull.
+    # Hand that pull back so the board follows it to completion.
+    active = workspace_service.get_active_search_run(db, workspace.id) if workspace else None
+    return AgentRunResponse(**outcome, pull_run_id=active.run_id if active else None)
 
 
 @router.post("/intent", response_model=AgentIntentResponse)

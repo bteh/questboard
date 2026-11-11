@@ -2,6 +2,7 @@ import { createContext, useContext, useCallback, useEffect, useRef, useState, ty
 import { useQueryClient } from '@tanstack/react-query';
 import { sseUrl, streamSse } from '@/lib/api-client';
 import { getRunStatus } from '@/api/search';
+import { classifyRunStatus, startRunReconcile, type ReconcileHandle, type ReconcileOutcome } from '@/contexts/reconcile-run';
 import { useWorkspace } from '@/contexts/workspace-context';
 import type { RunResult, SearchRequest, ProgressUpdate, SearchRunSnapshot } from '@/types/search';
 
@@ -17,7 +18,7 @@ interface SearchContextValue {
   progress: ProgressUpdate | null;
   snapshot: SearchRunSnapshot | null;
   /** Called after the backend returns a run_id from POST /search/run */
-  activate: (runId: string, mode: SearchRequest['mode'], snapshot: SearchRunSnapshot) => void;
+  activate: (runId: string, mode: SearchRequest['mode'], snapshot?: SearchRunSnapshot | null) => void;
   reset: () => void;
 }
 
@@ -59,7 +60,7 @@ export function SearchProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const activate = useCallback((id: string, m: SearchRequest['mode'], runSnapshot: SearchRunSnapshot) => {
+  const activate = useCallback((id: string, m: SearchRequest['mode'], runSnapshot: SearchRunSnapshot | null = null) => {
     cleanup();
     setRunId(id);
     setMode(m);
@@ -211,56 +212,75 @@ export function SearchProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    es.onerror = () => {
-      if (es.readyState === EventSource.CLOSED) {
-        esRef.current = null;
-        // The stream dropped, but the run almost always finished server-side
-        // (a scrape completes even if the SSE didn't deliver 'complete', e.g.
-        // the backend restarted). Reconcile with the real run status before
-        // ever declaring failure, and keep polling briefly if it's still going.
-        const cancelled = false;
-        (async () => {
-          for (let i = 0; i < 30 && !cancelled; i++) {
-            try {
-              const s = await getRunStatus(runId);
-              if (s.status === 'completed') {
-                setResult({
-                  run_id: runId,
-                  status: 'completed',
-                  jobs_found: s.jobs_found ?? 0,
-                  new_jobs: s.new_jobs ?? 0,
-                  jobs_scored: s.jobs_scored ?? 0,
-                  strong_matches: 0,
-                  duration_seconds: 0,
-                  error: null,
-                  source_coverage: s.source_coverage ?? null,
-                });
-                setState('completed');
-                queryClient.invalidateQueries({ queryKey: ['applications'] });
-                queryClient.invalidateQueries({ queryKey: ['profile-work'] });
-                queryClient.invalidateQueries({ queryKey: ['board-summary'] });
-                return;
-              }
-              if (s.status === 'failed') {
-                setError(s.error || 'The run failed');
-                setState('failed');
-                return;
-              }
-            } catch {
-              // status not readable yet — retry
-            }
-            await new Promise((r) => setTimeout(r, 3000));
-          }
-          // Gave up after ~90s with no terminal status.
-          setState((prev) => (prev === 'running' ? 'failed' : prev));
-          setError((prev) => prev || 'Lost contact with the run. Your board may still have updated');
-        })();
+    let reconcile: ReconcileHandle | null = null;
+
+    const applyOutcome = (outcome: ReconcileOutcome) => {
+      if (outcome.kind === 'cancelled') return;
+      if (outcome.kind === 'completed') {
+        const s = outcome.status;
+        setResult({
+          run_id: runId,
+          status: 'completed',
+          jobs_found: s.jobs_found ?? 0,
+          new_jobs: s.new_jobs ?? 0,
+          jobs_scored: s.jobs_scored ?? 0,
+          strong_matches: 0,
+          duration_seconds: 0,
+          error: null,
+          source_coverage: s.source_coverage ?? null,
+        });
+        setState('completed');
+        queryClient.invalidateQueries({ queryKey: ['applications'] });
+        queryClient.invalidateQueries({ queryKey: ['profile-work'] });
+        queryClient.invalidateQueries({ queryKey: ['board-summary'] });
+        return;
       }
-      // readyState === CONNECTING means EventSource is auto-reconnecting
-      // — don't interfere, let it retry.
+      if (outcome.kind === 'failed') {
+        setError(outcome.error);
+        setState('failed');
+        return;
+      }
+      setState((prev) => (prev === 'running' ? 'failed' : prev));
+      setError((prev) => prev || 'Lost contact with the run. Your board may still have updated');
     };
 
+    es.onerror = () => {
+      if (es.readyState !== EventSource.CLOSED || reconcile) return;
+      esRef.current = null;
+      // The stream dropped (a minimized desktop window lets macOS suspend the
+      // webview), but the run almost always keeps going server-side. Follow the
+      // real run status until it is terminal instead of guessing from silence.
+      reconcile = startRunReconcile(runId, getRunStatus);
+      void reconcile.done.then(applyOutcome);
+    };
+
+    // Timers in a hidden webview are throttled, so check the run as soon as the
+    // window is back instead of waiting out a sleeping poll.
+    let disposed = false;
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (reconcile) {
+        reconcile.poke();
+        return;
+      }
+      void getRunStatus(runId)
+        .then((s) => {
+          const outcome = classifyRunStatus(s);
+          if (disposed || reconcile || !outcome) return;
+          es.close();
+          esRef.current = null;
+          applyOutcome(outcome);
+        })
+        .catch(() => {});
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+
     return () => {
+      disposed = true;
+      reconcile?.cancel();
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
       es.close();
       esRef.current = null;
     };

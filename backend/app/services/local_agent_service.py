@@ -680,54 +680,55 @@ def resume_for_matching(
     }
 
 
+def _concrete_places(preferences, *, require_jurisdiction: bool = False) -> list[str]:
+    return [
+        item.label
+        for item in preferences.preferred_places
+        if item.label.strip().lower() not in {"remote", "anywhere"}
+        and (
+            not require_jurisdiction
+            or item.country_code or item.country or item.city or item.region
+        )
+    ]
+
+
+def _sibling_places(db: Session, workspace_id: str) -> list[str]:
+    # Local browser sessions historically created duplicate workspaces.
+    # If the current one says only "Remote" (no country), recover the
+    # last concrete jurisdictions saved alongside the exact same resume.
+    current_resume = (
+        db.query(WorkspaceResume)
+        .filter(WorkspaceResume.workspace_id == workspace_id)
+        .first()
+    )
+    if not current_resume or not current_resume.file_sha256:
+        return []
+    sibling_ids = [
+        row.workspace_id
+        for row in db.query(WorkspaceResume)
+        .filter(
+            WorkspaceResume.file_sha256 == current_resume.file_sha256,
+            WorkspaceResume.workspace_id != workspace_id,
+        )
+        .order_by(WorkspaceResume.updated_at.desc())
+        .all()
+    ]
+    for sibling_id in sibling_ids:
+        sibling = workspace_service.get_workspace_preferences(db, sibling_id)
+        places = _concrete_places(sibling, require_jurisdiction=True)
+        if places:
+            return places
+    return []
+
+
 def _saved_search_defaults(
     db: Session, workspace_id: str | None = None
-) -> tuple[list[str], str, str, int, float | None, float]:
+) -> tuple[list[str], list[str], str, int, float | None, float]:
     workspace = resolve_local_workspace(db, workspace_id)
     if workspace is None:
-        return [], "", "remote_friendly", 14, None, 1.0
+        return [], [], "remote_friendly", 14, None, 1.0
     preferences = workspace_service.get_workspace_preferences(db, workspace.id)
-    place = next(
-        (
-            item.label
-            for item in preferences.preferred_places
-            if item.label.strip().lower() not in {"remote", "anywhere"}
-        ),
-        "",
-    )
-    if not place:
-        # Local browser sessions historically created duplicate workspaces.
-        # If the current one says only "Remote" (no country), recover the
-        # last concrete jurisdiction saved alongside the exact same resume.
-        current_resume = (
-            db.query(WorkspaceResume)
-            .filter(WorkspaceResume.workspace_id == workspace.id)
-            .first()
-        )
-        if current_resume and current_resume.file_sha256:
-            sibling_ids = [
-                row.workspace_id
-                for row in db.query(WorkspaceResume)
-                .filter(
-                    WorkspaceResume.file_sha256 == current_resume.file_sha256,
-                    WorkspaceResume.workspace_id != workspace.id,
-                )
-                .order_by(WorkspaceResume.updated_at.desc())
-                .all()
-            ]
-            for sibling_id in sibling_ids:
-                sibling = workspace_service.get_workspace_preferences(db, sibling_id)
-                place = next(
-                    (
-                        item.label
-                        for item in sibling.preferred_places
-                        if item.label.strip().lower() not in {"remote", "anywhere"}
-                        and (item.country_code or item.country or item.city or item.region)
-                    ),
-                    "",
-                )
-                if place:
-                    break
+    places = _concrete_places(preferences) or _sibling_places(db, workspace.id)
     floor = preferences.compensation.min_acceptable_tc or preferences.compensation.min_base
     # Saved minimum means minimum. Role-match strictness may change recall,
     # but it must not lower this number behind the user's back.
@@ -737,7 +738,7 @@ def _saved_search_defaults(
         role_queries.append(preferences.current_title)
     return (
         role_queries,
-        place,
+        places,
         preferences.workplace_preference,
         preferences.max_days_old,
         floor,
@@ -746,9 +747,10 @@ def _saved_search_defaults(
 
 
 def saved_place(db: Session, workspace_id: str | None = None) -> str:
-    """The local user's saved place label ('' when none), for sources that
-    search near home."""
-    return _saved_search_defaults(db, workspace_id)[1]
+    """The local user's first saved place label ('' when none), for sources
+    that search near home."""
+    places = _saved_search_defaults(db, workspace_id)[1]
+    return places[0] if places else ""
 
 
 def _clean_excerpt(text: str | None, limit: int = _EXCERPT_CHARS) -> str:
@@ -1361,7 +1363,7 @@ def _search_work_uncached(
     # every eligible id, the MCP page stays compact (agent_sweep).
     (
         saved_terms,
-        saved_location,
+        saved_places,
         saved_workplace,
         saved_days,
         saved_floor,
@@ -1398,9 +1400,11 @@ def _search_work_uncached(
     if wanted_levels == {None} and not terms_are_saved_roles:
         wanted_levels = set()
     wanted_seniorities = _wanted_ic_seniorities(terms) if terms_are_saved_roles else set()
-    effective_location = " ".join(location.split())[:120] or (
-        saved_location if use_saved_preferences else ""
-    )
+    explicit_location = " ".join(location.split())[:120]
+    if explicit_location:
+        effective_places = [explicit_location]
+    else:
+        effective_places = list(saved_places) if use_saved_preferences else []
     effective_workplace = (
         saved_workplace if workplace_preference == "saved" else workplace_preference
     )
@@ -1437,9 +1441,9 @@ def _search_work_uncached(
         # ordinary exact-title matches consumed every shortlist slot.
         founding_only=founding_only,
         exclude_staffing_agencies=exclude_staffing_agencies,
-        location=effective_location or None,
+        location=effective_places or None,
         location_strict=bool(
-            effective_location and effective_workplace == "location_only"
+            effective_places and effective_workplace == "location_only"
         ),
         salary_min=effective_floor,
         salary_currency=effective_currency or None,
@@ -1683,7 +1687,7 @@ def _search_work_uncached(
         "needs_review_in_shortlist": shortlist_needs_review,
         "candidate_queries": terms,
         "filters_applied": {
-            "location": effective_location or None,
+            "location": " · ".join(effective_places) or None,
             "workplace_preference": effective_workplace,
             "compensation_floor": requested_floor,
             "effective_compensation_floor": effective_floor,

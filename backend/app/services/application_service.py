@@ -339,7 +339,9 @@ def _nationwide_us_match(model):
     return or_(*[padded.like(f"%;{term};%") for term in _US_COUNTRY_TERMS])
 
 
-def place_filter(model, location: str | None, location_strict: bool = False):
+def place_filter(
+    model, location: str | list[str] | None, location_strict: bool = False
+):
     """The board's reachability filter as one condition, or None when unset.
 
     A place filter narrows to quests you can actually reach; it must never
@@ -356,42 +358,17 @@ def place_filter(model, location: str | None, location_strict: bool = False):
     West Virginia), and the UPPERCASE abbreviation as a whole word
     (case-sensitive, so prose "in" is never Indiana). A typed city or free
     text keeps a plain location substring match.
-    """
-    if not location:
-        return None
-    from job_finder.us_states import STATE_TO_ABBR, state_aliases
 
-    area = area_for(location)
-    aliases = state_aliases(location)
-    # A US city or state means US-nationwide postings ("United States" with no
-    # city) are reachable for this seeker.
-    seeker_is_us = bool(area or aliases) or _looks_like_us_place(location)
-    if area:
-        # "Los Angeles" also finds Beverly Hills / Santa Monica, and
-        # "San Gabriel Valley (626)" finds Arcadia / El Monte: the seeker
-        # means the area, not only rows that name it (job_finder.place_areas).
-        place_match = _area_place_match(model, area)
-    elif aliases:
-        full_name, abbr = aliases
-        token_match = model.state_codes.like(f"%,{abbr},%")
-        padded = _word_padded_location(model)
-        name_match = padded.ilike(f"% {full_name}%")
-        longer_names = [
-            name for name in STATE_TO_ABBR if name != full_name and full_name in name
-        ]
-        if longer_names:
-            name_match = and_(
-                name_match,
-                *(~func.lower(model.location).like(f"%{name}%") for name in longer_names),
-            )
-        # length-vs-replace is the portable case-sensitive containment test:
-        # SQLite LIKE ignores ASCII case, replace() never does.
-        abbr_match = func.length(padded) != func.length(
-            func.replace(padded, f" {abbr} ", "")
-        )
-        place_match = or_(token_match, name_match, abbr_match)
-    else:
-        place_match = model.location.ilike(f"%{location.strip()}%")
+    A list of places is reachable from ANY of them: a seeker saving Los
+    Angeles and New York sees onsite roles in both, never Chicago.
+    """
+    places = [location] if isinstance(location, str) else list(location or [])
+    places = [place for place in places if place and place.strip()]
+    if not places:
+        return None
+    matches = [_place_match(model, place) for place in places]
+    place_match = or_(*(match for match, _ in matches))
+    seeker_is_us = any(is_us for _, is_us in matches)
     if location_strict:
         # "near me only": keep only rows that actually match the place, so
         # the filter visibly bites. Remote and placeless supply drop.
@@ -426,6 +403,45 @@ def place_filter(model, location: str | None, location_strict: bool = False):
     if seeker_is_us:
         reachable.append(_nationwide_us_match(model))
     return or_(*reachable)
+
+
+def _place_match(model, location: str):
+    """One place's own match condition, plus whether it is a US place (which
+    makes US-nationwide postings reachable)."""
+    from job_finder.us_states import STATE_TO_ABBR, state_aliases
+
+    area = area_for(location)
+    aliases = state_aliases(location)
+    # A US city or state means US-nationwide postings ("United States" with no
+    # city) are reachable for this seeker.
+    seeker_is_us = bool(area or aliases) or _looks_like_us_place(location)
+    if area:
+        # "Los Angeles" also finds Beverly Hills / Santa Monica, and
+        # "San Gabriel Valley (626)" finds Arcadia / El Monte: the seeker
+        # means the area, not only rows that name it (job_finder.place_areas).
+        place_match = _area_place_match(model, area)
+    elif aliases:
+        full_name, abbr = aliases
+        token_match = model.state_codes.like(f"%,{abbr},%")
+        padded = _word_padded_location(model)
+        name_match = padded.ilike(f"% {full_name}%")
+        longer_names = [
+            name for name in STATE_TO_ABBR if name != full_name and full_name in name
+        ]
+        if longer_names:
+            name_match = and_(
+                name_match,
+                *(~func.lower(model.location).like(f"%{name}%") for name in longer_names),
+            )
+        # length-vs-replace is the portable case-sensitive containment test:
+        # SQLite LIKE ignores ASCII case, replace() never does.
+        abbr_match = func.length(padded) != func.length(
+            func.replace(padded, f" {abbr} ", "")
+        )
+        place_match = or_(token_match, name_match, abbr_match)
+    else:
+        place_match = model.location.ilike(f"%{location.strip()}%")
+    return place_match, seeker_is_us
 
 
 def founding_role_condition(model):
@@ -468,7 +484,7 @@ def board_filter_conditions(
     model,
     *,
     search: str | None = None,
-    location: str | None = None,
+    location: str | list[str] | None = None,
     location_strict: bool = False,
     salary_min: float | None = None,
     salary_max: float | None = None,
@@ -686,7 +702,7 @@ def get_applications(
     founding_only: bool = False,
     exclude_staffing_agencies: bool = False,
     work_type: str | None = None,
-    location: str | None = None,
+    location: str | list[str] | None = None,
     location_strict: bool = False,
     facet: str | None = None,
     salary_min: float | None = None,

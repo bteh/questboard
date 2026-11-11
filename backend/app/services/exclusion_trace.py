@@ -426,10 +426,11 @@ def _run_stage(stage, applied, one_row, db, row_data, filters, verticals, source
         if cond is None:
             return StageResult(stage, True, "no location filter set", applied=False)
         ok = one_row.passes(cond)
+        shown = loc if isinstance(loc, str) else " · ".join(loc)
         return StageResult(
             stage, ok,
             "reachable from your place" if ok
-            else f"location {row_data.get('location')!r} not reachable from {loc!r}"
+            else f"location {row_data.get('location')!r} not reachable from {shown!r}"
                  + (" (near-me only)" if strict else ""),
             {"filter_location": loc, "location_strict": strict,
              "row_location": row_data.get("location"),
@@ -577,22 +578,22 @@ def saved_filters(
 ) -> dict[str, Any]:
     """Build the filters dict from the user's saved workspace preferences.
 
-    Uses the real local_agent_service._saved_search_defaults (roles, place,
+    Uses the real local_agent_service._saved_search_defaults (roles, places,
     workplace, max_days_old, floor). Falls back to a minimal raw read if the
     ORM preferences load fails (e.g. a schema migration in flight), so the CLI
     still reflects the person's real place/floor/roles.
     """
     try:
-        roles, place, workplace, days, floor = local_agent_service._saved_search_defaults(
+        roles, places, workplace, days, floor, _ = local_agent_service._saved_search_defaults(
             db, workspace_id
         )
     except Exception:
-        roles, place, workplace, days, floor = _saved_defaults_fallback(db, workspace_id)
+        roles, places, workplace, days, floor = _saved_defaults_fallback(db, workspace_id)
 
     window = max(1, min(int(days or 30), 365))
     filters: dict[str, Any] = {
-        "location": place or None,
-        "location_strict": bool(place) and workplace == "location_only",
+        "location": list(places) or None,
+        "location_strict": bool(places) and workplace == "location_only",
         "salary_min": floor,
         "salary_max": None,
         "is_remote": True if workplace == "remote_only" else None,
@@ -613,7 +614,7 @@ def saved_filters(
 
 def _saved_defaults_fallback(
     db: Session, workspace_id: str | None
-) -> tuple[list[str], str, str, int, float | None]:
+) -> tuple[list[str], list[str], str, int, float | None]:
     """Read only the columns that exist, so schema drift can't crash defaults."""
     import json
 
@@ -621,7 +622,7 @@ def _saved_defaults_fallback(
 
     ws = local_agent_service.resolve_local_workspace(db, workspace_id)
     if ws is None:
-        return [], "", "remote_friendly", 30, None
+        return [], [], "remote_friendly", 30, None
     row = db.execute(
         text(
             "SELECT roles_json, preferred_places_json, workplace_preference, "
@@ -631,7 +632,7 @@ def _saved_defaults_fallback(
         {"w": ws.id},
     ).mappings().first()
     if row is None:
-        return [], "", "remote_friendly", 30, None
+        return [], [], "remote_friendly", 30, None
 
     def _loads(value):
         try:
@@ -639,17 +640,16 @@ def _saved_defaults_fallback(
         except (TypeError, ValueError):
             return []
 
-    places = _loads(row["preferred_places_json"])
-    place = ""
-    for item in places:
-        label = (item.get("label") or "").strip()
-        if label and label.lower() not in {"remote", "anywhere"}:
-            place = label
-            break
+    places = [
+        label
+        for item in _loads(row["preferred_places_json"])
+        if (label := (item.get("label") or "").strip())
+        and label.lower() not in {"remote", "anywhere"}
+    ]
     roles = [str(r) for r in _loads(row["roles_json"]) if str(r).strip()]
     if not roles and (row["current_title"] or "").strip():
         roles = [row["current_title"].strip()]
     floor = row["min_base"] or row["min_acceptable_tc"]
     days = int(row["max_days_old"] or 30)
     workplace = row["workplace_preference"] or "remote_friendly"
-    return roles, place, workplace, days, floor
+    return roles, places, workplace, days, floor
