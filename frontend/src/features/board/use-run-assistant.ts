@@ -3,12 +3,16 @@
    pulls, then ranks them. On success the posters and applications refetch so
    verdicts land and ranked rows float first, and a fixed success toast says
    so (Nov 5 2026: a silent reload looked identical to a stale board). The
+   run ranks while its pull runs, so it can return mid-pull; that pull goes to
+   the shared search runner, whose own toast fires when the jobs land
+   (Nov 11 2026: "Board updated" fired two minutes early). The
    assistant's raw completion summary stays out of the UI: it can contain
    role proposals and internal review notes that do not belong in a toast. A superset of the plain
    pull, which is why the work lane keeps just one button. */
 
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
+import { useSearchContext } from '@/contexts/search-context';
 import { useRunAgent } from '@/hooks/use-agent-clients';
 
 export const ASSISTANT_DONE = 'Board updated. Ranked jobs are at the top.';
@@ -21,6 +25,7 @@ export interface RunAssistant {
 export function useRunAssistant(): RunAssistant {
   const run = useRunAgent();
   const queryClient = useQueryClient();
+  const { activate } = useSearchContext();
 
   function start() {
     if (run.isPending) return;
@@ -38,6 +43,10 @@ export function useRunAssistant(): RunAssistant {
           // separates a real ranking from a failed run.
           if (!data.ok) {
             toast.error(data.error || 'The run did not finish. Try again.');
+            return;
+          }
+          if (data.pull_run_id) {
+            activate(data.pull_run_id, 'search_only');
             return;
           }
           toast.success(ASSISTANT_DONE);

@@ -26,6 +26,7 @@ export interface AgentRunResult {
   error: string;
   cost_usd: number | null;
   num_turns: number | null;
+  pull_run_id?: string | null;
 }
 
 export type ResumeAnalysisStatus = 'completed' | 'skipped_no_llm' | 'failed' | 'analysis_error' | 'quota_exhausted';

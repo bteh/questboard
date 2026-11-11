@@ -357,9 +357,11 @@ export function WorkToolbar({
           )}
         </span>
       </div>
-      {/* The assistant run has no SSE line of its own. When it finishes,
-          useRunAssistant toasts "Board updated" and the line falls back to
-          the persisted receipt, which names its finish time. */}
+      {/* The assistant run has no SSE line of its own. If its pull is still
+          going when it returns, useRunAssistant hands that pull to the search
+          runner and this line follows it to the real finish. Otherwise it
+          toasts "Board updated" and the line falls back to the persisted
+          receipt, which names its finish time. */}
       {lastRun === 'assistant' && assistant.isPending ? (
         <AssistantRunLine />
       ) : (

@@ -530,10 +530,10 @@ def test_remote_only_profile_recovers_jurisdiction_from_the_same_resume(
     )
     local_agent_db.commit()
 
-    _, location, _, _, _, _ = local_agent_service._saved_search_defaults(
+    _, places, _, _, _, _ = local_agent_service._saved_search_defaults(
         local_agent_db, "configured"
     )
-    assert location == "Los Angeles, CA"
+    assert places == ["Los Angeles, CA"]
 
 
 def test_work_search_collapses_cross_source_title_duplicates(local_agent_db) -> None:
@@ -1041,3 +1041,101 @@ def test_weak_analytics_anchor_keeps_titles_whose_whole_discipline_is_analytics(
     assert _title_is_in_lane("Head of Analytics", q)
     # Nov 5 2026: the unshared qualifier makes it another function's analytics.
     assert not _title_is_in_lane("People Analytics Manager", q)
+
+
+# Nov 11 2026: Brian saved two places (Los Angeles, then New York). Find Work
+# filtered on the first one only, so Garner Health's live "Manager,
+# Engineering (Data Platform)" in NYC, and 264 other NYC rows already on the
+# board, never showed. Every saved place counts; a city on neither list still
+# stays out.
+def _save_la_and_ny(db) -> None:
+    from app.models.workspace import WorkspacePreferences
+
+    prefs = (
+        db.query(WorkspacePreferences)
+        .filter(WorkspacePreferences.workspace_id == "configured")
+        .one()
+    )
+    prefs.preferred_places_json = json.dumps(
+        [
+            {
+                "label": "Los Angeles, CA",
+                "kind": "city",
+                "match_scope": "city",
+                "city": "Los Angeles",
+                "region": "California",
+                "country": "United States",
+                "country_code": "US",
+            },
+            {
+                "label": "New York, United States",
+                "kind": "region",
+                "match_scope": "region",
+                "city": "",
+                "region": "New York",
+                "country": "United States",
+                "country_code": "US",
+            },
+        ]
+    )
+    db.commit()
+
+
+def _onsite_row(title: str, company: str, location: str, state: str):
+    from job_finder.models.database import ApplicationRecord
+
+    now = datetime.now(timezone.utc)
+    return ApplicationRecord(
+        job_title=title,
+        company=company,
+        location=location,
+        state_codes=f",{state},",
+        remote_scope="us",
+        is_remote=False,
+        work_type="onsite",
+        job_url=f"https://{company.lower().replace(' ', '')}.example/jobs/1",
+        source="Greenhouse",
+        description="Lead the data platform team.",
+        vertical="career",
+        date_posted=now.isoformat(),
+        date_confidence="exact",
+        date_found=now,
+        last_seen_at=now,
+    )
+
+
+@pytest.mark.parametrize("browse_all", [False, True])
+def test_work_search_honors_every_saved_place(local_agent_db, browse_all) -> None:
+    from app.services import local_agent_service
+    from job_finder.models.database import ApplicationRecord
+
+    _save_la_and_ny(local_agent_db)
+    local_agent_db.add_all(
+        [
+            _onsite_row(
+                "Manager, Engineering (Data Platform)",
+                "Garner Health",
+                "New York City, New York",
+                "NY",
+            ),
+            _onsite_row("Data Engineering Manager", "Chicago Co", "Chicago, IL", "IL"),
+        ]
+    )
+    local_agent_db.commit()
+
+    payload = local_agent_service.search_work(
+        local_agent_db,
+        queries=["Data Engineering"],
+        page_size=50,
+        browse_all=browse_all,
+    )
+    ids = [row["opportunity_id"] for row in payload["results"]]
+    orgs = {
+        row.company
+        for row in local_agent_db.query(ApplicationRecord)
+        .filter(ApplicationRecord.id.in_(ids))
+        .all()
+    }
+    assert "Local Co" in orgs
+    assert "Garner Health" in orgs
+    assert "Chicago Co" not in orgs

@@ -58,6 +58,7 @@ class AgentRunResponse(BaseModel):
     error: str = ""
     cost_usd: float | None = None
     num_turns: int | None = None
+    pull_run_id: str | None = None
 
 
 class AgentIntentRequest(BaseModel):
