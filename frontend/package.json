@@ -1,7 +1,7 @@
 {
   "name": "@questboard/frontend",
   "private": true,
-  "version": "0.2.25",
+  "version": "0.2.26",
   "description": "Questboard web frontend: React + TanStack Router + Tailwind",
   "license": "MIT",
   "type": "module",
