@@ -1139,3 +1139,35 @@ def test_work_search_honors_every_saved_place(local_agent_db, browse_all) -> Non
     assert "Local Co" in orgs
     assert "Garner Health" in orgs
     assert "Chicago Co" not in orgs
+
+
+# Nov 12 2026: Supabase "Engineering Manager - Pipelines" (a data replication
+# team) has no "data" in the title, so the board's title prefilter never
+# retrieved it for a "Data Engineering" search. See test_title_pipelines_is_data.
+@pytest.mark.parametrize("browse_all", [False, True])
+def test_work_search_finds_the_supabase_pipelines_manager(local_agent_db, browse_all) -> None:
+    from app.services import local_agent_service
+    from job_finder.models.database import ApplicationRecord
+
+    row = _onsite_row("Engineering Manager - Pipelines", "Supabase", "Remote, Global", "")
+    row.state_codes = None
+    row.remote_scope = "global"
+    row.is_remote = True
+    row.work_type = "remote"
+    local_agent_db.add(row)
+    local_agent_db.commit()
+
+    payload = local_agent_service.search_work(
+        local_agent_db,
+        queries=["Data Engineering Manager"],
+        page_size=50,
+        browse_all=browse_all,
+    )
+    ids = [r["opportunity_id"] for r in payload["results"]]
+    orgs = {
+        r.company
+        for r in local_agent_db.query(ApplicationRecord)
+        .filter(ApplicationRecord.id.in_(ids))
+        .all()
+    }
+    assert "Supabase" in orgs

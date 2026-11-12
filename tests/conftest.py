@@ -62,3 +62,20 @@ def _no_background_scheduler(monkeypatch):
     sources. Scheduler tests opt back in explicitly.
     """
     monkeypatch.setenv("SCHEDULER_ENABLED", "false")
+
+
+@pytest.fixture(autouse=True)
+def _no_live_board_name_probes(request, tmp_path, monkeypatch):
+    """Unresolved board companies get probed on each ATS; no test may hit those hosts.
+
+    The stub answers None (no status), so nothing is remembered. Tests that want
+    an answer patch probe_status themselves. test_board_probe exercises the real
+    probe_status over mocked HTTP, so it keeps it. The ATS cache dir moves to a
+    temp dir so a found board never lands in the source tree's dev cache.
+    """
+    from job_finder.tools.scrapers import _ats_discovery, _board_probe
+
+    monkeypatch.setattr(_ats_discovery, "_CACHE_DIR", tmp_path / "ats-cache")
+    if request.module.__name__.rsplit(".", 1)[-1] != "test_board_probe":
+        monkeypatch.setattr(_board_probe, "probe_status", lambda host: lambda slug: None)
+    yield
